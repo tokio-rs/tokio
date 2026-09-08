@@ -1,5 +1,8 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", tokio_unstable, not(target_os = "wasi"),))]
+#![cfg(all(feature = "full", not(target_os = "wasi"),))]
+
+use std::sync::Arc;
+use std::thread;
 
 use tokio::runtime::{self, Runtime};
 
@@ -16,6 +19,36 @@ fn worker_index_current_thread() {
 }
 
 #[test]
+fn worker_index_current_thread_concurrent_block_on() {
+    let rt = Arc::new(
+        runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap(),
+    );
+    let (entered_tx, entered_rx) = std::sync::mpsc::sync_channel(1);
+    let (release_tx, release_rx) = tokio::sync::oneshot::channel();
+
+    let owner_rt = rt.clone();
+    let owner = thread::spawn(move || {
+        owner_rt.block_on(async {
+            entered_tx.send(()).unwrap();
+            release_rx.await.unwrap();
+            runtime::worker_index()
+        })
+    });
+
+    entered_rx.recv().unwrap();
+
+    let other_rt = rt.clone();
+    let other = thread::spawn(move || other_rt.block_on(async { runtime::worker_index() }));
+
+    assert_eq!(other.join().unwrap(), None);
+    release_tx.send(()).unwrap();
+    assert_eq!(owner.join().unwrap(), Some(0));
+}
+
+#[test]
 fn worker_index_local_runtime() {
     let rt = runtime::LocalRuntime::new().unwrap();
     rt.block_on(async {
@@ -29,7 +62,7 @@ fn worker_index_outside_runtime() {
     assert_eq!(runtime::worker_index(), None);
 }
 
-#[cfg(target_has_atomic = "64")]
+#[cfg(all(tokio_unstable, target_has_atomic = "64"))]
 #[test]
 fn worker_index_matches_metrics_worker_thread_id() {
     let rt = runtime::Builder::new_multi_thread()
