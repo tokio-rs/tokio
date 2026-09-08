@@ -142,7 +142,7 @@ use std::future::Future;
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release, SeqCst};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::task::{ready, Context, Poll, Waker};
 
 /// Sending-half of the [`broadcast`] channel.
@@ -408,16 +408,15 @@ struct Slot<T> {
     ///
     /// When this goes to zero, the value is released.
     ///
-    /// An atomic is used as it is mutated concurrently with the slot read lock
-    /// acquired.
-    rem: AtomicUsize,
+    /// Access is protected by the slot mutex.
+    rem: usize,
 
     /// Uniquely identifies the `send` stored in the slot.
     pos: u64,
 
     /// The value being broadcast.
     ///
-    /// The value is set by `send` when the write lock is held. When a reader
+    /// The value is set by `send` while the slot mutex is held. When a reader
     /// drops, `rem` is decremented. When it hits zero, the value is dropped.
     val: Option<T>,
 }
@@ -584,7 +583,7 @@ impl<T> Sender<T> {
 
         let buffer = (0..capacity).map(|i| {
             Mutex::new(Slot {
-                rem: AtomicUsize::new(0),
+                rem: 0,
                 pos: (i as u64).wrapping_sub(capacity as u64),
                 val: None,
             })
@@ -680,7 +679,7 @@ impl<T> Sender<T> {
         slot.pos = pos;
 
         // Set remaining receivers
-        slot.rem.with_mut(|v| *v = rem);
+        slot.rem = rem;
 
         // Write the value
         slot.val = Some(value);
@@ -782,7 +781,7 @@ impl<T> Sender<T> {
         while low < high {
             let mid = low + (high - low) / 2;
             let idx = base_idx.wrapping_add(mid) & self.shared.mask;
-            if self.shared.buffer[idx].lock().rem.load(SeqCst) == 0 {
+            if self.shared.buffer[idx].lock().rem == 0 {
                 low = mid + 1;
             } else {
                 high = mid;
@@ -824,7 +823,7 @@ impl<T> Sender<T> {
         let tail = self.shared.tail.lock();
 
         let idx = (tail.pos.wrapping_sub(1) & self.shared.mask as u64) as usize;
-        self.shared.buffer[idx].lock().rem.load(SeqCst) == 0
+        self.shared.buffer[idx].lock().rem == 0
     }
 
     /// Returns the number of active receivers.
@@ -1750,7 +1749,8 @@ impl<'a, T> RecvGuard<'a, T> {
 impl<'a, T> Drop for RecvGuard<'a, T> {
     fn drop(&mut self) {
         // Decrement the remaining counter
-        if 1 == self.slot.rem.fetch_sub(1, SeqCst) {
+        self.slot.rem -= 1;
+        if self.slot.rem == 0 {
             self.slot.val = None;
         }
     }
