@@ -6,7 +6,7 @@
 
 use crate::{
     task::coop,
-    time::{error::Elapsed, safe_delay, Duration, Instant, Sleep},
+    time::{error::Elapsed, Duration, Instant, Sleep},
     util::trace,
 };
 
@@ -87,9 +87,12 @@ pub fn timeout<F>(duration: Duration, future: F) -> Timeout<F::IntoFuture>
 where
     F: IntoFuture,
 {
-    let deadline = Instant::now() + safe_delay(duration);
-    let delay = Sleep::new_timeout(deadline, trace::caller_location());
-    Timeout::new_with_delay(future.into_future(), delay)
+    Timeout {
+        value: future.into_future(),
+        delay: Instant::now()
+            .checked_add(duration)
+            .map(|deadline| Sleep::new_timeout(deadline, trace::caller_location())),
+    }
 }
 
 /// Requires a `Future` to complete before the specified instant in time.
@@ -160,8 +163,10 @@ pub fn timeout_at<F>(deadline: Instant, future: F) -> Timeout<F::IntoFuture>
 where
     F: IntoFuture,
 {
-    let delay = Sleep::new_timeout(deadline, trace::caller_location());
-    Timeout::new_with_delay(future.into_future(), delay)
+    Timeout {
+        value: future.into_future(),
+        delay: Some(Sleep::new_timeout(deadline, trace::caller_location())),
+    }
 }
 
 pin_project! {
@@ -172,15 +177,11 @@ pin_project! {
         #[pin]
         value: T,
         #[pin]
-        delay: Sleep,
+        delay: Option<Sleep>,
     }
 }
 
 impl<T> Timeout<T> {
-    pub(crate) fn new_with_delay(value: T, delay: Sleep) -> Timeout<T> {
-        Timeout { value, delay }
-    }
-
     /// Gets a reference to the underlying value in this timeout.
     pub fn get_ref(&self) -> &T {
         &self.value
@@ -213,7 +214,10 @@ where
             return Poll::Ready(Ok(v));
         }
 
-        poll_delay(had_budget_before, me.delay, cx).map(Err)
+        match me.delay.as_pin_mut() {
+            Some(delay) => poll_delay(had_budget_before, delay, cx).map(Err),
+            None => Poll::Pending,
+        }
     }
 }
 
