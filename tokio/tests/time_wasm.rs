@@ -1,5 +1,9 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(target_arch = "wasm32", not(target_os = "wasi")))]
+#![cfg(all(
+    target_arch = "wasm32",
+    not(target_os = "wasi"),
+    not(target_os = "emscripten")
+))]
 
 use wasm_bindgen_test::wasm_bindgen_test;
 

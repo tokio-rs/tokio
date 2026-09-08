@@ -214,8 +214,8 @@ impl ScheduledIo {
 
             let new_tick = match tick_op {
                 // Trying to clear readiness with an old event!
-                Tick::Clear(t) if tick as u8 != t => return None,
-                Tick::Clear(t) => t as usize,
+                Tick::Clear(t) if tick != usize::from(t) => return None,
+                Tick::Clear(t) => usize::from(t),
                 Tick::Set => tick.wrapping_add(1) % MAX_TICK,
             };
             let ready = Ready::from_usize(READINESS.unpack(curr));
@@ -289,7 +289,7 @@ impl ScheduledIo {
         let curr = self.readiness.load(Acquire);
 
         ReadyEvent {
-            tick: TICK.unpack(curr) as u8,
+            tick: TICK.unpack(curr) as u16,
             ready: interest.mask() & Ready::from_usize(READINESS.unpack(curr)),
             is_shutdown: SHUTDOWN.unpack(curr) != 0,
         }
@@ -332,7 +332,7 @@ impl ScheduledIo {
             let is_shutdown = SHUTDOWN.unpack(curr) != 0;
             if is_shutdown {
                 Poll::Ready(ReadyEvent {
-                    tick: TICK.unpack(curr) as u8,
+                    tick: TICK.unpack(curr) as u16,
                     ready: direction.mask(),
                     is_shutdown,
                 })
@@ -340,14 +340,14 @@ impl ScheduledIo {
                 Poll::Pending
             } else {
                 Poll::Ready(ReadyEvent {
-                    tick: TICK.unpack(curr) as u8,
+                    tick: TICK.unpack(curr) as u16,
                     ready,
                     is_shutdown,
                 })
             }
         } else {
             Poll::Ready(ReadyEvent {
-                tick: TICK.unpack(curr) as u8,
+                tick: TICK.unpack(curr) as u16,
                 ready,
                 is_shutdown,
             })
@@ -452,7 +452,7 @@ impl Future for Readiness<'_> {
 
                     if !ready.is_empty() || is_shutdown {
                         // Currently ready!
-                        let tick = TICK.unpack(curr) as u8;
+                        let tick = TICK.unpack(curr) as u16;
                         *state = State::Done;
                         return Poll::Ready(ReadyEvent {
                             tick,
@@ -476,7 +476,7 @@ impl Future for Readiness<'_> {
 
                     if !ready.is_empty() || is_shutdown {
                         // Currently ready!
-                        let tick = TICK.unpack(curr) as u8;
+                        let tick = TICK.unpack(curr) as u16;
                         *state = State::Done;
                         return Poll::Ready(ReadyEvent {
                             tick,
@@ -539,7 +539,7 @@ impl Future for Readiness<'_> {
                     // The returned tick might be newer than the event
                     // which notified our waker. This is ok because the future
                     // still didn't return `Poll::Ready`.
-                    let tick = TICK.unpack(curr) as u8;
+                    let tick = TICK.unpack(curr) as u16;
 
                     // Safety: We don't need to acquire the lock here because
                     //   1. `State::Done`` means `waiter` is no longer shared,
@@ -578,3 +578,23 @@ impl Drop for Readiness<'_> {
 
 unsafe impl Send for Readiness<'_> {}
 unsafe impl Sync for Readiness<'_> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stale_event_does_not_clear_readiness_after_u8_wraparound() {
+        let io = ScheduledIo::default();
+        io.set_readiness(Tick::Set, |curr| curr | Ready::READABLE);
+        let event = io.ready_event(Interest::READABLE);
+
+        for _ in 0..=u8::MAX {
+            io.set_readiness(Tick::Set, |curr| curr | Ready::READABLE);
+        }
+
+        io.clear_readiness(event);
+
+        assert!(io.ready_event(Interest::READABLE).ready.is_readable());
+    }
+}

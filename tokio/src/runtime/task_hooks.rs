@@ -1,6 +1,6 @@
 use super::Config;
 use std::marker::PhantomData;
-#[cfg(feature = "schedule-latency")]
+#[cfg(all(tokio_unstable, feature = "schedule-latency"))]
 use std::time::Duration;
 
 impl TaskHooks {
@@ -65,7 +65,7 @@ pub struct TaskMeta<'a> {
     #[cfg_attr(not(tokio_unstable), allow(unreachable_pub, dead_code))]
     pub(crate) spawned_at: crate::runtime::task::SpawnLocation,
     /// The latency between scheduling the task and starting its current poll.
-    #[cfg(feature = "schedule-latency")]
+    #[cfg(all(tokio_unstable, feature = "schedule-latency"))]
     pub(crate) schedule_latency: Option<Duration>,
     pub(crate) _phantom: PhantomData<&'a ()>,
 }
@@ -103,8 +103,8 @@ impl<'a> TaskMeta<'a> {
     /// [`enable_metrics_schedule_latency_histogram`]: crate::runtime::Builder::enable_metrics_schedule_latency_histogram
     /// [`on_before_task_poll`]: crate::runtime::Builder::on_before_task_poll
     /// [`on_after_task_poll`]: crate::runtime::Builder::on_after_task_poll
-    #[cfg(feature = "schedule-latency")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "schedule-latency")))]
+    #[cfg(all(tokio_unstable, feature = "schedule-latency"))]
+    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "schedule-latency"))))]
     pub fn schedule_latency(&self) -> Option<Duration> {
         self.schedule_latency
     }

@@ -1,5 +1,13 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "macros",
+        feature = "test-util"
+    )
+))]
 #![cfg(not(miri))] // Too slow on miri.
 
 use rand::SeedableRng;
@@ -7,7 +15,7 @@ use rand::{rngs::StdRng, Rng};
 use tokio::time::{self, Duration, Instant, Sleep};
 use tokio_test::{assert_elapsed, assert_pending, assert_ready, assert_ready_eq, task};
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(all(feature = "full", not(target_os = "wasi")))]
 use tokio_test::assert_err;
 
 use std::{

@@ -1,5 +1,13 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(miri)))]
+#![cfg(any(
+    all(feature = "full", not(miri)),
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "macros",
+        feature = "io-util"
+    )
+))]
 
 use tokio::io::AsyncReadExt;
 
