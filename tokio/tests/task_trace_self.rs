@@ -165,7 +165,7 @@ fn strip_symbol_hash(s: &str) -> &str {
 
 pin_project_lite::pin_project! {
     /// A future wrapper that uses `trace_with` to capture backtraces, skipping
-    /// capture on the poll immediately following a capture-induced wake.
+    /// capture on the poll immediately following each capture.
     /// The captured backtraces are stored in `logs`.
     pub struct TaskDump<F: Future> {
         #[pin]
@@ -196,8 +196,8 @@ impl<F: Future> Future for TaskDump<F> {
             return Poll::Ready(result);
         };
 
-        // Let the capture-induced wake register normal waiters without
-        // immediately capturing again and scheduling yet another wake.
+        // Skip capture on the next poll so capture-induced wakes do not
+        // cause a wake-and-capture loop.
         if std::mem::take(this.just_captured) {
             return Poll::Pending;
         }
@@ -209,7 +209,7 @@ impl<F: Future> Future for TaskDump<F> {
             || this.f.as_mut().poll(cx),
             |meta| trace_leaf_for_test(meta, &mut logs),
         );
-        // trace should always produce poll pending
+        // The futures used in these tests remain pending during capture.
         assert!(
             matches!(trace_poll, Poll::Pending),
             "expected trace to produce Poll::Pending but it was ready"
