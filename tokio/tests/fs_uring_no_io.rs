@@ -12,7 +12,7 @@ use std::future::poll_fn;
 use std::io::Write;
 use std::pin::Pin;
 
-use tempfile::NamedTempFile;
+use tempfile::{tempdir, NamedTempFile};
 use tokio::io::{AsyncRead, ReadBuf};
 use tokio::runtime::{Builder, Runtime};
 
@@ -76,4 +76,35 @@ fn file_read_should_fall_back_to_blocking_if_runtime_has_no_io_driver() {
     });
 
     assert_eq!(&contents[..n.unwrap()], b"hello");
+}
+
+#[test]
+fn try_exists_should_fall_back_to_blocking_if_runtime_has_no_io_driver() {
+    let tempfile = NamedTempFile::new().unwrap();
+    let missing_path = tempfile.path().with_extension("missing");
+
+    let exists = runtime_without_io()
+        .block_on(tokio::fs::try_exists(tempfile.path()))
+        .unwrap();
+    let missing = runtime_without_io()
+        .block_on(tokio::fs::try_exists(missing_path))
+        .unwrap();
+
+    assert!(exists);
+    assert!(!missing);
+}
+
+#[test]
+fn rename_should_fall_back_to_blocking_if_runtime_has_no_io_driver() {
+    let temp_dir = tempdir().unwrap();
+    let source_path = temp_dir.path().join("source");
+    let renamed_path = temp_dir.path().join("renamed");
+    std::fs::write(&source_path, b"hello").unwrap();
+
+    runtime_without_io()
+        .block_on(tokio::fs::rename(&source_path, &renamed_path))
+        .unwrap();
+
+    assert!(!source_path.exists());
+    assert_eq!(std::fs::read(renamed_path).unwrap(), b"hello");
 }

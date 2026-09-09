@@ -6,6 +6,7 @@ use std::path::Path;
 cfg_io_uring! {
     mod uring_open_options;
     pub(crate) use uring_open_options::UringOpenOptions;
+
 }
 
 #[cfg(test)]
@@ -537,7 +538,7 @@ impl OpenOptions {
                             .check_and_init(io_uring::opcode::OpenAt::CODE)
                             .await?
                         {
-                            return Op::open(path, opts)?.await;
+                            return crate::io::uring::open::open(path, opts).await;
                         }
                     }
                 }

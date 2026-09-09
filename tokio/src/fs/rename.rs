@@ -24,16 +24,17 @@ pub async fn rename(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<
         use crate::io::uring::rename::Rename;
         use crate::runtime::driver::op::Op;
 
-        let handle = crate::runtime::Handle::current();
-        let driver_handle = handle.inner.driver().io();
-
         type RenameOp = Op<Rename>;
 
-        if driver_handle
-            .check_and_init(io_uring::opcode::RenameAt::CODE)
-            .await?
-        {
-            return RenameOp::rename(from, to)?.await;
+        if let Ok(handle) = crate::runtime::Handle::try_current() {
+            if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
+                if driver_handle
+                    .check_and_init(io_uring::opcode::RenameAt::CODE)
+                    .await?
+                {
+                    return RenameOp::rename(from, to)?.await;
+                }
+            }
         }
     }
 
