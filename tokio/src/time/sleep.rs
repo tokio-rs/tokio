@@ -381,7 +381,7 @@ impl Sleep {
     }
 
     fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
         let mut this = self.project();
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]

@@ -293,7 +293,7 @@ impl Trace {
 // backtrace, below which frames should not be included in the backtrace (since they reflect the
 // internal implementation details of this crate).
 #[inline(never)]
-pub(crate) fn trace_leaf() -> Poll<()> {
+pub(crate) fn trace_leaf(_cx: &mut task::Context<'_>) -> Poll<()> {
     let root_addr = Context::current_frame_addr();
 
     let ret = Context::try_with_current_trace_leaf_fn(|leaf_fn| {
