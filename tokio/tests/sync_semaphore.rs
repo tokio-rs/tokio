@@ -1,6 +1,6 @@
 #![cfg(feature = "sync")]
 
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use std::sync::Arc;
@@ -325,4 +325,22 @@ async fn blocking_acquire_many_owned_in_async_context() {
     let sem = Arc::new(Semaphore::new(1));
     // Calling a blocking method from an async context must panic.
     let _permit = sem.blocking_acquire_many_owned(1);
+}
+
+#[test]
+#[cfg(target_pointer_width = "64")]
+fn merge_many_permits() {
+    let sem = Arc::new(Semaphore::new(6_000_000_000));
+    let mut a = sem.try_acquire_many(3_000_000_000).unwrap();
+    let b = sem.try_acquire_many(3_000_000_000).unwrap();
+    assert_eq!(a.num_permits(), 3_000_000_000);
+    assert_eq!(b.num_permits(), 3_000_000_000);
+    assert_eq!(sem.available_permits(), 0);
+
+    a.merge(b);
+    assert_eq!(a.num_permits(), 6_000_000_000);
+    assert_eq!(sem.available_permits(), 0);
+
+    drop(a);
+    assert_eq!(sem.available_permits(), 6_000_000_000);
 }

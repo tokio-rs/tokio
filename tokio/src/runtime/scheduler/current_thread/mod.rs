@@ -365,7 +365,7 @@ impl Core {
     }
 }
 
-#[cfg(feature = "taskdump")]
+#[cfg(all(tokio_unstable, feature = "taskdump"))]
 fn wake_deferred_tasks_and_free(context: &Context) {
     let wakers = context.defer.take_deferred();
     for waker in wakers {
@@ -514,7 +514,7 @@ impl Handle {
         me.task_hooks.spawn(&TaskMeta {
             id,
             spawned_at,
-            #[cfg(feature = "schedule-latency")]
+            #[cfg(all(tokio_unstable, feature = "schedule-latency"))]
             schedule_latency: None,
             _phantom: Default::default(),
         });
@@ -554,7 +554,7 @@ impl Handle {
         me.task_hooks.spawn(&TaskMeta {
             id,
             spawned_at,
-            #[cfg(feature = "schedule-latency")]
+            #[cfg(all(tokio_unstable, feature = "schedule-latency"))]
             schedule_latency: None,
             _phantom: Default::default(),
         });
@@ -662,7 +662,7 @@ cfg_unstable_metrics! {
         }
 
         pub(crate) fn num_blocking_threads(&self) -> usize {
-            self.blocking_spawner.num_threads()
+            self.blocking_spawner.num_blocking_threads()
         }
 
         pub(crate) fn num_idle_blocking_threads(&self) -> usize {

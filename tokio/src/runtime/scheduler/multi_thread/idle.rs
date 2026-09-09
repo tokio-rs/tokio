@@ -92,6 +92,10 @@ impl Idle {
         // Acquire the lock
         let mut lock = shared.synced.lock();
 
+        // A worker that is already tracked as a sleeper would be counted twice,
+        // which corrupts `num_unparked` and the sleeper list.
+        debug_assert!(!lock.idle.sleepers.contains(&worker));
+
         // Decrement the number of unparked threads
         let ret = State::dec_num_unparked(&self.state, is_searching);
 
@@ -151,6 +155,9 @@ impl Idle {
     }
 
     fn notify_should_wakeup(&self) -> bool {
+        // This must be a `SeqCst` RMW rather than a load: it is what makes
+        // the caller's preceding inject-queue push visible to a parking
+        // worker's subsequent unlocked queue-emptiness check.
         let state = State(self.state.fetch_add(0, SeqCst));
         state.num_searching() == 0 && state.num_unparked() < self.num_workers
     }
@@ -194,6 +201,7 @@ impl State {
         }
 
         let prev = State(cell.fetch_sub(dec, SeqCst));
+        debug_assert!(prev.num_unparked() > 0, "{prev:?}");
         is_searching && prev.num_searching() == 1
     }
 
