@@ -170,11 +170,16 @@ pub struct TraceMeta {
     pub trace_leaf_addr: *const c_void,
 }
 
-/// Runs `f`. If `f` hits a Tokio yield point `trace_leaf` will be invoked.
+/// Runs `f`. If `f` hits a Tokio yield point, the `trace_leaf` callback will be invoked.
 ///
-/// This allows taking a task dump with caller-provided task dump machinery. If `f` is the poll
-/// function of a future and that future returns `Poll::Pending`, then `trace_leaf` will be
-/// invoked. `trace_leaf` can then take a backtrace to determine exactly where the yield occurred.
+/// This allows taking a task dump with caller-provided task dump machinery. At each Tokio yield
+/// point reached while polling a future, `trace_leaf` can take a backtrace. The leaf future then
+/// returns `Poll::Pending` instead of performing its normal work.
+///
+/// When running on a Tokio scheduler, each captured leaf's waker is deferred until the scheduler
+/// regains control, so that the future can be polled again. The future must be polled outside of
+/// `trace_with` to make progress. Capturing on every poll can cause a wake-and-capture loop even
+/// when the future has no work to do.
 ///
 /// # Example
 ///
@@ -283,12 +288,10 @@ impl Trace {
     }
 }
 
-/// If this is a sub-invocation of [`trace_with`], capture a backtrace.
+/// If this is a sub-invocation of [`trace_with`], invoke its callback, defer a wake,
+/// and return `Poll::Pending`.
 ///
-/// The captured backtrace will be returned by [`trace_with`].
-///
-/// Invoking this function does nothing when it is not a sub-invocation
-/// [`trace_with`].
+/// Otherwise, return `Poll::Ready(())` without waking the future.
 // This function is marked `#[inline(never)]` to ensure that it gets a distinct `Frame` in the
 // backtrace, below which frames should not be included in the backtrace (since they reflect the
 // internal implementation details of this crate).
