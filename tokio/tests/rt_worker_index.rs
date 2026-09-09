@@ -115,14 +115,15 @@ fn worker_index_from_spawn_blocking() {
 }
 
 #[test]
-fn worker_index_block_on_multi_thread() {
-    let rt = Runtime::new().unwrap();
-    // block_on runs on the calling thread, not a worker thread
-    let index = rt.block_on(async { runtime::worker_index() });
-    assert_eq!(
-        index, None,
-        "block_on thread is not a worker thread on multi-thread runtime"
-    );
+fn worker_index_multi_thread() {
+    let rt = runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    rt.block_on(async {
+        let index = runtime::worker_index();
+        assert_eq!(index, None);
+    });
 }
 
 #[tokio::test(flavor = "current_thread")]
