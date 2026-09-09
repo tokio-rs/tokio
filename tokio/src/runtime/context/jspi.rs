@@ -1,9 +1,10 @@
 //! Minimal JSPI primitives for `wasm32-unknown-emscripten`.
 //!
-//! [`sleep`] is the one suspending import the runtime issues, parking the
-//! calling activation on a host timer. The runtime stays entered while
-//! parked, so a `block_on` from another promising activation on the thread
-//! during the park panics as a nested runtime.
+//! [`sleep`] is the runtime's own suspending import, parking the calling
+//! activation on a host timer; with `net`, Emscripten's `epoll_wait` suspends
+//! as well. The runtime stays entered while parked, so a `block_on` from
+//! another promising activation on the thread during the park panics as a
+//! nested runtime.
 
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -55,4 +56,32 @@ pub(crate) fn sleep(dur: Duration) {
     // SAFETY: the import takes an `f64` and returns nothing. Under `-sJSPI`
     // it suspends this activation; the caller has checked `jspi_enabled`.
     unsafe { tokio_jspi_sleep_import(ms) }
+}
+
+/// The I/O driver's `epoll_wait` of `max_wait` (`None` = no deadline) as a
+/// park.
+///
+/// Under JSPI a non-zero wait suspends on the host loop until readiness or
+/// the deadline, but a zero-timeout `epoll_wait` is a synchronous probe, and
+/// the host loop is the only producer of readiness, so the scheduler's
+/// maintenance park would never let Node deliver socket events. Yield a
+/// host turn first, as the zero-duration `ParkThread` park does. Without JSPI
+/// `epoll_wait` cannot block at all and returns at once, so a real wait would
+/// spin.
+#[cfg(feature = "net")]
+pub(crate) fn io_wait<R>(max_wait: Option<Duration>, wait: impl FnOnce() -> R) -> R {
+    let immediate = max_wait == Some(Duration::ZERO);
+    if jspi_enabled() {
+        if immediate {
+            sleep(Duration::ZERO);
+        }
+        wait()
+    } else if immediate {
+        wait()
+    } else {
+        panic!(
+            "cannot block on wasm32-unknown-emscripten: waiting for I/O \
+             readiness needs the build to link `-sJSPI`"
+        );
+    }
 }
