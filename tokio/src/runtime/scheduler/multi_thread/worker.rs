@@ -72,7 +72,6 @@ use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::RefCell;
-use std::convert::Infallible;
 use std::ops::ControlFlow;
 use std::task::Waker;
 use std::thread;
@@ -557,7 +556,7 @@ fn run(worker: Arc<Worker>) {
         context::set_scheduler(&cx, || {
             let cx = cx.expect_multi_thread();
 
-            _ = cx.run(core);
+            cx.run(core);
 
             // Check if there are any deferred tasks to notify. This can happen when
             // the worker core is lost due to `block_in_place()` being called from
@@ -568,7 +567,7 @@ fn run(worker: Arc<Worker>) {
 }
 
 impl Context {
-    fn run(&self, mut core: Box<Core>) -> ControlFlow<(), Infallible> {
+    fn run(&self, mut core: Box<Core>) {
         // Reset `lifo_enabled` here in case the core was previously stolen from
         // a task that had the LIFO slot disabled.
         self.reset_lifo_enabled(&mut core);
@@ -592,7 +591,10 @@ impl Context {
 
             // First, check work available to the current worker.
             if let Some(task) = core.next_task(&self.worker) {
-                core = self.run_task(task, core)?;
+                core = match self.run_task(task, core) {
+                    ControlFlow::Continue(core) => core,
+                    ControlFlow::Break(()) => return,
+                };
                 continue;
             }
 
@@ -604,7 +606,10 @@ impl Context {
             if let Some(task) = core.steal_work(&self.worker) {
                 // Found work, switch back to processing
                 core.stats.start_processing_scheduled_tasks();
-                core = self.run_task(task, core)?;
+                core = match self.run_task(task, core) {
+                    ControlFlow::Continue(core) => core,
+                    ControlFlow::Break(()) => return,
+                };
             } else {
                 // Wait for work
                 core = if !self.defer.is_empty() {
@@ -634,7 +639,6 @@ impl Context {
         core.pre_shutdown(&self.worker);
         // Signal shutdown
         self.worker.handle.shutdown_core(core);
-        ControlFlow::Break(())
     }
 
     /// Running a task may consume the core. If the core is still available when
