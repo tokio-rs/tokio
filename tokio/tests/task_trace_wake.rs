@@ -102,12 +102,14 @@ async fn capture_defers_wake_current_thread() {
     assert_capture_defers_wake().await;
 }
 
+#[cfg(feature = "rt-multi-thread")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn capture_defers_wake_multi_thread() {
     // Run on a worker: multi-threaded block_on does not drive the scheduler.
     tokio::spawn(assert_capture_defers_wake()).await.unwrap();
 }
 
+#[cfg(feature = "rt-multi-thread")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn trace_with_futures_unordered_on_worker() {
     tokio::spawn(async {
