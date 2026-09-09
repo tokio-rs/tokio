@@ -34,7 +34,7 @@ fn channels(count: usize) -> (Vec<oneshot::Receiver<usize>>, impl Future<Output 
 }
 
 async fn assert_progress<F: Future>(task: &mut Spawn<F>) -> F::Output {
-    // Yield so Tokio can drain the deferred-wake queue used before #8043.
+    // Yield so Tokio can drain the deferred-wake queue.
     // Poll the parent even without a wake: a parent re-poll alone cannot repair
     // a lost child notification. Bound the loop so regressions fail, not hang.
     for _ in 0..10 {
@@ -63,6 +63,66 @@ async fn trace_after_wake<F: Future>(future: F, make_ready: impl Future<Output =
         Poll::Ready(output) => output,
         Poll::Pending => assert_progress(&mut task).await,
     }
+}
+
+async fn assert_capture_defers_wake() {
+    let (sender, receiver) = oneshot::channel();
+    let mut task = task::spawn(receiver);
+    assert!(task.poll().is_pending());
+    assert!(!task.is_woken());
+
+    let mut leaves = 0;
+    assert!(trace_with(|| task.poll(), |_| leaves += 1).is_pending());
+    assert_eq!(leaves, 1);
+    assert!(!task.is_woken(), "capture must defer the leaf's wake");
+
+    for _ in 0..10 {
+        yield_now().await;
+        if task.is_woken() {
+            break;
+        }
+    }
+    assert!(task.is_woken(), "capture must eventually wake the leaf");
+
+    // A normal poll registers the waker without scheduling another wake.
+    assert!(task.poll().is_pending());
+    yield_now().await;
+    assert!(
+        !task.is_woken(),
+        "normal polling must let an idle future rest"
+    );
+
+    sender.send(42).unwrap();
+    assert!(task.is_woken());
+    assert_eq!(task.poll(), Poll::Ready(Ok(42)));
+}
+
+#[tokio::test]
+async fn capture_defers_wake_current_thread() {
+    assert_capture_defers_wake().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn capture_defers_wake_multi_thread() {
+    // Run on a worker: multi-threaded block_on does not drive the scheduler.
+    tokio::spawn(assert_capture_defers_wake()).await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn trace_with_futures_unordered_on_worker() {
+    tokio::spawn(async {
+        let (receivers, make_ready) = channels(2);
+        let future = receivers
+            .into_iter()
+            .collect::<FuturesUnordered<_>>()
+            .collect::<Vec<_>>();
+
+        let mut results = trace_after_wake(future, make_ready).await;
+        results.sort_unstable_by_key(|result| *result.as_ref().unwrap());
+        assert_eq!(results, vec![Ok(0), Ok(1)]);
+    })
+    .await
+    .unwrap();
 }
 
 #[tokio::test]

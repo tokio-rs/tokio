@@ -66,10 +66,6 @@ impl<F: Future> Future for PrettyFuture<F> {
             let (res, trace) = tokio::runtime::dump::Trace::capture(|| this.f.as_mut().poll(cx));
             this.logs.lock().unwrap().push(trace);
             *this.t_last = State::Alerted;
-            // `Trace::capture` does not reschedule the task. Wake the task
-            // ourselves so the wrapped future gets polled again and can make
-            // progress now that tracing has captured its state.
-            cx.waker().wake_by_ref();
             return res;
         }
         this.f.poll(cx)
@@ -168,13 +164,14 @@ fn strip_symbol_hash(s: &str) -> &str {
 }
 
 pin_project_lite::pin_project! {
-    /// A future wrapper that uses `trace_with` to capture a backtrace on every
-    /// poll.
+    /// A future wrapper that uses `trace_with` to capture backtraces, skipping
+    /// capture on the poll immediately following a capture-induced wake.
     /// The captured backtraces are stored in `logs`.
     pub struct TaskDump<F: Future> {
         #[pin]
         f: Root<F>,
         logs: Arc<Mutex<Vec<Vec<String>>>>,
+        just_captured: bool,
     }
 }
 
@@ -183,6 +180,7 @@ impl<F: Future> TaskDump<F> {
         TaskDump {
             f: Trace::root(f),
             logs,
+            just_captured: false,
         }
     }
 }
@@ -197,6 +195,12 @@ impl<F: Future> Future for TaskDump<F> {
         if let Poll::Ready(result) = this.f.as_mut().poll(cx) {
             return Poll::Ready(result);
         };
+
+        // Let the capture-induced wake register normal waiters without
+        // immediately capturing again and scheduling yet another wake.
+        if std::mem::take(this.just_captured) {
+            return Poll::Pending;
+        }
 
         // if is pending, trace its location:
         let mut logs = Vec::new();
@@ -213,6 +217,7 @@ impl<F: Future> Future for TaskDump<F> {
 
         // Drain any frames captured by trace_leaf_for_test into our log.
         this.logs.lock().unwrap().extend(logs);
+        *this.just_captured = true;
         Poll::Pending
     }
 }
@@ -276,4 +281,24 @@ async fn trace_with_callback_and_backtrace() {
             "expected frame containing {expected:?}, got {actual:?}\nfull trace:\n{trace:#?}"
         );
     }
+}
+
+#[tokio::test]
+async fn trace_with_wrapper_does_not_recapture_its_wake() {
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    let logs = Arc::new(Mutex::new(vec![]));
+    let mut task = tokio_test::task::spawn(TaskDump::new(receiver, logs.clone()));
+
+    assert!(task.poll().is_pending());
+    tokio::task::yield_now().await;
+    assert!(task.is_woken());
+
+    assert!(task.poll().is_pending());
+    tokio::task::yield_now().await;
+    assert!(!task.is_woken());
+    assert_eq!(logs.lock().unwrap().len(), 1);
+
+    sender.send(42).unwrap();
+    assert!(task.is_woken());
+    assert_eq!(task.poll(), Poll::Ready(Ok(42)));
 }
