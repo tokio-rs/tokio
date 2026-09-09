@@ -577,10 +577,11 @@ cfg_rt! {
     /// multi-thread runtime, the thread that calls [`Runtime::block_on`] is
     /// not a worker thread, so this also returns `None` there.
     ///
-    /// For the current-thread runtime and [`LocalRuntime`], this returns
-    /// `Some(0)` when called from the thread that currently owns the runtime
-    /// driver. If multiple threads call [`Runtime::block_on`] concurrently,
-    /// calls on threads that do not own the driver return `None`.
+    /// For the current-thread runtime, this returns `Some(0)` when called from
+    /// the thread that currently owns the runtime driver. If multiple threads
+    /// call [`Runtime::block_on`] concurrently, calls on threads that do not
+    /// own the driver return `None`. A [`LocalRuntime`] can only be driven from
+    /// its owning thread, so calls inside `block_on` always return `Some(0)`.
     ///
     /// Note that the result may change across `.await` points, as the
     /// task may be moved to a different worker thread by the scheduler.

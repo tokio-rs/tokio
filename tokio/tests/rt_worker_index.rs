@@ -19,6 +19,16 @@ fn worker_index_current_thread() {
 }
 
 #[test]
+fn worker_index_handle_block_on_current_thread() {
+    let rt = runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let index = rt.handle().block_on(async { runtime::worker_index() });
+    assert_eq!(index, None);
+}
+
+#[test]
 fn worker_index_current_thread_concurrent_block_on() {
     let rt = Arc::new(
         runtime::Builder::new_current_thread()
@@ -113,4 +123,14 @@ fn worker_index_block_on_multi_thread() {
         index, None,
         "block_on thread is not a worker thread on multi-thread runtime"
     );
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn worker_index_tokio_test_current_thread() {
+    assert_eq!(runtime::worker_index(), Some(0));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn worker_index_tokio_test_multi_thread() {
+    assert_eq!(runtime::worker_index(), None);
 }
