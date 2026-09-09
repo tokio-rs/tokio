@@ -20,6 +20,9 @@ env:
   # Pin a specific miri version
   rust_miri_nightly: nightly-2026-06-29
   rust_emscripten_nightly: nightly-2026-08-17
+  # `OwnedFd::try_clone` (mio's epoll registry handle) is unsupported on
+  # emscripten before Rust 1.99. Return to `rust_stable` once 1.99 is stable.
+  rust_emscripten_beta: beta
   emsdk_version: '6.0.8'
   rust_clippy: '1.88'
   # When updating this, also update:
@@ -1201,10 +1204,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Install Rust ${{ env.rust_stable }}
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust ${{ env.rust_emscripten_beta }}
+        uses: dtolnay/rust-toolchain@beta
         with:
-          toolchain: ${{ env.rust_stable }}
+          toolchain: ${{ env.rust_emscripten_beta }}
           targets: wasm32-unknown-emscripten
 
       - name: Install Emscripten
@@ -1224,23 +1227,25 @@ jobs:
           tool: cargo-hack
 
       - name: Check tokio feature matrix for emscripten
-        run: cargo hack check -p tokio --each-feature --exclude-features full,net,process,signal,rt-multi-thread,io-uring,taskdump,schedule-latency --target wasm32-unknown-emscripten
+        run: cargo hack check -p tokio --each-feature --exclude-features full,process,signal,rt-multi-thread,io-uring,taskdump,schedule-latency --target wasm32-unknown-emscripten
         working-directory: tokio
+        env:
+          RUSTFLAGS: "-Dwarnings -Adeprecated"
 
       - name: Test tokio for emscripten (JSPI)
-        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,fs,io-util,io-std,test-util" --tests
+        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,fs,io-util,io-std,test-util,net" --tests
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
-          # The last two serve tests/rt_emscripten_jspi.rs; rustc runs from the workspace root.
-          RUSTFLAGS: "-Dwarnings -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sJSPI -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sJSPI_EXPORTS=tokio_test_reenter -Clink-args=--js-library=tokio/tests/rt_emscripten_jspi.js"
+          # The JSPI exports and JS library serve tests/rt_emscripten_jspi.rs, the pre-js fails a binary whose main never returns; rustc runs from the workspace root.
+          RUSTFLAGS: "-Dwarnings -Adeprecated -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sJSPI -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sNODERAWSOCKETS -Clink-args=-sNODERAWFS -Clink-args=-sJSPI_EXPORTS=tokio_test_reenter -Clink-args=--js-library=tokio/tests/rt_emscripten_jspi.js -Clink-args=--pre-js=tokio/tests/rt_emscripten_pre.js"
 
       - name: Test tokio for emscripten (non-JSPI)
         run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,fs,io-util,io-std,test-util" --test rt_emscripten_block_on
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
-          RUSTFLAGS: "-Dwarnings -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576"
+          RUSTFLAGS: "-Dwarnings -Adeprecated -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576"
 
       - name: Install Rust ${{ env.rust_emscripten_nightly }}
         uses: dtolnay/rust-toolchain@nightly
@@ -1250,11 +1255,11 @@ jobs:
           components: rust-src
 
       - name: Test tokio for emscripten (pthreads)
-        run: cargo +${{ env.rust_emscripten_nightly }} test -Zbuild-std=std,panic_abort -p tokio --target wasm32-unknown-emscripten --features "rt,rt-multi-thread,time,sync,macros,fs,io-util,io-std,test-util" --tests
+        run: cargo +${{ env.rust_emscripten_nightly }} test -Zbuild-std=std,panic_abort -p tokio --target wasm32-unknown-emscripten --features "rt,rt-multi-thread,time,sync,macros,fs,io-util,io-std,test-util,net" --tests
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
-          RUSTFLAGS: "-Dwarnings -Ctarget-feature=+atomics,+bulk-memory,+mutable-globals -Clink-args=-pthread -Clink-args=-sPTHREAD_POOL_SIZE=8 -Clink-args=-sINITIAL_MEMORY=134217728 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576"
+          RUSTFLAGS: "-Dwarnings -Adeprecated -Ctarget-feature=+atomics,+bulk-memory,+mutable-globals -Clink-args=-pthread -Clink-args=-sPTHREAD_POOL_SIZE=8 -Clink-args=-sPROXY_TO_PTHREAD -Clink-args=-sINITIAL_MEMORY=134217728 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sNODERAWSOCKETS -Clink-args=-sNODERAWFS"
 
   check-external-types:
     name: check-external-types (${{ matrix.os }})

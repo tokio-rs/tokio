@@ -80,6 +80,8 @@ fn timer_wait_needs_jspi() {
     }
 }
 
+// With `net` the wait is a real `epoll_wait`, which a socket could wake.
+#[cfg(not(feature = "net"))]
 #[test]
 fn wait_without_a_deadline_always_panics() {
     // A oneshot whose sender never fires: pending with no wake source, so

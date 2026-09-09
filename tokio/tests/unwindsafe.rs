@@ -28,6 +28,7 @@ fn net_types_are_unwind_safe() {
 #[test]
 #[cfg(all(unix, feature = "net"))]
 fn unix_net_types_are_unwind_safe() {
+    #[cfg(not(target_os = "emscripten"))]
     is_unwind_safe::<tokio::net::UnixDatagram>();
     is_unwind_safe::<tokio::net::UnixListener>();
     is_unwind_safe::<tokio::net::UnixStream>();
