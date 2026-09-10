@@ -15,12 +15,13 @@ pub struct Handle {
 }
 
 use crate::runtime::task::JoinHandle;
-use crate::runtime::BOX_FUTURE_THRESHOLD;
+use crate::runtime::AutoBox;
 use crate::util::error::{CONTEXT_MISSING_ERROR, THREAD_LOCAL_DESTROYED_ERROR};
 use crate::util::trace::SpawnMeta;
 
 use std::future::Future;
 use std::marker::PhantomData;
+use std::pin::Pin;
 use std::{error, fmt, mem};
 
 /// Runtime context guard.
@@ -200,8 +201,9 @@ impl Handle {
         F::Output: Send + 'static,
     {
         let fut_size = mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
-            self.spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
+        if AutoBox::<F>::SHOULD_BOX {
+            let future: Pin<Box<dyn Future<Output = F::Output> + Send>> = Box::pin(future);
+            self.spawn_named(future, SpawnMeta::new_unnamed(fut_size))
         } else {
             self.spawn_named(future, SpawnMeta::new_unnamed(fut_size))
         }
@@ -341,8 +343,9 @@ impl Handle {
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         let fut_size = mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
-            self.block_on_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
+        if AutoBox::<F>::SHOULD_BOX {
+            let future: Pin<Box<dyn Future<Output = F::Output> + '_>> = Box::pin(future);
+            self.block_on_inner(future, SpawnMeta::new_unnamed(fut_size))
         } else {
             self.block_on_inner(future, SpawnMeta::new_unnamed(fut_size))
         }

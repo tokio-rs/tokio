@@ -1,4 +1,4 @@
-use super::BOX_FUTURE_THRESHOLD;
+use super::AutoBox;
 use crate::runtime::blocking::BlockingPool;
 use crate::runtime::scheduler::CurrentThread;
 use crate::runtime::{context, EnterGuard, Handle};
@@ -9,6 +9,7 @@ use crate::util::trace::SpawnMeta;
 use std::future::Future;
 use std::io;
 use std::mem;
+use std::pin::Pin;
 use std::time::Duration;
 
 cfg_rt_multi_thread! {
@@ -247,9 +248,10 @@ impl Runtime {
         F::Output: Send + 'static,
     {
         let fut_size = mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
+        if AutoBox::<F>::SHOULD_BOX {
+            let future: Pin<Box<dyn Future<Output = F::Output> + Send>> = Box::pin(future);
             self.handle
-                .spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
+                .spawn_named(future, SpawnMeta::new_unnamed(fut_size))
         } else {
             self.handle
                 .spawn_named(future, SpawnMeta::new_unnamed(fut_size))
@@ -342,8 +344,9 @@ impl Runtime {
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         let fut_size = mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
-            self.block_on_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
+        if AutoBox::<F>::SHOULD_BOX {
+            let future: Pin<Box<dyn Future<Output = F::Output> + '_>> = Box::pin(future);
+            self.block_on_inner(future, SpawnMeta::new_unnamed(fut_size))
         } else {
             self.block_on_inner(future, SpawnMeta::new_unnamed(fut_size))
         }

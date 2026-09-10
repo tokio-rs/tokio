@@ -7,7 +7,7 @@ use crate::runtime::blocking::sharded::ShardedImpl;
 use crate::runtime::blocking::{shutdown, BlockingTask};
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::task::{self, JoinHandle};
-use crate::runtime::{Builder, Callback, Handle, BOX_FUTURE_THRESHOLD};
+use crate::runtime::{AutoBox, Builder, Callback, Handle};
 use crate::util::metric_atomics::MetricAtomicUsize;
 use crate::util::trace::{blocking_task, SpawnMeta};
 
@@ -370,9 +370,10 @@ impl Spawner {
         R: Send + 'static,
     {
         let fn_size = std::mem::size_of::<F>();
-        let (join_handle, spawn_result) = if fn_size > BOX_FUTURE_THRESHOLD {
+        let (join_handle, spawn_result) = if AutoBox::<F>::SHOULD_BOX {
+            let func: Box<dyn FnOnce() -> R + Send> = Box::new(func);
             self.spawn_blocking_inner(
-                Box::new(func),
+                func,
                 Mandatory::NonMandatory,
                 SpawnMeta::new_unnamed(fn_size),
                 rt,
@@ -409,9 +410,10 @@ impl Spawner {
             R: Send + 'static,
         {
             let fn_size = std::mem::size_of::<F>();
-            let (join_handle, spawn_result) = if fn_size > BOX_FUTURE_THRESHOLD {
+            let (join_handle, spawn_result) = if AutoBox::<F>::SHOULD_BOX {
+                let func: Box<dyn FnOnce() -> R + Send> = Box::new(func);
                 self.spawn_blocking_inner(
-                    Box::new(func),
+                    func,
                     Mandatory::Mandatory,
                     SpawnMeta::new_unnamed(fn_size),
                     rt,

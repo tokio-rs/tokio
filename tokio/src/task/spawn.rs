@@ -1,8 +1,9 @@
-use crate::runtime::BOX_FUTURE_THRESHOLD;
+use crate::runtime::AutoBox;
 use crate::task::JoinHandle;
 use crate::util::trace::SpawnMeta;
 
 use std::future::Future;
+use std::pin::Pin;
 
 cfg_rt! {
     /// Spawns a new asynchronous task, returning a
@@ -177,8 +178,9 @@ cfg_rt! {
         F::Output: Send + 'static,
     {
         let fut_size = std::mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
-            spawn_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
+        if AutoBox::<F>::SHOULD_BOX {
+            let future: Pin<Box<dyn Future<Output = F::Output> + Send>> = Box::pin(future);
+            spawn_inner(future, SpawnMeta::new_unnamed(fut_size))
         } else {
             spawn_inner(future, SpawnMeta::new_unnamed(fut_size))
         }

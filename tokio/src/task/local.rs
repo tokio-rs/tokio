@@ -5,7 +5,7 @@ use crate::runtime;
 use crate::runtime::task::{
     self, JoinHandle, LocalOwnedTasks, SpawnLocation, Task, TaskHarnessScheduleHooks,
 };
-use crate::runtime::{context, ThreadId, BOX_FUTURE_THRESHOLD};
+use crate::runtime::{context, AutoBox, ThreadId};
 use crate::sync::AtomicWaker;
 use crate::util::trace::SpawnMeta;
 use crate::util::RcCell;
@@ -397,8 +397,9 @@ cfg_rt! {
         F::Output: 'static,
     {
         let fut_size = std::mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
-            spawn_local_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
+        if AutoBox::<F>::SHOULD_BOX {
+            let future: Pin<Box<dyn Future<Output = F::Output>>> = Box::pin(future);
+            spawn_local_inner(future, SpawnMeta::new_unnamed(fut_size))
         } else {
             spawn_local_inner(future, SpawnMeta::new_unnamed(fut_size))
         }
@@ -594,8 +595,9 @@ impl LocalSet {
         F::Output: 'static,
     {
         let fut_size = mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
-            self.spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
+        if AutoBox::<F>::SHOULD_BOX {
+            let future: Pin<Box<dyn Future<Output = F::Output>>> = Box::pin(future);
+            self.spawn_named(future, SpawnMeta::new_unnamed(fut_size))
         } else {
             self.spawn_named(future, SpawnMeta::new_unnamed(fut_size))
         }
