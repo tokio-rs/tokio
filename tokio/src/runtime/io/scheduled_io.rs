@@ -219,7 +219,11 @@ impl ScheduledIo {
                 Tick::Set => tick.wrapping_add(1) % MAX_TICK,
             };
             let ready = Ready::from_usize(READINESS.unpack(curr));
-            Some(TICK.pack(new_tick, f(ready).as_usize()))
+            // Keep the shutdown bit, so that a clear after shutdown (a
+            // `WouldBlock` observed once the driver is gone) does not turn the
+            // next wait into a wait for an event that will never come.
+            let next = TICK.pack(new_tick, f(ready).as_usize());
+            Some(SHUTDOWN.pack(SHUTDOWN.unpack(curr), next))
         });
     }
 
