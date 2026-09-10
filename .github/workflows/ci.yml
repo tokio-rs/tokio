@@ -1407,7 +1407,7 @@ jobs:
       - name: Test in FreeBSD
         uses: vmactions/freebsd-vm@v1
         with:
-          release: '14.4'
+          release: '14.5'
           envs: "TOKIO_STABLE_FEATURES RUSTFLAGS"
           sync: rsync
           copyback: false
@@ -1436,7 +1436,7 @@ jobs:
           RUSTFLAGS: --cfg docsrs --cfg tokio_unstable
           RUSTDOCFLAGS: --cfg docsrs --cfg tokio_unstable -Dwarnings
         with:
-          release: '14.4'
+          release: '14.5'
           envs: "TOKIO_STABLE_FEATURES RUSTDOCFLAGS RUSTFLAGS"
           sync: rsync
           copyback: false
@@ -1461,7 +1461,7 @@ jobs:
       - name: Test in FreeBSD
         uses: vmactions/freebsd-vm@v1
         with:
-          release: '14.4'
+          release: '14.5'
           envs: "TOKIO_STABLE_FEATURES RUSTFLAGS"
           sync: rsync
           copyback: false

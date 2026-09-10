@@ -111,10 +111,6 @@ async fn rewind_seek_position() {
 }
 
 #[tokio::test]
-#[cfg_attr(
-    target_os = "emscripten",
-    ignore = "inline-fs shim does not insert cooperative yield points"
-)]
 async fn coop() {
     let mut tempfile = tempfile();
     tempfile.write_all(HELLO).unwrap();
