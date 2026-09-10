@@ -638,6 +638,24 @@ cfg_rt! {
         16384
     };
 
+    /// Decides whether a future or closure of type `T` is boxed before it is
+    /// turned into a task, based on [`BOX_FUTURE_THRESHOLD`].
+    ///
+    /// The decision is an associated constant rather than a runtime
+    /// comparison of `std::mem::size_of::<T>()` so that only the taken branch
+    /// is instantiated. With a runtime `if`, both branches are instantiated
+    /// for every `T` (one task harness for `T`, one for `Pin<Box<T>>`),
+    /// doubling the generated code for every spawned future in a crate. A
+    /// branch on a constant that is known once `T` is known is pruned by the
+    /// monomorphization collector, so only the harness that is actually used
+    /// is generated.
+    pub(crate) struct AutoBox<T>(std::marker::PhantomData<T>);
+
+    impl<T> AutoBox<T> {
+        /// `true` if a value of type `T` is larger than [`BOX_FUTURE_THRESHOLD`].
+        pub(crate) const SHOULD_BOX: bool = std::mem::size_of::<T>() > BOX_FUTURE_THRESHOLD;
+    }
+
     mod thread_id;
     pub(crate) use thread_id::ThreadId;
 
