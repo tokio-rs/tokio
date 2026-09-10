@@ -5,7 +5,8 @@
         target_os = "emscripten",
         feature = "rt",
         feature = "macros",
-        feature = "test-util"
+        feature = "test-util",
+        feature = "io-util"
     )
 ))]
 
