@@ -61,7 +61,7 @@ use crate::runtime;
 use crate::runtime::scheduler::multi_thread::{
     idle, park, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
 };
-use crate::runtime::scheduler::{Defer, Inject};
+use crate::runtime::scheduler::{inject::InjectQueue, Defer};
 use crate::runtime::task::OwnedTasks;
 use crate::runtime::{
     blocking, driver, scheduler, task, Config, SchedulerMetrics, TimerFlavor, WorkerMetrics,
@@ -175,7 +175,7 @@ pub(crate) struct Shared {
     /// Global task queue used for:
     ///  1. Submit work to the scheduler while **not** currently on a worker thread.
     ///  2. Submit work to the scheduler when a worker run queue is saturated
-    pub(super) inject: Inject<Arc<Handle>>,
+    pub(super) inject: InjectQueue<Arc<Handle>>,
 
     /// Coordinates idle workers
     idle: Idle,
@@ -323,7 +323,7 @@ pub(super) fn create(
         task_hooks: TaskHooks::from_config(&config),
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
-            inject: Inject::new(),
+            inject: InjectQueue::new(),
             idle,
             owned: OwnedTasks::new(size),
             synced: Mutex::new(Synced {
@@ -1344,7 +1344,7 @@ impl Core {
 
 impl Worker {
     /// Returns a reference to the scheduler's injection queue.
-    fn inject(&self) -> &Inject<Arc<Handle>> {
+    fn inject(&self) -> &InjectQueue<Arc<Handle>> {
         &self.handle.shared.inject
     }
 }
