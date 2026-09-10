@@ -476,6 +476,22 @@
 //! `test-util` features. The `rt-multi-thread` feature is additionally
 //! supported when building with Emscripten pthreads (`-pthread`). The `net`,
 //! `process`, and `signal` features are not supported.
+//!
+//! Emscripten's filesystem is synchronous, so `tokio::fs` and `io-std` run
+//! their operations inline on the calling thread rather than on the blocking
+//! pool, in pthreads builds too.
+//!
+//! When the build links [JSPI], a wait with a deadline suspends on the host
+//! event loop rather than blocking, leaving the runtime for the duration, so
+//! sibling promising activations on the thread may each drive their own
+//! runtime. Host callbacks that run during such a wait see the context the
+//! runtime was entered from, not the suspended runtime, so a callback that
+//! needs it must hold its [`Handle`] explicitly. Without JSPI, such a wait
+//! panics, as does a wait with no deadline in either mode. The panic unwinds
+//! out of `block_on` and leaves the runtime usable.
+//!
+//! [`Handle`]: crate::runtime::Handle
+//! [JSPI]: https://github.com/WebAssembly/js-promise-integration
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at
 // least 32 bits, which a lot of components in Tokio currently assumes.
