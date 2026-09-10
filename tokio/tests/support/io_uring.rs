@@ -20,10 +20,15 @@ use io_uring::IoUring;
 pub fn io_uring_supported() -> bool {
     match IoUring::new(256) {
         Ok(_) => true,
-        // The Kernel does not support io-uring
-        Err(e) if e.raw_os_error() == Some(libc::ENOSYS) => false,
-        Err(_) => unreachable!(
-            "The target should either support io_uring or return ENOSYS if not supported"
+        // ENOSYS: kernel does not support io_uring.
+        // EPERM: io_uring disabled via sysctl kernel.io_uring_disabled (#7691).
+        Err(e)
+            if e.raw_os_error() == Some(libc::ENOSYS) || e.raw_os_error() == Some(libc::EPERM) =>
+        {
+            false
+        }
+        Err(e) => unreachable!(
+            "IoUring::new failed with an unexpected error (expected ENOSYS or EPERM): {e}"
         ),
     }
 }

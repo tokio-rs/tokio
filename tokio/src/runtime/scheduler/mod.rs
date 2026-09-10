@@ -17,9 +17,6 @@ cfg_rt_multi_thread! {
     mod block_in_place;
     pub(crate) use block_in_place::block_in_place;
 
-    mod lock;
-    use lock::Lock;
-
     pub(crate) mod multi_thread;
     pub(crate) use multi_thread::MultiThread;
 }
