@@ -490,3 +490,31 @@ async fn abstract_socket_name() {
     // `as_abstract_name` removes leading zero bytes
     assert_eq!(abstract_path_name, b"aaa");
 }
+
+// Both ends of a fresh pair are writable without a driver event, but not
+// readable until the peer writes.
+#[tokio::test(flavor = "current_thread")]
+async fn pair_starts_writable() -> io::Result<()> {
+    let (a, mut b) = UnixStream::pair()?;
+
+    // Nothing has polled the driver since `pair()`.
+    let mut writable = task::spawn(a.writable());
+    assert_ready_ok!(writable.poll());
+    assert_eq!(a.try_write(b"hi")?, 2);
+    let mut write = task::spawn(b.write_all(b"yo"));
+    assert_ready_ok!(write.poll());
+    drop(write);
+
+    let (c, _d) = UnixStream::pair()?;
+    let mut readable = task::spawn(c.readable());
+    assert_pending!(readable.poll());
+    assert_eq!(
+        c.try_read(&mut [0u8; 1]).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+
+    // The peer's bytes still arrive through the normal event path.
+    a.readable().await?;
+    assert_eq!(a.try_read(&mut [0u8; 8])?, 2);
+    Ok(())
+}
