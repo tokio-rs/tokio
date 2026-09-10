@@ -6,10 +6,8 @@ use tokio::runtime;
 use tokio_test::{assert_err, assert_pending, assert_ready, task};
 
 use futures::task::{waker_ref, ArcWake};
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::task::Context;
 
 #[test]
@@ -71,7 +69,7 @@ impl ArcWake for RegistrationWaker {
 
 impl Drop for RegistrationWaker {
     fn drop(&mut self) {
-        self.dropped.store(true, Ordering::SeqCst);
+        self.dropped.store(true, Ordering::Relaxed);
     }
 }
 
@@ -102,10 +100,10 @@ fn shutdown_drops_waker_holding_registration() {
 
     drop(listener);
     drop(task);
-    assert!(!dropped.load(Ordering::SeqCst));
+    assert!(!dropped.load(Ordering::Relaxed));
     drop(rt);
 
-    assert!(dropped.load(Ordering::SeqCst));
+    assert!(dropped.load(Ordering::Relaxed));
 }
 
 fn rt() -> runtime::Runtime {
@@ -114,3 +112,4 @@ fn rt() -> runtime::Runtime {
         .build()
         .unwrap()
 }
+
