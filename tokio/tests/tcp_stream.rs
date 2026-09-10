@@ -55,6 +55,13 @@ async fn try_read_write() {
     let (server, _) = listener.accept().await.unwrap();
     let mut written = DATA.to_vec();
 
+    // An accepted socket starts out assumed readable; a read that finds
+    // nothing clears that.
+    assert_eq!(
+        server.try_read(&mut [0; 1]).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+
     // Track the server receiving data
     let mut readable = task::spawn(server.readable());
     assert_pending!(readable.poll());
@@ -231,7 +238,10 @@ macro_rules! assert_not_writable_by_polling {
 async fn poll_read_ready() {
     let (mut client, mut server) = create_pair().await;
 
-    // Initial state - not readable.
+    // Initial state - an accepted socket is assumed readable until a read
+    // finds nothing.
+    assert_readable_by_polling!(server);
+    read_until_pending(&mut server);
     assert_not_readable_by_polling!(server);
 
     // There is data in the buffer - readable.
@@ -316,6 +326,13 @@ async fn try_read_buf() {
         .unwrap();
     let (server, _) = listener.accept().await.unwrap();
     let mut written = DATA.to_vec();
+
+    // An accepted socket starts out assumed readable; a read that finds
+    // nothing clears that.
+    assert_eq!(
+        server.try_read(&mut [0; 1]).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
 
     // Track the server receiving data
     let mut readable = task::spawn(server.readable());
