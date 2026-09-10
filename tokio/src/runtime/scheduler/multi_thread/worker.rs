@@ -1075,7 +1075,6 @@ impl Context {
         })
     }
 
-    #[cfg(tokio_unstable)]
     pub(crate) fn worker_index(&self) -> usize {
         self.worker.index
     }
