@@ -105,10 +105,11 @@ impl Registration {
     }
 
     /// Marks the resource ready without waiting for the driver's first event.
-    /// Used for accepted sockets, which are writable and usually already hold
-    /// the peer's first bytes; under load that first event can queue behind
-    /// every established connection's events. A wrong guess costs one
-    /// `WouldBlock`, which clears the readiness again.
+    /// Used for sockets whose state is known when they are created: accepted
+    /// sockets are writable and usually already hold the peer's first bytes
+    /// (under load that first event can queue behind every established
+    /// connection's events), and both ends of a fresh `pair()` are writable.
+    /// A wrong guess costs one `WouldBlock`, which clears the readiness again.
     #[cfg(feature = "net")]
     pub(crate) fn assume_ready(&self, ready: crate::io::Ready) {
         self.shared.assume_ready(ready);

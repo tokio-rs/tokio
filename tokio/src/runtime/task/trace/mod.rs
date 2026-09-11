@@ -386,13 +386,14 @@ pub(in crate::runtime) fn trace_current_thread(
 }
 
 cfg_rt_multi_thread! {
+    use crate::runtime::scheduler::inject::InjectQueue;
     use crate::runtime::scheduler::multi_thread;
 
     /// Trace and poll all tasks of the `multi_thread` runtime.
     pub(in crate::runtime) fn trace_multi_thread(
         owned: &OwnedTasks<Arc<multi_thread::Handle>>,
         local: &mut multi_thread::queue::Local<Arc<multi_thread::Handle>>,
-        injection: &Inject<Arc<multi_thread::Handle>>,
+        injection: &InjectQueue<Arc<multi_thread::Handle>>,
     ) -> Vec<(Id, Trace)> {
         let mut dequeued = Vec::new();
 
