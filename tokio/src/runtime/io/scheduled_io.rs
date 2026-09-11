@@ -105,6 +105,9 @@ pub(crate) struct ScheduledIo {
     readiness: AtomicUsize,
 
     waiters: Mutex<Waiters>,
+
+    /// I/O driver shard this resource is registered on.
+    shard: usize,
 }
 
 #[derive(Debug, Default)]
@@ -173,13 +176,18 @@ const SHUTDOWN: bit::Pack = TICK.then(1);
 
 // ===== impl ScheduledIo =====
 
-impl Default for ScheduledIo {
-    fn default() -> ScheduledIo {
+impl ScheduledIo {
+    pub(crate) fn new(shard: usize) -> ScheduledIo {
         ScheduledIo {
             linked_list_pointers: UnsafeCell::new(linked_list::Pointers::new()),
             readiness: AtomicUsize::new(0),
             waiters: Mutex::new(Waiters::default()),
+            shard,
         }
+    }
+
+    pub(crate) fn shard(&self) -> usize {
+        self.shard
     }
 }
 
@@ -600,7 +608,7 @@ mod tests {
 
     #[test]
     fn stale_event_does_not_clear_readiness_after_u8_wraparound() {
-        let io = ScheduledIo::default();
+        let io = ScheduledIo::new(0);
         io.set_readiness(Tick::Set, |curr| curr | Ready::READABLE);
         let event = io.ready_event(Interest::READABLE);
 

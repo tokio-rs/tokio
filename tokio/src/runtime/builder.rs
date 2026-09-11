@@ -64,6 +64,13 @@ pub struct Builder {
     nevents: usize,
     nevents_busy: Option<usize>,
 
+    /// Number of I/O driver shards for the multi-thread runtime (`None` = the
+    /// `TOKIO_IO_SHARDS` environment variable, or 1).
+    pub(super) io_shards: Option<usize>,
+
+    /// Longest a sharded driver blocks; see `io_shard_sweep_interval`.
+    pub(super) io_shard_sweep: Option<Duration>,
+
     /// Whether or not to enable the time driver
     enable_time: bool,
 
@@ -310,6 +317,10 @@ impl Builder {
             enable_io: false,
             nevents: 1024,
             nevents_busy: None,
+
+            io_shards: None,
+
+            io_shard_sweep: Some(DEFAULT_IO_SHARD_SWEEP),
 
             // Time defaults to "off"
             enable_time: false,
@@ -1200,7 +1211,121 @@ impl Builder {
             nevents: self.nevents,
             nevents_busy: self.nevents_busy,
             timer_flavor: self.timer_flavor,
+            io_shards: 1,
         }
+    }
+
+    /// Sets the number of I/O driver shards (independent `mio::Poll`
+    /// instances) used by the multi-thread runtime.
+    ///
+    /// Workers are split into `n` contiguous groups; each group parks on its
+    /// own shard, and a worker about to park also zero-timeout polls the
+    /// other shards. With `n > 1` a parked driver wakes at least once per
+    /// [`io_shard_sweep_interval`] (10 ms by default) to repeat that sweep, so
+    /// a group whose workers are all busy in non-yielding tasks delays its
+    /// sockets by at most that interval. New sockets are assigned to shards
+    /// round-robin. Timers, signals and io_uring completions are unaffected
+    /// (one wheel; shard 0 services signals). `n` is clamped to
+    /// `1..=worker_threads`; `1` is the single-driver behavior and the
+    /// default. Ignored by the current-thread runtime; not intended for use
+    /// with a paused clock.
+    ///
+    /// A worker that is busy, or that parks only because a task yielded,
+    /// polls its own shard; it polls another shard only once that shard has
+    /// gone without a poll for 10 sweep intervals. So while every worker of a group
+    /// is busy, [`yield_now`] on another worker does not let that group's
+    /// sockets make progress sooner than that. Keep several workers per
+    /// shard.
+    ///
+    /// [`yield_now`]: crate::task::yield_now
+    ///
+    /// When this method is not called, the `TOKIO_IO_SHARDS` environment
+    /// variable (read once per process) sets the count; a value that does not
+    /// parse as a positive integer counts as 1. It applies to every runtime in
+    /// the process, so it is lowered until each shard has at least 8 workers:
+    /// a runtime with fewer than 16 workers keeps one driver.
+    ///
+    /// [`io_shard_sweep_interval`]: Self::io_shard_sweep_interval
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// let rt = tokio::runtime::Builder::new_multi_thread()
+    ///     .worker_threads(16)
+    ///     .io_shards(4)
+    ///     .enable_all()
+    ///     .build()
+    ///     .unwrap();
+    /// # drop(rt);
+    /// # }
+    /// ```
+    pub fn io_shards(&mut self, n: usize) -> &mut Self {
+        self.io_shards = Some(n);
+        self
+    }
+
+    /// Sets the longest a sharded I/O driver blocks before its worker sweeps
+    /// the other shards again, or turns that limit off.
+    ///
+    /// With [`io_shards`] above 1, a thread blocked in the driver watches only
+    /// its own shard. `Some(interval)` bounds how long a shard whose workers
+    /// are all busy in non-yielding tasks goes without a poll while other workers
+    /// are idle. A shorter interval lowers that bound and costs more wakeups
+    /// while idle: one per shard per interval. `None` removes the limit, so an
+    /// idle runtime does not wake, but such a shard then waits until another
+    /// worker parks or the busy tasks yield. It has no effect with one shard.
+    ///
+    /// The default is `Some(10 ms)`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `interval` is `Some` of a zero duration.
+    ///
+    /// [`io_shards`]: Self::io_shards
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use std::time::Duration;
+    ///
+    /// let rt = tokio::runtime::Builder::new_multi_thread()
+    ///     .worker_threads(16)
+    ///     .io_shards(4)
+    ///     .io_shard_sweep_interval(Some(Duration::from_millis(2)))
+    ///     .enable_all()
+    ///     .build()
+    ///     .unwrap();
+    /// # drop(rt);
+    /// # }
+    /// ```
+    #[track_caller]
+    pub fn io_shard_sweep_interval(&mut self, interval: Option<Duration>) -> &mut Self {
+        assert!(
+            interval != Some(Duration::ZERO),
+            "io_shard_sweep_interval must be non-zero"
+        );
+        self.io_shard_sweep = interval;
+        self
+    }
+
+    #[cfg(feature = "rt-multi-thread")]
+    fn resolved_io_shards(&self, workers: usize) -> usize {
+        static ENV: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+        if !self.enable_io {
+            return 1;
+        }
+        io_shards_for(self.io_shards, workers, || {
+            *ENV.get_or_init(|| {
+                std::env::var("TOKIO_IO_SHARDS")
+                    .ok()
+                    .and_then(|v| v.trim().parse::<usize>().ok())
+                    .unwrap_or(1)
+            })
+        })
     }
 
     /// Sets a custom timeout for a thread in the blocking pool.
@@ -1884,7 +2009,14 @@ impl Builder {
     ///
     /// The runtime treats any poll that does not wait as busy. That
     /// includes a park with a timer that has already expired, because the
-    /// worker runs that timer's task next.
+    /// worker runs that timer's task next. With [`io_shards`] above 1, it
+    /// also includes the polls a worker makes of its own and other shards
+    /// just before it parks: under overload that worker's queue is empty
+    /// only because earlier busy polls left the backlog in the kernel.
+    /// One exception: a worker whose polls all filled the busy batch in
+    /// two such sweeps within half an `io_shard_sweep_interval` (at least
+    /// 1 ms) polls its own shard once more with the full batch, as an idle
+    /// worker's blocking poll would with one shard.
     ///
     /// A multi-thread worker's local queue holds 256 tasks, so set
     /// `max_io_events_per_tick` to at most 256 as well, with room for the
@@ -1893,6 +2025,7 @@ impl Builder {
     /// The default is to use the same value as [`max_io_events_per_tick`].
     ///
     /// [`event_interval`]: Builder::event_interval
+    /// [`io_shards`]: Builder::io_shards
     /// [`max_io_events_per_tick`]: Builder::max_io_events_per_tick
     ///
     /// # Panics
@@ -2178,7 +2311,9 @@ cfg_rt_multi_thread! {
 
             let worker_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
-            let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
+            let mut cfg = self.get_cfg();
+            cfg.io_shards = self.resolved_io_shards(worker_threads);
+            let (drivers, driver_handle) = driver::Driver::new_sharded(cfg)?;
 
             // Create the blocking pool
             let blocking_pool =
@@ -2191,7 +2326,8 @@ cfg_rt_multi_thread! {
 
             let (scheduler, handle, launch) = MultiThread::new(
                 worker_threads,
-                driver,
+                drivers,
+                self.io_shard_sweep,
                 driver_handle,
                 blocking_spawner,
                 seed_generator_2,
@@ -2260,5 +2396,53 @@ impl fmt::Debug for Builder {
         } else {
             debug.finish()
         }
+    }
+}
+
+/// Default for `Builder::io_shard_sweep_interval`.
+const DEFAULT_IO_SHARD_SWEEP: Duration = Duration::from_millis(10);
+
+/// Fewest workers per shard when the shard count comes from `TOKIO_IO_SHARDS`.
+#[cfg(feature = "rt-multi-thread")]
+const MIN_WORKERS_PER_ENV_SHARD: usize = 8;
+
+/// Shard count for a runtime with `workers` workers. An explicit count is
+/// only clamped to the worker count. The environment default is lowered so
+/// each shard keeps at least `MIN_WORKERS_PER_ENV_SHARD` workers, because it
+/// also reaches small runtimes nobody tuned.
+#[cfg(feature = "rt-multi-thread")]
+fn io_shards_for(explicit: Option<usize>, workers: usize, env: impl FnOnce() -> usize) -> usize {
+    let workers = workers.max(1);
+    let n = match explicit {
+        Some(n) => n,
+        None => env().min(workers / MIN_WORKERS_PER_ENV_SHARD),
+    };
+    n.clamp(1, workers)
+}
+
+#[cfg(all(test, feature = "rt-multi-thread"))]
+mod io_shards_tests {
+    use super::io_shards_for;
+
+    #[test]
+    fn env_default_keeps_eight_workers_per_shard() {
+        let env = |workers| io_shards_for(None, workers, || 8);
+        assert_eq!(env(4), 1);
+        assert_eq!(env(15), 1);
+        assert_eq!(env(16), 2);
+        assert_eq!(env(31), 3);
+        assert_eq!(env(32), 4);
+        assert_eq!(env(64), 8);
+        assert_eq!(env(180), 8);
+        assert_eq!(io_shards_for(None, 180, || 1), 1);
+        assert_eq!(io_shards_for(None, 180, || 0), 1);
+    }
+
+    #[test]
+    fn explicit_count_is_only_clamped_to_workers() {
+        assert_eq!(io_shards_for(Some(2), 2, || unreachable!()), 2);
+        assert_eq!(io_shards_for(Some(8), 4, || unreachable!()), 4);
+        assert_eq!(io_shards_for(Some(0), 4, || unreachable!()), 1);
+        assert_eq!(io_shards_for(Some(4), 0, || unreachable!()), 1);
     }
 }
