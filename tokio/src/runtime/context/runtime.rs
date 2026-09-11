@@ -27,6 +27,9 @@ pub(crate) struct EnterRuntimeGuard {
 
     // Tracks the previous random number generator seed
     old_seed: RngSeed,
+
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    prev_entry: Option<Box<super::jspi::Snapshot>>,
 }
 
 /// Marks the current thread as being within the dynamic extent of an
@@ -40,6 +43,9 @@ where
         if c.runtime.get().is_entered() {
             None
         } else {
+            #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+            let prev_entry = c.entry.replace(Some(Box::new(c.snapshot())));
+
             // Set the entered flag
             c.runtime.set(EnterRuntime::Entered {
                 allow_block_in_place,
@@ -57,6 +63,8 @@ where
                 blocking: BlockingRegionGuard::new(),
                 handle: c.set_current(handle),
                 old_seed,
+                #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+                prev_entry,
             })
         }
     });
@@ -84,6 +92,8 @@ impl Drop for EnterRuntimeGuard {
         CONTEXT.with(|c| {
             assert!(c.runtime.get().is_entered());
             c.runtime.set(EnterRuntime::NotEntered);
+            #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+            c.entry.replace(self.prev_entry.take());
             // Replace the previous RNG seed
             let mut rng = c.rng.get().unwrap_or_else(FastRand::new);
             rng.replace_seed(self.old_seed.clone());

@@ -60,6 +60,10 @@ async fn send_recv_poll() -> std::io::Result<()> {
     target_os = "wasi",
     ignore = "temporarily disabled for WASI pending https://github.com/bytecodealliance/wasmtime/pull/13933"
 )]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "emscripten NODERAWSOCKETS (node dgram) does not surface ICMP port-unreachable as a recv error"
+)]
 async fn send_to_recv_closed_returns_err() -> std::io::Result<()> {
     let sender = UdpSocket::bind("127.0.0.1:0").await?;
     let receiver = UdpSocket::bind("127.0.0.1:0").await?;
@@ -403,6 +407,10 @@ async fn split_chan_poll() -> std::io::Result<()> {
     target_os = "wasi",
     ignore = "WASI does not yet support multithreading"
 )]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "emscripten runs single-threaded; std::thread::spawn is unsupported"
+)]
 #[tokio::test]
 async fn try_send_spawn() {
     const MSG2: &[u8] = b"world!";
@@ -743,13 +751,13 @@ macro_rules! test {
 #[cfg(not(target_os = "wasi"))] // WASI does not yet support broadcast
 test!(broadcast, set_broadcast(true));
 
-#[cfg(not(target_os = "wasi"))] // WASI does not yet support multicast
+#[cfg(not(any(target_os = "wasi", target_os = "emscripten")))] // WASI/emscripten do not support multicast
 test!(IPv4 multicast_loop_v4, set_multicast_loop_v4(false));
 
 #[cfg(target_os = "linux")] // broken on non-Linux platforms https://github.com/rust-lang/socket2/pull/630
 test!(multicast_ttl_v4, set_multicast_ttl_v4(40));
 
-#[cfg(not(target_os = "wasi"))] // WASI does not yet support multicast
+#[cfg(not(any(target_os = "wasi", target_os = "emscripten")))] // WASI/emscripten do not support multicast
 test!(IPv6 multicast_loop_v6, set_multicast_loop_v6(false));
 
 #[cfg(any(
@@ -773,6 +781,7 @@ test!(IPv4 ttl, set_ttl(40));
     target_os = "solaris",
     target_os = "illumos",
     target_os = "haiku",
-    target_os = "wasi"
+    target_os = "wasi",
+    target_os = "emscripten" // emscripten NODERAWSOCKETS does not support IP_TOS
 )))]
 test!(IPv4 tos_v4, set_tos_v4(96));

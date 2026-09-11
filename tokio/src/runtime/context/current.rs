@@ -21,10 +21,10 @@ pub(crate) struct SetCurrentGuard {
 
 pub(super) struct HandleCell {
     /// Current handle
-    handle: RefCell<Option<scheduler::Handle>>,
+    pub(super) handle: RefCell<Option<scheduler::Handle>>,
 
     /// Tracks the number of nested calls to `try_set_current`.
-    depth: Cell<usize>,
+    pub(super) depth: Cell<usize>,
 }
 
 /// Sets this [`Handle`] as the current active [`Handle`].

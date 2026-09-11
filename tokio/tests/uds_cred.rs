@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 #![cfg(all(unix, not(target_os = "dragonfly"), not(miri)))] // No `getsockopt` for Unix domain sockets on miri.
+#![cfg(not(target_os = "emscripten"))] // No `SO_PEERCRED`/`socketpair(2)` on emscripten.
 
 use tokio::net::UnixStream;
 
