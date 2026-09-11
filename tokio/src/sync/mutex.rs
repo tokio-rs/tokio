@@ -23,8 +23,11 @@ use std::{fmt, mem, ptr};
 ///
 /// # Which kind of mutex should you use?
 ///
-/// Contrary to popular belief, it is ok and often preferred to use the ordinary
-/// [`Mutex`][std] from the standard library in asynchronous code.
+/// The ordinary std [`Mutex`][std] cannot be held across an `.await` point -
+/// your program will deadlock if you do this. Use the async mutex instead in
+/// such cases. However, it is ok and often preferred to use the std mutex in
+/// asynchronous tasks when it does not need to be held across an `.await`
+/// point.
 ///
 /// The feature that the async mutex offers over the blocking mutex is the
 /// ability to keep it locked across an `.await` point. This makes the async
