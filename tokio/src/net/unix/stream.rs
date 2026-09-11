@@ -914,6 +914,10 @@ impl UnixStream {
         let (a, b) = mio::net::UnixStream::pair()?;
         let a = UnixStream::new(a)?;
         let b = UnixStream::new(b)?;
+        // A fresh pair has empty buffers: writable now, readable only once
+        // the peer writes.
+        a.io.registration().assume_ready(Ready::WRITABLE);
+        b.io.registration().assume_ready(Ready::WRITABLE);
 
         Ok((a, b))
     }
