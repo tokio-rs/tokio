@@ -166,7 +166,7 @@ impl TcpListener {
             .async_io(Interest::READABLE, || self.io.accept())
             .await?;
 
-        let stream = TcpStream::new(mio)?;
+        let stream = TcpStream::new_accepted(mio)?;
         Ok((stream, addr))
     }
 
@@ -182,7 +182,7 @@ impl TcpListener {
 
             match self.io.accept() {
                 Ok((io, addr)) => {
-                    let io = TcpStream::new(io)?;
+                    let io = TcpStream::new_accepted(io)?;
                     return Poll::Ready(Ok((io, addr)));
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {

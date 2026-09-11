@@ -14,6 +14,7 @@ pub(crate) use synced::Synced;
 
 cfg_rt_multi_thread! {
     mod rt_multi_thread;
+    pub(crate) use rt_multi_thread::InjectQueue;
 }
 
 mod metrics;

@@ -4,6 +4,90 @@ use crate::runtime::task;
 
 use std::sync::atomic::Ordering::Release;
 
+/// The multi-thread scheduler's inject queue. Each variant owns its queue and
+/// lock topology.
+pub(crate) enum InjectQueue<T: 'static> {
+    /// A single queue behind a single mutex.
+    Locked(Inject<T>),
+}
+
+impl<T: 'static> InjectQueue<T> {
+    pub(crate) fn new() -> InjectQueue<T> {
+        InjectQueue::Locked(Inject::new())
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        match self {
+            InjectQueue::Locked(q) => q.is_empty(),
+        }
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        match self {
+            InjectQueue::Locked(q) => q.len(),
+        }
+    }
+
+    pub(crate) fn is_closed(&self) -> bool {
+        match self {
+            InjectQueue::Locked(q) => q.is_closed(),
+        }
+    }
+
+    /// Closes the queue, returns `true` if the queue was open when the
+    /// transition was made.
+    pub(crate) fn close(&self) -> bool {
+        match self {
+            InjectQueue::Locked(q) => q.close(),
+        }
+    }
+
+    /// Pushes a value into the queue.
+    ///
+    /// This does nothing if the queue is closed.
+    pub(crate) fn push(&self, task: task::Notified<T>) {
+        match self {
+            InjectQueue::Locked(q) => q.push(task),
+        }
+    }
+
+    pub(crate) fn pop(&self) -> Option<task::Notified<T>> {
+        match self {
+            InjectQueue::Locked(q) => q.pop(),
+        }
+    }
+
+    /// Pushes several values into the queue.
+    ///
+    /// This does nothing if the queue is closed.
+    pub(crate) fn push_batch<I>(&self, iter: I)
+    where
+        I: Iterator<Item = task::Notified<T>>,
+    {
+        match self {
+            InjectQueue::Locked(q) => q.push_batch(iter),
+        }
+    }
+
+    /// Pops up to `n` values from the queue, passing an iterator over them to
+    /// `f`. Any values `f` does not consume are removed from the queue and
+    /// dropped.
+    pub(crate) fn pop_n<R>(&self, n: usize, f: impl FnOnce(Pop<'_, T>) -> R) -> R {
+        match self {
+            InjectQueue::Locked(q) => q.pop_n(n, f),
+        }
+    }
+
+    /// Pops every task from the queue into `dst`, atomically with respect to
+    /// concurrent pushes.
+    #[cfg(all(tokio_unstable, feature = "taskdump"))]
+    pub(crate) fn drain_into(&self, dst: &mut Vec<task::Notified<T>>) {
+        match self {
+            InjectQueue::Locked(q) => q.drain_into(dst),
+        }
+    }
+}
+
 impl<T: 'static> Inject<T> {
     pub(crate) fn is_empty(&self) -> bool {
         self.shared.is_empty()
