@@ -1,4 +1,4 @@
-use crate::time::{sleep_until, Duration, Instant, Sleep};
+use crate::time::{safe_delay, sleep_until, Duration, Instant, Sleep};
 use crate::util::trace;
 
 use std::future::{poll_fn, Future};
@@ -133,7 +133,7 @@ fn internal_interval_at(
 
     Interval {
         delay: Box::pin(sleep_until(start)),
-        period,
+        period: safe_delay(period),
         missed_tick_behavior: MissedTickBehavior::default(),
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         resource_span,
@@ -337,21 +337,21 @@ impl MissedTickBehavior {
             Self::Burst => timeout + period,
             Self::Delay => now + period,
             Self::Skip => {
-                now + period
-                    - Duration::from_nanos(
-                        ((now - timeout).as_nanos() % period.as_nanos())
-                            .try_into()
-                            // This operation is practically guaranteed not to
-                            // fail, as in order for it to fail, `period` would
-                            // have to be longer than `now - timeout`, and both
-                            // would have to be longer than 584 years.
-                            //
-                            // If it did fail, there's not a good way to pass
-                            // the error along to the user, so we just panic.
-                            .expect(
-                                "too much time has elapsed since the interval was supposed to tick",
-                            ),
-                    )
+                let offset = Duration::from_nanos(
+                    ((now - timeout).as_nanos() % period.as_nanos())
+                        .try_into()
+                        // This operation is practically guaranteed not to
+                        // fail, as in order for it to fail, `period` would
+                        // have to be longer than `now - timeout`, and both
+                        // would have to be longer than 584 years.
+                        //
+                        // If it did fail, there's not a good way to pass
+                        // the error along to the user, so we just panic.
+                        .expect(
+                            "too much time has elapsed since the interval was supposed to tick",
+                        ),
+                );
+                now + (period - offset)
             }
         }
     }
@@ -474,9 +474,7 @@ impl Interval {
             self.missed_tick_behavior
                 .next_timeout(timeout, now, self.period)
         } else {
-            timeout
-                .checked_add(self.period)
-                .unwrap_or_else(Instant::far_future)
+            timeout + self.period
         };
 
         // When we arrive here, the internal delay returned `Poll::Ready`.
@@ -582,7 +580,8 @@ impl Interval {
     /// # }
     /// ```
     pub fn reset_after(&mut self, after: Duration) {
-        self.delay.as_mut().reset(Instant::now() + after);
+        let deadline = Instant::now() + safe_delay(after);
+        self.delay.as_mut().reset(deadline);
     }
 
     /// Resets the interval to a [`crate::time::Instant`] deadline.

@@ -175,11 +175,13 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
                 let waker = cx.waker().clone();
 
                 // SAFETY: entry is valid for the entire duration of the operation
-                match unsafe { driver.register_op(entry, waker) } {
+                match unsafe { driver.register_op(entry, waker).into_tuple() } {
                     Ok(idx) => this.state = State::Polled(idx),
+
                     Err((_err, Some(idx))) => {
                         this.state = State::Polled(idx);
                     }
+
                     Err((err, None)) => {
                         let data = this
                             .take_data()

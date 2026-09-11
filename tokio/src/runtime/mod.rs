@@ -550,6 +550,11 @@ cfg_rt! {
     }
 
     cfg_fs! {
+        // Non-pthread emscripten uses the inline shim in `crate::blocking`.
+        #[cfg_attr(
+            all(target_os = "emscripten", not(target_feature = "atomics")),
+            allow(unused_imports)
+        )]
         pub(crate) use blocking::spawn_mandatory_blocking;
     }
 
@@ -558,43 +563,45 @@ cfg_rt! {
     cfg_unstable! {
         pub use self::builder::UnhandledPanic;
         pub use crate::util::rand::RngSeed;
+    }
 
-        /// Returns the index of the current worker thread, if called from a
-        /// runtime worker thread.
-        ///
-        /// The returned value is a 0-based index matching the worker indices
-        /// used by [`RuntimeMetrics`] methods such as
-        /// [`worker_total_busy_duration`](RuntimeMetrics::worker_total_busy_duration).
-        ///
-        /// Returns `None` when called from outside a runtime worker thread
-        /// (for example, from a blocking thread or a non-Tokio thread). On the
-        /// multi-thread runtime, the thread that calls [`Runtime::block_on`] is
-        /// not a worker thread, so this also returns `None` there.
-        ///
-        /// For the current-thread runtime and [`LocalRuntime`], this always
-        /// returns `Some(0)` (including inside `block_on`, since the calling
-        /// thread *is* the worker thread).
-        ///
-        /// Note that the result may change across `.await` points, as the
-        /// task may be moved to a different worker thread by the scheduler.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// # #[cfg(not(target_family = "wasm"))]
-        /// # {
-        /// #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
-        /// async fn main() {
-        ///     let index = tokio::spawn(async {
-        ///         tokio::runtime::worker_index()
-        ///     }).await.unwrap();
-        ///     println!("Task ran on worker {:?}", index);
-        /// }
-        /// # }
-        /// ```
-        pub fn worker_index() -> Option<usize> {
-            context::worker_index()
-        }
+    /// Returns the index of the current worker thread, if called from a
+    /// runtime worker thread.
+    ///
+    /// The returned value is a 0-based index matching the worker indices
+    /// used by [`RuntimeMetrics`] methods such as
+    /// [`worker_total_busy_duration`](RuntimeMetrics::worker_total_busy_duration).
+    ///
+    /// Returns `None` when called from outside a runtime worker thread
+    /// (for example, from a blocking thread or a non-Tokio thread). On the
+    /// multi-thread runtime, the thread that calls [`Runtime::block_on`] is
+    /// not a worker thread, so this also returns `None` there.
+    ///
+    /// For the current-thread runtime, this returns `Some(0)` when called from
+    /// the thread that currently owns the runtime driver. If multiple threads
+    /// call [`Runtime::block_on`] concurrently, calls on threads that do not
+    /// own the driver return `None`. A [`LocalRuntime`] can only be driven from
+    /// its owning thread, so calls inside `block_on` always return `Some(0)`.
+    ///
+    /// Note that the result may change across `.await` points, as the
+    /// task may be moved to a different worker thread by the scheduler.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
+    /// async fn main() {
+    ///     let index = tokio::spawn(async {
+    ///         tokio::runtime::worker_index()
+    ///     }).await.unwrap();
+    ///     println!("Task ran on worker {:?}", index);
+    /// }
+    /// # }
+    /// ```
+    pub fn worker_index() -> Option<usize> {
+        context::worker_index()
     }
 
     cfg_taskdump! {
@@ -630,6 +637,24 @@ cfg_rt! {
     } else {
         16384
     };
+
+    /// Decides whether a future or closure of type `T` is boxed before it is
+    /// turned into a task, based on [`BOX_FUTURE_THRESHOLD`].
+    ///
+    /// The decision is an associated constant rather than a runtime
+    /// comparison of `std::mem::size_of::<T>()` so that only the taken branch
+    /// is instantiated. With a runtime `if`, both branches are instantiated
+    /// for every `T` (one task harness for `T`, one for `Pin<Box<T>>`),
+    /// doubling the generated code for every spawned future in a crate. A
+    /// branch on a constant that is known once `T` is known is pruned by the
+    /// monomorphization collector, so only the harness that is actually used
+    /// is generated.
+    pub(crate) struct AutoBox<T>(std::marker::PhantomData<T>);
+
+    impl<T> AutoBox<T> {
+        /// `true` if a value of type `T` is larger than [`BOX_FUTURE_THRESHOLD`].
+        pub(crate) const SHOULD_BOX: bool = std::mem::size_of::<T>() > BOX_FUTURE_THRESHOLD;
+    }
 
     mod thread_id;
     pub(crate) use thread_id::ThreadId;

@@ -14,6 +14,22 @@ use std::{io, mem, task::Waker};
 
 const DEFAULT_RING_SIZE: u32 = 256;
 
+pub(crate) enum RegisterResult {
+    Submitted(usize),
+    NotPushed(std::io::Error),
+    Pushed { index: usize, error: std::io::Error },
+}
+
+impl RegisterResult {
+    pub(crate) fn into_tuple(self) -> Result<usize, (std::io::Error, Option<usize>)> {
+        match self {
+            RegisterResult::Submitted(idx) => Ok(idx),
+            RegisterResult::NotPushed(err) => Err((err, None)),
+            RegisterResult::Pushed { index, error } => Err((error, Some(index))),
+        }
+    }
+}
+
 pub(crate) struct UringContext {
     pub(crate) uring: Option<io_uring::IoUring>,
     pub(crate) ops: slab::Slab<Lifecycle>,
@@ -263,40 +279,33 @@ impl Handle {
     ///
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
-    pub(crate) unsafe fn register_op(
-        &self,
-        entry: Entry,
-        waker: Waker,
-    ) -> Result<usize, (io::Error, Option<usize>)> {
+    pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> RegisterResult {
         assert!(self.uring_probe.initialized());
-
-        // Uring is initialized.
 
         let mut guard = self.get_uring().lock();
         let ctx = &mut *guard;
         let index = ctx.ops.insert(Lifecycle::Waiting(waker));
         let entry = entry.user_data(index as u64);
 
-        let submit_or_err =
-            |ctx: &mut UringContext, queued: bool| -> Result<(), (io::Error, Option<usize>)> {
-                if let Err(e) = ctx.submit() {
-                    if !queued {
-                        // SQE is not in the ring. Safe to remove the tracking data.
-                        ctx.remove_op(index);
-                        return Err((e, None));
-                    } else {
-                        // SQE IS in the ring. We must NOT remove the op.
-                        // Return the index so the caller knows to quarantine the memory.
-                        return Err((e, Some(index)));
-                    }
+        let submit_or_err = |ctx: &mut UringContext, queued: bool| -> Result<(), RegisterResult> {
+            if let Err(e) = ctx.submit() {
+                if !queued {
+                    // SQE is not in the ring. Safe to remove the tracking data.
+                    ctx.remove_op(index);
+                    return Err(RegisterResult::NotPushed(e));
+                } else {
+                    // SQE IS in the ring. We must NOT remove the op.
+                    return Err(RegisterResult::Pushed { index, error: e });
                 }
-                Ok(())
-            };
+            }
+            Ok(())
+        };
 
         // SAFETY: entry is valid for the entire duration of the operation
         while unsafe { ctx.ring_mut().submission().push(&entry).is_err() } {
-            // If the submission queue is full, flush it to the kernel
-            submit_or_err(ctx, false)?;
+            if let Err(err_res) = submit_or_err(ctx, false) {
+                return err_res;
+            }
         }
 
         // Ensure that the completion queue is not full before submitting the entry.
@@ -304,9 +313,11 @@ impl Handle {
             ctx.dispatch_completions();
         }
 
-        submit_or_err(ctx, true)?;
+        if let Err(err_res) = submit_or_err(ctx, true) {
+            return err_res;
+        }
 
-        Ok(index)
+        RegisterResult::Submitted(index)
     }
 
     pub(crate) fn cancel_op<T: Cancellable>(&self, index: usize, data: Option<T>) {

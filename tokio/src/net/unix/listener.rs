@@ -214,7 +214,7 @@ impl UnixListener {
             .await?;
 
         let addr = SocketAddr(addr);
-        let stream = UnixStream::new(mio)?;
+        let stream = UnixStream::new_accepted(mio)?;
         Ok((stream, addr))
     }
 
@@ -227,7 +227,7 @@ impl UnixListener {
     pub fn poll_accept(&self, cx: &mut Context<'_>) -> Poll<io::Result<(UnixStream, SocketAddr)>> {
         let (sock, addr) = ready!(self.io.registration().poll_read_io(cx, || self.io.accept()))?;
         let addr = SocketAddr(addr);
-        let sock = UnixStream::new(sock)?;
+        let sock = UnixStream::new_accepted(sock)?;
         Poll::Ready(Ok((sock, addr)))
     }
 }

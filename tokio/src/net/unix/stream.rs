@@ -918,6 +918,16 @@ impl UnixStream {
         Ok((a, b))
     }
 
+    /// See `TcpStream::new_accepted`.
+    pub(crate) fn new_accepted(stream: mio::net::UnixStream) -> io::Result<UnixStream> {
+        let stream = UnixStream::new(stream)?;
+        stream
+            .io
+            .registration()
+            .assume_ready(Ready::READABLE | Ready::WRITABLE);
+        Ok(stream)
+    }
+
     pub(crate) fn new(stream: mio::net::UnixStream) -> io::Result<UnixStream> {
         let io = PollEvented::new(stream)?;
         Ok(UnixStream { io })
