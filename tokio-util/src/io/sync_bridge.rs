@@ -282,6 +282,12 @@ impl<T: AsyncBufRead + Unpin> BufRead for SyncIoBridge<T> {
         self.rt
             .block_on(AsyncBufReadExt::read_until(src, byte, buf))
     }
+
+    fn skip_until(&mut self, byte: u8) -> std::io::Result<usize> {
+        let src = &mut self.src;
+        self.rt.block_on(AsyncBufReadExt::skip_until(src, byte))
+    }
+
     fn read_line(&mut self, buf: &mut String) -> std::io::Result<usize> {
         let src = &mut self.src;
         self.rt.block_on(AsyncBufReadExt::read_line(src, buf))
