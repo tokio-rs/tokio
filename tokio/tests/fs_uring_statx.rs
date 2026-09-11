@@ -24,7 +24,7 @@ use tokio::runtime::{Builder, Runtime};
 use tokio_test::assert_pending;
 use tokio_util::task::TaskTracker;
 
-use crate::support::io_uring::io_uring_supported;
+use crate::support::io_uring::{io_uring_supported, uring_fs_op_in_use};
 
 mod support {
     pub(crate) mod io_uring;
@@ -57,7 +57,7 @@ fn rt_combinations() -> Vec<Box<dyn Fn() -> Runtime>> {
 
 #[test]
 fn shutdown_runtime_while_performing_io_uring_ops() {
-    if !io_uring_supported() {
+    if !uring_fs_op_in_use(io_uring::opcode::Statx::CODE) {
         return;
     }
 
@@ -239,7 +239,7 @@ async fn stat_path_name_too_long() {
 
 #[tokio::test]
 async fn cancel_op_future() {
-    if !io_uring_supported() {
+    if !uring_fs_op_in_use(io_uring::opcode::Statx::CODE) {
         return;
     }
 

@@ -17,6 +17,7 @@ use io_uring::IoUring;
 // to check if the fallback mechanism works, this comes with the limitation that we are not
 // able to run some checks (e.g., asserting a poll returns pending). This utility function
 // is useful when we want to run a test only in Linux targets where io_uring is supported.
+#[allow(dead_code)]
 pub fn io_uring_supported() -> bool {
     match IoUring::new(256) {
         Ok(_) => true,
@@ -31,6 +32,25 @@ pub fn io_uring_supported() -> bool {
             "IoUring::new failed with an unexpected error (expected ENOSYS or EPERM): {e}"
         ),
     }
+}
+
+/// Whether tokio uses io_uring, rather than the `spawn_blocking` fallback, for
+/// the `fs` functions built on `opcode` (`Statx` for `try_exists`, `Read` for
+/// `read`). Mirrors the gate in `tokio/src/fs`: the target must have
+/// `libc::statx` (see the FIXME there about musl) and the kernel must support
+/// the opcode. Tests that assert on the io_uring path (e.g. that the first
+/// poll is `Pending`) return early when this is false, since the blocking
+/// fallback may already be done by the first poll.
+#[allow(dead_code)]
+pub fn uring_fs_op_in_use(opcode: u8) -> bool {
+    if !cfg!(any(target_env = "gnu", target_os = "android")) {
+        return false;
+    }
+    let Ok(ring) = IoUring::new(2) else {
+        return false;
+    };
+    let mut probe = io_uring::Probe::new();
+    ring.submitter().register_probe(&mut probe).is_ok() && probe.is_supported(opcode)
 }
 
 #[allow(dead_code)]
