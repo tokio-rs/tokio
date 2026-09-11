@@ -36,7 +36,8 @@ struct Inner {
     /// Avoids entering the park if possible
     state: AtomicUsize,
 
-    /// I/O driver shard this parker's driver polls; used to target unparks.
+    /// I/O driver shard that the driver of this parker polls; used to target
+    /// unparks.
     shard: usize,
 
     /// Drivers of every shard (including ours), for the 0-timeout help pass.

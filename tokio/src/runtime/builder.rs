@@ -64,8 +64,8 @@ pub struct Builder {
     nevents: usize,
     nevents_busy: Option<usize>,
 
-    /// Number of I/O driver shards for the multi-thread runtime (`None` =
-    /// `TOKIO_IO_SHARDS` env or 1).
+    /// Number of I/O driver shards for the multi-thread runtime (`None` = the
+    /// `TOKIO_IO_SHARDS` environment variable, or 1).
     pub(super) io_shards: Option<usize>,
 
     /// Longest a sharded driver blocks; see `io_shard_sweep_interval`.

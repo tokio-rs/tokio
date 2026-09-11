@@ -385,7 +385,7 @@ fn shard_keeps_a_poller_when_its_blocker_runs_a_task() {
     // Before the standby hand-off the sibling slept on its condvar and shard 0
     // waited for another group's stale-help, about half the sweep (100 ms).
     use std::io::Write;
-    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
     use std::sync::Arc;
 
     const MARKER: u64 = u64::MAX;
@@ -400,7 +400,8 @@ fn shard_keeps_a_poller_when_its_blocker_runs_a_task() {
         .unwrap();
     let t0 = std::time::Instant::now();
     // Sockets 0..4 land on shards 0, 1, 0, 1.
-    let maxes: Vec<Arc<AtomicU64>> = (0..4).map(|_| Arc::new(AtomicU64::new(0))).collect();
+    // Delays in microseconds; `usize` because some targets have no 64-bit atomics.
+    let maxes: Vec<Arc<AtomicUsize>> = (0..4).map(|_| Arc::new(AtomicUsize::new(0))).collect();
     let mut writers = Vec::new();
     for m in &maxes {
         let (w, r) = std::os::unix::net::UnixStream::pair().unwrap();
@@ -417,7 +418,7 @@ fn shard_keeps_a_poller_when_its_blocker_runs_a_task() {
                         continue;
                     }
                     let now = t0.elapsed().as_micros() as u64;
-                    m.fetch_max(now.saturating_sub(sent), Relaxed);
+                    m.fetch_max(now.saturating_sub(sent) as usize, Relaxed);
                 }
             });
         });
@@ -444,7 +445,7 @@ fn shard_keeps_a_poller_when_its_blocker_runs_a_task() {
         maxes[2].store(0, Relaxed);
         marker.write_all(&MARKER.to_le_bytes()).unwrap();
         std::thread::sleep(BLOCK + Duration::from_millis(50));
-        worst = worst.max(Duration::from_micros(maxes[2].load(Relaxed)));
+        worst = worst.max(Duration::from_micros(maxes[2].load(Relaxed) as u64));
     }
     stop.store(true, Relaxed);
     feeder.join().unwrap();
