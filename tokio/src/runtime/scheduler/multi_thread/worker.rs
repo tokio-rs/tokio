@@ -323,7 +323,7 @@ pub(super) fn create(
         task_hooks: TaskHooks::from_config(&config),
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
-            inject: InjectQueue::new(),
+            inject: InjectQueue::new(config.sharded_inject_queue, size),
             idle,
             owned: OwnedTasks::new(size),
             synced: Mutex::new(Synced {
@@ -1143,15 +1143,19 @@ impl Core {
             // and not pushed onto the local queue.
             let n = usize::max(1, n);
 
+            let mut ret = None;
+
             worker.inject().pop_n(n, |mut tasks| {
                 // Pop the first task to return immediately
-                let ret = tasks.next();
+                if ret.is_none() {
+                    ret = tasks.next();
+                }
 
                 // Push the rest of the on the run queue
                 self.run_queue.push_back(tasks);
+            });
 
-                ret
-            })
+            ret
         }
     }
 
