@@ -25,6 +25,29 @@ use std::{io, path::Path};
 /// # }
 /// ```
 pub async fn read_to_string(path: impl AsRef<Path>) -> io::Result<String> {
-    let path = path.as_ref().to_owned();
+    let path = path.as_ref();
+
+    #[cfg(all(tokio_unstable, feature = "io-uring", feature = "rt", feature = "fs",))]
+    {
+        use crate::fs::read_uring;
+
+        let handle = crate::runtime::Handle::current();
+        let driver_handle = handle.inner.driver().io();
+        if driver_handle
+            .check_and_init(io_uring::opcode::Read::CODE)
+            .await?
+        {
+            return read_uring(path).await.and_then(|bytes| {
+                String::from_utf8(bytes)
+                    .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+            });
+        }
+    }
+
+    read_to_string_spawn_blocking(path).await
+}
+
+async fn read_to_string_spawn_blocking(path: &Path) -> io::Result<String> {
+    let path = path.to_owned();
     asyncify(move || std::fs::read_to_string(path)).await
 }
