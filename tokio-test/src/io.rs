@@ -66,11 +66,22 @@ enum Action {
     WriteError(Option<Arc<io::Error>>),
 }
 
+/// Identifies which half is polling the shared `Sleep`.
+///
+/// A `Mock` may be used through [`tokio::io::split`], in which case the read
+/// and write halves are polled by two independent tasks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Half {
+    Read,
+    Write,
+}
+
 struct Inner {
     actions: VecDeque<Action>,
     waiting: Option<Instant>,
     sleep: Option<Pin<Box<Sleep>>>,
     read_wait: Option<Waker>,
+    write_wait: Option<Waker>,
     rx: UnboundedReceiverStream<Action>,
     name: String,
 }
@@ -201,6 +212,7 @@ impl Inner {
             actions,
             sleep: None,
             read_wait: None,
+            write_wait: None,
             rx,
             waiting: None,
             name,
@@ -209,6 +221,58 @@ impl Inner {
         let handle = Handle { tx };
 
         (inner, handle)
+    }
+
+    /// Polls the pending `Wait` timer, if one is set.
+    ///
+    /// Both `poll_read` and `poll_write` drive this same `Sleep`, but a timer
+    /// only stores the waker of its most recent poll. When a `Mock` is used
+    /// through [`tokio::io::split`], the two halves are polled by independent
+    /// tasks, so whichever half polls last evicts the other half's waker and
+    /// that half would never be woken again.
+    ///
+    /// To keep the shared wait usable from both halves, each half records its
+    /// own waker here, and the half that observes the timer firing wakes the
+    /// other one. The `Sleep` itself is still shared, so a `wait()` continues
+    /// to describe a single shared deadline for the whole `Mock`.
+    ///
+    /// Note that `read_wait` is also the slot `maybe_wakeup_reader` uses to
+    /// park a reader that currently has nothing to read. Both uses only ever
+    /// take the waker and wake it, so a wake arriving from either path is at
+    /// worst an extra poll.
+    ///
+    /// This does not help a half whose peer stops polling entirely: if the task
+    /// holding the timer's waker is dropped, nobody observes the timer firing
+    /// and the remaining half stays parked.
+    ///
+    /// See <https://github.com/tokio-rs/tokio/issues/7445>.
+    fn poll_sleep(&mut self, cx: &mut task::Context<'_>, half: Half) -> Poll<()> {
+        if let Some(ref mut sleep) = self.sleep {
+            if Pin::new(sleep).poll(cx).is_pending() {
+                match half {
+                    Half::Read => self.read_wait = Some(cx.waker().clone()),
+                    Half::Write => self.write_wait = Some(cx.waker().clone()),
+                }
+
+                return Poll::Pending;
+            }
+
+            // The shared timer fired. Polling it above replaced whatever waker
+            // the other half had registered, so wake that half explicitly.
+            let other = match half {
+                Half::Read => self.write_wait.take(),
+                Half::Write => self.read_wait.take(),
+            };
+
+            if let Some(waker) = other {
+                waker.wake();
+            }
+        }
+
+        // If a sleep was set, it has already fired
+        self.sleep = None;
+
+        Poll::Ready(())
     }
 
     fn poll_action(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Action>> {
@@ -363,12 +427,7 @@ impl AsyncRead for Mock {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         loop {
-            if let Some(ref mut sleep) = self.inner.sleep {
-                ready!(Pin::new(sleep).poll(cx));
-            }
-
-            // If a sleep is set, it has already fired
-            self.inner.sleep = None;
+            ready!(self.inner.poll_sleep(cx, Half::Read));
 
             // Capture 'filled' to monitor if it changed
             let filled = buf.filled().len();
@@ -411,12 +470,7 @@ impl AsyncWrite for Mock {
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         loop {
-            if let Some(ref mut sleep) = self.inner.sleep {
-                ready!(Pin::new(sleep).poll(cx));
-            }
-
-            // If a sleep is set, it has already fired
-            self.inner.sleep = None;
+            ready!(self.inner.poll_sleep(cx, Half::Write));
 
             if self.inner.actions.is_empty() {
                 match self.inner.poll_action(cx) {
