@@ -86,6 +86,16 @@ impl TcpStream {
         /// result in a successful connection, the error returned from the last
         /// connection attempt (the last address) is returned.
         ///
+        /// Note that on dual-stack hosts the address list may contain both IPv4
+        /// and IPv6 addresses. If all attempts fail, only the last error is
+        /// returned. For example, on an IPv4-only host where DNS returns
+        /// `[IPv4, IPv6]`, a real IPv4 failure (e.g. connection refused) can be
+        /// hidden by a subsequent IPv6 `EADDRNOTAVAIL` (`AddrNotAvailable`,
+        /// raw OS error 99 on Linux / 10049 on Windows) when the host has no
+        /// IPv6 connectivity. If you need per-address errors, resolve the
+        /// addresses with [`ToSocketAddrs`] yourself and try each address in a
+        /// loop. This matches `std::net::TcpStream::connect`.
+        ///
         /// To configure the socket before connecting, you can use the [`TcpSocket`]
         /// type.
         ///
