@@ -1208,7 +1208,7 @@ jobs:
           targets: wasm32-unknown-emscripten
 
       - name: Install Emscripten
-        uses: mymindstorm/setup-emsdk@v14
+        uses: mymindstorm/setup-emsdk@v16
         with:
           version: ${{ env.emsdk_version }}
 
