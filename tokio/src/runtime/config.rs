@@ -12,6 +12,12 @@ pub(crate) struct Config {
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(crate) event_interval: u32,
 
+    /// When `Some`, the cooperative scheduling budget for each task poll is
+    /// time-based: the task may continue making cooperative yield points until
+    /// the configured wall-clock duration has elapsed, instead of using the
+    /// default tick-based budget.
+    pub(crate) coop_time_budget: Option<std::time::Duration>,
+
     /// Callback for a worker parking itself
     pub(crate) before_park: Option<Callback>,
 
