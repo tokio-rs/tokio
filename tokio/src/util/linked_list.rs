@@ -380,6 +380,10 @@ feature! {
     }
 
     impl<L: Link> GuardedLinkedList<L> {
+        pub(crate) fn is_empty(&self) -> bool {
+            self.tail().is_none()
+        }
+
         fn tail(&self) -> Option<NonNull<L::Target>> {
             let tail_ptr = unsafe {
                 L::pointers(self.guard).as_ref().get_prev().unwrap()
