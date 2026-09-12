@@ -11,6 +11,7 @@
 
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio_test::assert_ok;
+use tokio_test::io::Builder;
 
 use bytes::BytesMut;
 use std::cmp;
@@ -56,4 +57,14 @@ async fn write_all() {
     assert_ok!(wr.write_all(b"hello world").await);
     assert_eq!(wr.buf, b"hello world"[..]);
     assert_eq!(wr.cnt, 3);
+}
+
+#[tokio::test]
+async fn write_all_retries_interrupted() {
+    let mut mock = Builder::new()
+        .write_error(io::Error::from(io::ErrorKind::Interrupted))
+        .write(b"hello")
+        .build();
+
+    mock.write_all(b"hello").await.unwrap();
 }
