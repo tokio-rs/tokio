@@ -109,6 +109,20 @@ impl<W: AsyncWrite> BufWriter<W> {
         self.inner
     }
 
+    /// Consumes this `BufWriter`, returning the underlying writer and any
+    /// buffered but unwritten data.
+    ///
+    /// The returned data does not include any bytes that were already written to
+    /// the underlying writer before a previous flush returned `Poll::Pending`.
+    /// This method does not attempt to flush data before returning.
+    pub fn into_parts(mut self) -> (W, Vec<u8>) {
+        if self.written > 0 {
+            self.buf.drain(..self.written);
+        }
+
+        (self.inner, self.buf)
+    }
+
     /// Returns a reference to the internally buffered data.
     pub fn buffer(&self) -> &[u8] {
         &self.buf
