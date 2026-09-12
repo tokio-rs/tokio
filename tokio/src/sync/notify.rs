@@ -1224,8 +1224,9 @@ impl NotifiedProject<'_> {
                 }
                 State::Waiting => {
                     #[cfg(all(tokio_unstable, feature = "taskdump"))]
-                    if let Some(_waker) = waker {
-                        std::task::ready!(crate::trace::trace_leaf());
+                    if let Some(waker) = waker {
+                        let mut cx = Context::from_waker(waker);
+                        std::task::ready!(crate::trace::trace_leaf(&mut cx));
                     }
 
                     if waiter.notification.load(Acquire).is_some() {
@@ -1317,8 +1318,9 @@ impl NotifiedProject<'_> {
                 }
                 State::Done => {
                     #[cfg(all(tokio_unstable, feature = "taskdump"))]
-                    if let Some(_waker) = waker {
-                        std::task::ready!(crate::trace::trace_leaf());
+                    if let Some(waker) = waker {
+                        let mut cx = Context::from_waker(waker);
+                        std::task::ready!(crate::trace::trace_leaf(&mut cx));
                     }
                     return Poll::Ready(());
                 }
