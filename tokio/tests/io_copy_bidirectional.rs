@@ -2,7 +2,9 @@
 #![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support bind()
 
 use std::time::Duration;
-use tokio::io::{self, copy_bidirectional, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{
+    self, copy_bidirectional, copy_bidirectional_with_sizes, AsyncReadExt, AsyncWriteExt,
+};
 use tokio::net::TcpStream;
 use tokio::task::JoinHandle;
 
@@ -137,6 +139,28 @@ async fn immediate_exit_on_read_error() {
     let mut b = tokio_test::io::Builder::new().read_error(error()).build();
 
     assert!(copy_bidirectional(&mut a, &mut b).await.is_err());
+}
+
+#[tokio::test]
+#[should_panic(expected = "`a_to_b_buf_size` must be greater than 0")]
+async fn copy_bidirectional_with_sizes_panics_on_zero_a_to_b_buffer() {
+    let mut a = tokio_test::io::Builder::new().build();
+    let mut b = tokio_test::io::Builder::new().build();
+
+    copy_bidirectional_with_sizes(&mut a, &mut b, 0, 1)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+#[should_panic(expected = "`b_to_a_buf_size` must be greater than 0")]
+async fn copy_bidirectional_with_sizes_panics_on_zero_b_to_a_buffer() {
+    let mut a = tokio_test::io::Builder::new().build();
+    let mut b = tokio_test::io::Builder::new().build();
+
+    copy_bidirectional_with_sizes(&mut a, &mut b, 1, 0)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
