@@ -1,5 +1,5 @@
 use futures_core::FusedStream;
-use tokio_stream::StreamExt;
+use tokio_stream::{StreamExt, StreamNotifyClose};
 
 // Helper: a fused base stream built from a vec
 fn fused_iter<T>(items: Vec<T>) -> impl FusedStream<Item = T> {
@@ -205,4 +205,15 @@ async fn merge_terminated_only_after_both_done() {
     assert_eq!(stream.next().await, None);
     assert!(stream.is_terminated());
     assert_eq!(collected.len(), 2);
+}
+
+#[tokio::test]
+async fn stream_notify_close_is_terminated_after_close_notification() {
+    let mut stream = StreamNotifyClose::new(tokio_stream::iter(vec![1]));
+    assert!(!stream.is_terminated());
+    assert_eq!(stream.next().await, Some(Some(1)));
+    assert!(!stream.is_terminated());
+    assert_eq!(stream.next().await, Some(None));
+    assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
 }
