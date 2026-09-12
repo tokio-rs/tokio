@@ -40,6 +40,66 @@ fn rt(start_paused: bool) -> crate::runtime::Runtime {
         .unwrap()
 }
 
+#[cfg(not(loom))]
+fn reset_from_another_thread_wakes_parked_driver(
+    configure: impl FnOnce(&mut crate::runtime::Builder),
+) {
+    use std::future::{poll_fn, Future};
+    use std::sync::{mpsc, Arc as StdArc, Mutex as StdMutex};
+    use std::thread as std_thread;
+    use std::time::Instant as StdInstant;
+
+    let mut builder = crate::runtime::Builder::new_current_thread();
+    builder.enable_time();
+    configure(&mut builder);
+    let rt = builder.build().unwrap();
+
+    let sleep = {
+        let _guard = rt.enter();
+        StdArc::new(StdMutex::new(Box::pin(crate::time::sleep(
+            Duration::from_secs(1),
+        ))))
+    };
+
+    let (parked_tx, parked_rx) = mpsc::sync_channel(0);
+    let (reset_tx, reset_rx) = mpsc::sync_channel(0);
+    super::test_hooks::set_before_park(move || {
+        parked_tx.send(()).unwrap();
+        reset_rx.recv().unwrap();
+    });
+
+    let reset_sleep = sleep.clone();
+    let reset_thread = std_thread::spawn(move || {
+        parked_rx.recv().unwrap();
+        reset_sleep
+            .lock()
+            .unwrap()
+            .as_mut()
+            .reset(crate::time::Instant::now() + Duration::from_millis(10));
+        reset_tx.send(()).unwrap();
+    });
+
+    let start = StdInstant::now();
+    rt.block_on(poll_fn(|cx| sleep.lock().unwrap().as_mut().poll(cx)));
+
+    reset_thread.join().unwrap();
+    assert!(start.elapsed() < Duration::from_millis(500));
+}
+
+#[test]
+#[cfg(not(loom))]
+fn reset_from_another_thread_wakes_timer_only_driver() {
+    reset_from_another_thread_wakes_parked_driver(|_| {});
+}
+
+#[test]
+#[cfg(all(not(loom), feature = "net"))]
+fn reset_from_another_thread_wakes_mio_driver() {
+    reset_from_another_thread_wakes_parked_driver(|builder| {
+        builder.enable_io();
+    });
+}
+
 #[test]
 fn single_timer() {
     model(|| {
