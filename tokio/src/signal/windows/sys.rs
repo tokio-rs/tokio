@@ -1,8 +1,11 @@
 use std::io;
 use std::io::Error;
+use std::mem::MaybeUninit;
+use std::num::NonZeroI32;
 use std::ops::Index;
 use std::sync::OnceLock;
 
+use crate::loom::cell::UnsafeCell;
 use crate::signal::RxFuture;
 use crate::sync::watch;
 
@@ -57,21 +60,28 @@ pub(super) fn ctrl_shutdown() -> io::Result<RxFuture> {
 }
 
 fn new(signal: SignalKind) -> io::Result<RxFuture> {
-    // Initialize the registry BEFORE registering the OS handler: the
-    // handler thread can then always observe an initialized `REGISTRY`
-    // (`SetConsoleCtrlHandler` happens-after the initialization below),
-    // so it needs no blocking wait.
-    let registry = REGISTRY.get_or_init(Registry::default);
+    let handler_result = GLOBALS.handler_result.get_or_init(|| {
+        // SAFETY: exclusive access from `OnceLock::get_or_init`.
+        GLOBALS
+            .registry
+            .with_mut(|x| unsafe { &mut *x }.write(Registry::default()));
 
-    HANDLER_RESULT
-        .get_or_init(
-            || match unsafe { console::SetConsoleCtrlHandler(Some(handler), 1) } {
-                0 => Err(Error::last_os_error().raw_os_error().expect("unreachable")),
-                _ => Ok(()),
+        // SAFETY: the global registry was just initialized.
+        match unsafe { console::SetConsoleCtrlHandler(Some(handler), 1) } {
+            0 => match Error::last_os_error().raw_os_error().expect("unreachable") {
+                // Unreachable: `SetConsoleCtrlHandler` does not call `SetLastError` on success.
+                0 => Ok(()),
+                err => Err(NonZeroI32::new(err).expect("unreachable")),
             },
-        )
-        .map_err(Error::from_raw_os_error)?;
+            _ => Ok(()),
+        }
+    });
+    if let Err(err) = handler_result {
+        return Err(Error::from_raw_os_error(err.get()));
+    }
 
+    // SAFETY: the global registry was just initialized.
+    let registry = GLOBALS.registry.with(|x| unsafe { (*x).assume_init_ref() });
     let rx = registry[signal].subscribe();
     Ok(RxFuture::new(rx))
 }
@@ -99,12 +109,21 @@ impl Index<SignalKind> for Registry {
     }
 }
 
-static REGISTRY: OnceLock<Registry> = OnceLock::new();
+struct Globals {
+    handler_result: OnceLock<Result<(), NonZeroI32>>,
+    registry: UnsafeCell<MaybeUninit<Registry>>,
+}
 
-/// Whether `SetConsoleCtrlHandler` succeeded, initialized (once) only
-/// after `REGISTRY` — see `new` for the ordering argument.
-static HANDLER_RESULT: OnceLock<Result<(), i32>> = OnceLock::new();
+unsafe impl Sync for Globals {}
 
+static GLOBALS: Globals = Globals {
+    handler_result: OnceLock::new(),
+    registry: UnsafeCell::new(MaybeUninit::uninit()),
+};
+
+/// # Safety
+///
+/// The global registry must be initialized.
 unsafe extern "system" fn handler(ty: u32) -> BOOL {
     let signal = match ty {
         console::CTRL_C_EVENT => SignalKind::CtrlC,
@@ -116,15 +135,8 @@ unsafe extern "system" fn handler(ty: u32) -> BOOL {
         _ => return 0,
     };
 
-    // `new` initializes `REGISTRY` before it registers this handler with
-    // the OS, so an invoked handler always finds it initialized —
-    // `get()` suffices and no blocking wait is needed (using `get`
-    // also keeps the crate's MSRV: `OnceLock::wait` needs Rust 1.86).
-    let Some(registry) = REGISTRY.get() else {
-        // Unreachable by the ordering above; kept as a defensive
-        // fallback that lets the OS run the next handler.
-        return 0;
-    };
+    // SAFETY: the global registry is initialized.
+    let registry = GLOBALS.registry.with(|x| unsafe { (*x).assume_init_ref() });
 
     // According to https://learn.microsoft.com/en-us/windows/console/handlerroutine
     // the handler routine is always invoked in a new thread, thus we don't
