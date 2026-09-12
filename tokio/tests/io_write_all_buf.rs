@@ -10,8 +10,8 @@
 ))]
 
 use tokio::io::{AsyncWrite, AsyncWriteExt};
-use tokio_test::{assert_err, assert_ok};
 use tokio_test::io::Builder;
+use tokio_test::{assert_err, assert_ok};
 
 use bytes::{Buf, Bytes, BytesMut};
 use std::cmp;
@@ -133,9 +133,7 @@ async fn write_all_buf_vectored() {
         ) -> Poll<Result<usize, io::Error>> {
             if !self.interrupted {
                 self.interrupted = true;
-                return Poll::Ready(Err(io::Error::from(
-                    io::ErrorKind::Interrupted,
-                )));
+                return Poll::Ready(Err(io::Error::from(io::ErrorKind::Interrupted)));
             }
 
             for buf in bufs {
