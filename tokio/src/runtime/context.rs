@@ -19,6 +19,9 @@ cfg_rt! {
     mod scoped;
     use scoped::Scoped;
 
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    pub(crate) mod jspi;
+
     use crate::runtime::{scheduler, task::Id};
 
     use std::task::Waker;
@@ -63,6 +66,17 @@ struct Context {
     /// Tracks the amount of "work" a task may still do before yielding back to
     /// the scheduler
     budget: Cell<coop::Budget>,
+
+    /// The context the current runtime was entered from, restored while a
+    /// JSPI park is suspended. `jspi::Snapshot` must cover every field the
+    /// runtime's dynamic extent writes; `task::local::CURRENT` is the known
+    /// exception.
+    #[cfg(all(
+        feature = "rt",
+        target_os = "emscripten",
+        not(target_feature = "atomics")
+    ))]
+    entry: std::cell::RefCell<Option<Box<jspi::Snapshot>>>,
 
     #[cfg(all(
         tokio_unstable,
@@ -109,6 +123,13 @@ tokio_thread_local! {
             rng: Cell::new(None),
 
             budget: Cell::new(coop::Budget::unconstrained()),
+
+            #[cfg(all(
+                feature = "rt",
+                target_os = "emscripten",
+                not(target_feature = "atomics")
+            ))]
+            entry: std::cell::RefCell::new(None),
 
             #[cfg(all(
                 tokio_unstable,

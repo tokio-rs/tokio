@@ -1227,8 +1227,16 @@ jobs:
         run: cargo hack check -p tokio --each-feature --exclude-features full,net,process,signal,rt-multi-thread,io-uring,taskdump,schedule-latency --target wasm32-unknown-emscripten
         working-directory: tokio
 
-      - name: Test tokio for emscripten
+      - name: Test tokio for emscripten (JSPI)
         run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,fs,io-util,io-std,test-util" --tests
+        working-directory: tokio
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
+          # The last two serve tests/rt_emscripten_jspi.rs; rustc runs from the workspace root.
+          RUSTFLAGS: "-Dwarnings -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sJSPI -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sJSPI_EXPORTS=tokio_test_reenter -Clink-args=--js-library=tokio/tests/rt_emscripten_jspi.js"
+
+      - name: Test tokio for emscripten (non-JSPI)
+        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,fs,io-util,io-std,test-util" --test rt_emscripten_block_on
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
@@ -1241,8 +1249,8 @@ jobs:
           targets: wasm32-unknown-emscripten
           components: rust-src
 
-      - name: Test tokio multi-thread runtime for emscripten (pthreads)
-        run: cargo +${{ env.rust_emscripten_nightly }} test -Zbuild-std=std,panic_abort -p tokio --target wasm32-unknown-emscripten --features "rt,rt-multi-thread,time,sync,macros" --test rt_multi_thread_emscripten
+      - name: Test tokio for emscripten (pthreads)
+        run: cargo +${{ env.rust_emscripten_nightly }} test -Zbuild-std=std,panic_abort -p tokio --target wasm32-unknown-emscripten --features "rt,rt-multi-thread,time,sync,macros,fs,io-util,io-std,test-util" --tests
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node

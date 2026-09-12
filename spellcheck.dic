@@ -1,4 +1,4 @@
-331
+333
 &
 +
 <
@@ -32,6 +32,7 @@
 8MB
 ABI
 accessors
+activations
 adaptor
 adaptors
 Adaptors
@@ -163,6 +164,7 @@ IP
 IPv4
 IPv6
 iteratively
+JSPI
 Kotlin's
 latencies
 Lauck
