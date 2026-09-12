@@ -11,6 +11,7 @@
 
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio_test::{assert_err, assert_ok};
+use tokio_test::io::Builder;
 
 use bytes::{Buf, Bytes, BytesMut};
 use std::cmp;
@@ -107,6 +108,7 @@ async fn write_buf_err() {
 async fn write_all_buf_vectored() {
     struct Wr {
         buf: BytesMut,
+        interrupted: bool,
     }
     impl AsyncWrite for Wr {
         fn poll_write(
@@ -129,6 +131,13 @@ async fn write_all_buf_vectored() {
             _cx: &mut Context<'_>,
             bufs: &[io::IoSlice<'_>],
         ) -> Poll<Result<usize, io::Error>> {
+            if !self.interrupted {
+                self.interrupted = true;
+                return Poll::Ready(Err(io::Error::from(
+                    io::ErrorKind::Interrupted,
+                )));
+            }
+
             for buf in bufs {
                 self.buf.extend_from_slice(buf);
             }
@@ -143,6 +152,7 @@ async fn write_all_buf_vectored() {
 
     let mut wr = Wr {
         buf: BytesMut::with_capacity(64),
+        interrupted: false,
     };
     let mut buf = Bytes::from_static(b"hello")
         .chain(Bytes::from_static(b" "))
@@ -150,4 +160,16 @@ async fn write_all_buf_vectored() {
 
     wr.write_all_buf(&mut buf).await.unwrap();
     assert_eq!(&wr.buf[..], b"hello world");
+}
+
+#[tokio::test]
+async fn write_all_buf_retries_interrupted() {
+    let mut mock = Builder::new()
+        .write_error(io::Error::from(io::ErrorKind::Interrupted))
+        .write(b"hello")
+        .build();
+    let mut buf = Bytes::from_static(b"hello");
+
+    mock.write_all_buf(&mut buf).await.unwrap();
+    assert!(!buf.has_remaining());
 }

@@ -40,7 +40,13 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         let me = self.project();
         while !me.buf.is_empty() {
-            let n = ready!(Pin::new(&mut *me.writer).poll_write(cx, me.buf))?;
+            let n = loop {
+                match ready!(Pin::new(&mut *me.writer).poll_write(cx, me.buf)) {
+                    Ok(n) => break n,
+                    Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                    Err(e) => return Poll::Ready(Err(e)),
+                }
+            };
             {
                 let (_, rest) = mem::take(&mut *me.buf).split_at(n);
                 *me.buf = rest;
