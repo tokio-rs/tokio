@@ -535,7 +535,7 @@ impl LengthDelimitedCodec {
 
             // Adjust `n` with bounds checking
             let n = if self.builder.length_adjustment < 0 {
-                n.checked_sub(-self.builder.length_adjustment as usize)
+                n.checked_sub(self.builder.length_adjustment.unsigned_abs())
             } else {
                 n.checked_add(self.builder.length_adjustment as usize)
             };
@@ -618,7 +618,7 @@ impl Encoder<&[u8]> for LengthDelimitedCodec {
 
         // Adjust `n` with bounds checking
         let n = if self.builder.length_adjustment < 0 {
-            n.checked_add(-self.builder.length_adjustment as usize)
+            n.checked_add(self.builder.length_adjustment.unsigned_abs())
         } else {
             n.checked_sub(self.builder.length_adjustment as usize)
         };
