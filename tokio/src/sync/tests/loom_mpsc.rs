@@ -224,6 +224,29 @@ fn nonempty_after_send() {
 }
 
 #[test]
+#[cfg(tokio_unstable)]
+fn array_nonempty_after_send() {
+    loom::model(|| {
+        // Under loom, BLOCK_CAP is 2, so this bounded channel uses the
+        // array-backed queue when tokio_unstable is enabled.
+        let (send, recv) = mpsc::channel(2);
+        let send2 = send.clone();
+
+        let join = thread::spawn(move || {
+            block_on(send2.send("message2")).unwrap();
+        });
+
+        // Loom can schedule send2 so it reserves the head slot but stalls before
+        // marking it ready. This send can then complete in the next slot.
+        // is_empty must still report that the channel contains a message.
+        block_on(send.send("message1")).unwrap();
+        assert!(!recv.is_empty());
+
+        join.join().unwrap();
+    });
+}
+
+#[test]
 fn is_empty_during_close() {
     loom::model(|| {
         let (tx, rx) = mpsc::channel::<()>(1);

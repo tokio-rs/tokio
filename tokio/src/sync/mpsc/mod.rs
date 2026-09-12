@@ -123,6 +123,9 @@ pub use self::bounded::{
 
 mod chan;
 
+#[cfg(tokio_unstable)]
+pub(super) mod array;
+
 pub(super) mod list;
 
 mod unbounded;
@@ -131,6 +134,23 @@ pub use self::unbounded::{
 };
 
 pub mod error;
+
+pub(crate) enum TryPopResult<T> {
+    /// Successfully popped a value.
+    Ok(T),
+    /// The channel is empty.
+    ///
+    /// Note that `mpsc::chan` only tracks the close state set by senders. If the
+    /// channel is closed by `Rx::close()`, then `TryPopResult::Empty` is still
+    /// returned, and the close state needs to be handled by `chan.rs`.
+    Empty,
+    /// The channel is empty and closed.
+    ///
+    /// Returned when the send half is closed (all senders dropped).
+    Closed,
+    /// The channel is not empty, but the first value is being written.
+    Busy,
+}
 
 /// The number of values a block can contain.
 ///
