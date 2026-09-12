@@ -105,8 +105,14 @@ where
     A: AsyncRead + AsyncWrite + Unpin + ?Sized,
     B: AsyncRead + AsyncWrite + Unpin + ?Sized,
 {
-    assert!(a_to_b_buf_size > 0, "`a_to_b_buf_size` must be greater than 0");
-    assert!(b_to_a_buf_size > 0, "`b_to_a_buf_size` must be greater than 0");
+    assert!(
+        a_to_b_buf_size > 0,
+        "`a_to_b_buf_size` must be greater than 0"
+    );
+    assert!(
+        b_to_a_buf_size > 0,
+        "`b_to_a_buf_size` must be greater than 0"
+    );
 
     copy_bidirectional_impl(
         a,
