@@ -277,3 +277,24 @@ async fn trace_with_callback_and_backtrace() {
         );
     }
 }
+
+/// Regression test for <https://github.com/tokio-rs/tokio/issues/8391>.
+///
+/// Taking a task dump on a `current_thread` runtime used to panic with
+/// "RefCell already borrowed" if any traced task woke a waker while it was
+/// being re-polled by the tracer. Waking during a poll is legal, so the dump
+/// must release the scheduler-core borrow before polling any task.
+#[tokio::test(flavor = "current_thread")]
+async fn dump_does_not_panic_when_traced_task_wakes_self() {
+    let task = tokio::spawn(std::future::poll_fn(|cx| {
+        if tokio::runtime::Handle::is_tracing() {
+            cx.waker().wake_by_ref();
+        }
+        std::task::Poll::<()>::Pending
+    }));
+
+    tokio::task::yield_now().await;
+    let _dump = tokio::runtime::Handle::current().dump().await;
+
+    task.abort();
+}
