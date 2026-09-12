@@ -38,23 +38,42 @@
 //! Specifically, through invariant #2, we know that we always have to lock a parent
 //! before its child.
 //!
+use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::{Arc, Mutex, MutexGuard};
 
 /// A node of the cancellation tree structure
 ///
-/// The actual data it holds is wrapped inside a mutex for synchronization.
+/// The cancellation state lives in a lock-free `AtomicBool` so that
+/// [`is_cancelled`] can be checked without acquiring the per-node mutex. The
+/// remaining tree bookkeeping still lives inside the mutex-protected `Inner`.
 pub(crate) struct TreeNode {
+    /// Whether the node has been cancelled.
+    ///
+    /// Monotonic: once it transitions `false` -> `true`, it never goes back.
+    /// Stored with `Release`, loaded with `Acquire`, so an observer that sees
+    /// `true` synchronizes with the `cancel()` call that set it (and thus
+    /// with any data the cancelling thread wrote first).
+    ///
+    /// This pair is *not* sufficient on its own for the `WaitForCancellationFuture::poll`
+    /// check-then-register pattern, where a load returning `false` must
+    /// happen-before the corresponding store of `true`. That use site takes
+    /// the mutex via [`is_cancelled_with_sync`] instead — the lock pair
+    /// supplies the missing direction. Keeping the public `is_cancelled` as
+    /// a plain `load(Acquire)` matters because read-modify-write atomics
+    /// (e.g. `lock cmpxchg`) take the cache line exclusive and would defeat
+    /// the fast path for many concurrent readers on different cores.
+    is_cancelled: AtomicBool,
     inner: Mutex<Inner>,
     waker: tokio::sync::Notify,
 }
 impl TreeNode {
     pub(crate) fn new() -> Self {
         Self {
+            is_cancelled: AtomicBool::new(false),
             inner: Mutex::new(Inner {
                 parent: None,
                 parent_idx: 0,
                 children: vec![],
-                is_cancelled: false,
                 num_handles: 1,
             }),
             waker: tokio::sync::Notify::new(),
@@ -69,18 +88,43 @@ impl TreeNode {
 /// The data contained inside a `TreeNode`.
 ///
 /// This struct exists so that the data of the node can be wrapped
-/// in a Mutex.
+/// in a `Mutex`.
 struct Inner {
     parent: Option<Arc<TreeNode>>,
     parent_idx: usize,
     children: Vec<Arc<TreeNode>>,
-    is_cancelled: bool,
     num_handles: usize,
 }
 
-/// Returns whether or not the node is cancelled
+/// Returns whether or not the node is cancelled.
+///
+/// This is a lock-free, non-blocking fast path: it never acquires the node's
+/// mutex and never performs an atomic read-modify-write. It is the right
+/// choice for callers that just want to ask "is this token cancelled?" —
+/// including tight loops on real-time threads.
+///
+/// Note: if you intend to read this flag and then register a `Notified` for
+/// wakeup on cancellation, use [`is_cancelled_with_sync`] instead.
 pub(crate) fn is_cancelled(node: &Arc<TreeNode>) -> bool {
-    node.inner.lock().unwrap().is_cancelled
+    node.is_cancelled.load(Ordering::Acquire)
+}
+
+/// Returns whether or not the node is cancelled, providing a full
+/// happens-before with the `cancel()` that sets the flag.
+///
+/// This is used by `WaitForCancellationFuture::poll`'s check-then-register
+/// pattern: the caller has already created a `Notified` future, will read
+/// the flag here, and — if it observes `false` — will then register itself
+/// on the `Notify`'s waiter list. For that registration to be guaranteed to
+/// happen-before the next `cancel()`'s `notify_waiters()`, the load must
+/// happen-before any concurrent `cancel()` write. A plain `load(Acquire)`
+/// does not establish that direction; taking the node's mutex does, because
+/// `cancel()` does its work under the same mutex.
+pub(crate) fn is_cancelled_with_sync(node: &Arc<TreeNode>) -> bool {
+    // The mutex's release/acquire chain with `cancel()` carries the
+    // happens-before, so the atomic read itself only needs `Relaxed`.
+    let _guard = node.inner.lock().unwrap();
+    node.is_cancelled.load(Ordering::Relaxed)
 }
 
 /// Creates a child node
@@ -90,13 +134,16 @@ pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
     // Do not register as child if we are already cancelled.
     // Cancelled trees can never be uncancelled and therefore
     // need no connection to parents or children any more.
-    if locked_parent.is_cancelled {
+    //
+    // `Relaxed` is sufficient here: any write that set the flag to `true` was
+    // performed while holding `parent.inner`, and we hold that mutex now.
+    if parent.is_cancelled.load(Ordering::Relaxed) {
         return Arc::new(TreeNode {
+            is_cancelled: AtomicBool::new(true),
             inner: Mutex::new(Inner {
                 parent: None,
                 parent_idx: 0,
                 children: vec![],
-                is_cancelled: true,
                 num_handles: 1,
             }),
             waker: tokio::sync::Notify::new(),
@@ -104,11 +151,11 @@ pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
     }
 
     let child = Arc::new(TreeNode {
+        is_cancelled: AtomicBool::new(false),
         inner: Mutex::new(Inner {
             parent: Some(parent.clone()),
             parent_idx: locked_parent.children.len(),
             children: vec![],
-            is_cancelled: false,
             num_handles: 1,
         }),
         waker: tokio::sync::Notify::new(),
@@ -297,7 +344,9 @@ pub(crate) fn decrease_handle_refcount(node: &Arc<TreeNode>) {
 pub(crate) fn cancel(node: &Arc<TreeNode>) {
     let mut locked_node = node.inner.lock().unwrap();
 
-    if locked_node.is_cancelled {
+    // `Relaxed` is sufficient when reading inside the mutex; the mutex
+    // release-acquire chain already orders this with any previous writer.
+    if node.is_cancelled.load(Ordering::Relaxed) {
         return;
     }
 
@@ -313,7 +362,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
         locked_child.parent_idx = 0;
 
         // If child is already cancelled, detaching is enough
-        if locked_child.is_cancelled {
+        if child.is_cancelled.load(Ordering::Relaxed) {
             continue;
         }
 
@@ -328,7 +377,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
             locked_grandchild.parent_idx = 0;
 
             // If grandchild is already cancelled, detaching is enough
-            if locked_grandchild.is_cancelled {
+            if grandchild.is_cancelled.load(Ordering::Relaxed) {
                 continue;
             }
 
@@ -336,8 +385,8 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
             // Otherwise, just cancel them right away, no need for another iteration.
             if locked_grandchild.children.is_empty() {
                 // Cancel the grandchild
-                locked_grandchild.is_cancelled = true;
                 locked_grandchild.children = Vec::new();
+                grandchild.is_cancelled.store(true, Ordering::Release);
                 drop(locked_grandchild);
                 grandchild.waker.notify_waiters();
             } else {
@@ -350,8 +399,8 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
         }
 
         // Cancel the child
-        locked_child.is_cancelled = true;
         locked_child.children = Vec::new();
+        child.is_cancelled.store(true, Ordering::Release);
         drop(locked_child);
         child.waker.notify_waiters();
 
@@ -360,8 +409,8 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
     }
 
     // Cancel the node itself.
-    locked_node.is_cancelled = true;
     locked_node.children = Vec::new();
+    node.is_cancelled.store(true, Ordering::Release);
     drop(locked_node);
     node.waker.notify_waiters();
 }
