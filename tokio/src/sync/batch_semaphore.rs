@@ -397,17 +397,13 @@ impl Semaphore {
     fn poll_acquire(
         &self,
         cx: &mut Context<'_>,
-        num_permits: usize,
+        _num_permits: usize,
         node: Pin<&mut Waiter>,
         queued: bool,
     ) -> Poll<Result<(), AcquireError>> {
         let mut acquired = 0;
 
-        let needed = if queued {
-            node.state.load(Acquire) << Self::PERMIT_SHIFT
-        } else {
-            num_permits << Self::PERMIT_SHIFT
-        };
+        let needed = node.state.load(Acquire) << Self::PERMIT_SHIFT;
 
         let mut lock = None;
         // First, try to take the requested number of permits from the
@@ -461,6 +457,7 @@ impl Semaphore {
                                 )
                             });
 
+                            node.assign_permits(&mut acquired);
                             return Poll::Ready(Ok(()));
                         } else if lock.is_none() {
                             break self.waiters.lock();
@@ -587,24 +584,24 @@ impl Future for Acquire<'_> {
 
         let (node, semaphore, needed, queued) = self.project();
 
-        // First, ensure the current task has enough budget to proceed.
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let coop = ready!(trace_poll_op!(
-            "poll_acquire",
-            crate::task::coop::poll_proceed(cx),
-        ));
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let coop = ready!(crate::task::coop::poll_proceed(cx));
-
         let result = match semaphore.poll_acquire(cx, needed, node, *queued) {
             Poll::Pending => {
                 *queued = true;
                 Poll::Pending
             }
             Poll::Ready(r) => {
-                coop.made_progress();
                 r?;
+
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                let coop = ready!(trace_poll_op!(
+                    "poll_acquire",
+                    crate::task::coop::poll_proceed(cx),
+                ));
+
+                #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+                let coop = ready!(crate::task::coop::poll_proceed(cx));
+
+                coop.made_progress();
                 *queued = false;
                 Poll::Ready(Ok(()))
             }
