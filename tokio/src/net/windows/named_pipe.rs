@@ -2575,7 +2575,9 @@ impl ClientOptions {
             };
 
             if result == 0 {
-                return Err(io::Error::last_os_error());
+                let err = io::Error::last_os_error();
+                unsafe { windows_sys::CloseHandle(h) };
+                return Err(err);
             }
         }
 
