@@ -1,5 +1,25 @@
 use futures_core::FusedStream;
-use tokio_stream::{StreamExt, StreamNotifyClose};
+use tokio_stream::{Stream, StreamExt, StreamNotifyClose};
+
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+struct EndOnce {
+    ended: bool,
+}
+
+impl Stream for EndOnce {
+    type Item = ();
+
+    fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if self.ended {
+            panic!("stream polled after returning None");
+        }
+
+        self.ended = true;
+        Poll::Ready(None)
+    }
+}
 
 // Helper: a fused base stream built from a vec
 fn fused_iter<T>(items: Vec<T>) -> impl FusedStream<Item = T> {
@@ -212,6 +232,15 @@ async fn stream_notify_close_is_terminated_after_close_notification() {
     let mut stream = StreamNotifyClose::new(tokio_stream::iter(vec![1]));
     assert!(!stream.is_terminated());
     assert_eq!(stream.next().await, Some(Some(1)));
+    assert!(!stream.is_terminated());
+    assert_eq!(stream.next().await, Some(None));
+    assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
+}
+
+#[tokio::test]
+async fn stream_notify_close_does_not_poll_inner_after_close_notification() {
+    let mut stream = StreamNotifyClose::new(EndOnce { ended: false });
     assert!(!stream.is_terminated());
     assert_eq!(stream.next().await, Some(None));
     assert!(stream.is_terminated());
