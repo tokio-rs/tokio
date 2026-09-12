@@ -3,6 +3,9 @@ use std::path::Path;
 
 use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use std::fs::Permissions;
+
 use crate::net::{UnixDatagram, UnixListener, UnixStream};
 
 cfg_net_unix! {
@@ -242,6 +245,33 @@ impl UnixSocket {
         };
 
         UnixDatagram::from_mio(mio)
+    }
+
+    /// Sets the permissions of the socket.
+    ///
+    /// Calling this function on a socket that has already been bound will return an error.
+    ///
+    /// This calls the `fchmod(2)` operating-system function.
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub fn set_permissions(&self, perm: Permissions) -> io::Result<()> {
+        use std::fs::File;
+        use std::mem::ManuallyDrop;
+
+        let is_bound = self.inner.local_addr()?.as_pathname().is_some();
+
+        // After binding, the file is a separate inode so `fchmod` would silently no-op
+        if is_bound {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "set_permissions cannot be called on a bound socket",
+            ));
+        }
+
+        // Safety: `self` keeps the descriptor open, and `file` neither escapes this
+        // function nor is dropped, so the descriptor is not closed.
+        let file = ManuallyDrop::new(unsafe { File::from_raw_fd(self.as_raw_fd()) });
+
+        file.set_permissions(perm)
     }
 }
 
