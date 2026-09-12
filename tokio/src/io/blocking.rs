@@ -312,6 +312,36 @@ cfg_io_uring! {
 
 cfg_fs! {
     impl Buf {
+        /// Writes the entire buffer to `wr`, advancing the cursor past the
+        /// bytes that are written.
+        ///
+        /// On success the buffer is left empty. If a write fails, the bytes
+        /// that were not written are left in the buffer so that the caller can
+        /// retry them, with the cursor positioned at the first byte still to
+        /// be written.
+        ///
+        /// This differs from [`Buf::write_to`], which clears the buffer even
+        /// when the write fails. That behavior is relied upon by `Blocking<T>`,
+        /// so the two cannot be merged.
+        pub(crate) fn write_all_to<T: Write>(&mut self, wr: &mut T) -> io::Result<()> {
+            while !self.is_empty() {
+                // `Write::write_all` cannot be used here: it does not report
+                // how many bytes it wrote before failing.
+                let res = uninterruptibly!(wr.write(self.bytes()));
+
+                match res {
+                    Ok(0) => return Err(io::ErrorKind::WriteZero.into()),
+                    Ok(n) => self.pos += n,
+                    Err(e) => return Err(e),
+                }
+            }
+
+            self.buf.clear();
+            self.pos = 0;
+
+            Ok(())
+        }
+
         pub(crate) fn discard_read(&mut self) -> i64 {
             let ret = -(self.bytes().len() as i64);
             self.pos = 0;
