@@ -459,17 +459,18 @@ macro_rules! doc {
         /// # }
         /// ```
         ///
-        /// ### Moving to `merge`
+        /// ### Moving to a stream
         ///
-        /// By using merge, you can unify multiple asynchronous tasks into a single stream,
-        /// eliminating the need to manage tasks manually and reducing the risk of
-        /// unintended behavior like data loss.
+        /// By combining the tasks into a single stream, you avoid managing them manually
+        /// and reduce the risk of unintended behavior like data loss. [`StreamMap`] polls
+        /// its entries fairly, which suits three or more sources (chaining
+        /// [`StreamExt::merge`] works for two streams but grows unfair beyond that):
         ///
         /// ```
-        /// use std::pin::pin;
+        /// use std::pin::Pin;
         ///
         /// use futures::stream::unfold;
-        /// use tokio_stream::StreamExt;
+        /// use tokio_stream::{Stream, StreamExt, StreamMap};
         ///
         /// struct File;
         /// struct Channel;
@@ -508,8 +509,13 @@ macro_rules! doc {
         /// });
         /// let c = tokio_stream::iter([Message::Stop]);
         ///
-        /// let mut s = pin!(a.merge(b).merge(c));
-        /// while let Some(msg) = s.next().await {
+        /// let mut s: StreamMap<&str, Pin<Box<dyn Stream<Item = Message>>>> =
+        ///     StreamMap::from_iter([
+        ///         ("file_channel", Box::pin(a) as _),
+        ///         ("socket", Box::pin(b) as _),
+        ///         ("control", Box::pin(c) as _),
+        ///     ]);
+        /// while let Some((_key, msg)) = s.next().await {
         ///     match msg {
         ///         Message::Data(_data) => { /* ... */ }
         ///         Message::Sent => continue,
@@ -518,6 +524,9 @@ macro_rules! doc {
         /// }
         /// # }
         /// ```
+        ///
+        /// [`StreamExt::merge`]: https://docs.rs/tokio-stream/latest/tokio_stream/trait.StreamExt.html#method.merge
+        /// [`StreamMap`]: https://docs.rs/tokio-stream/latest/tokio_stream/struct.StreamMap.html
         ///
         /// ## Racing Futures
         ///
