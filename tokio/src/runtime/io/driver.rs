@@ -23,6 +23,9 @@ use std::time::Duration;
 
 /// I/O driver, backed by Mio.
 pub(crate) struct Driver {
+    /// Index of the [`Shard`] in the [`Handle`] that this driver polls.
+    shard: usize,
+
     /// True when an event with the signal token is received
     signal_ready: bool,
 
@@ -37,8 +40,8 @@ pub(crate) struct Driver {
     poll: mio::Poll,
 }
 
-/// A reference to an I/O driver.
-pub(crate) struct Handle {
+/// One `epoll` instance and the registrations that live on it.
+pub(crate) struct Shard {
     /// Registers I/O resources.
     registry: mio::Registry,
 
@@ -52,6 +55,12 @@ pub(crate) struct Handle {
     /// Not supported on `Wasi` due to lack of threading support.
     #[cfg(not(target_os = "wasi"))]
     waker: mio::Waker,
+}
+
+/// A reference to an I/O driver.
+pub(crate) struct Handle {
+    /// The driver's `epoll` instances. There is exactly one.
+    shards: Box<[Shard]>,
 
     pub(crate) metrics: IoDriverMetrics,
 
@@ -125,6 +134,7 @@ impl Driver {
         let registry = poll.registry().try_clone()?;
 
         let driver = Driver {
+            shard: 0,
             signal_ready: false,
             events: mio::Events::with_capacity(nevents),
             events_busy: nevents_busy.map(mio::Events::with_capacity),
@@ -133,12 +143,16 @@ impl Driver {
 
         let (registrations, synced) = RegistrationSet::new();
 
-        let handle = Handle {
+        let shard = Shard {
             registry,
             registrations,
             synced: Mutex::new(synced),
             #[cfg(not(target_os = "wasi"))]
             waker,
+        };
+
+        let handle = Handle {
+            shards: Box::new([shard]),
             metrics: IoDriverMetrics::default(),
             #[cfg(all(
                 tokio_unstable,
@@ -172,8 +186,8 @@ impl Driver {
     }
 
     pub(crate) fn shutdown(&mut self, rt_handle: &driver::Handle) {
-        let handle = rt_handle.io();
-        let ios = handle.registrations.shutdown(&mut handle.synced.lock());
+        let shard = &rt_handle.io().shards[self.shard];
+        let ios = shard.registrations.shutdown(&mut shard.synced.lock());
 
         // `shutdown()` must be called without holding the lock.
         for io in ios {
@@ -182,9 +196,10 @@ impl Driver {
     }
 
     fn turn(&mut self, handle: &Handle, max_wait: Option<Duration>) {
-        debug_assert!(!handle.registrations.is_shutdown(&handle.synced.lock()));
+        let shard = &handle.shards[self.shard];
+        debug_assert!(!shard.registrations.is_shutdown(&shard.synced.lock()));
 
-        handle.release_pending_registrations();
+        shard.release_pending_registrations();
 
         // A poll that does not wait takes the busy batch. Events it leaves
         // behind stay queued in the kernel, so the next poll returns them.
@@ -279,7 +294,26 @@ impl Handle {
     /// return immediately.
     pub(crate) fn unpark(&self) {
         #[cfg(not(target_os = "wasi"))]
-        self.waker.wake().expect("failed to wake I/O driver");
+        for shard in self.shards.iter() {
+            shard.waker.wake().expect("failed to wake I/O driver");
+        }
+    }
+
+    /// Wakes the poller of one shard.
+    pub(crate) fn unpark_shard(&self, shard: usize) {
+        #[cfg(not(target_os = "wasi"))]
+        self.shards[shard]
+            .waker
+            .wake()
+            .expect("failed to wake I/O driver");
+        #[cfg(target_os = "wasi")]
+        let _ = shard;
+    }
+
+    /// Registry of shard 0; used for the signal pipe and the `io_uring` `eventfd`.
+    #[allow(dead_code)]
+    pub(super) fn registry(&self) -> &mio::Registry {
+        &self.shards[0].registry
     }
 
     /// Registers an I/O resource with the reactor for a given `mio::Ready` state.
@@ -290,16 +324,22 @@ impl Handle {
         source: &mut impl mio::event::Source,
         interest: Interest,
     ) -> io::Result<Arc<ScheduledIo>> {
-        let scheduled_io = self.registrations.allocate(&mut self.synced.lock())?;
+        // A source stays on one shard for its whole life.
+        let shard_idx = 0;
+        let shard = &self.shards[shard_idx];
+        let scheduled_io = shard
+            .registrations
+            .allocate(&mut shard.synced.lock(), shard_idx)?;
         let token = scheduled_io.token();
 
         // we should remove the `scheduled_io` from the `registrations` set if registering
         // the `source` with the OS fails. Otherwise it will leak the `scheduled_io`.
-        if let Err(e) = self.registry.register(source, token, interest.to_mio()) {
+        if let Err(e) = shard.registry.register(source, token, interest.to_mio()) {
             // safety: `scheduled_io` is part of the `registrations` set.
             unsafe {
-                self.registrations
-                    .remove(&mut self.synced.lock(), &scheduled_io)
+                shard
+                    .registrations
+                    .remove(&mut shard.synced.lock(), &scheduled_io)
             };
 
             return Err(e);
@@ -317,22 +357,27 @@ impl Handle {
         registration: &Arc<ScheduledIo>,
         source: &mut impl Source,
     ) -> io::Result<()> {
+        let shard_idx = registration.shard();
+        let shard = &self.shards[shard_idx];
+
         // Deregister the source with the OS poller **first**
         // Cleanup ALWAYS happens
-        let os_result = self.registry.deregister(source);
+        let os_result = shard.registry.deregister(source);
 
-        if self
+        if shard
             .registrations
-            .deregister(&mut self.synced.lock(), registration)
+            .deregister(&mut shard.synced.lock(), registration)
         {
-            self.unpark();
+            self.unpark_shard(shard_idx);
         }
 
         self.metrics.dec_fd_count();
 
         os_result // Return error after cleanup
     }
+}
 
+impl Shard {
     fn release_pending_registrations(&self) {
         if self.registrations.needs_release() {
             self.registrations.release(&mut self.synced.lock());
@@ -382,6 +427,6 @@ mod tests {
         for (mut rx, _tx, reg) in sources {
             handle.deregister_source(&reg, &mut rx).unwrap();
         }
-        handle.release_pending_registrations();
+        handle.shards[0].release_pending_registrations();
     }
 }
