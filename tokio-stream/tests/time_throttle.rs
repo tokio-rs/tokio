@@ -7,6 +7,11 @@ use tokio_test::*;
 
 use std::time::Duration;
 
+#[test]
+fn throttle_can_be_created_outside_runtime() {
+    let _stream = futures::stream::iter([1, 2]).throttle(Duration::from_millis(1));
+}
+
 #[tokio::test]
 async fn usage() {
     time::pause();
