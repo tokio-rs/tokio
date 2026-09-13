@@ -22,8 +22,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 /// I/O driver, backed by Mio.
+///
+/// With several shards: one `Driver` per shard, all sharing one [`Handle`].
 pub(crate) struct Driver {
-    /// Index of the [`Shard`] in the [`Handle`] that this driver polls.
+    /// Which shard of the handle this driver polls.
     shard: usize,
 
     /// True when an event with the signal token is received
@@ -55,12 +57,27 @@ pub(crate) struct Shard {
     /// Not supported on `Wasi` due to lack of threading support.
     #[cfg(not(target_os = "wasi"))]
     waker: mio::Waker,
+
+    /// When this shard's `epoll_wait` last returned (`poll_clock_us`); 0
+    /// means never.
+    polled_us: crate::loom::sync::atomic::AtomicU64,
+
+    /// Whether this shard's last `epoll_wait` filled its event buffer, which
+    /// means more readiness is waiting in the kernel.
+    saturated: crate::loom::sync::atomic::AtomicBool,
+
+    /// The next poll that does not wait takes the full batch instead of the
+    /// busy batch. Set by `shard_request_full` and consumed in `turn`, both
+    /// under the shard's driver lock.
+    full_next: crate::loom::sync::atomic::AtomicBool,
 }
 
-/// A reference to an I/O driver.
+/// A reference to an I/O driver (all shards).
 pub(crate) struct Handle {
-    /// The driver's `epoll` instances. There is exactly one.
     shards: Box<[Shard]>,
+
+    /// Round-robin cursor for new sources.
+    next_shard: std::sync::atomic::AtomicUsize,
 
     pub(crate) metrics: IoDriverMetrics,
 
@@ -127,32 +144,52 @@ fn _assert_kinds() {
 impl Driver {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
+    #[cfg(test)]
     pub(crate) fn new(nevents: usize, nevents_busy: Option<usize>) -> io::Result<(Driver, Handle)> {
-        let poll = mio::Poll::new()?;
-        #[cfg(not(target_os = "wasi"))]
-        let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
-        let registry = poll.registry().try_clone()?;
+        let (mut drivers, handle) = Self::new_sharded(nevents, nevents_busy, 1)?;
+        Ok((drivers.pop().unwrap(), handle))
+    }
 
-        let driver = Driver {
-            shard: 0,
-            signal_ready: false,
-            events: mio::Events::with_capacity(nevents),
-            events_busy: nevents_busy.map(mio::Events::with_capacity),
-            poll,
-        };
+    /// Creates `num_shards` event loops (one `epoll` instance each) sharing one
+    /// [`Handle`]. `drivers[i]` polls shard `i`.
+    pub(crate) fn new_sharded(
+        nevents: usize,
+        nevents_busy: Option<usize>,
+        num_shards: usize,
+    ) -> io::Result<(Vec<Driver>, Handle)> {
+        let num_shards = num_shards.max(1);
+        let mut drivers = Vec::with_capacity(num_shards);
+        let mut shards = Vec::with_capacity(num_shards);
 
-        let (registrations, synced) = RegistrationSet::new();
-
-        let shard = Shard {
-            registry,
-            registrations,
-            synced: Mutex::new(synced),
+        for shard in 0..num_shards {
+            let poll = mio::Poll::new()?;
             #[cfg(not(target_os = "wasi"))]
-            waker,
-        };
+            let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
+            let registry = poll.registry().try_clone()?;
+            let (registrations, synced) = RegistrationSet::new();
+
+            drivers.push(Driver {
+                shard,
+                signal_ready: false,
+                events: mio::Events::with_capacity(nevents),
+                events_busy: nevents_busy.map(mio::Events::with_capacity),
+                poll,
+            });
+            shards.push(Shard {
+                registry,
+                registrations,
+                synced: Mutex::new(synced),
+                #[cfg(not(target_os = "wasi"))]
+                waker,
+                polled_us: crate::loom::sync::atomic::AtomicU64::new(0),
+                saturated: crate::loom::sync::atomic::AtomicBool::new(false),
+                full_next: crate::loom::sync::atomic::AtomicBool::new(false),
+            });
+        }
 
         let handle = Handle {
-            shards: Box::new([shard]),
+            shards: shards.into_boxed_slice(),
+            next_shard: std::sync::atomic::AtomicUsize::new(0),
             metrics: IoDriverMetrics::default(),
             #[cfg(all(
                 tokio_unstable,
@@ -172,7 +209,7 @@ impl Driver {
             uring_probe: OnceCell::new(),
         };
 
-        Ok((driver, handle))
+        Ok((drivers, handle))
     }
 
     pub(crate) fn park(&mut self, rt_handle: &driver::Handle) {
@@ -203,14 +240,22 @@ impl Driver {
 
         // A poll that does not wait takes the busy batch. Events it leaves
         // behind stay queued in the kernel, so the next poll returns them.
+        // The exception is the poll that follows `Handle::shard_request_full`.
+        let full = shard
+            .full_next
+            .swap(false, std::sync::atomic::Ordering::Relaxed);
         let events = match (&mut self.events_busy, max_wait) {
-            (Some(busy), Some(wait)) if wait.is_zero() => busy,
+            (Some(busy), Some(wait)) if wait.is_zero() && !full => busy,
             _ => &mut self.events,
         };
 
         // Block waiting for an event to happen, peeling out how many events
         // happened.
-        match self.poll.poll(events, max_wait) {
+        let res = self.poll.poll(events, max_wait);
+        shard
+            .polled_us
+            .store(poll_clock_us(), std::sync::atomic::Ordering::Relaxed);
+        match res {
             Ok(()) => {}
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
             #[cfg(target_os = "wasi")]
@@ -223,7 +268,9 @@ impl Driver {
 
         // Process all the events that came in, dispatching appropriately
         let mut ready_count = 0;
+        let mut event_count = 0;
         for event in events.iter() {
+            event_count += 1;
             let token = event.token();
 
             if token == TOKEN_WAKEUP {
@@ -246,6 +293,10 @@ impl Driver {
                 ready_count += 1;
             }
         }
+        shard.saturated.store(
+            event_count >= events.capacity(),
+            std::sync::atomic::Ordering::Relaxed,
+        );
 
         #[cfg(all(
             tokio_unstable,
@@ -254,7 +305,7 @@ impl Driver {
             feature = "fs",
             target_os = "linux",
         ))]
-        {
+        if self.shard == 0 {
             let mut guard = handle.get_uring().lock();
             let ctx = &mut *guard;
             ctx.dispatch_completions();
@@ -283,6 +334,29 @@ impl fmt::Debug for Driver {
 }
 
 impl Handle {
+    /// Whether shard `shard` returned from `epoll_wait` within `within`.
+    pub(crate) fn shard_polled_within(&self, shard: usize, within: Duration) -> bool {
+        let last = self.shards[shard]
+            .polled_us
+            .load(std::sync::atomic::Ordering::Relaxed);
+        last != 0 && poll_clock_us().saturating_sub(last) < within.as_micros() as u64
+    }
+
+    /// Whether shard `shard`'s last `epoll_wait` filled its event buffer.
+    pub(crate) fn shard_saturated(&self, shard: usize) -> bool {
+        self.shards[shard]
+            .saturated
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Makes the next poll of `shard` that does not wait take the full batch.
+    /// The caller holds that shard's driver and polls it next.
+    pub(crate) fn shard_request_full(&self, shard: usize) {
+        self.shards[shard]
+            .full_next
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
     /// makes the next call to `turn` return immediately.
     ///
@@ -292,6 +366,8 @@ impl Handle {
     /// after this method has been called. If the reactor is not currently
     /// blocked in `turn`, then the next call to `turn` will not block and
     /// return immediately.
+    ///
+    /// With several shards this wakes every shard's poller.
     pub(crate) fn unpark(&self) {
         #[cfg(not(target_os = "wasi"))]
         for shard in self.shards.iter() {
@@ -316,6 +392,17 @@ impl Handle {
         &self.shards[0].registry
     }
 
+    /// Picks the shard for a new source, round-robin.
+    fn pick_shard(&self) -> usize {
+        let n = self.shards.len();
+        if n == 1 {
+            return 0;
+        }
+        self.next_shard
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            % n
+    }
+
     /// Registers an I/O resource with the reactor for a given `mio::Ready` state.
     ///
     /// The registration token is returned.
@@ -324,8 +411,7 @@ impl Handle {
         source: &mut impl mio::event::Source,
         interest: Interest,
     ) -> io::Result<Arc<ScheduledIo>> {
-        // A source stays on one shard for its whole life.
-        let shard_idx = 0;
+        let shard_idx = self.pick_shard();
         let shard = &self.shards[shard_idx];
         let scheduled_io = shard
             .registrations
@@ -375,6 +461,12 @@ impl Handle {
 
         os_result // Return error after cleanup
     }
+}
+
+/// Microseconds since a process-wide origin; never 0.
+fn poll_clock_us() -> u64 {
+    static T: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    (T.get_or_init(std::time::Instant::now).elapsed().as_micros() as u64).max(1)
 }
 
 impl Shard {
