@@ -121,14 +121,14 @@ where
             // drop empty buffers at the start
             *me.bufs = &mut mem::take(me.bufs)[non_empty..];
 
-            match ready!(Pin::new(&mut *me.writer).poll_write_vectored(cx, me.bufs)) {
-                Ok(0) => return Poll::Ready(Err(io::ErrorKind::WriteZero.into())),
-                Ok(n) => self::advance_slices(me.bufs, n),
-                Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
-                Err(e) => return Poll::Ready(Err(e)),
+            let n = match ready!(Pin::new(&mut *me.writer).poll_write_vectored(cx, me.bufs)) {
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                res => res?,
+            };
+            if n == 0 {
+                return Poll::Ready(Err(io::ErrorKind::WriteZero.into()));
             }
-            // Do not check before poll_write_vectored: nested writers could exhaust the budget before writing any data.
-            ready!(crate::util::poll_proceed(cx)).made_progress();
+            self::advance_slices(me.bufs, n);
         }
 
         Poll::Ready(Ok(()))
