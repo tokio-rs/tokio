@@ -82,6 +82,8 @@ where
                     }
                     None => return Poll::Ready(None),
                 }
+                // Do not check before poll_next: nested streams could exhaust the budget before reading any item.
+                ready!(crate::coop::poll_proceed(cx)).made_progress();
             }
         } else {
             this.stream.poll_next(cx)

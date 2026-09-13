@@ -9,6 +9,11 @@ use tokio::io::{
 use tokio::net::TcpStream;
 use tokio::task::JoinHandle;
 
+mod support {
+    pub mod io_coop;
+}
+use support::io_coop::{ByteAtATimeReader, ByteAtATimeWriter};
+
 async fn make_socketpair() -> (TcpStream, TcpStream) {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -162,27 +167,24 @@ fn copy_bidirectional_with_sizes_panics_on_zero_b_to_a_buffer() {
 
 #[tokio::test]
 async fn copy_bidirectional_is_cooperative() {
-    tokio::select! {
-        biased;
-        _ = async {
-            loop {
-                let payload = b"here, take this";
+    let expected = b"abcd".repeat(64);
+    let reader = ByteAtATimeReader {
+        data: &expected,
+        interruptions_remaining: 0,
+    };
+    // Join read and write halves to satisfy copy_bidirectional's AsyncRead + AsyncWrite bounds.
+    let mut a = io::join(reader, Vec::new());
+    let writer = ByteAtATimeWriter {
+        data: Vec::new(),
+        interruptions_remaining: 0,
+    };
+    let mut b = io::join(&b""[..], writer);
+    let mut copy = tokio_test::task::spawn(copy_bidirectional(&mut a, &mut b));
 
-                let mut a = tokio_test::io::Builder::new()
-                    .read(payload)
-                    .write(payload)
-                    .build();
-
-                let mut b = tokio_test::io::Builder::new()
-                    .read(payload)
-                    .write(payload)
-                    .build();
-
-                let _ = copy_bidirectional(&mut a, &mut b).await;
-            }
-        } => {},
-        _ = tokio::task::yield_now() => {}
-    }
+    tokio_test::assert_pending!(copy.poll());
+    assert!(!tokio::task::coop::has_budget_remaining());
+    assert_eq!(copy.await.unwrap(), (expected.len() as u64, 0));
+    assert_eq!(b.writer().data, expected);
 }
 
 #[tokio::test]
@@ -215,4 +217,47 @@ async fn retry_on_io_interrupted() {
         };
         assert_eq!(result.unwrap(), (2, 2));
     }
+}
+
+#[tokio::test]
+async fn interrupted_reads_are_cooperative() {
+    let mut a = {
+        let mut builder = tokio_test::io::Builder::new();
+        for _ in 0..256 {
+            builder.read_error(ErrorKind::Interrupted.into());
+        }
+        builder.read(b"abcd").write(b"xy").build()
+    };
+    let mut b = tokio_test::io::Builder::new()
+        .write(b"abcd")
+        .read(b"xy")
+        .build();
+    let mut copy = tokio_test::task::spawn(copy_bidirectional(&mut a, &mut b));
+
+    tokio_test::assert_pending!(copy.poll());
+    // Pending must come from coop, not just waiting for the mock's next action.
+    assert!(!tokio::task::coop::has_budget_remaining());
+    assert_eq!(copy.await.unwrap(), (4, 2));
+}
+
+#[tokio::test]
+async fn interrupted_writes_are_cooperative() {
+    let mut a = {
+        let mut builder = tokio_test::io::Builder::new();
+        builder.read(b"xy");
+        for _ in 0..256 {
+            builder.write_error(ErrorKind::Interrupted.into());
+        }
+        builder.write(b"abcd").build()
+    };
+    let mut b = tokio_test::io::Builder::new()
+        .write(b"xy")
+        .read(b"abcd")
+        .build();
+    let mut copy = tokio_test::task::spawn(copy_bidirectional(&mut a, &mut b));
+
+    tokio_test::assert_pending!(copy.poll());
+    // Pending must come from coop, not just waiting for the mock's next action.
+    assert!(!tokio::task::coop::has_budget_remaining());
+    assert_eq!(copy.await.unwrap(), (2, 4));
 }

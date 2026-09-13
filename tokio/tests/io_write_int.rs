@@ -15,6 +15,11 @@ use std::io::{self, ErrorKind};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+mod support {
+    pub mod io_coop;
+}
+use support::io_coop::ByteAtATimeWriter;
+
 #[tokio::test]
 async fn write_int_should_err_if_write_count_0() {
     struct Wr {}
@@ -44,6 +49,7 @@ async fn write_int_should_err_if_write_count_0() {
     assert!(wr.write_i32(12).await.is_err());
 }
 
+// Test numeric writes, Interrupted retries, and other I/O errors.
 macro_rules! number {
     ($name:ident, $write:ident, $value:expr, $bytes:expr) => {
         #[tokio::test]
@@ -99,3 +105,300 @@ number!(f64_le, write_f64_le, 1.25f64, (1.25f64).to_le_bytes());
 
 number!(u128_le, write_u128_le, 42u128, (42u128).to_le_bytes());
 number!(i128_le, write_i128_le, -42i128, (-42i128).to_le_bytes());
+
+// Test that repeated Interrupted errors make numeric writes yield.
+macro_rules! cooperative_number {
+    ($name:ident, $write:ident, $value:expr, $bytes:expr) => {
+        #[tokio::test]
+        async fn $name() {
+            // Repeated Interrupted errors must yield before completing this number.
+            let expected = $bytes;
+            let mut writer = ByteAtATimeWriter {
+                data: Vec::new(),
+                interruptions_remaining: 256,
+            };
+            let mut operation = tokio_test::task::spawn(writer.$write($value));
+
+            tokio_test::assert_pending!(operation.poll());
+            operation.await.unwrap();
+            assert_eq!(writer.data, expected);
+        }
+    };
+}
+
+cooperative_number!(
+    u8_interrupted_is_cooperative,
+    write_u8,
+    42u8,
+    (42u8).to_be_bytes()
+);
+cooperative_number!(
+    i8_interrupted_is_cooperative,
+    write_i8,
+    42i8,
+    (42i8).to_be_bytes()
+);
+cooperative_number!(
+    u16_interrupted_is_cooperative,
+    write_u16,
+    42u16,
+    (42u16).to_be_bytes()
+);
+cooperative_number!(
+    u16_le_interrupted_is_cooperative,
+    write_u16_le,
+    42u16,
+    (42u16).to_le_bytes()
+);
+cooperative_number!(
+    i16_interrupted_is_cooperative,
+    write_i16,
+    42i16,
+    (42i16).to_be_bytes()
+);
+cooperative_number!(
+    i16_le_interrupted_is_cooperative,
+    write_i16_le,
+    42i16,
+    (42i16).to_le_bytes()
+);
+cooperative_number!(
+    u32_interrupted_is_cooperative,
+    write_u32,
+    42u32,
+    (42u32).to_be_bytes()
+);
+cooperative_number!(
+    u32_le_interrupted_is_cooperative,
+    write_u32_le,
+    42u32,
+    (42u32).to_le_bytes()
+);
+cooperative_number!(
+    i32_interrupted_is_cooperative,
+    write_i32,
+    42i32,
+    (42i32).to_be_bytes()
+);
+cooperative_number!(
+    i32_le_interrupted_is_cooperative,
+    write_i32_le,
+    42i32,
+    (42i32).to_le_bytes()
+);
+cooperative_number!(
+    u64_interrupted_is_cooperative,
+    write_u64,
+    42u64,
+    (42u64).to_be_bytes()
+);
+cooperative_number!(
+    u64_le_interrupted_is_cooperative,
+    write_u64_le,
+    42u64,
+    (42u64).to_le_bytes()
+);
+cooperative_number!(
+    i64_interrupted_is_cooperative,
+    write_i64,
+    42i64,
+    (42i64).to_be_bytes()
+);
+cooperative_number!(
+    i64_le_interrupted_is_cooperative,
+    write_i64_le,
+    42i64,
+    (42i64).to_le_bytes()
+);
+cooperative_number!(
+    u128_interrupted_is_cooperative,
+    write_u128,
+    42u128,
+    (42u128).to_be_bytes()
+);
+cooperative_number!(
+    i128_interrupted_is_cooperative,
+    write_i128,
+    42i128,
+    (42i128).to_be_bytes()
+);
+cooperative_number!(
+    f32_interrupted_is_cooperative,
+    write_f32,
+    1.25f32,
+    (1.25f32).to_be_bytes()
+);
+cooperative_number!(
+    f32_le_interrupted_is_cooperative,
+    write_f32_le,
+    1.25f32,
+    (1.25f32).to_le_bytes()
+);
+cooperative_number!(
+    f64_interrupted_is_cooperative,
+    write_f64,
+    1.25f64,
+    (1.25f64).to_be_bytes()
+);
+cooperative_number!(
+    f64_le_interrupted_is_cooperative,
+    write_f64_le,
+    1.25f64,
+    (1.25f64).to_le_bytes()
+);
+cooperative_number!(
+    u128_le_interrupted_is_cooperative,
+    write_u128_le,
+    42u128,
+    (42u128).to_le_bytes()
+);
+cooperative_number!(
+    i128_le_interrupted_is_cooperative,
+    write_i128_le,
+    -42i128,
+    (-42i128).to_le_bytes()
+);
+
+// Test that numeric writes preserve partial progress across a coop yield.
+macro_rules! cooperative_partial_number {
+    ($name:ident, $write:ident, $value:expr, $bytes:expr) => {
+        #[tokio::test]
+        async fn $name() {
+            let expected = $bytes;
+            // Keep the first byte across the yield caused by Interrupted retries.
+            let mut writer = {
+                let mut builder = tokio_test::io::Builder::new();
+                builder.write(&expected[..1]);
+                for _ in 0..256 {
+                    builder.write_error(ErrorKind::Interrupted.into());
+                }
+                builder.write(&expected[1..]).build()
+            };
+            let mut operation = tokio_test::task::spawn(writer.$write($value));
+
+            tokio_test::assert_pending!(operation.poll());
+            operation.await.unwrap();
+        }
+    };
+}
+
+cooperative_partial_number!(
+    u16_interrupted_after_partial_write_is_cooperative,
+    write_u16,
+    42u16,
+    (42u16).to_be_bytes()
+);
+cooperative_partial_number!(
+    u16_le_interrupted_after_partial_write_is_cooperative,
+    write_u16_le,
+    42u16,
+    (42u16).to_le_bytes()
+);
+cooperative_partial_number!(
+    i16_interrupted_after_partial_write_is_cooperative,
+    write_i16,
+    42i16,
+    (42i16).to_be_bytes()
+);
+cooperative_partial_number!(
+    i16_le_interrupted_after_partial_write_is_cooperative,
+    write_i16_le,
+    42i16,
+    (42i16).to_le_bytes()
+);
+cooperative_partial_number!(
+    u32_interrupted_after_partial_write_is_cooperative,
+    write_u32,
+    42u32,
+    (42u32).to_be_bytes()
+);
+cooperative_partial_number!(
+    u32_le_interrupted_after_partial_write_is_cooperative,
+    write_u32_le,
+    42u32,
+    (42u32).to_le_bytes()
+);
+cooperative_partial_number!(
+    i32_interrupted_after_partial_write_is_cooperative,
+    write_i32,
+    42i32,
+    (42i32).to_be_bytes()
+);
+cooperative_partial_number!(
+    i32_le_interrupted_after_partial_write_is_cooperative,
+    write_i32_le,
+    42i32,
+    (42i32).to_le_bytes()
+);
+cooperative_partial_number!(
+    u64_interrupted_after_partial_write_is_cooperative,
+    write_u64,
+    42u64,
+    (42u64).to_be_bytes()
+);
+cooperative_partial_number!(
+    u64_le_interrupted_after_partial_write_is_cooperative,
+    write_u64_le,
+    42u64,
+    (42u64).to_le_bytes()
+);
+cooperative_partial_number!(
+    i64_interrupted_after_partial_write_is_cooperative,
+    write_i64,
+    42i64,
+    (42i64).to_be_bytes()
+);
+cooperative_partial_number!(
+    i64_le_interrupted_after_partial_write_is_cooperative,
+    write_i64_le,
+    42i64,
+    (42i64).to_le_bytes()
+);
+cooperative_partial_number!(
+    u128_interrupted_after_partial_write_is_cooperative,
+    write_u128,
+    42u128,
+    (42u128).to_be_bytes()
+);
+cooperative_partial_number!(
+    i128_interrupted_after_partial_write_is_cooperative,
+    write_i128,
+    42i128,
+    (42i128).to_be_bytes()
+);
+cooperative_partial_number!(
+    f32_interrupted_after_partial_write_is_cooperative,
+    write_f32,
+    1.25f32,
+    (1.25f32).to_be_bytes()
+);
+cooperative_partial_number!(
+    f32_le_interrupted_after_partial_write_is_cooperative,
+    write_f32_le,
+    1.25f32,
+    (1.25f32).to_le_bytes()
+);
+cooperative_partial_number!(
+    f64_interrupted_after_partial_write_is_cooperative,
+    write_f64,
+    1.25f64,
+    (1.25f64).to_be_bytes()
+);
+cooperative_partial_number!(
+    f64_le_interrupted_after_partial_write_is_cooperative,
+    write_f64_le,
+    1.25f64,
+    (1.25f64).to_le_bytes()
+);
+cooperative_partial_number!(
+    u128_le_interrupted_after_partial_write_is_cooperative,
+    write_u128_le,
+    42u128,
+    (42u128).to_le_bytes()
+);
+cooperative_partial_number!(
+    i128_le_interrupted_after_partial_write_is_cooperative,
+    write_i128_le,
+    -42i128,
+    (-42i128).to_le_bytes()
+);
