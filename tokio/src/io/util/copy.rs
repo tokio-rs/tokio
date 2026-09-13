@@ -30,7 +30,7 @@ impl CopyBuffer {
     fn poll_fill_buf<R>(
         &mut self,
         cx: &mut Context<'_>,
-        reader: Pin<&mut R>,
+        mut reader: Pin<&mut R>,
     ) -> Poll<io::Result<()>>
     where
         R: AsyncRead + ?Sized,
@@ -39,7 +39,12 @@ impl CopyBuffer {
         let mut buf = ReadBuf::new(&mut me.buf);
         buf.set_filled(me.cap);
 
-        let res = reader.poll_read(cx, &mut buf);
+        let res = loop {
+            match reader.as_mut().poll_read(cx, &mut buf) {
+                Poll::Ready(Err(e)) if e.kind() == io::ErrorKind::Interrupted => continue,
+                res => break res,
+            }
+        };
         if let Poll::Ready(Ok(())) = res {
             let filled_len = buf.filled().len();
             me.read_done = me.cap == filled_len;
@@ -59,16 +64,19 @@ impl CopyBuffer {
         W: AsyncWrite + ?Sized,
     {
         let me = &mut *self;
-        match writer.as_mut().poll_write(cx, &me.buf[me.pos..me.cap]) {
-            Poll::Pending => {
-                // Top up the buffer towards full if we can read a bit more
-                // data - this should improve the chances of a large write
-                if !me.read_done && me.cap < me.buf.len() {
-                    ready!(me.poll_fill_buf(cx, reader.as_mut()))?;
+        loop {
+            match writer.as_mut().poll_write(cx, &me.buf[me.pos..me.cap]) {
+                Poll::Ready(Err(e)) if e.kind() == io::ErrorKind::Interrupted => continue,
+                Poll::Pending => {
+                    // Top up the buffer towards full if we can read a bit more
+                    // data - this should improve the chances of a large write
+                    if !me.read_done && me.cap < me.buf.len() {
+                        ready!(me.poll_fill_buf(cx, reader.as_mut()))?;
+                    }
+                    return Poll::Pending;
                 }
-                Poll::Pending
+                res => return res,
             }
-            res => res,
         }
     }
 
@@ -257,7 +265,9 @@ cfg_io_util! {
     /// # Errors
     ///
     /// The returned future will return an error immediately if any call to
-    /// `poll_read` or `poll_write` returns an error.
+    /// `poll_read` or `poll_write` returns an error other than
+    /// [`io::ErrorKind::Interrupted`], which is retried. Errors from flushing
+    /// the writer are returned without retrying.
     ///
     /// # Examples
     ///

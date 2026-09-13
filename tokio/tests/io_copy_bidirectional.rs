@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support bind()
 
+use std::io::ErrorKind;
 use std::time::Duration;
 use tokio::io::{
     self, copy_bidirectional, copy_bidirectional_with_sizes, AsyncReadExt, AsyncWriteExt,
@@ -181,5 +182,37 @@ async fn copy_bidirectional_is_cooperative() {
             }
         } => {},
         _ = tokio::task::yield_now() => {}
+    }
+}
+
+#[tokio::test]
+async fn retry_on_io_interrupted() {
+    for sized in [false, true] {
+        let mut a = tokio::io::join(
+            tokio_test::io::Builder::new()
+                .read_error(ErrorKind::Interrupted.into())
+                .read(b"ab")
+                .build(),
+            tokio_test::io::Builder::new()
+                .write_error(ErrorKind::Interrupted.into())
+                .write(b"cd")
+                .build(),
+        );
+        let mut b = tokio::io::join(
+            tokio_test::io::Builder::new()
+                .read_error(ErrorKind::Interrupted.into())
+                .read(b"cd")
+                .build(),
+            tokio_test::io::Builder::new()
+                .write_error(ErrorKind::Interrupted.into())
+                .write(b"ab")
+                .build(),
+        );
+        let result = if sized {
+            tokio::io::copy_bidirectional_with_sizes(&mut a, &mut b, 1, 1).await
+        } else {
+            tokio::io::copy_bidirectional(&mut a, &mut b).await
+        };
+        assert_eq!(result.unwrap(), (2, 2));
     }
 }
