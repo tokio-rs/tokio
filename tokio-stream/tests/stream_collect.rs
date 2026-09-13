@@ -295,13 +295,3 @@ async fn collect_results_err() {
     let err = assert_ready_err!(fut.poll());
     assert_eq!("oh no", err);
 }
-
-#[cfg(feature = "rt")]
-#[tokio::test]
-async fn always_ready_items_are_cooperative() {
-    // futures::stream::iter( does not trigger coop, so we can test the combinator's coop behavior.
-    let mut operation = tokio_test::task::spawn(futures::stream::iter(0..256).collect::<Vec<_>>());
-
-    tokio_test::assert_pending!(operation.poll());
-    assert_eq!(operation.await, (0..256).collect::<Vec<_>>());
-}

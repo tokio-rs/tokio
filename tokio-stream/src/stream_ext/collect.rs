@@ -79,8 +79,6 @@ where
             if !U::extend(sealed::Internal, me.collection, item) {
                 return Ready(U::finalize(sealed::Internal, me.collection));
             }
-            // Do not check before poll_next: nested streams could exhaust the budget before reading any item.
-            ready!(crate::coop::poll_proceed(cx)).made_progress();
         }
     }
 }
