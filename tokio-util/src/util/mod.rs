@@ -10,11 +10,17 @@ pub(crate) use maybe_dangling::MaybeDangling;
 pub use poll_buf::{poll_read_buf, poll_write_buf};
 
 cfg_rt! {
+    #[cfg(feature = "io-util")]
+    pub(crate) use tokio::task::coop::consume_budget;
+
     #[cfg_attr(not(feature = "io"), allow(unused))]
     pub(crate) use tokio::task::coop::poll_proceed;
 }
 
 cfg_not_rt! {
+    #[cfg(feature = "io-util")]
+    pub(crate) async fn consume_budget() {}
+
     #[cfg_attr(not(feature = "io"), allow(unused))]
     use std::task::{Context, Poll};
 

@@ -246,6 +246,8 @@ where
 
             // paused -> framing or reading -> framing or reading -> pausing
             state.is_readable = true;
+            // Do not check before poll_read_buf: nested adapters could exhaust the budget before reading any data.
+            ready!(crate::util::poll_proceed(cx)).made_progress();
         }
     }
 }
