@@ -34,10 +34,7 @@ pub async fn read_exact_arc<R: AsyncRead>(read: R, len: usize) -> io::Result<Arc
     // as we write through this reference.
     let mut buf = unsafe { &mut *(Arc::as_ptr(&arc) as *mut [MaybeUninit<u8>]) };
     while !buf.is_empty() {
-        let result = read.read_buf(&mut buf).await;
-        // Do not check before read_buf: nested readers could exhaust the budget before reading any data.
-        crate::util::consume_budget().await;
-        let n = match result {
+        let n = match read.read_buf(&mut buf).await {
             Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
             res => res?,
         };
