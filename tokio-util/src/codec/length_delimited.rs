@@ -481,7 +481,7 @@ impl LengthDelimitedCodec {
 
     /// Returns the current max frame setting
     ///
-    /// This is the largest size this codec will accept from the wire. Larger
+    /// This is the largest adjusted frame size this codec will accept. Larger
     /// frames will be rejected.
     pub fn max_frame_length(&self) -> usize {
         self.builder.max_frame_len
@@ -523,26 +523,15 @@ impl LengthDelimitedCodec {
                 src.get_uint_le(field_len)
             };
 
-            if n > self.builder.max_frame_len as u64 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    LengthDelimitedCodecError { _priv: () },
-                ));
-            }
-
-            // The check above ensures there is no overflow
-            let n = n as usize;
-
             // Adjust `n` with bounds checking
-            let n = if self.builder.length_adjustment < 0 {
-                n.checked_sub(-self.builder.length_adjustment as usize)
-            } else {
-                n.checked_add(self.builder.length_adjustment as usize)
-            };
-
-            // Error handling
-            match n {
-                Some(n) => n,
+            match n.checked_add_signed(self.builder.length_adjustment as i64) {
+                Some(n) if n <= self.builder.max_frame_len as u64 => n as usize,
+                Some(_) => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        LengthDelimitedCodecError { _priv: () },
+                    ));
+                }
                 None => {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
@@ -805,10 +794,9 @@ impl Builder {
     /// This configuration option applies to both encoding and decoding. The
     /// default value is 8MB.
     ///
-    /// When decoding, the length field read from the byte stream is checked
-    /// against this setting **before** any adjustments are applied. When
-    /// encoding, the length of the submitted payload is checked against this
-    /// setting.
+    /// When decoding, the length field read from the byte stream is adjusted
+    /// before it is checked against this setting. When encoding, the length of
+    /// the submitted payload is checked against this setting.
     ///
     /// When frames exceed the max length, an `io::Error` with the custom value
     /// of the `LengthDelimitedCodecError` type will be returned.
