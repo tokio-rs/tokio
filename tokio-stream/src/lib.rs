@@ -73,8 +73,6 @@
 #[macro_use]
 mod macros;
 
-mod coop;
-
 pub mod wrappers;
 
 mod stream_ext;
