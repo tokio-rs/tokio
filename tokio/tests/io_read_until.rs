@@ -13,6 +13,11 @@ use std::io::ErrorKind;
 use tokio::io::{AsyncBufReadExt, BufReader, Error};
 use tokio_test::{assert_ok, io::Builder};
 
+mod support {
+    pub mod io_coop;
+}
+use support::io_coop::ByteAtATimeReader;
+
 #[tokio::test]
 async fn read_until() {
     let mut buf = vec![];
@@ -93,4 +98,35 @@ async fn read_until_fail() {
     assert_eq!(err.kind(), ErrorKind::Other);
     assert_eq!(err.to_string(), "The world has no end");
     assert_eq!(chunk, b"FooHello \xffWor");
+}
+
+#[tokio::test]
+async fn always_ready_reads_are_cooperative() {
+    // Successful one-byte reads must yield without any Interrupted errors.
+    let expected = b"abcd".repeat(64);
+    let mut reader = ByteAtATimeReader {
+        data: &expected,
+        interruptions_remaining: 0,
+    };
+    let mut output = Vec::new();
+    let mut read = tokio_test::task::spawn(reader.read_until(b'\n', &mut output));
+
+    tokio_test::assert_pending!(read.poll());
+    assert_eq!(read.await.unwrap(), expected.len());
+    assert_eq!(output, expected);
+}
+#[tokio::test]
+async fn interrupted_is_cooperative() {
+    // Repeated Interrupted errors must exhaust the budget even with a small payload.
+    let expected = b"abcd";
+    let mut reader = ByteAtATimeReader {
+        data: expected,
+        interruptions_remaining: 256,
+    };
+    let mut output = Vec::new();
+    let mut read = tokio_test::task::spawn(reader.read_until(b'\n', &mut output));
+
+    tokio_test::assert_pending!(read.poll());
+    assert_eq!(read.await.unwrap(), expected.len());
+    assert_eq!(output, expected);
 }

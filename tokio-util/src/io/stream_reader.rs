@@ -286,6 +286,8 @@ where
                     Poll::Ready(Some(Ok(chunk))) => {
                         // Go around the loop in case the chunk is empty.
                         *self.as_mut().project().chunk = Some(chunk);
+                        // Do not check before poll_next: nested adapters could exhaust the budget before reading any chunk.
+                        std::task::ready!(crate::util::poll_proceed(cx)).made_progress();
                     }
                     Poll::Ready(Some(Err(err))) => return Poll::Ready(Err(err.into())),
                     Poll::Ready(None) => {
