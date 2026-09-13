@@ -6,7 +6,6 @@ use std::path::Path;
 cfg_io_uring! {
     mod uring_open_options;
     pub(crate) use uring_open_options::UringOpenOptions;
-    use crate::runtime::driver::op::Op;
 }
 
 #[cfg(test)]
@@ -539,7 +538,7 @@ impl OpenOptions {
                     .check_and_init(io_uring::opcode::OpenAt::CODE)
                     .await?
                 {
-                    Op::open(path, opts)?.await
+                    crate::io::uring::open::open(path, opts).await
                 } else {
                     let opts = opts.clone().into();
                     Self::std_open(&opts, path).await
