@@ -246,3 +246,21 @@ async fn stream_notify_close_does_not_poll_inner_after_close_notification() {
     assert!(stream.is_terminated());
     assert_eq!(stream.next().await, None);
 }
+
+#[tokio::test]
+async fn peekable_not_terminated_before_done() {
+    let mut stream = fused_iter(vec![1, 2]).peekable();
+    assert!(!stream.is_terminated());
+    assert_eq!(stream.peek().await, Some(&1));
+    assert!(!stream.is_terminated());
+}
+
+#[tokio::test]
+async fn peekable_terminated_after_inner_done() {
+    let mut stream = fused_iter(vec![1]).peekable();
+    assert_eq!(stream.next().await, Some(1));
+    assert!(!stream.is_terminated());
+    assert_eq!(stream.next().await, None);
+    assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
+}
