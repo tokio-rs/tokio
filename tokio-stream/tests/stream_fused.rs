@@ -246,3 +246,9 @@ async fn stream_notify_close_does_not_poll_inner_after_close_notification() {
     assert!(stream.is_terminated());
     assert_eq!(stream.next().await, None);
 }
+
+#[test]
+fn stream_notify_close_size_hint_does_not_assume_termination() {
+    let stream = StreamNotifyClose::new(tokio_stream::pending::<()>());
+    assert_eq!(stream.size_hint(), (0, None));
+}
