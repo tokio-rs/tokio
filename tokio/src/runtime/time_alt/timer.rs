@@ -18,16 +18,10 @@ impl std::fmt::Debug for Timer {
     }
 }
 
-impl Drop for Timer {
-    fn drop(&mut self) {
-        self.entry.cancel();
-    }
-}
-
 impl Timer {
     #[track_caller]
-    pub(crate) fn new(handle: scheduler::Handle, deadline: u64) -> Self {
-        let entry = with_current_temp_local_context(&handle, |ctx| match ctx {
+    pub(crate) fn new(handle: &scheduler::Handle, deadline: u64) -> Self {
+        let entry = with_current_temp_local_context(handle, |ctx| match ctx {
             Some(TempLocalContext::Running { registration_queue }) => {
                 let entry = EntryHandle::new(deadline);
                 unsafe { registration_queue.push_front(entry.clone()) }
@@ -38,12 +32,16 @@ impl Timer {
 
             _ => {
                 let entry = EntryHandle::new(deadline);
-                push_from_remote(&handle, entry.clone());
+                push_from_remote(handle, entry.clone());
                 entry
             }
         });
 
         Timer { entry }
+    }
+
+    pub(crate) fn cancel(&self) {
+        self.entry.cancel();
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {
