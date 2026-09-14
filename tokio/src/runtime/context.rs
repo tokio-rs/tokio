@@ -19,6 +19,9 @@ cfg_rt! {
     mod scoped;
     use scoped::Scoped;
 
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    pub(crate) mod jspi;
+
     use crate::runtime::{scheduler, task::Id};
 
     use std::task::Waker;
