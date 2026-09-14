@@ -28,6 +28,11 @@ const EMPTY: usize = 0;
 const PARKED: usize = 1;
 const NOTIFIED: usize = 2;
 
+#[cfg(not(all(
+    target_os = "emscripten",
+    not(target_feature = "atomics"),
+    feature = "rt"
+)))]
 tokio_thread_local! {
     static CURRENT_PARKER: ParkThread = ParkThread::new();
 }
@@ -76,6 +81,11 @@ impl ParkThread {
 // ==== impl Inner ====
 
 impl Inner {
+    #[cfg(not(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt"
+    )))]
     fn park(&self) {
         // If we were previously notified then we consume this notification and
         // return quickly.
@@ -123,7 +133,49 @@ impl Inner {
         }
     }
 
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt"
+    ))]
+    fn park(&self) {
+        // If we were previously notified then we consume this notification and
+        // return quickly.
+        if self
+            .state
+            .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
+            .is_ok()
+        {
+            return;
+        }
+
+        // A wait with no deadline can never be woken here: host timers are
+        // the only mid-park wake source, since there is no reactor and every
+        // tokio-internal waker fires during the drive, before the park. Fail
+        // fast instead of deadlocking the host loop.
+        panic!(
+            "cannot block on wasm32-unknown-emscripten: this wait has no \
+             deadline, and host timers are the only mid-park wake source, \
+             so nothing could ever deliver the wake"
+        );
+    }
+
+    /// Consume a pending notification token, if any.
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt"
+    ))]
+    fn consume_notified(&self) {
+        let _ = self.state.compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst);
+    }
+
     /// Parks the current thread for at most `dur`.
+    #[cfg(not(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt"
+    )))]
     fn park_timeout(&self, dur: Duration) {
         // Like `park` above we have a fast path for an already-notified thread,
         // and afterwards we start coordinating for a sleep. Return quickly.
@@ -171,6 +223,45 @@ impl Inner {
             NOTIFIED => {} // got a notification, hurray!
             PARKED => {}   // no notification, alas
             n => panic!("inconsistent park_timeout state: {n}"),
+        }
+    }
+
+    /// Parks the current thread for at most `dur`.
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt"
+    ))]
+    fn park_timeout(&self, dur: Duration) {
+        // Consume a pending notification and return quickly.
+        if self
+            .state
+            .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
+            .is_ok()
+        {
+            return;
+        }
+
+        // With JSPI linked the wait is real: suspend on a host timer, then
+        // consume any notification delivered during the sleep so the token
+        // does not leak into the next park. Without it a zero-duration park
+        // is a no-op as on native, and a real wait is impossible, since
+        // suspending would trap and busy-waiting would starve the host loop
+        // the wake depends on.
+        if crate::runtime::context::jspi::jspi_enabled() {
+            // Includes `dur == 0`: a genuine host turn, letting timers
+            // and microtasks run mid-drive (the scheduler's maintenance
+            // yield).
+            crate::runtime::context::jspi::sleep(dur);
+            self.consume_notified();
+        } else if dur == Duration::from_millis(0) {
+            // Native semantics: a zero-duration park returns immediately.
+        } else {
+            panic!(
+                "cannot block on wasm32-unknown-emscripten: this wait has a \
+                 deadline, but suspending on the host event loop needs the \
+                 build to link `-sJSPI`"
+            );
         }
     }
 
@@ -231,6 +322,16 @@ use std::task::{RawWaker, RawWakerVTable, Waker};
 /// Blocks the current thread using a condition variable.
 #[derive(Debug)]
 pub(crate) struct CachedParkThread {
+    // While a suspended stack is parked, host callbacks can still run tokio
+    // code on this thread, and a shared thread-local parker would hand this
+    // stack's notification token to that code. Each blocking call gets its
+    // own parker instead.
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt"
+    ))]
+    park: ParkThread,
     _anchor: PhantomData<Rc<()>>,
 }
 
@@ -241,6 +342,12 @@ impl CachedParkThread {
     /// the thread that the caller intends to park.
     pub(crate) fn new() -> CachedParkThread {
         CachedParkThread {
+            #[cfg(all(
+                target_os = "emscripten",
+                not(target_feature = "atomics"),
+                feature = "rt"
+            ))]
+            park: ParkThread::new(),
             _anchor: PhantomData,
         }
     }
@@ -268,7 +375,20 @@ impl CachedParkThread {
     where
         F: FnOnce(&ParkThread) -> R,
     {
-        CURRENT_PARKER.try_with(|inner| f(inner))
+        #[cfg(not(all(
+            target_os = "emscripten",
+            not(target_feature = "atomics"),
+            feature = "rt"
+        )))]
+        return CURRENT_PARKER.try_with(|inner| f(inner));
+
+        // See the comment on the `park` field.
+        #[cfg(all(
+            target_os = "emscripten",
+            not(target_feature = "atomics"),
+            feature = "rt"
+        ))]
+        return Ok(f(&self.park));
     }
 
     pub(crate) fn block_on<F: Future>(&mut self, f: F) -> Result<F::Output, AccessError> {
