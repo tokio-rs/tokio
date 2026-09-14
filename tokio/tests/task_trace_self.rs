@@ -164,14 +164,14 @@ fn strip_symbol_hash(s: &str) -> &str {
 }
 
 pin_project_lite::pin_project! {
-    /// A future wrapper that uses `trace_with` to capture backtraces, skipping
-    /// capture on the poll immediately following each capture.
+    /// A future wrapper that uses `trace_with` for a single capture after the
+    /// wrapped future first returns `Pending`.
     /// The captured backtraces are stored in `logs`.
     pub struct TaskDump<F: Future> {
         #[pin]
         f: Root<F>,
         logs: Arc<Mutex<Vec<Vec<String>>>>,
-        just_captured: bool,
+        captured: bool,
     }
 }
 
@@ -180,7 +180,7 @@ impl<F: Future> TaskDump<F> {
         TaskDump {
             f: Trace::root(f),
             logs,
-            just_captured: false,
+            captured: false,
         }
     }
 }
@@ -196,10 +196,9 @@ impl<F: Future> Future for TaskDump<F> {
             return Poll::Ready(result);
         };
 
-        // Skip capture on the next poll so capture-induced wakes do not
-        // cause a wake-and-capture loop.
-        if *this.just_captured {
-            *this.just_captured = false;
+        // Capture only once so capture-induced wakes do not cause a
+        // wake-and-capture loop.
+        if *this.captured {
             return Poll::Pending;
         }
 
@@ -218,7 +217,7 @@ impl<F: Future> Future for TaskDump<F> {
 
         // Drain any frames captured by trace_leaf_for_test into our log.
         this.logs.lock().unwrap().extend(logs);
-        *this.just_captured = true;
+        *this.captured = true;
         Poll::Pending
     }
 }
@@ -285,7 +284,7 @@ async fn trace_with_callback_and_backtrace() {
 }
 
 #[tokio::test]
-async fn trace_with_wrapper_does_not_recapture_its_wake() {
+async fn trace_with_wakes_pending_future() {
     let (sender, receiver) = tokio::sync::oneshot::channel();
     let logs = Arc::new(Mutex::new(vec![]));
     let mut task = tokio_test::task::spawn(TaskDump::new(receiver, logs.clone()));
