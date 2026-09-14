@@ -14,7 +14,7 @@ tokio-stream = { version = "0.1", path = "../tokio-stream" }
 
 tracing = "0.1"
 tracing-subscriber = { version = "0.3.1", default-features = false, features = ["fmt", "ansi", "env-filter", "tracing-log"] }
-bytes = "1.0.0"
+bytes = "1.11.1"
 futures = { version = "0.3.0", features = ["thread-pool"]}
 http = "1"
 serde = "1.0"

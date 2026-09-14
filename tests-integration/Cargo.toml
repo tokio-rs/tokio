@@ -60,7 +60,7 @@ tokio = { version = "1.0.0", path = "../tokio" }
 tokio-test = { version = "0.4", path = "../tokio-test", optional = true }
 doc-comment = "0.3.1"
 futures = { version = "0.3.0", features = ["async-await"] }
-bytes = "1.0.0"
+bytes = "1.11.1"
 
 [lints]
 workspace = true
