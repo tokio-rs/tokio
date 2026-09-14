@@ -1,4 +1,5 @@
 use crate::Stream;
+use futures_core::FusedStream;
 
 use core::pin::Pin;
 use core::task::{Context, Poll};
@@ -58,5 +59,11 @@ impl<T> Stream for Once<T> {
         } else {
             (0, Some(0))
         }
+    }
+}
+
+impl<T> FusedStream for Once<T> {
+    fn is_terminated(&self) -> bool {
+        self.value.is_none()
     }
 }

@@ -89,6 +89,10 @@ impl<T: Stream> Stream for Throttle<T> {
 
         Poll::Ready(value)
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.stream.size_hint()
+    }
 }
 
 fn is_zero(dur: Duration) -> bool {

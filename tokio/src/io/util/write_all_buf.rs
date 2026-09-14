@@ -46,12 +46,20 @@ where
 
         let me = self.project();
         while me.buf.has_remaining() {
-            let n = if me.writer.is_write_vectored() {
-                let mut slices = [IoSlice::new(&[]); MAX_VECTOR_ELEMENTS];
-                let cnt = me.buf.chunks_vectored(&mut slices);
-                ready!(Pin::new(&mut *me.writer).poll_write_vectored(cx, &slices[..cnt]))?
-            } else {
-                ready!(Pin::new(&mut *me.writer).poll_write(cx, me.buf.chunk())?)
+            let n = loop {
+                let result = if me.writer.is_write_vectored() {
+                    let mut slices = [IoSlice::new(&[]); MAX_VECTOR_ELEMENTS];
+                    let cnt = me.buf.chunks_vectored(&mut slices);
+                    ready!(Pin::new(&mut *me.writer).poll_write_vectored(cx, &slices[..cnt]))
+                } else {
+                    ready!(Pin::new(&mut *me.writer).poll_write(cx, me.buf.chunk()))
+                };
+
+                match result {
+                    Ok(n) => break n,
+                    Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                    Err(e) => return Poll::Ready(Err(e)),
+                }
             };
             me.buf.advance(n);
             if n == 0 {

@@ -1,4 +1,5 @@
 use crate::Stream;
+use futures_core::FusedStream;
 
 use core::marker::PhantomData;
 use core::pin::Pin;
@@ -54,5 +55,11 @@ impl<T> Stream for Empty<T> {
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         (0, Some(0))
+    }
+}
+
+impl<T> FusedStream for Empty<T> {
+    fn is_terminated(&self) -> bool {
+        true
     }
 }

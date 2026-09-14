@@ -2,7 +2,7 @@
 #![cfg(all(feature = "time", feature = "sync", feature = "io-util"))]
 
 use tokio::time;
-use tokio_stream::StreamExt;
+use tokio_stream::{Stream, StreamExt};
 use tokio_test::*;
 
 use std::time::Duration;
@@ -32,4 +32,11 @@ async fn duration_max_does_not_overflow() {
     let mut stream = task::spawn(futures::stream::iter([1]).throttle(Duration::MAX));
 
     assert_ready_eq!(stream.poll_next(), Some(1));
+}
+
+#[tokio::test]
+async fn size_hint() {
+    let stream = futures::stream::iter([1, 2, 3]).throttle(Duration::from_secs(1));
+
+    assert_eq!(stream.size_hint(), (3, Some(3)));
 }

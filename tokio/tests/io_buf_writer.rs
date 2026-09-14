@@ -127,6 +127,21 @@ async fn buf_writer_inner_flushes() {
 }
 
 #[tokio::test]
+async fn buf_writer_flush_retries_interrupted() {
+    let inner = {
+        let mut builder = tokio_test::io::Builder::new();
+        builder
+            .write_error(io::Error::from(io::ErrorKind::Interrupted))
+            .write(b"hello");
+        builder.build()
+    };
+    let mut writer = BufWriter::with_capacity(6, inner);
+
+    assert_eq!(writer.write(b"hello").await.unwrap(), 5);
+    writer.flush().await.unwrap();
+}
+
+#[tokio::test]
 async fn buf_writer_seek() {
     let mut w = BufWriter::with_capacity(3, Cursor::new(Vec::new()));
     w.write_all(&[0, 1, 2, 3, 4, 5]).await.unwrap();

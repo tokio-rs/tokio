@@ -90,6 +90,10 @@ where
 ///
 /// This method is the same as the [`copy_bidirectional()`], except that it allows you to set the
 /// size of the internal buffers used when copying data.
+///
+/// # Panics
+///
+/// Panics if either buffer size is zero.
 #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
 pub async fn copy_bidirectional_with_sizes<A, B>(
     a: &mut A,
@@ -101,6 +105,15 @@ where
     A: AsyncRead + AsyncWrite + Unpin + ?Sized,
     B: AsyncRead + AsyncWrite + Unpin + ?Sized,
 {
+    assert!(
+        a_to_b_buf_size > 0,
+        "`a_to_b_buf_size` must be greater than 0"
+    );
+    assert!(
+        b_to_a_buf_size > 0,
+        "`b_to_a_buf_size` must be greater than 0"
+    );
+
     copy_bidirectional_impl(
         a,
         b,

@@ -238,6 +238,14 @@ async fn set_max_buf_size_write() {
 }
 
 #[tokio::test]
+#[should_panic(expected = "`max_buf_size` must be greater than 0")]
+async fn set_max_buf_size_panics_on_zero() {
+    let tempfile = tempfile();
+    let mut file = File::open(tempfile.path()).await.unwrap();
+    file.set_max_buf_size(0);
+}
+
+#[tokio::test]
 #[cfg_attr(miri, ignore)]
 #[cfg(unix)]
 async fn file_debug_fmt() {
