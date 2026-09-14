@@ -24,6 +24,13 @@ use std::time::Duration;
 use std::time::Instant;
 use std::{fmt, thread};
 
+#[cfg(all(
+    target_os = "emscripten",
+    not(target_feature = "atomics"),
+    tokio_unstable
+))]
+mod event_loop;
+
 /// Executes tasks on the current thread
 pub(crate) struct CurrentThread {
     /// Core scheduler data is acquired by a thread entering `block_on`.
@@ -198,6 +205,22 @@ impl CurrentThread {
 
     #[track_caller]
     pub(crate) fn block_on<F: Future>(&self, handle: &scheduler::Handle, future: F) -> F::Output {
+        // An event-loop runtime's wait is the host loop: no stack can hold
+        // a synchronous result across it. Reject eagerly, like a nested
+        // runtime, not only once the future would park.
+        #[cfg(all(
+            target_os = "emscripten",
+            not(target_feature = "atomics"),
+            tokio_unstable
+        ))]
+        if handle.as_current_thread().driver.is_event_loop() {
+            panic!(
+                "cannot `block_on` an `EventLoopRuntime`: it is driven by the host \
+                 event loop, so no stack can wait for the result; use \
+                 `EventLoopRuntime::schedule` to receive it by callback"
+            );
+        }
+
         pin!(future);
 
         crate::runtime::context::enter_runtime(handle, false, |blocking| {

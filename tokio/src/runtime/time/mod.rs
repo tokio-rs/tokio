@@ -287,6 +287,18 @@ impl Driver {
 }
 
 impl Handle {
+    /// The wheel's next expiration tick, if any timer is registered: the
+    /// deadline an `EventLoopRuntime` arms its host timer for.
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt",
+        tokio_unstable
+    ))]
+    pub(crate) fn next_expiration_tick(&self) -> Option<u64> {
+        self.inner.lock().wheel.next_expiration_time()
+    }
+
     pub(self) fn process(&self, clock: &Clock) {
         let now = self.time_source().now(clock);
 

@@ -1187,6 +1187,45 @@ impl Builder {
         }
     }
 
+    /// Creates an [`EventLoopRuntime`]: a [`LocalRuntime`] driven by the host
+    /// JavaScript event loop on `wasm32-unknown-emscripten`, so it never
+    /// blocks or suspends the host. Submit roots with
+    /// [`EventLoopRuntime::schedule`]; timer deadlines and socket readiness
+    /// drive it again from the host loop.
+    ///
+    /// Only available on `wasm32-unknown-emscripten` without pthreads, and
+    /// requires `--cfg tokio_unstable`.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if the runtime is configured with [`new_multi_thread()`].
+    ///
+    /// [`new_multi_thread()`]: Builder::new_multi_thread
+    /// [`EventLoopRuntime`]: crate::runtime::EventLoopRuntime
+    /// [`EventLoopRuntime::schedule`]: crate::runtime::EventLoopRuntime::schedule
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the I/O driver or other OS resources required by the
+    /// runtime cannot be initialized.
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        tokio_unstable
+    ))]
+    pub fn build_event_loop_runtime(&mut self) -> io::Result<crate::runtime::EventLoopRuntime> {
+        use crate::runtime::event_loop::EventLoopState;
+
+        let runtime = self.build_local(LocalOptions::default())?;
+        let state = EventLoopState::new(runtime);
+        let (_, handle) = state.runtime().parts();
+        handle
+            .inner
+            .driver()
+            .set_event_loop(std::sync::Arc::downgrade(&state));
+        Ok(crate::runtime::EventLoopRuntime::new(state))
+    }
+
     fn get_cfg(&self) -> driver::Cfg {
         driver::Cfg {
             enable_pause_time: match self.kind {

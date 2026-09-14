@@ -500,6 +500,13 @@
 //! `socketpair(2)` (so `UnixStream::pair`), no datagram `AF_UNIX` (so
 //! `UnixDatagram`), and no `SO_PEERCRED` (so `peer_cred`).
 //!
+//! With `--cfg tokio_unstable`, `Builder::build_event_loop_runtime` builds
+//! an `EventLoopRuntime`: a `LocalRuntime` driven by the host JavaScript
+//! event loop instead of by a park, so it needs neither JSPI nor pthreads.
+//! Roots are submitted with `EventLoopRuntime::schedule` and complete by
+//! callback; the host loop drives the runtime on its timer deadlines and,
+//! with `net`, on socket readiness. `block_on` is rejected on such a runtime.
+//!
 //! [JSPI]: https://github.com/WebAssembly/js-promise-integration
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at

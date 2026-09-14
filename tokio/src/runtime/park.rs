@@ -22,6 +22,17 @@ struct Inner {
     state: AtomicUsize,
     mutex: Mutex<()>,
     condvar: Condvar,
+    /// Set when the driver stack of this parker, which has no I/O driver,
+    /// belongs to an `EventLoopRuntime`: an unpark then arms a drive of it
+    /// instead of waking a parked thread. Weak: an armed callback must not
+    /// keep the runtime alive.
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt",
+        tokio_unstable
+    ))]
+    event_loop: std::sync::OnceLock<std::sync::Weak<crate::runtime::event_loop::EventLoopState>>,
 }
 
 const EMPTY: usize = 0;
@@ -52,6 +63,13 @@ impl ParkThread {
                 state: AtomicUsize::new(EMPTY),
                 mutex: Mutex::new(()),
                 condvar: Condvar::new(),
+                #[cfg(all(
+                    target_os = "emscripten",
+                    not(target_feature = "atomics"),
+                    feature = "rt",
+                    tokio_unstable
+                ))]
+                event_loop: std::sync::OnceLock::new(),
             }),
         }
     }
@@ -242,6 +260,18 @@ impl Inner {
             return;
         }
 
+        // An event-loop runtime's driver turn is a zero-duration park from a
+        // host callback: it must not suspend (the host loop already has the
+        // turn), and a real wait has no stack to hold it.
+        #[cfg(tokio_unstable)]
+        if self.event_loop.get().is_some() {
+            assert!(
+                dur.is_zero(),
+                "cannot block on an `EventLoopRuntime`: its wait is the host event loop"
+            );
+            return;
+        }
+
         // With JSPI linked the wait is real: suspend on a host timer, then
         // consume any notification delivered during the sleep so the token
         // does not leak into the next park. Without it a zero-duration park
@@ -310,6 +340,48 @@ impl Default for ParkThread {
 impl UnparkThread {
     pub(crate) fn unpark(&self) {
         self.inner.unpark();
+        // No thread is parked on an event-loop runtime: the wake is a drive.
+        #[cfg(all(
+            target_os = "emscripten",
+            not(target_feature = "atomics"),
+            feature = "rt",
+            tokio_unstable
+        ))]
+        if let Some(state) = self
+            .inner
+            .event_loop
+            .get()
+            .and_then(std::sync::Weak::upgrade)
+        {
+            state.arm_drive();
+        }
+    }
+
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt",
+        tokio_unstable
+    ))]
+    pub(crate) fn is_event_loop(&self) -> bool {
+        self.inner.event_loop.get().is_some()
+    }
+
+    /// Attach this parker to its `EventLoopRuntime` (builder only).
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt",
+        tokio_unstable
+    ))]
+    pub(crate) fn set_event_loop(
+        &self,
+        state: std::sync::Weak<crate::runtime::event_loop::EventLoopState>,
+    ) {
+        assert!(
+            self.inner.event_loop.set(state).is_ok(),
+            "event loop attached once"
+        );
     }
 }
 

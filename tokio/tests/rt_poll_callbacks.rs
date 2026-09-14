@@ -5,7 +5,7 @@ use std::sync::{atomic::AtomicUsize, Arc, Mutex};
 
 use tokio::task::yield_now;
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(all(not(target_os = "wasi"), feature = "rt-multi-thread"))]
 #[test]
 fn callbacks_fire_multi_thread() {
     let poll_start_counter = Arc::new(AtomicUsize::new(0));

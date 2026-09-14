@@ -621,6 +621,20 @@ cfg_rt! {
     mod local_runtime;
     pub use local_runtime::{LocalRuntime, LocalOptions};
 
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        tokio_unstable
+    ))]
+    pub use local_runtime::EventLoopRuntime;
+
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        tokio_unstable
+    ))]
+    pub(crate) mod event_loop;
+
     mod id;
     pub use id::Id;
 

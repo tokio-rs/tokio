@@ -1261,6 +1261,59 @@ jobs:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
           RUSTFLAGS: "-Dwarnings -Adeprecated -Ctarget-feature=+atomics,+bulk-memory,+mutable-globals -Clink-args=-pthread -Clink-args=-sPTHREAD_POOL_SIZE=8 -Clink-args=-sPROXY_TO_PTHREAD -Clink-args=-sINITIAL_MEMORY=134217728 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sNODERAWSOCKETS -Clink-args=-sNODERAWFS"
 
+  wasm32-unknown-emscripten-unstable:
+    name: test tokio for wasm32-unknown-emscripten (unstable)
+    needs: basics
+    runs-on: ubuntu-latest
+    # TEMPORARY: `EventLoopRuntime` with `net` links `emscripten_epoll_add_listener`
+    # from emscripten-core/emscripten#27547; overlay that branch on the
+    # tip-of-tree emsdk (whose LLVM its libc needs) until it is released.
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust ${{ env.rust_emscripten_beta }}
+        uses: dtolnay/rust-toolchain@beta
+        with:
+          toolchain: ${{ env.rust_emscripten_beta }}
+          targets: wasm32-unknown-emscripten
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: tot
+
+      # The emsdk config (LLVM_ROOT, BINARYEN_ROOT) stays in force; only the
+      # frontend is swapped.
+      - name: Overlay emscripten epoll-callback branch
+        run: |
+          git clone --depth 1 --branch epoll-callback https://github.com/guybedford/emscripten.git em-fork
+          python3 em-fork/bootstrap.py
+          rm -rf "$EMSDK/upstream/emscripten"
+          ln -s "$(pwd)/em-fork" "$EMSDK/upstream/emscripten"
+          echo "EM_CONFIG=$EMSDK/.emscripten" >> "$GITHUB_ENV"
+          EM_CONFIG="$EMSDK/.emscripten" emcc --version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Test tokio for emscripten (unstable, JSPI)
+        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,fs,io-util,io-std,test-util,net" --tests
+        working-directory: tokio
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
+          RUSTFLAGS: "--cfg tokio_unstable -Dwarnings -Adeprecated -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sJSPI -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sNODERAWSOCKETS -Clink-args=-sNODERAWFS -Clink-args=--pre-js=tokio/tests/rt_emscripten_pre.js"
+
+      # Without `-sJSPI` any stack suspension traps: the event-loop drives
+      # must complete the roots without one.
+      - name: Test tokio for emscripten (unstable, non-JSPI)
+        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,fs,io-util,io-std,test-util,net" --test rt_emscripten_block_on --test rt_emscripten_event_loop --test rt_emscripten_event_loop_main
+        working-directory: tokio
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
+          RUSTFLAGS: "--cfg tokio_unstable -Dwarnings -Adeprecated -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sNODERAWSOCKETS -Clink-args=-sNODERAWFS -Clink-args=--pre-js=tokio/tests/rt_emscripten_pre.js"
+
   check-external-types:
     name: check-external-types (${{ matrix.os }})
     needs: basics

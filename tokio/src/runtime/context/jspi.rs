@@ -68,10 +68,24 @@ pub(crate) fn sleep(dur: Duration) {
 /// host turn first, as the zero-duration `ParkThread` park does. Without JSPI
 /// `epoll_wait` cannot block at all and returns at once, so a real wait would
 /// spin.
+///
+/// An `event_loop` runtime's turn runs from a host callback: the host loop
+/// already has the turn, so the probe is synchronous, and a real wait has no
+/// stack to hold it.
 #[cfg(feature = "net")]
-pub(crate) fn io_wait<R>(max_wait: Option<Duration>, wait: impl FnOnce() -> R) -> R {
+pub(crate) fn io_wait<R>(
+    max_wait: Option<Duration>,
+    event_loop: bool,
+    wait: impl FnOnce() -> R,
+) -> R {
     let immediate = max_wait == Some(Duration::ZERO);
-    if jspi_enabled() {
+    if event_loop {
+        assert!(
+            immediate,
+            "cannot block on an `EventLoopRuntime`: its wait is the host event loop"
+        );
+        wait()
+    } else if jspi_enabled() {
         if immediate {
             sleep(Duration::ZERO);
         }

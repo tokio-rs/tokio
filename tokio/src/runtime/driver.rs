@@ -88,6 +88,32 @@ impl Handle {
         self.io.unpark();
     }
 
+    /// Whether this driver stack belongs to an `EventLoopRuntime`, whose
+    /// wait is the host event loop rather than a park.
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt",
+        tokio_unstable
+    ))]
+    pub(crate) fn is_event_loop(&self) -> bool {
+        self.io.is_event_loop()
+    }
+
+    /// Attach this driver stack to its `EventLoopRuntime` (builder only).
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt",
+        tokio_unstable
+    ))]
+    pub(crate) fn set_event_loop(
+        &self,
+        state: std::sync::Weak<crate::runtime::event_loop::EventLoopState>,
+    ) {
+        self.io.set_event_loop(state);
+    }
+
     cfg_io_driver! {
         #[track_caller]
         pub(crate) fn io(&self) -> &crate::runtime::io::Handle {
@@ -201,6 +227,35 @@ cfg_io_driver! {
             match self {
                 IoHandle::Enabled(handle) => handle.unpark(),
                 IoHandle::Disabled(handle) => handle.unpark(),
+            }
+        }
+
+        #[cfg(all(
+            target_os = "emscripten",
+            not(target_feature = "atomics"),
+            feature = "rt",
+            tokio_unstable
+        ))]
+        pub(crate) fn is_event_loop(&self) -> bool {
+            match self {
+                IoHandle::Enabled(handle) => handle.is_event_loop(),
+                IoHandle::Disabled(handle) => handle.is_event_loop(),
+            }
+        }
+
+        #[cfg(all(
+            target_os = "emscripten",
+            not(target_feature = "atomics"),
+            feature = "rt",
+            tokio_unstable
+        ))]
+        pub(crate) fn set_event_loop(
+            &self,
+            state: std::sync::Weak<crate::runtime::event_loop::EventLoopState>,
+        ) {
+            match self {
+                IoHandle::Enabled(handle) => handle.set_event_loop(state),
+                IoHandle::Disabled(handle) => handle.set_event_loop(state),
             }
         }
 
