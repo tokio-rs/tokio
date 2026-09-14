@@ -313,6 +313,36 @@ fn read_max_frame_len() {
 }
 
 #[test]
+fn read_positive_adjusted_frame_does_not_fit() {
+    let mut codec = LengthDelimitedCodec::builder()
+        .length_field_length(1)
+        .length_adjustment(1)
+        .max_frame_length(4)
+        .new_codec();
+    let mut src = BytesMut::from(&b"\x04abcde"[..]);
+
+    assert_eq!(
+        codec.decode(&mut src).unwrap_err().kind(),
+        io::ErrorKind::InvalidData
+    );
+}
+
+#[test]
+fn read_negative_adjusted_frame_fits() {
+    let mut codec = LengthDelimitedCodec::builder()
+        .length_field_length(1)
+        .length_adjustment(-1)
+        .max_frame_length(4)
+        .new_codec();
+    let mut src = BytesMut::from(&b"\x05abcd"[..]);
+
+    assert_eq!(
+        codec.decode(&mut src).unwrap(),
+        Some(BytesMut::from(&b"abcd"[..]))
+    );
+}
+
+#[test]
 fn read_update_max_frame_len_at_rest() {
     let io = length_delimited::Builder::new().new_read(mock! {
         data(b"\x00\x00\x00\x09abcdefghi"),
