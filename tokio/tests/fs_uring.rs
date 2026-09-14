@@ -15,7 +15,7 @@ use std::time::Duration;
 use std::{future::poll_fn, path::PathBuf};
 use tempfile::NamedTempFile;
 use tokio::{
-    fs::OpenOptions,
+    fs::{File, OpenOptions},
     runtime::{Builder, Runtime},
 };
 use tokio_util::task::TaskTracker;
@@ -143,6 +143,29 @@ async fn cancel_op_future() {
 
     let res = handle.await.unwrap_err();
     assert!(res.is_cancelled());
+}
+
+#[tokio::test]
+async fn uring_cmd_is_available_via_file() {
+    let (tmp_file, _path): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(1);
+    let file = File::open(tmp_file[0].path()).await.unwrap();
+
+    let cmd_op = 0; // A dummy command
+    let cmd = [0; 16]; // A dummy payload
+
+    // SAFETY: The command and payload are dummies for testing availability.
+    // Standard file systems will safely reject unknown/dummy `cmd_op`s
+    // without causing kernel-level memory issues.
+    let result = unsafe { file.uring_cmd(cmd_op, cmd, None).await };
+
+    // We only care that the function doesn't panic and returns a Result.
+    // The specific error depends on the kernel and whether io_uring is available.
+    if let Err(e) = result {
+        // Because `tmp_file` is a standard file descriptor without an underlying
+        // `file_operations.uring_cmd` driver implementation, the Linux kernel
+        // should return EOPNOTSUPP (Operation Not Supported).
+        assert_eq!(e.kind(), std::io::ErrorKind::Unsupported);
+    }
 }
 
 fn create_tmp_files(num_files: usize) -> (Vec<NamedTempFile>, Vec<PathBuf>) {
