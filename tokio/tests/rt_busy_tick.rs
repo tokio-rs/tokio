@@ -11,6 +11,12 @@ fn zero_busy_tick_panics() {
     tokio::runtime::Builder::new_multi_thread().max_io_events_per_busy_tick(0);
 }
 
+#[test]
+#[should_panic(expected = "max_io_events_per_tick must be non-zero")]
+fn zero_io_events_per_tick_panics() {
+    tokio::runtime::Builder::new_multi_thread().max_io_events_per_tick(0);
+}
+
 // Liveness check: the runtime always has runnable tasks, so its I/O polls do
 // not wait and each takes one event. Echo traffic must still complete.
 fn busy_runtime_gets_every_event(rt: tokio::runtime::Runtime) {
