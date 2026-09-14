@@ -387,8 +387,9 @@ impl Context {
         #[cfg(tokio_unstable)]
         let task_meta = task.task_meta(_task_schedule_latency);
 
+        let coop_time_budget = self.handle.shared.config.coop_time_budget;
         let (mut c, ()) = self.enter(core, || {
-            crate::task::coop::budget(|| {
+            crate::task::coop::run_with_coop_budget(coop_time_budget, || {
                 #[cfg(tokio_unstable)]
                 self.handle.task_hooks.poll_start_callback(&task_meta);
 
@@ -824,8 +825,11 @@ impl CoreGuard<'_> {
                 let handle = &context.handle;
 
                 if handle.reset_woken() {
+                    let coop_time_budget = handle.shared.config.coop_time_budget;
                     let (c, res) = context.enter(core, || {
-                        crate::task::coop::budget(|| future.as_mut().poll(&mut cx))
+                        crate::task::coop::run_with_coop_budget(coop_time_budget, || {
+                            future.as_mut().poll(&mut cx)
+                        })
                     });
 
                     core = c;
