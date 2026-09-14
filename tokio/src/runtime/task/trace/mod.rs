@@ -170,11 +170,16 @@ pub struct TraceMeta {
     pub trace_leaf_addr: *const c_void,
 }
 
-/// Runs `f`. If `f` hits a Tokio yield point `trace_leaf` will be invoked.
+/// Runs `f`. If `f` hits a Tokio yield point, the `trace_leaf` callback will be invoked.
 ///
-/// This allows taking a task dump with caller-provided task dump machinery. If `f` is the poll
-/// function of a future and that future returns `Poll::Pending`, then `trace_leaf` will be
-/// invoked. `trace_leaf` can then take a backtrace to determine exactly where the yield occurred.
+/// This allows taking a task dump with caller-provided task dump machinery. At each Tokio yield
+/// point reached while polling a future, `trace_leaf` can take a backtrace. The leaf future then
+/// returns `Poll::Pending` instead of performing its normal work.
+///
+/// When running on a Tokio scheduler, each captured leaf's waker is deferred until the scheduler
+/// regains control, so that the future can be polled again. The future must be polled outside of
+/// `trace_with` to make progress. Capturing on every poll can cause a wake-and-capture loop even
+/// when the future has no work to do.
 ///
 /// # Example
 ///
@@ -283,17 +288,15 @@ impl Trace {
     }
 }
 
-/// If this is a sub-invocation of [`trace_with`], capture a backtrace.
+/// If this is a sub-invocation of [`trace_with`], invoke its callback, defer a wake,
+/// and return `Poll::Pending`.
 ///
-/// The captured backtrace will be returned by [`trace_with`].
-///
-/// Invoking this function does nothing when it is not a sub-invocation
-/// [`trace_with`].
+/// Otherwise, return `Poll::Ready(())` without waking the future.
 // This function is marked `#[inline(never)]` to ensure that it gets a distinct `Frame` in the
 // backtrace, below which frames should not be included in the backtrace (since they reflect the
 // internal implementation details of this crate).
 #[inline(never)]
-pub(crate) fn trace_leaf() -> Poll<()> {
+pub(crate) fn trace_leaf(cx: &mut task::Context<'_>) -> Poll<()> {
     let root_addr = Context::current_frame_addr();
 
     let ret = Context::try_with_current_trace_leaf_fn(|leaf_fn| {
@@ -302,6 +305,19 @@ pub(crate) fn trace_leaf() -> Poll<()> {
             trace_leaf_addr: trace_leaf as *const c_void,
         };
         leaf_fn(&meta);
+
+        // Wake the leaf, not just the enclosing Tokio task: sub-executors may
+        // only poll children whose own wakers have fired. As with `yield_now`,
+        // defer the wake until the scheduler regains control.
+        context::with_scheduler(|scheduler| {
+            if let Some(scheduler) = scheduler {
+                match scheduler {
+                    scheduler::Context::CurrentThread(s) => s.defer.defer(cx.waker()),
+                    #[cfg(feature = "rt-multi-thread")]
+                    scheduler::Context::MultiThread(s) => s.defer.defer(cx.waker()),
+                }
+            }
+        });
     });
 
     match ret {
@@ -438,26 +454,6 @@ fn trace_owned<S: Schedule>(owned: &OwnedTasks<S>, dequeued: Vec<Notified<S>>) -
         .map(|task| {
             let local_notified = owned.assert_owner(task);
             let id = local_notified.task.id();
-
-            // Re-enqueue the task's waker on the scheduler's defer queue so
-            // the task is polled again after the dump completes. This is the
-            // same mechanism `yield_now` uses; the defer queue is drained
-            // after `trace_current_thread` / `trace_multi_thread` returns.
-            //
-            // We do this before polling so the borrow of the task ends before
-            // the `LocalNotified` is consumed in `run()`. `defer` clones the
-            // waker into its own queue, so the deferred entry outlives the
-            // `WakerRef` here.
-            let waker_ref = local_notified.waker_ref();
-            context::with_scheduler(|scheduler| {
-                if let Some(scheduler) = scheduler {
-                    match scheduler {
-                        scheduler::Context::CurrentThread(s) => s.defer.defer(&waker_ref),
-                        #[cfg(feature = "rt-multi-thread")]
-                        scheduler::Context::MultiThread(s) => s.defer.defer(&waker_ref),
-                    }
-                }
-            });
 
             let ((), trace) = Trace::capture(|| local_notified.run());
             (id, trace)
