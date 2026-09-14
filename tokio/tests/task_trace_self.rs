@@ -198,7 +198,8 @@ impl<F: Future> Future for TaskDump<F> {
 
         // Skip capture on the next poll so capture-induced wakes do not
         // cause a wake-and-capture loop.
-        if std::mem::take(this.just_captured) {
+        if *this.just_captured {
+            *this.just_captured = false;
             return Poll::Pending;
         }
 
