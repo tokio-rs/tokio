@@ -1022,8 +1022,8 @@ impl Notified<'_> {
         }
     }
 
-    fn poll_notified(self: Pin<&mut Self>, waker: Option<&Waker>) -> Poll<()> {
-        self.project().poll_notified(waker)
+    fn poll_notified(self: Pin<&mut Self>, ctx: Option<&mut Context<'_>>) -> Poll<()> {
+        self.project().poll_notified(ctx)
     }
 }
 
@@ -1031,7 +1031,7 @@ impl Future for Notified<'_> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        self.poll_notified(Some(cx.waker()))
+        self.poll_notified(Some(cx))
     }
 }
 
@@ -1077,8 +1077,8 @@ impl OwnedNotified {
         }
     }
 
-    fn poll_notified(self: Pin<&mut Self>, waker: Option<&Waker>) -> Poll<()> {
-        self.project().poll_notified(waker)
+    fn poll_notified(self: Pin<&mut Self>, ctx: Option<&mut Context<'_>>) -> Poll<()> {
+        self.project().poll_notified(ctx)
     }
 }
 
@@ -1086,7 +1086,7 @@ impl Future for OwnedNotified {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        self.poll_notified(Some(cx.waker()))
+        self.poll_notified(Some(cx))
     }
 }
 
@@ -1102,7 +1102,7 @@ impl Drop for OwnedNotified {
 // ===== impl NotifiedProject =====
 
 impl NotifiedProject<'_> {
-    fn poll_notified(self, waker: Option<&Waker>) -> Poll<()> {
+    fn poll_notified(self, mut ctx: Option<&mut Context<'_>>) -> Poll<()> {
         let NotifiedProject {
             notify,
             state,
@@ -1139,7 +1139,7 @@ impl NotifiedProject<'_> {
 
                     // Clone the waker before locking, a waker clone can be
                     // triggering arbitrary code.
-                    let waker = waker.cloned();
+                    let waker = ctx.as_mut().map(|ctx| ctx.waker().clone());
 
                     // Acquire the lock and attempt to transition to the waiting
                     // state.
@@ -1224,9 +1224,8 @@ impl NotifiedProject<'_> {
                 }
                 State::Waiting => {
                     #[cfg(all(tokio_unstable, feature = "taskdump"))]
-                    if let Some(waker) = waker {
-                        let mut cx = Context::from_waker(waker);
-                        std::task::ready!(crate::trace::trace_leaf(&mut cx));
+                    if let Some(ctx) = ctx.as_mut() {
+                        std::task::ready!(crate::trace::trace_leaf(ctx));
                     }
 
                     if waiter.notification.load(Acquire).is_some() {
@@ -1287,7 +1286,8 @@ impl NotifiedProject<'_> {
                         // Safety: we hold the lock, so we can modify the waker.
                         unsafe {
                             waiter.waker.with_mut(|v| {
-                                if let Some(waker) = waker {
+                                if let Some(ctx) = ctx.as_ref() {
+                                    let waker = ctx.waker();
                                     let should_update = match &*v {
                                         Some(current_waker) => !current_waker.will_wake(waker),
                                         None => true,
@@ -1318,9 +1318,8 @@ impl NotifiedProject<'_> {
                 }
                 State::Done => {
                     #[cfg(all(tokio_unstable, feature = "taskdump"))]
-                    if let Some(waker) = waker {
-                        let mut cx = Context::from_waker(waker);
-                        std::task::ready!(crate::trace::trace_leaf(&mut cx));
+                    if let Some(ctx) = ctx.as_mut() {
+                        std::task::ready!(crate::trace::trace_leaf(ctx));
                     }
                     return Poll::Ready(());
                 }
