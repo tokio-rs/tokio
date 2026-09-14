@@ -7,6 +7,27 @@ use tokio_test::*;
 
 use std::time::Duration;
 
+#[test]
+fn throttle_can_be_created_outside_runtime() {
+    let _stream = futures::stream::iter([1, 2]).throttle(Duration::from_millis(1));
+}
+
+#[test]
+fn zero_duration_does_not_require_time_driver() {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        let stream = futures::stream::iter([1, 2]).throttle(Duration::from_millis(0));
+        tokio::pin!(stream);
+
+        assert_eq!(stream.next().await, Some(1));
+        assert_eq!(stream.next().await, Some(2));
+        assert_eq!(stream.next().await, None);
+    });
+}
+
 #[tokio::test]
 async fn usage() {
     time::pause();
