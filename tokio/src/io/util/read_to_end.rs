@@ -43,7 +43,9 @@ pub(super) fn read_to_end_internal<V: VecU8, R: AsyncRead + ?Sized>(
     cx: &mut Context<'_>,
 ) -> Poll<io::Result<usize>> {
     loop {
+        let coop = ready!(crate::util::coop::poll_proceed(cx));
         let ret = ready!(poll_read_to_end(buf, reader.as_mut(), cx));
+        coop.made_progress();
         match ret {
             Err(err) if err.kind() == io::ErrorKind::Interrupted => continue,
             Err(err) => return Poll::Ready(Err(err)),
