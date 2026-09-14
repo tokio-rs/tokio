@@ -71,9 +71,9 @@ impl Op<Open> {
 pub(crate) async fn open(path: &Path, options: &UringOpenOptions) -> io::Result<crate::fs::File> {
     loop {
         match Op::open(path, options)?.await {
+            Ok(file) => return Ok(file),
             Err(OpenError::Completion(e)) if e.kind() == io::ErrorKind::Interrupted => continue,
             Err(OpenError::Completion(e) | OpenError::Submission(e)) => return Err(e),
-            Ok(file) => return Ok(file),
         }
     }
 }

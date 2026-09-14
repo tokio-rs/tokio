@@ -35,8 +35,9 @@ pin_project! {
 /// ) -> io::Result<()> {
 ///     while !bufs.is_empty() {
 ///         let n = match write_vectored(writer, bufs).await {
+///             Ok(n) => n,
 ///             Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
-///             res => res?,
+///             Err(e) => return Err(e),
 ///         };
 ///         if n == 0 {
 ///             return Err(io::ErrorKind::WriteZero.into());
