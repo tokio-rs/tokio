@@ -1,7 +1,7 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures_core::Stream;
+use futures_core::{FusedStream, Stream};
 use pin_project_lite::pin_project;
 
 use crate::stream_ext::Fuse;
@@ -81,5 +81,11 @@ impl<T: Stream> Stream for Peekable<T> {
         let lo = lo.saturating_add(peek_len);
         let hi = hi.and_then(|x| x.checked_add(peek_len));
         (lo, hi)
+    }
+}
+
+impl<T: Stream> FusedStream for Peekable<T> {
+    fn is_terminated(&self) -> bool {
+        self.peek.is_none() && self.stream.is_terminated()
     }
 }

@@ -227,6 +227,21 @@ async fn merge_terminated_only_after_both_done() {
     assert_eq!(collected.len(), 2);
 }
 
+#[tokio::test(start_paused = true)]
+async fn chunks_timeout_not_terminated_before_done() {
+    let stream = fused_iter(vec![1, 2]).chunks_timeout(3, std::time::Duration::from_secs(1));
+    assert!(!stream.is_terminated());
+}
+
+#[tokio::test(start_paused = true)]
+async fn chunks_timeout_terminated_after_inner_done() {
+    let stream = fused_iter(vec![1, 2]).chunks_timeout(3, std::time::Duration::from_secs(1));
+    tokio::pin!(stream);
+    assert_eq!(stream.next().await, Some(vec![1, 2]));
+    assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
+}
+
 #[tokio::test]
 async fn stream_notify_close_is_terminated_after_close_notification() {
     let mut stream = StreamNotifyClose::new(tokio_stream::iter(vec![1]));
@@ -243,6 +258,24 @@ async fn stream_notify_close_does_not_poll_inner_after_close_notification() {
     let mut stream = StreamNotifyClose::new(EndOnce { ended: false });
     assert!(!stream.is_terminated());
     assert_eq!(stream.next().await, Some(None));
+    assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
+}
+
+#[tokio::test]
+async fn peekable_not_terminated_before_done() {
+    let mut stream = fused_iter(vec![1, 2]).peekable();
+    assert!(!stream.is_terminated());
+    assert_eq!(stream.peek().await, Some(&1));
+    assert!(!stream.is_terminated());
+}
+
+#[tokio::test]
+async fn peekable_terminated_after_inner_done() {
+    let mut stream = fused_iter(vec![1]).peekable();
+    assert_eq!(stream.next().await, Some(1));
+    assert!(!stream.is_terminated());
+    assert_eq!(stream.next().await, None);
     assert!(stream.is_terminated());
     assert_eq!(stream.next().await, None);
 }
