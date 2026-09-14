@@ -26,6 +26,28 @@ fn fused_iter<T>(items: Vec<T>) -> impl FusedStream<Item = T> {
     tokio_stream::iter(items).fuse()
 }
 
+#[tokio::test]
+async fn empty_is_terminated_immediately() {
+    let mut stream = tokio_stream::empty::<i32>();
+    assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
+    assert!(stream.is_terminated());
+}
+
+#[tokio::test]
+async fn once_not_terminated_before_polled() {
+    let stream = tokio_stream::once(1);
+    assert!(!stream.is_terminated());
+}
+
+#[tokio::test]
+async fn once_terminated_after_item_yielded() {
+    let mut stream = tokio_stream::once(1);
+    assert_eq!(stream.next().await, Some(1));
+    assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
+}
+
 // ── map ──────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
