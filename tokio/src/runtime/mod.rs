@@ -548,11 +548,8 @@ cfg_rt! {
     }
 
     cfg_fs! {
-        // Non-pthread emscripten uses the inline shim in `crate::blocking`.
-        #[cfg_attr(
-            all(target_os = "emscripten", not(target_feature = "atomics")),
-            allow(unused_imports)
-        )]
+        // Emscripten uses the inline shim in `crate::blocking`.
+        #[cfg_attr(target_os = "emscripten", allow(unused_imports))]
         pub(crate) use blocking::spawn_mandatory_blocking;
     }
 
@@ -623,6 +620,20 @@ cfg_rt! {
 
     mod local_runtime;
     pub use local_runtime::{LocalRuntime, LocalOptions};
+
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        tokio_unstable
+    ))]
+    pub use local_runtime::EventLoopRuntime;
+
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        tokio_unstable
+    ))]
+    pub(crate) mod event_loop;
 
     mod id;
     pub use id::Id;

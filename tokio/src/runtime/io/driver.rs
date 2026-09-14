@@ -53,6 +53,18 @@ pub(crate) struct Handle {
     #[cfg(not(target_os = "wasi"))]
     waker: mio::Waker,
 
+    /// Set when this reactor belongs to an `EventLoopRuntime`: readiness
+    /// then re-enters its drive from the host loop's epoll listener, and a
+    /// driver turn never suspends. Weak: the armed listener must not keep
+    /// the runtime alive.
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt",
+        tokio_unstable
+    ))]
+    event_loop: std::sync::OnceLock<std::sync::Weak<crate::runtime::event_loop::EventLoopState>>,
+
     pub(crate) metrics: IoDriverMetrics,
 
     #[cfg(all(
@@ -139,6 +151,13 @@ impl Driver {
             synced: Mutex::new(synced),
             #[cfg(not(target_os = "wasi"))]
             waker,
+            #[cfg(all(
+                target_os = "emscripten",
+                not(target_feature = "atomics"),
+                feature = "rt",
+                tokio_unstable
+            ))]
+            event_loop: std::sync::OnceLock::new(),
             metrics: IoDriverMetrics::default(),
             #[cfg(all(
                 tokio_unstable,
@@ -195,7 +214,23 @@ impl Driver {
 
         // Block waiting for an event to happen, peeling out how many events
         // happened.
-        match self.poll.poll(events, max_wait) {
+        #[cfg(not(all(
+            target_os = "emscripten",
+            not(target_feature = "atomics"),
+            feature = "rt"
+        )))]
+        let polled = self.poll.poll(events, max_wait);
+        #[cfg(all(
+            target_os = "emscripten",
+            not(target_feature = "atomics"),
+            feature = "rt"
+        ))]
+        let polled =
+            crate::runtime::context::jspi::io_wait(max_wait, handle.is_event_loop(), || {
+                self.poll.poll(events, max_wait)
+            });
+
+        match polled {
             Ok(()) => {}
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
             #[cfg(target_os = "wasi")]
@@ -267,6 +302,23 @@ impl fmt::Debug for Driver {
     }
 }
 
+/// The epoll set has uncollected ready events: drive, which collects them
+/// with a zero-timeout poll.
+#[cfg(all(
+    target_os = "emscripten",
+    not(target_feature = "atomics"),
+    feature = "rt",
+    tokio_unstable
+))]
+unsafe extern "C-unwind" fn on_ready(user_data: *mut std::ffi::c_void) {
+    // SAFETY: `user_data` is the `Handle` the listener was armed with in
+    // `set_event_loop`, alive while the epoll fd is.
+    let handle = unsafe { &*(user_data as *const Handle) };
+    if let Some(state) = handle.event_loop.get().and_then(std::sync::Weak::upgrade) {
+        state.drive();
+    }
+}
+
 impl Handle {
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
     /// makes the next call to `turn` return immediately.
@@ -278,8 +330,64 @@ impl Handle {
     /// blocked in `turn`, then the next call to `turn` will not block and
     /// return immediately.
     pub(crate) fn unpark(&self) {
+        // On an event-loop runtime the waker's readiness edge re-enters the
+        // drive through the epoll listener; a wake during a drive is
+        // absorbed by that drive's own turn.
+        #[cfg(all(
+            target_os = "emscripten",
+            not(target_feature = "atomics"),
+            feature = "rt",
+            tokio_unstable
+        ))]
+        if self
+            .event_loop
+            .get()
+            .and_then(std::sync::Weak::upgrade)
+            .is_some_and(|state| state.is_driving())
+        {
+            return;
+        }
         #[cfg(not(target_os = "wasi"))]
         self.waker.wake().expect("failed to wake I/O driver");
+    }
+
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt"
+    ))]
+    pub(crate) fn is_event_loop(&self) -> bool {
+        #[cfg(tokio_unstable)]
+        return self.event_loop.get().is_some();
+        #[cfg(not(tokio_unstable))]
+        return false;
+    }
+
+    /// Attach this reactor to its `EventLoopRuntime` (builder only): the
+    /// host loop's epoll readiness listener re-enters the drive.
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt",
+        tokio_unstable
+    ))]
+    pub(crate) fn set_event_loop(
+        &self,
+        state: std::sync::Weak<crate::runtime::event_loop::EventLoopState>,
+    ) {
+        use std::os::fd::AsRawFd;
+
+        assert!(
+            self.event_loop.set(state).is_ok(),
+            "event loop attached once"
+        );
+        // `self` lives in the runtime's `Arc<Handle>`, dropped after the
+        // driver whose epoll fd (and with it the listener) closes first.
+        crate::runtime::event_loop::EventLoopState::add_epoll_listener(
+            self.registry.as_raw_fd(),
+            on_ready,
+            self as *const Handle as *mut std::ffi::c_void,
+        );
     }
 
     /// Registers an I/O resource with the reactor for a given `mio::Ready` state.
@@ -355,7 +463,15 @@ impl Direction {
     }
 }
 
-#[cfg(all(test, unix, feature = "net", not(loom), not(miri)))]
+// Node has no `socketpair(2)`.
+#[cfg(all(
+    test,
+    unix,
+    feature = "net",
+    not(loom),
+    not(miri),
+    not(target_os = "emscripten")
+))]
 mod tests {
     use super::*;
     use std::io::Write;

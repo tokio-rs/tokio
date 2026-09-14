@@ -1,4 +1,4 @@
-331
+335
 &
 +
 <
@@ -32,6 +32,7 @@
 8MB
 ABI
 accessors
+activations
 adaptor
 adaptors
 Adaptors
@@ -114,6 +115,7 @@ enqueued
 EntryInner
 enum
 eof
+epoll
 Erlang's
 errored
 EWMA
@@ -163,6 +165,8 @@ IP
 IPv4
 IPv6
 iteratively
+JSPI
+keepalive
 Kotlin's
 latencies
 Lauck
