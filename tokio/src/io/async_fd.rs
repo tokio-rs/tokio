@@ -247,6 +247,30 @@ impl<T: AsRawFd> AsyncFd<T> {
         Self::new_with_handle_and_interest(inner, scheduler::Handle::current(), interest)
     }
 
+    /// Create a new AsyncFd with the provided raw epoll flags for registration.
+    ///
+    /// These flags replace any epoll flags would normally set when registering the fd.
+    ///
+    /// # Note
+    /// This API does not support the use of `EPOLLONESHOT`.
+    /// Users are strongly advised to use `EPOLLET` to prevent the tokio IO driver from receiving
+    /// spurious wakes.
+    ///
+    /// # Stability
+    /// This is an [unstable API][unstable]. The public API of this may break in 1.x releases.
+    /// See [the documentation on unstable features][unstable] for details.
+    ///
+    ///  [unstable]: crate#unstable-features
+    #[track_caller]
+    #[cfg(all(target_os = "linux", tokio_unstable))]
+    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, target_os = "linux"))))]
+    pub fn with_epoll_flags(inner: T, flags: u32) -> io::Result<Self>
+    where
+        T: AsRawFd,
+    {
+        Self::new_with_handle_and_flags(inner, scheduler::Handle::current(), flags)
+    }
+
     #[track_caller]
     pub(crate) fn new_with_handle_and_interest(
         inner: T,
@@ -316,6 +340,21 @@ impl<T: AsRawFd> AsyncFd<T> {
             }),
             Err(cause) => Err(AsyncFdTryNewError { inner, cause }),
         }
+    }
+
+    #[track_caller]
+    #[cfg(all(target_os = "linux", tokio_unstable))]
+    pub(crate) fn new_with_handle_and_flags(
+        mut inner: T,
+        handle: scheduler::Handle,
+        flags: u32,
+    ) -> io::Result<Self> {
+        let registration = Registration::new_with_flags_and_handle(&mut inner, flags, handle)?;
+
+        Ok(AsyncFd {
+            registration,
+            inner: Some(inner),
+        })
     }
 
     /// Returns a shared reference to the backing object of this [`AsyncFd`].
