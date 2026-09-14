@@ -63,3 +63,15 @@ async fn correct_behavior_on_errors() {
     assert_eq!(zeros_received, 8000);
     assert!(stream.next().await.is_none());
 }
+
+#[tokio::test]
+async fn zero_capacity_still_reads_data() {
+    let mut stream = tokio_util::io::ReaderStream::with_capacity(&b"hello"[..], 0);
+    let mut received = Vec::new();
+
+    while let Some(chunk) = stream.next().await {
+        received.extend_from_slice(&chunk.unwrap());
+    }
+
+    assert_eq!(received, b"hello");
+}
