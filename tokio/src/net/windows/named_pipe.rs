@@ -112,6 +112,8 @@ impl NamedPipeServer {
     /// This function will consume ownership of the handle given, passing
     /// responsibility for closing the handle to the returned object.
     ///
+    /// # Safety
+    ///
     /// This function is also unsafe as the primitives currently returned have
     /// the contract that they are the sole owner of the file descriptor they
     /// are wrapping. Usage of this function could accidentally allow violating
@@ -984,6 +986,8 @@ impl NamedPipeClient {
     ///
     /// This function will consume ownership of the handle given, passing
     /// responsibility for closing the handle to the returned object.
+    ///
+    /// # Safety
     ///
     /// This function is also unsafe as the primitives currently returned have
     /// the contract that they are the sole owner of the file descriptor they
@@ -2365,6 +2369,12 @@ impl ServerOptions {
     }
 }
 
+impl Default for ServerOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A builder suitable for building and interacting with named pipes from the
 /// client side.
 ///
@@ -2584,6 +2594,12 @@ impl ClientOptions {
 
     fn get_flags(&self) -> u32 {
         self.security_qos_flags | windows_sys::FILE_FLAG_OVERLAPPED
+    }
+}
+
+impl Default for ClientOptions {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
