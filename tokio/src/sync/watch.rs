@@ -747,6 +747,24 @@ impl<T> Receiver<T> {
         Ok(self.version != new_version)
     }
 
+    /// Checks if the channel has been closed. This happens when all [`Sender`]s
+    /// have been dropped.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// let (tx, rx) = watch::channel(());
+    /// assert!(!rx.is_closed());
+    ///
+    /// drop(tx);
+    /// assert!(rx.is_closed());
+    /// ```
+    pub fn is_closed(&self) -> bool {
+        self.shared.state.load().is_closed()
+    }
+
     /// Marks the state as changed.
     ///
     /// After invoking this method [`has_changed()`](Self::has_changed)
