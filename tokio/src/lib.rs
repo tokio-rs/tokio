@@ -481,10 +481,10 @@
 //! their operations inline on the calling thread rather than on the blocking
 //! pool, in pthreads builds too.
 //!
-//! When the build links [JSPI], a wait with a deadline suspends on the host
-//! event loop rather than blocking. Without JSPI, such a wait panics, as does
-//! a wait with no deadline in either mode. The panic unwinds out of `block_on`
-//! and leaves the runtime usable.
+//! When the build links [JSPI], a wait that would block suspends on the host
+//! event loop rather than blocking, resuming when a timer fires or when a
+//! later call into the module wakes it. Without JSPI, such a wait panics; the
+//! panic unwinds out of `block_on` and leaves the runtime usable.
 //!
 //! [JSPI]: https://github.com/WebAssembly/js-promise-integration
 
