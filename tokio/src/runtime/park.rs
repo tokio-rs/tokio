@@ -28,6 +28,11 @@ const EMPTY: usize = 0;
 const PARKED: usize = 1;
 const NOTIFIED: usize = 2;
 
+#[cfg(not(all(
+    target_os = "emscripten",
+    not(target_feature = "atomics"),
+    feature = "rt"
+)))]
 tokio_thread_local! {
     static CURRENT_PARKER: ParkThread = ParkThread::new();
 }
@@ -76,6 +81,11 @@ impl ParkThread {
 // ==== impl Inner ====
 
 impl Inner {
+    #[cfg(not(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt"
+    )))]
     fn park(&self) {
         // If we were previously notified then we consume this notification and
         // return quickly.
@@ -123,7 +133,81 @@ impl Inner {
         }
     }
 
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt"
+    ))]
+    fn park(&self) {
+        self.park_jspi(None);
+    }
+
+    /// Parks the activation until unparked or `dur` elapses, if given.
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt"
+    ))]
+    fn park_jspi(&self, dur: Option<Duration>) {
+        // If we were previously notified then we consume this notification and
+        // return quickly.
+        if self
+            .state
+            .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
+            .is_ok()
+        {
+            return;
+        }
+
+        // Without JSPI a real wait is impossible: suspending would trap and
+        // busy-waiting would starve the host loop the wake depends on. A
+        // zero-duration park returns immediately as on native.
+        if !crate::runtime::context::jspi::jspi_enabled() {
+            if dur == Some(Duration::ZERO) {
+                return;
+            }
+            panic!(
+                "cannot block on wasm32-unknown-emscripten: this wait would \
+                 suspend on the host event loop, which needs the build to \
+                 link `-sJSPI`"
+            );
+        }
+
+        // Suspend until a host timer fires or a later activation (a host
+        // callback entering tokio) unparks us. A zero-duration park still
+        // takes a host turn so timers and microtasks run mid-drive (the
+        // scheduler's maintenance yield). No threads: nothing runs between
+        // here and the suspension, so an unpark can only land while parked,
+        // where it settles the promise.
+        let old = self.state.swap(PARKED, SeqCst);
+        debug_assert_eq!(old, EMPTY, "inconsistent park state");
+
+        crate::runtime::context::jspi::park(self.id(), dur);
+
+        // Consume any notification delivered during the park so the token
+        // does not leak into the next one.
+        match self.state.swap(EMPTY, SeqCst) {
+            NOTIFIED => {} // got a notification, hurray!
+            PARKED => {}   // timer deadline, alas
+            n => panic!("inconsistent park state: {n}"),
+        }
+    }
+
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt"
+    ))]
+    fn id(&self) -> usize {
+        self as *const Inner as usize
+    }
+
     /// Parks the current thread for at most `dur`.
+    #[cfg(not(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt"
+    )))]
     fn park_timeout(&self, dur: Duration) {
         // Like `park` above we have a fast path for an already-notified thread,
         // and afterwards we start coordinating for a sleep. Return quickly.
@@ -174,6 +258,15 @@ impl Inner {
         }
     }
 
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt"
+    ))]
+    fn park_timeout(&self, dur: Duration) {
+        self.park_jspi(Some(dur));
+    }
+
     fn unpark(&self) {
         // To ensure the unparked thread will observe any writes we made before
         // this call, we must perform a release operation that `park` can
@@ -186,6 +279,14 @@ impl Inner {
             PARKED => {}        // gotta go wake someone up
             _ => panic!("inconsistent state in unpark"),
         }
+
+        // The parked activation is suspended in the host; settle its promise.
+        #[cfg(all(
+            target_os = "emscripten",
+            not(target_feature = "atomics"),
+            feature = "rt"
+        ))]
+        crate::runtime::context::jspi::unpark(self.id());
 
         // There is a period between when the parked thread sets `state` to
         // `PARKED` (or last checked `state` in the case of a spurious wake
@@ -231,6 +332,16 @@ use std::task::{RawWaker, RawWakerVTable, Waker};
 /// Blocks the current thread using a condition variable.
 #[derive(Debug)]
 pub(crate) struct CachedParkThread {
+    // While a suspended stack is parked, host callbacks can still run tokio
+    // code on this thread, and a shared thread-local parker would hand this
+    // stack's notification token to that code. Each blocking call gets its
+    // own parker instead.
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt"
+    ))]
+    park: ParkThread,
     _anchor: PhantomData<Rc<()>>,
 }
 
@@ -241,6 +352,12 @@ impl CachedParkThread {
     /// the thread that the caller intends to park.
     pub(crate) fn new() -> CachedParkThread {
         CachedParkThread {
+            #[cfg(all(
+                target_os = "emscripten",
+                not(target_feature = "atomics"),
+                feature = "rt"
+            ))]
+            park: ParkThread::new(),
             _anchor: PhantomData,
         }
     }
@@ -268,7 +385,20 @@ impl CachedParkThread {
     where
         F: FnOnce(&ParkThread) -> R,
     {
-        CURRENT_PARKER.try_with(|inner| f(inner))
+        #[cfg(not(all(
+            target_os = "emscripten",
+            not(target_feature = "atomics"),
+            feature = "rt"
+        )))]
+        return CURRENT_PARKER.try_with(|inner| f(inner));
+
+        // See the comment on the `park` field.
+        #[cfg(all(
+            target_os = "emscripten",
+            not(target_feature = "atomics"),
+            feature = "rt"
+        ))]
+        return Ok(f(&self.park));
     }
 
     pub(crate) fn block_on<F: Future>(&mut self, f: F) -> Result<F::Output, AccessError> {
