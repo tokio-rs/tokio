@@ -560,6 +560,14 @@ cfg_rt! {
     pub use self::builder::Builder;
     cfg_unstable! {
         pub use self::builder::UnhandledPanic;
+        #[cfg(feature = "rt-multi-thread")]
+        #[allow(dead_code)]
+        mod llc;
+        #[cfg(feature = "rt-multi-thread")]
+        pub use self::llc::{LlcAwareConfig, LlcTaskHint};
+        #[cfg(feature = "rt-multi-thread")]
+        #[allow(unused_imports)]
+        pub(crate) use self::llc::{LlcTaskOptions, LlcTaskPlacement};
         pub use crate::util::rand::RngSeed;
     }
 
