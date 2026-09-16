@@ -12,6 +12,10 @@ pub(crate) use overflow::Overflow;
 mod idle;
 use self::idle::Idle;
 
+#[cfg(tokio_unstable)]
+#[allow(dead_code)]
+mod llc;
+
 mod stats;
 pub(crate) use stats::Stats;
 
