@@ -168,6 +168,14 @@ fn split() {
     assert_eq!(sem.available_permits(), 5);
 }
 
+#[test]
+fn permit_semaphore() {
+    let sem = Semaphore::new(1);
+    let permit = sem.try_acquire().unwrap();
+
+    assert!(std::ptr::eq(permit.semaphore(), &sem));
+}
+
 #[tokio::test]
 #[cfg(feature = "full")]
 async fn stress_test() {
