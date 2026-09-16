@@ -394,6 +394,7 @@ cfg_rt_multi_thread! {
         owned: &OwnedTasks<Arc<multi_thread::Handle>>,
         local: &mut multi_thread::queue::Local<Arc<multi_thread::Handle>>,
         injection: &InjectQueue<Arc<multi_thread::Handle>>,
+        mut additional: Vec<Notified<Arc<multi_thread::Handle>>>,
     ) -> Vec<(Id, Trace)> {
         let mut dequeued = Vec::new();
 
@@ -404,6 +405,7 @@ cfg_rt_multi_thread! {
 
         // clear the injection queue
         injection.drain_into(&mut dequeued);
+        dequeued.append(&mut additional);
 
         // precondition: we have drained the tasks from the local and injection
         // queues.

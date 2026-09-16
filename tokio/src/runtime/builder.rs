@@ -8,6 +8,8 @@ use crate::runtime::{
 use crate::runtime::{metrics::HistogramConfiguration, TaskMeta};
 
 use crate::runtime::{LocalOptions, LocalRuntime};
+#[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+use crate::runtime::LlcAwareConfig;
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use crate::runtime::blocking::BlockingPool;
@@ -159,6 +161,18 @@ pub struct Builder {
 
     /// When true, the blocking pool uses the sharded queue implementation.
     pub(super) sharded_blocking_queue: bool,
+
+    /// Configuration for LLC-aware scheduling.
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    llc_aware: LlcAwareSetting,
+}
+
+#[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+#[derive(Clone, Debug)]
+enum LlcAwareSetting {
+    Auto,
+    Disabled,
+    Custom(LlcAwareConfig),
 }
 
 cfg_unstable! {
@@ -373,6 +387,13 @@ impl Builder {
             enable_eager_driver_handoff: false,
 
             sharded_blocking_queue: sharded_blocking_queue_default(),
+
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            llc_aware: if cfg!(target_os = "linux") {
+                LlcAwareSetting::Auto
+            } else {
+                LlcAwareSetting::Disabled
+            },
         }
     }
 
@@ -582,6 +603,130 @@ impl Builder {
     pub fn worker_threads(&mut self, val: usize) -> &mut Self {
         assert!(val > 0, "Worker threads cannot be set to 0");
         self.worker_threads = Some(val);
+        self
+    }
+
+    /// Sets a custom LLC-aware scheduling configuration for the multi-thread
+    /// runtime.
+    ///
+    /// Workers prefer work associated with their current last-level-cache
+    /// partition before stealing across partitions. Tokio refreshes the
+    /// worker's partition after it wakes and periodically while it is busy, so
+    /// this remains correct when the operating system migrates worker threads.
+    /// If the runtime has fewer workers than configured partitions, Tokio
+    /// falls back to its standard scheduler rather than create a partition
+    /// which cannot have a local worker. A warning is emitted when Tokio's
+    /// `tracing` feature is enabled.
+    ///
+    /// This option only affects the multi-thread runtime.
+    ///
+    /// **Note**: This is an [unstable API][unstable].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio::runtime::{Builder, LlcAwareConfig};
+    ///
+    /// // This example assumes each worker is externally pinned to the LLC
+    /// // matching its worker index. A dynamic callback may instead inspect
+    /// // the CPU on which it is currently running.
+    /// let config = LlcAwareConfig::new(2, |worker| worker.map(|worker| worker % 2));
+    /// let runtime = Builder::new_multi_thread()
+    ///     .worker_threads(4)
+    ///     .llc_aware(config)
+    ///     .build()
+    ///     .unwrap();
+    /// # drop(runtime);
+    /// # }
+    /// ```
+    ///
+    /// [unstable]: crate#unstable-features
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(tokio_unstable, feature = "rt-multi-thread")))
+    )]
+    pub fn llc_aware(&mut self, config: LlcAwareConfig) -> &mut Self {
+        self.llc_aware = LlcAwareSetting::Custom(config);
+        self
+    }
+
+    /// Enables automatic LLC-aware scheduling using Linux sysfs topology
+    /// discovery and `sched_getcpu(3)`.
+    ///
+    /// Automatic discovery is already enabled by default on Linux. This method
+    /// is useful to re-enable it after [`disable_llc_aware`](Self::disable_llc_aware)
+    /// or after replacing a custom configuration. Discovery occurs when
+    /// [`build`](Self::build) is called. If the host topology cannot be read,
+    /// or the allowed CPU set contains only one LLC, Tokio retains its standard
+    /// scheduler. A discovery failure emits a warning when Tokio's `tracing`
+    /// feature is enabled.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime::Builder;
+    ///
+    /// let runtime = Builder::new_multi_thread()
+    ///     .enable_llc_aware()
+    ///     .build()
+    ///     .unwrap();
+    /// # drop(runtime);
+    /// ```
+    ///
+    /// **Note**: This is an [unstable API][unstable].
+    ///
+    /// [unstable]: crate#unstable-features
+    #[cfg(all(
+        tokio_unstable,
+        feature = "rt-multi-thread",
+        target_os = "linux"
+    ))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(
+            tokio_unstable,
+            feature = "rt-multi-thread",
+            target_os = "linux"
+        )))
+    )]
+    pub fn enable_llc_aware(&mut self) -> &mut Self {
+        self.llc_aware = LlcAwareSetting::Auto;
+        self
+    }
+
+    /// Disables LLC-aware scheduling.
+    ///
+    /// This is useful when conditionally applying a reusable runtime
+    /// configuration, or to opt out of automatic Linux topology discovery.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio::runtime::Builder;
+    ///
+    /// let runtime = Builder::new_multi_thread()
+    ///     .disable_llc_aware()
+    ///     .build()
+    ///     .unwrap();
+    /// # drop(runtime);
+    /// # }
+    /// ```
+    ///
+    /// **Note**: This is an [unstable API][unstable].
+    ///
+    /// [unstable]: crate#unstable-features
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(tokio_unstable, feature = "rt-multi-thread")))
+    )]
+    pub fn disable_llc_aware(&mut self) -> &mut Self {
+        self.llc_aware = LlcAwareSetting::Disabled;
         self
     }
 
@@ -1779,6 +1924,8 @@ impl Builder {
             blocking_spawner,
             seed_generator_2,
             Config {
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                llc_aware: None,
                 before_park: self.before_park.clone(),
                 after_unpark: self.after_unpark.clone(),
                 before_spawn: self.before_spawn.clone(),
@@ -2195,6 +2342,50 @@ cfg_rt_multi_thread! {
             let seed_generator_1 = self.seed_generator.next_generator();
             let seed_generator_2 = self.seed_generator.next_generator();
 
+            #[cfg(tokio_unstable)]
+            let llc_aware = match &self.llc_aware {
+                LlcAwareSetting::Disabled => None,
+                LlcAwareSetting::Custom(config) => Some(config.clone()),
+                LlcAwareSetting::Auto => {
+                    #[cfg(target_os = "linux")]
+                    {
+                        match LlcAwareConfig::from_linux_topology() {
+                            Ok(config) if config.partition_count() > 1 => Some(config),
+                            Ok(_) => None,
+                            Err(error) => {
+                                #[cfg(feature = "tracing")]
+                                tracing::warn!(
+                                    target: "tokio::runtime",
+                                    %error,
+                                    "could not discover LLC topology; using the standard scheduler"
+                                );
+                                #[cfg(not(feature = "tracing"))]
+                                let _ = error;
+                                None
+                            }
+                        }
+                    }
+                    #[cfg(not(target_os = "linux"))]
+                    {
+                        None
+                    }
+                }
+            };
+            #[cfg(tokio_unstable)]
+            let llc_aware = match llc_aware {
+                Some(config) if config.partition_count() > worker_threads => {
+                    #[cfg(feature = "tracing")]
+                    tracing::warn!(
+                        target: "tokio::runtime",
+                        worker_threads,
+                        llc_partitions = config.partition_count(),
+                        "disabling LLC-aware scheduling because the runtime has fewer workers than LLC partitions"
+                    );
+                    None
+                }
+                config => config,
+            };
+
             let (scheduler, handle, launch) = MultiThread::new(
                 worker_threads,
                 driver,
@@ -2202,6 +2393,8 @@ cfg_rt_multi_thread! {
                 blocking_spawner,
                 seed_generator_2,
                 Config {
+                    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                    llc_aware,
                     before_park: self.before_park.clone(),
                     after_unpark: self.after_unpark.clone(),
                     before_spawn: self.before_spawn.clone(),
@@ -2261,10 +2454,36 @@ impl fmt::Debug for Builder {
                 &self.enable_eager_driver_handoff,
             );
 
+        #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+        debug.field("llc_aware", &self.llc_aware);
+
         if self.name.is_none() {
             debug.finish_non_exhaustive()
         } else {
             debug.finish()
         }
+    }
+}
+
+#[cfg(all(
+    test,
+    tokio_unstable,
+    feature = "rt-multi-thread",
+    target_os = "linux"
+))]
+mod llc_tests {
+    use super::{Builder, LlcAwareSetting};
+
+    #[test]
+    fn linux_multi_thread_builder_uses_automatic_llc_discovery() {
+        let builder = Builder::new_multi_thread();
+        assert!(matches!(builder.llc_aware, LlcAwareSetting::Auto));
+    }
+
+    #[test]
+    fn llc_awareness_can_be_disabled() {
+        let mut builder = Builder::new_multi_thread();
+        builder.disable_llc_aware();
+        assert!(matches!(builder.llc_aware, LlcAwareSetting::Disabled));
     }
 }

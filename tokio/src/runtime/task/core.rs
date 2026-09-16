@@ -27,6 +27,9 @@ use crate::runtime::task::state::State;
 use crate::runtime::task::{Id, Schedule, TaskHarnessScheduleHooks};
 use crate::util::linked_list;
 
+#[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+use crate::loom::sync::atomic::AtomicUsize;
+
 use std::num::NonZeroU64;
 #[cfg(tokio_unstable)]
 use std::panic::Location;
@@ -195,6 +198,11 @@ pub(crate) struct Header {
 
     /// The last time this task was scheduled. Used to measure schedule latency.
     pub(super) scheduled_at: UnsafeCell<ScheduleLatencyInstant>,
+
+    /// Encodes the LLC partition on which this task was last polled and whether
+    /// the cold trailer contains explicit LLC options.
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    pub(super) last_llc_partition: AtomicUsize,
 }
 
 unsafe impl Send for Header {}
@@ -210,6 +218,11 @@ pub(super) struct Trailer {
     /// Optional hooks needed in the harness.
     #[cfg_attr(not(tokio_unstable), allow(dead_code))] //TODO: remove when hooks are stabilized
     pub(super) hooks: TaskHarnessScheduleHooks,
+
+    /// Per-task LLC scheduling options. These are initialized before the task
+    /// is made visible to the scheduler and remain immutable afterwards.
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    pub(super) llc: UnsafeCell<crate::runtime::LlcTaskOptions>,
 }
 
 generate_addr_of_methods! {
@@ -252,6 +265,8 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
                 scheduled_at: UnsafeCell::new(ScheduleLatencyInstant::new(None)),
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                last_llc_partition: AtomicUsize::new(0),
             }
         }
 
@@ -564,7 +579,23 @@ impl Trailer {
             waker: UnsafeCell::new(None),
             owned: linked_list::Pointers::new(),
             hooks,
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            llc: UnsafeCell::new(crate::runtime::LlcTaskOptions::default()),
         }
+    }
+
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    pub(super) unsafe fn set_llc_options(&self, options: crate::runtime::LlcTaskOptions) {
+        self.llc.with_mut(|ptr| {
+            *ptr = options;
+        });
+    }
+
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    pub(super) fn llc_options(&self) -> crate::runtime::LlcTaskOptions {
+        // Safety: LLC options are only written before the task is submitted to
+        // the scheduler and are immutable after that point.
+        unsafe { self.llc.with(|ptr| *ptr) }
     }
 
     pub(super) unsafe fn set_waker(&self, waker: Option<Waker>) {

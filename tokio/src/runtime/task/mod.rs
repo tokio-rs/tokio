@@ -253,6 +253,58 @@ impl<S> Notified<S> {
             self.0.header().set_scheduled_at(scheduled_at);
         }
     }
+
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    pub(crate) fn task_meta<'meta>(&self) -> crate::runtime::TaskMeta<'meta> {
+        self.0.task_meta(None)
+    }
+
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    pub(crate) fn last_llc_partition(&self) -> Option<usize> {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let encoded = self.0.header().last_llc_partition.load(Relaxed) >> 1;
+        encoded.checked_sub(1)
+    }
+
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    pub(crate) fn set_last_llc_partition(&self, partition: usize) {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        let options = self.0.header().last_llc_partition.load(Relaxed) & 1;
+        let encoded = partition
+            .checked_add(1)
+            .and_then(|partition| partition.checked_mul(2))
+            .unwrap_or(0);
+        self.0
+            .header()
+            .last_llc_partition
+            .store(encoded | options, Relaxed);
+    }
+
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    pub(crate) unsafe fn set_llc_options(&self, options: crate::runtime::LlcTaskOptions) {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        if options.placement.is_none() {
+            return;
+        }
+        // Safety: The caller guarantees that the task has not been submitted
+        // to the scheduler yet.
+        unsafe { self.0.raw.trailer().set_llc_options(options) };
+        self.0.header().last_llc_partition.fetch_or(1, Relaxed);
+    }
+
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    pub(crate) fn llc_options(&self) -> crate::runtime::LlcTaskOptions {
+        use std::sync::atomic::Ordering::Relaxed;
+
+        if self.0.header().last_llc_partition.load(Relaxed) & 1 == 0 {
+            crate::runtime::LlcTaskOptions::default()
+        } else {
+            self.0.raw.trailer().llc_options()
+        }
+    }
 }
 
 // safety: This type cannot be used to touch the task without first verifying

@@ -55,9 +55,17 @@
 //!
 //! ## NUMA awareness
 //!
-//! The tokio runtime is not NUMA (Non-Uniform Memory Access) aware.
-//! You may want to start multiple runtimes instead of a single runtime
-//! for better performance on NUMA systems.
+//! With `tokio_unstable`, the multi-thread runtime automatically discovers the
+//! process's allowed CPUs on Linux and arranges scheduler queues by LLC and
+//! NUMA node. Other platforms use the standard scheduler by default, but may
+//! provide their topology with [`LlcAwareConfig`]. The runtime rechecks a
+//! worker's location after it wakes and while it remains busy, so
+//! operating-system CPU migration does not leave it using a stale queue.
+//! [`Builder::disable_llc_aware`] opts out.
+//!
+//! LLC-aware scheduling preserves scheduling and cache locality; it does not
+//! bind worker threads or memory to a NUMA node. Applications which require
+//! strict placement may still prefer pinned workers or multiple runtimes.
 //!
 //! # Usage
 //!
@@ -543,9 +551,11 @@ cfg_rt! {
     #[cfg_attr(target_os = "wasi", allow(unused_imports))]
     pub(crate) use blocking::spawn_blocking;
 
-    cfg_trace! {
-        pub(crate) use blocking::Mandatory;
-    }
+    #[cfg(all(
+        tokio_unstable,
+        any(feature = "tracing", feature = "rt-multi-thread")
+    ))]
+    pub(crate) use blocking::Mandatory;
 
     cfg_fs! {
         // Non-pthread emscripten uses the inline shim in `crate::blocking`.
@@ -561,12 +571,10 @@ cfg_rt! {
     cfg_unstable! {
         pub use self::builder::UnhandledPanic;
         #[cfg(feature = "rt-multi-thread")]
-        #[allow(dead_code)]
         mod llc;
         #[cfg(feature = "rt-multi-thread")]
         pub use self::llc::{LlcAwareConfig, LlcTaskHint};
         #[cfg(feature = "rt-multi-thread")]
-        #[allow(unused_imports)]
         pub(crate) use self::llc::{LlcTaskOptions, LlcTaskPlacement};
         pub use crate::util::rand::RngSeed;
     }

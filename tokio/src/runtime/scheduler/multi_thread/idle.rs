@@ -81,6 +81,37 @@ impl Idle {
         ret
     }
 
+    /// Selects a sleeping worker last observed in `partition`.
+    ///
+    /// A sleeping worker may have been migrated by the OS. This is only a
+    /// locality preference; the worker refreshes its actual partition after it
+    /// wakes and the caller falls back to the regular wakeup path when no
+    /// matching sleeper is known.
+    #[cfg(tokio_unstable)]
+    pub(super) fn worker_to_notify_for_partition(
+        &self,
+        shared: &Shared,
+        partition: usize,
+    ) -> Option<usize> {
+        if !self.notify_should_wakeup() {
+            return None;
+        }
+
+        let mut lock = shared.synced.lock();
+        if !self.notify_should_wakeup() {
+            return None;
+        }
+
+        let position = lock
+            .idle
+            .sleepers
+            .iter()
+            .rposition(|worker| shared.worker_llc_partition(*worker) == Some(partition))?;
+        let worker = lock.idle.sleepers.swap_remove(position);
+        State::unpark_one(&self.state, 1);
+        Some(worker)
+    }
+
     /// Returns `true` if the worker needs to do a final check for submitted
     /// work.
     pub(super) fn transition_worker_to_parked(

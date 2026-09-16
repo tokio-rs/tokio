@@ -57,12 +57,20 @@ impl Handle {
         future: F,
         id: task::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] llc: crate::runtime::LlcTaskOptions,
     ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        Self::bind_new_task(me, future, id, spawned_at)
+        Self::bind_new_task(
+            me,
+            future,
+            id,
+            spawned_at,
+            #[cfg(tokio_unstable)]
+            llc,
+        )
     }
 
     #[cfg(all(tokio_unstable, feature = "time"))]
@@ -83,12 +91,19 @@ impl Handle {
         future: T,
         id: task::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] llc: crate::runtime::LlcTaskOptions,
     ) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
         let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
+
+        #[cfg(tokio_unstable)]
+        if let Some(notified) = &notified {
+            // Safety: the task has not been submitted to the scheduler yet.
+            unsafe { notified.set_llc_options(llc) };
+        }
 
         me.task_hooks.spawn(&TaskMeta {
             id,

@@ -146,16 +146,34 @@ cfg_rt! {
             }
         }
 
-        pub(crate) fn spawn<F>(&self, future: F, id: Id, spawned_at: SpawnLocation) -> JoinHandle<F::Output>
+        pub(crate) fn spawn<F>(
+            &self,
+            future: F,
+            id: Id,
+            spawned_at: SpawnLocation,
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            llc: crate::runtime::LlcTaskOptions,
+        ) -> JoinHandle<F::Output>
         where
             F: Future + Send + 'static,
             F::Output: Send + 'static,
         {
             match self {
-                Handle::CurrentThread(h) => current_thread::Handle::spawn(h, future, id, spawned_at),
+                Handle::CurrentThread(h) => {
+                    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                    let _ = llc;
+                    current_thread::Handle::spawn(h, future, id, spawned_at)
+                }
 
                 #[cfg(feature = "rt-multi-thread")]
-                Handle::MultiThread(h) => multi_thread::Handle::spawn(h, future, id, spawned_at),
+                Handle::MultiThread(h) => multi_thread::Handle::spawn(
+                    h,
+                    future,
+                    id,
+                    spawned_at,
+                    #[cfg(tokio_unstable)]
+                    llc,
+                ),
             }
         }
 
