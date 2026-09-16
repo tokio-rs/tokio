@@ -2,6 +2,8 @@
 // This module does not currently provide any public API, but it was
 // unintentionally defined as a public module. Hide it from the documentation
 // instead of changing it to a private module to avoid breakage.
+// Emscripten's node-backed sockets have no datagram primitive.
+#[cfg(not(target_os = "emscripten"))]
 #[doc(hidden)]
 pub mod datagram;
 
