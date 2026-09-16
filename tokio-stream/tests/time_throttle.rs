@@ -76,7 +76,7 @@ async fn is_terminated() {
     assert!(stream.as_ref().get_ref().get_ref().is_terminated());
     assert!(!stream.as_ref().get_ref().is_terminated());
 
-    time::advance(Duration::from_millis(101)).await;
+    time::sleep(Duration::from_millis(101)).await;
 
     // After the delay has elapsed, the stream yields None and is terminated.
     assert_eq!(stream.next().await, None);
