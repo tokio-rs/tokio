@@ -382,6 +382,28 @@ impl Runtime {
         }
     }
 
+    /// Polls `future` once, runs any locally-owned tasks that are ready, then does one
+    /// non-blocking drive of the io/time driver, and returns `true` iff `future` completed.
+    ///
+    /// `block_on`'s scheduling loop assumes `park()` is a real blocking wait some other thread
+    /// eventually interrupts, which doesn't hold on wasm without atomics (no threads, so
+    /// `park()` is instant and non-blocking): looping it would spin forever without giving the
+    /// JS event loop a turn to progress any pending I/O. Call this repeatedly from an outer,
+    /// JS-driven loop (e.g. `emscripten_set_main_loop_arg`) until it returns `true` instead.
+    #[cfg(all(target_family = "wasm", not(target_feature = "atomics")))]
+    pub fn pump_once(&self, future: std::pin::Pin<&mut dyn Future<Output = ()>>) -> bool {
+        let _enter = self.enter();
+        match &self.scheduler {
+            Scheduler::CurrentThread(exec) => exec.pump_once(&self.handle.inner, future),
+            // Feature unification can enable "rt-multi-thread" here even though nothing on this
+            // target ever builds a multi-thread runtime; kept exhaustive rather than relying on that.
+            #[cfg(feature = "rt-multi-thread")]
+            Scheduler::MultiThread(_) => {
+                unreachable!("pump_once() is only used with a current_thread runtime")
+            }
+        }
+    }
+
     /// Enters the runtime context.
     ///
     /// This allows you to construct types that must have an executor

@@ -251,6 +251,25 @@ impl CurrentThread {
         })
     }
 
+    // `block_on()` above loops on `park()` being a real blocking wait another thread interrupts,
+    // which doesn't hold on wasm without atomics (no threads, non-blocking `park()`; see
+    // io::Driver::turn()). `pump_once` instead does a single non-looping pass -- poll the
+    // future, run ready locally-owned tasks, one non-blocking driver pump -- so the caller's own
+    // JS-driven loop regains control between calls instead of spinning here forever.
+    #[cfg(all(target_family = "wasm", not(target_feature = "atomics")))]
+    pub(crate) fn pump_once(
+        &self,
+        handle: &scheduler::Handle,
+        future: std::pin::Pin<&mut dyn Future<Output = ()>>,
+    ) -> bool {
+        let handle = handle.as_current_thread();
+        let Some(core) = self.take_core(handle) else {
+            // Another block_on()/pump_once() call is already active on this thread.
+            return false;
+        };
+        core.pump_once(future)
+    }
+
     pub(crate) fn shutdown(&mut self, handle: &scheduler::Handle) {
         let handle = handle.as_current_thread();
 
@@ -887,6 +906,56 @@ impl CoreGuard<'_> {
                 panic!("a spawned task panicked and the runtime is configured to shut down on unhandled panic");
             }
         }
+    }
+
+    // See CurrentThread::pump_once()'s comment. A single non-looping pass through the same steps
+    // block_on()'s `'outer: loop` body performs each iteration, using park_yield() (never the
+    // blocking park()) so it always returns immediately.
+    #[cfg(all(target_family = "wasm", not(target_feature = "atomics")))]
+    fn pump_once(self, future: std::pin::Pin<&mut dyn Future<Output = ()>>) -> bool {
+        self.enter(|mut core, context| {
+            let waker = Handle::waker_ref(&context.handle);
+            let mut cx = std::task::Context::from_waker(&waker);
+
+            core.metrics.start_processing_scheduled_tasks();
+
+            let handle = &context.handle;
+            let mut done = false;
+
+            if handle.reset_woken() {
+                let (c, res) = context.enter(core, || {
+                    crate::task::coop::budget(|| future.poll(&mut cx))
+                });
+                core = c;
+                if res.is_ready() {
+                    done = true;
+                }
+            }
+
+            if !done {
+                for _ in 0..handle.shared.config.event_interval {
+                    if core.unhandled_panic {
+                        break;
+                    }
+                    core.tick();
+                    let entry = core.next_task(handle);
+                    let task = match entry {
+                        Some(entry) => entry,
+                        None => break,
+                    };
+                    let task = context.handle.shared.owned.assert_owner(task);
+                    core = context.run_task(task, core);
+                }
+            }
+
+            core.metrics.end_processing_scheduled_tasks();
+
+            // One non-blocking pump of the driver, refreshing IO/timer readiness.
+            core = context.park_yield(core, handle);
+            core.metrics.start_processing_scheduled_tasks();
+
+            (core, done)
+        })
     }
 
     /// Enters the scheduler context. This sets the queue and other necessary
