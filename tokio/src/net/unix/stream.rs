@@ -910,6 +910,8 @@ impl UnixStream {
     /// This function will create a pair of interconnected Unix sockets for
     /// communicating back and forth between one another. Each socket will
     /// be associated with the default event loop's handle.
+    // socketpair(2) isn't available on Emscripten's node-backed sockets.
+    #[cfg(not(target_os = "emscripten"))]
     pub fn pair() -> io::Result<(UnixStream, UnixStream)> {
         let (a, b) = mio::net::UnixStream::pair()?;
         let a = UnixStream::new(a)?;
