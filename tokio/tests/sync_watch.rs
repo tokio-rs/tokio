@@ -493,6 +493,19 @@ fn has_changed_errors_on_closed_channel_with_seen_value() {
         .expect_err("`has_changed` returns an error if and only if channel is closed.");
 }
 
+#[test]
+fn receiver_is_closed_after_all_senders_are_dropped() {
+    let (tx, rx) = watch::channel("A");
+    let tx2 = tx.clone();
+    assert!(!rx.is_closed());
+
+    drop(tx);
+    assert!(!rx.is_closed());
+
+    drop(tx2);
+    assert!(rx.is_closed());
+}
+
 #[tokio::test]
 async fn wait_for_errors_on_closed_channel_true_predicate() {
     let (tx, mut rx) = watch::channel("A");
