@@ -144,6 +144,27 @@ fn steal_batch() {
     assert!(local1.pop().is_none());
 }
 
+#[test]
+fn steal_batch_respects_limit() {
+    let mut stats = new_stats();
+    let (steal, mut source) = queue::local();
+    let (_, mut destination) = queue::local();
+    let inject = RefCell::new(vec![]);
+
+    for _ in 0..8 {
+        let (task, _) = super::unowned(async {});
+        source.push_back_or_overflow(task, &inject, &mut stats);
+    }
+
+    assert!(steal
+        .steal_into_with_limit(&mut destination, &mut stats, 1)
+        .is_some());
+    assert!(destination.pop().is_none());
+    assert_eq!(source.len(), 7);
+
+    while source.pop().is_some() {}
+}
+
 const fn normal_or_miri(normal: usize, miri: usize) -> usize {
     if cfg!(miri) {
         miri

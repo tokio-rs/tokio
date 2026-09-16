@@ -419,6 +419,17 @@ impl<T> Steal<T> {
         dst: &mut Local<T>,
         dst_stats: &mut Stats,
     ) -> Option<task::Notified<T>> {
+        self.steal_into_with_limit(dst, dst_stats, usize::MAX)
+    }
+
+    /// Steals at most `limit` tasks from self and places them into `dst`.
+    pub(crate) fn steal_into_with_limit(
+        &self,
+        dst: &mut Local<T>,
+        dst_stats: &mut Stats,
+        limit: usize,
+    ) -> Option<task::Notified<T>> {
+        debug_assert!(limit > 0);
         // Safety: the caller is the only thread that mutates `dst.tail` and
         // holds a mutable reference.
         let dst_tail = unsafe { dst.inner.tail.unsync_load() };
@@ -436,7 +447,7 @@ impl<T> Steal<T> {
 
         // Steal the tasks into `dst`'s buffer. This does not yet expose the
         // tasks in `dst`.
-        let mut n = self.steal_into2(dst, dst_tail);
+        let mut n = self.steal_into2(dst, dst_tail, limit);
 
         if n == 0 {
             // No tasks were stolen
@@ -469,7 +480,12 @@ impl<T> Steal<T> {
 
     // Steal tasks from `self`, placing them into `dst`. Returns the number of
     // tasks that were stolen.
-    fn steal_into2(&self, dst: &mut Local<T>, dst_tail: UnsignedShort) -> UnsignedShort {
+    fn steal_into2(
+        &self,
+        dst: &mut Local<T>,
+        dst_tail: UnsignedShort,
+        limit: usize,
+    ) -> UnsignedShort {
         let mut prev_packed = self.0.head.load(Acquire);
         let mut next_packed;
 
@@ -485,7 +501,7 @@ impl<T> Steal<T> {
 
             // Number of available tasks to steal
             let n = src_tail.wrapping_sub(src_head_real);
-            let n = n - n / 2;
+            let n = usize::min((n - n / 2) as usize, limit) as UnsignedShort;
 
             if n == 0 {
                 // No tasks available to steal
