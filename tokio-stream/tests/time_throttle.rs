@@ -63,9 +63,8 @@ async fn size_hint() {
     assert_eq!(stream.size_hint(), (3, Some(3)));
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn is_terminated() {
-    time::pause();
 
     let stream = tokio_stream::once(1).throttle(Duration::from_millis(100));
     tokio::pin!(stream);
