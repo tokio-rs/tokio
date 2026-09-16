@@ -125,3 +125,18 @@ async fn copy_is_cooperative() {
         _ = tokio::task::yield_now() => {}
     }
 }
+
+#[tokio::test]
+async fn copy_buf_is_cooperative() {
+    tokio::select! {
+        biased;
+        _ = async {
+            loop {
+                let mut reader: &[u8] = b"hello";
+                let mut writer: Vec<u8> = vec![];
+                let _ = io::copy_buf(&mut reader, &mut writer).await;
+            }
+        } => {},
+        _ = tokio::task::yield_now() => {}
+    }
+}

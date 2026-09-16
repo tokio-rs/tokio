@@ -434,6 +434,10 @@ impl UnixDatagram {
         let (a, b) = mio::net::UnixDatagram::pair()?;
         let a = UnixDatagram::new(a)?;
         let b = UnixDatagram::new(b)?;
+        // A fresh pair has empty buffers: writable now, readable only once
+        // the peer sends.
+        a.io.registration().assume_ready(Ready::WRITABLE);
+        b.io.registration().assume_ready(Ready::WRITABLE);
 
         Ok((a, b))
     }

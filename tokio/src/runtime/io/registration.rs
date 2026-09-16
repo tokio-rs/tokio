@@ -104,6 +104,17 @@ impl Registration {
         self.shared.clear_readiness(event);
     }
 
+    /// Marks the resource ready without waiting for the driver's first event.
+    /// Used for sockets whose state is known when they are created: accepted
+    /// sockets are writable and usually already hold the peer's first bytes
+    /// (under load that first event can queue behind every established
+    /// connection's events), and both ends of a fresh `pair()` are writable.
+    /// A wrong guess costs one `WouldBlock`, which clears the readiness again.
+    #[cfg(feature = "net")]
+    pub(crate) fn assume_ready(&self, ready: crate::io::Ready) {
+        self.shared.assume_ready(ready);
+    }
+
     // Uses the poll path, requiring the caller to ensure mutual exclusion for
     // correctness. Only the last task to call this function is notified.
     pub(crate) fn poll_read_ready(&self, cx: &mut Context<'_>) -> Poll<io::Result<ReadyEvent>> {

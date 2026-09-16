@@ -571,6 +571,10 @@ impl File {
     /// Although Tokio uses a sensible default value for this buffer size, this function would be
     /// useful for changing that default depending on the situation.
     ///
+    /// # Panics
+    ///
+    /// This function panics if `max_buf_size` is 0.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -590,7 +594,9 @@ impl File {
     /// # Ok(())
     /// # }
     /// ```
+    #[track_caller]
     pub fn set_max_buf_size(&mut self, max_buf_size: usize) {
+        assert!(max_buf_size > 0, "`max_buf_size` must be greater than 0");
         self.max_buf_size = max_buf_size;
     }
 

@@ -9,6 +9,7 @@ use tokio::try_join;
 use std::future::poll_fn;
 use std::io;
 use std::sync::Arc;
+use std::task::Poll;
 
 async fn echo_server(socket: UnixDatagram) -> io::Result<()> {
     let mut recv_buf = vec![0u8; 1024];
@@ -421,5 +422,36 @@ async fn poll_ready() -> io::Result<()> {
         }
     }
 
+    Ok(())
+}
+
+// Both ends of a fresh pair are writable without a driver event, but not
+// readable until the peer sends.
+#[tokio::test(flavor = "current_thread")]
+#[cfg_attr(miri, ignore)] // No SOCK_DGRAM for `socketpair` in miri.
+async fn pair_starts_writable() -> io::Result<()> {
+    let (a, b) = UnixDatagram::pair()?;
+
+    // Nothing has polled the driver since `pair()`.
+    assert!(poll_fn(|cx| Poll::Ready(a.poll_send_ready(cx)))
+        .await
+        .is_ready());
+    a.try_send(b"hi")?;
+    b.try_send(b"yo")?;
+
+    let (c, _d) = UnixDatagram::pair()?;
+    assert!(poll_fn(|cx| Poll::Ready(c.poll_recv_ready(cx)))
+        .await
+        .is_pending());
+    assert_eq!(
+        c.try_recv(&mut [0u8; 1]).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+
+    // The peer's datagram still arrives through the normal event path.
+    a.readable().await?;
+    let mut buf = [0u8; 8];
+    assert_eq!(a.try_recv(&mut buf)?, 2);
+    assert_eq!(&buf[..2], b"yo");
     Ok(())
 }

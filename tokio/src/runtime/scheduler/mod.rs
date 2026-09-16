@@ -278,7 +278,6 @@ cfg_rt! {
             match_flavor!(self, Context(context) => context.defer(waker));
         }
 
-        #[cfg(tokio_unstable)]
         pub(crate) fn worker_index(&self) -> Option<usize> {
             match self {
                 Context::CurrentThread(_) => Some(0),

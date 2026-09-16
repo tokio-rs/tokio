@@ -434,6 +434,7 @@ cfg_coop! {
     pin_project! {
         /// Future wrapper to ensure cooperative scheduling created by [`cooperative`].
         #[must_use = "futures do nothing unless polled"]
+        #[derive(Debug)]
         pub struct Coop<F: Future> {
             #[pin]
             pub(crate) fut: F,

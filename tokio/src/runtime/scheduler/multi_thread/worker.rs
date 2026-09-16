@@ -61,7 +61,7 @@ use crate::runtime;
 use crate::runtime::scheduler::multi_thread::{
     idle, park, queue, Counters, Handle, Idle, Overflow, Parker, Stats, TraceStatus, Unparker,
 };
-use crate::runtime::scheduler::{Defer, Inject};
+use crate::runtime::scheduler::{inject::InjectQueue, Defer};
 use crate::runtime::task::OwnedTasks;
 use crate::runtime::{
     blocking, driver, scheduler, task, Config, SchedulerMetrics, TimerFlavor, WorkerMetrics,
@@ -72,6 +72,7 @@ use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::RefCell;
+use std::ops::ControlFlow;
 use std::task::Waker;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -174,7 +175,7 @@ pub(crate) struct Shared {
     /// Global task queue used for:
     ///  1. Submit work to the scheduler while **not** currently on a worker thread.
     ///  2. Submit work to the scheduler when a worker run queue is saturated
-    pub(super) inject: Inject<Arc<Handle>>,
+    pub(super) inject: InjectQueue<Arc<Handle>>,
 
     /// Coordinates idle workers
     idle: Idle,
@@ -258,11 +259,6 @@ pub(crate) struct Context {
 /// Starts the workers
 pub(crate) struct Launch(Vec<Arc<Worker>>);
 
-/// Running a task may consume the core. If the core is still available when
-/// running the task completes, it is returned. Otherwise, the worker will need
-/// to stop processing.
-type RunResult = Result<Box<Core>, ()>;
-
 /// A notified task handle
 type Notified = task::Notified<Arc<Handle>>;
 
@@ -327,7 +323,7 @@ pub(super) fn create(
         task_hooks: TaskHooks::from_config(&config),
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
-            inject: Inject::new(),
+            inject: InjectQueue::new(),
             idle,
             owned: OwnedTasks::new(size),
             synced: Mutex::new(Synced {
@@ -560,9 +556,7 @@ fn run(worker: Arc<Worker>) {
         context::set_scheduler(&cx, || {
             let cx = cx.expect_multi_thread();
 
-            // This should always be an error. It only returns a `Result` to support
-            // using `?` to short circuit.
-            assert!(cx.run(core).is_err());
+            cx.run(core);
 
             // Check if there are any deferred tasks to notify. This can happen when
             // the worker core is lost due to `block_in_place()` being called from
@@ -573,7 +567,7 @@ fn run(worker: Arc<Worker>) {
 }
 
 impl Context {
-    fn run(&self, mut core: Box<Core>) -> RunResult {
+    fn run(&self, mut core: Box<Core>) {
         // Reset `lifo_enabled` here in case the core was previously stolen from
         // a task that had the LIFO slot disabled.
         self.reset_lifo_enabled(&mut core);
@@ -597,7 +591,10 @@ impl Context {
 
             // First, check work available to the current worker.
             if let Some(task) = core.next_task(&self.worker) {
-                core = self.run_task(task, core)?;
+                core = match self.run_task(task, core) {
+                    ControlFlow::Continue(core) => core,
+                    ControlFlow::Break(()) => return,
+                };
                 continue;
             }
 
@@ -609,7 +606,10 @@ impl Context {
             if let Some(task) = core.steal_work(&self.worker) {
                 // Found work, switch back to processing
                 core.stats.start_processing_scheduled_tasks();
-                core = self.run_task(task, core)?;
+                core = match self.run_task(task, core) {
+                    ControlFlow::Continue(core) => core,
+                    ControlFlow::Break(()) => return,
+                };
             } else {
                 // Wait for work
                 core = if !self.defer.is_empty() {
@@ -639,10 +639,12 @@ impl Context {
         core.pre_shutdown(&self.worker);
         // Signal shutdown
         self.worker.handle.shutdown_core(core);
-        Err(())
     }
 
-    fn run_task(&self, task: Notified, mut core: Box<Core>) -> RunResult {
+    /// Running a task may consume the core. If the core is still available when
+    /// running the task completes, it is returned. Otherwise, the worker will need
+    /// to stop processing.
+    fn run_task(&self, task: Notified, mut core: Box<Core>) -> ControlFlow<(), Box<Core>> {
         let task = self.worker.handle.shared.owned.assert_owner(task);
 
         // Make sure the worker is not in the **searching** state. This enables
@@ -717,7 +719,7 @@ impl Context {
                         // In this case, we cannot call `reset_lifo_enabled()`
                         // because the core was stolen. The stealer will handle
                         // that at the top of `Context::run`
-                        return Err(());
+                        return ControlFlow::Break(());
                     }
                 };
 
@@ -727,7 +729,7 @@ impl Context {
                     None => {
                         self.reset_lifo_enabled(&mut core);
                         core.stats.end_poll();
-                        return Ok(core);
+                        return ControlFlow::Continue(core);
                     }
                 };
 
@@ -744,7 +746,7 @@ impl Context {
                     // If we hit this point, the LIFO slot should be enabled.
                     // There is no need to reset it.
                     debug_assert!(core.lifo_enabled);
-                    return Ok(core);
+                    return ControlFlow::Continue(core);
                 }
 
                 // Track that we are about to run a task from the LIFO slot.
@@ -1073,7 +1075,6 @@ impl Context {
         })
     }
 
-    #[cfg(tokio_unstable)]
     pub(crate) fn worker_index(&self) -> usize {
         self.worker.index
     }
@@ -1343,7 +1344,7 @@ impl Core {
 
 impl Worker {
     /// Returns a reference to the scheduler's injection queue.
-    fn inject(&self) -> &Inject<Arc<Handle>> {
+    fn inject(&self) -> &InjectQueue<Arc<Handle>> {
         &self.handle.shared.inject
     }
 }

@@ -128,6 +128,11 @@ impl Handle {
         pub(crate) fn clock(&self) -> &Clock {
             &self.clock
         }
+
+        #[cfg(test)]
+        pub(crate) fn now(&self) -> u64 {
+           self.time().time_source().deadline_to_tick(self.clock.now())
+        }
     }
 }
 
