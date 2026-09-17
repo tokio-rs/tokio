@@ -3,7 +3,7 @@
 
 pub(crate) mod sync {
     #[cfg(all(test, loom))]
-    pub(crate) use loom::sync::{Arc, Mutex, MutexGuard};
+    pub(crate) use loom::sync::{atomic, Arc, Mutex, MutexGuard};
     #[cfg(not(all(test, loom)))]
-    pub(crate) use std::sync::{Arc, Mutex, MutexGuard};
+    pub(crate) use std::sync::{atomic, Arc, Mutex, MutexGuard};
 }
