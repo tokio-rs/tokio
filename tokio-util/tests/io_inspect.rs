@@ -44,6 +44,18 @@ async fn read_tee() {
     assert_eq!(altout.len(), contents.len());
 }
 
+#[tokio::test]
+async fn inspect_reader_access_inner() {
+    let mut reader = InspectReader::new(std::io::Cursor::new(b"hello"), |_| {});
+
+    assert_eq!(reader.get_ref().position(), 0);
+    reader.get_mut().set_position(1);
+    assert_eq!(reader.get_ref().position(), 1);
+
+    tokio::pin!(reader);
+    assert_eq!(reader.as_mut().get_pin_mut().get_mut().position(), 1);
+}
+
 /// An AsyncWrite implementation that works byte-by-byte for poll_write, and
 /// that reads the whole of the first buffer plus one byte from the second in
 /// poll_write_vectored.
@@ -123,6 +135,18 @@ async fn write_tee() {
             .unwrap();
     }
     assert_eq!(altout, writeout.contents);
+}
+
+#[tokio::test]
+async fn inspect_writer_access_inner() {
+    let mut writer = InspectWriter::new(std::io::Cursor::new(Vec::new()), |_| {});
+
+    assert_eq!(writer.get_ref().position(), 0);
+    writer.get_mut().set_position(1);
+    assert_eq!(writer.get_ref().position(), 1);
+
+    tokio::pin!(writer);
+    assert_eq!(writer.as_mut().get_pin_mut().get_mut().position(), 1);
 }
 
 // This is inefficient, but works well enough for test use.
