@@ -40,6 +40,7 @@ impl CurrentThread {
     }
 
     /// Moves the driver out of the core, for parking on another thread.
+    #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
     pub(crate) fn take_driver(&self, handle: &Arc<Handle>) -> Option<Driver> {
         let core = self.take_core(handle)?;
         let context = core.context.expect_current_thread();
@@ -112,6 +113,14 @@ impl Context {
 impl CoreGuard<'_> {
     fn drive_batch(self) -> bool {
         let busy = self.enter(|core, context| {
+            // No thread parks in the driver on this target: its turn (I/O
+            // readiness, due timers) runs here, ahead of the batch that
+            // consumes what it wakes. A synchronous probe: the host already
+            // has the turn, so it must neither yield nor suspend.
+            #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+            let core =
+                crate::runtime::jspi::host_turn(|| context.park_yield(core, &context.handle));
+
             let (core, batch) = context.run_batch(core);
             let busy = match batch {
                 Batch::Panicked => None,

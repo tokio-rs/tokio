@@ -34,7 +34,15 @@ pub(crate) struct Handle {
     pub(crate) clock: Clock,
 
     /// An event loop's host, woken whenever the driver is unparked.
-    #[cfg(all(tokio_unstable, feature = "rt", not(loom), not(target_family = "wasm")))]
+    #[cfg(all(
+        tokio_unstable,
+        feature = "rt",
+        not(loom),
+        not(all(
+            target_family = "wasm",
+            any(not(target_os = "emscripten"), target_feature = "atomics")
+        ))
+    ))]
     host: std::sync::OnceLock<std::task::Waker>,
 }
 
@@ -69,7 +77,10 @@ impl Driver {
                     tokio_unstable,
                     feature = "rt",
                     not(loom),
-                    not(target_family = "wasm")
+                    not(all(
+                        target_family = "wasm",
+                        any(not(target_os = "emscripten"), target_feature = "atomics")
+                    ))
                 ))]
                 host: std::sync::OnceLock::new(),
             },
@@ -98,7 +109,15 @@ impl Handle {
 
         self.io.unpark();
 
-        #[cfg(all(tokio_unstable, feature = "rt", not(loom), not(target_family = "wasm")))]
+        #[cfg(all(
+            tokio_unstable,
+            feature = "rt",
+            not(loom),
+            not(all(
+                target_family = "wasm",
+                any(not(target_os = "emscripten"), target_feature = "atomics")
+            ))
+        ))]
         self.wake_host();
     }
 

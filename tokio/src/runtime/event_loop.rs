@@ -12,7 +12,16 @@
 //! tasks through the same cross-thread schedule that wakes the host. Nothing
 //! about the platform's reactor or timers is exposed; the host's whole
 //! contract is the waker and `drive`.
+//!
+//! On `wasm32-unknown-emscripten` without threads the JavaScript host is
+//! the reactor: its callbacks stand in for that thread, and a hosted event
+//! loop supplies its own waker, which schedules the drive on the host loop
+//! ([`reactor`]).
 
+#[cfg_attr(
+    all(target_os = "emscripten", not(target_feature = "atomics")),
+    path = "event_loop/emscripten.rs"
+)]
 mod reactor;
 use reactor::Reactor;
 
@@ -54,7 +63,8 @@ pub struct LocalEventLoop {
 }
 
 impl LocalEventLoop {
-    pub(crate) fn new(runtime: LocalRuntime, waker: Waker) -> io::Result<LocalEventLoop> {
+    /// `None` for the waker means the runtime's own host on this target.
+    pub(crate) fn new(runtime: LocalRuntime, waker: Option<Waker>) -> io::Result<LocalEventLoop> {
         Ok(LocalEventLoop {
             shared: Shared::new(runtime, waker)?,
         })
@@ -124,7 +134,7 @@ impl LocalEventLoop {
 }
 
 #[derive(Debug)]
-struct Shared {
+pub(super) struct Shared {
     /// Its shutdown needs the driver back, which `Drop` restores before the
     /// fields drop.
     runtime: LocalRuntime,
@@ -134,7 +144,7 @@ struct Shared {
 }
 
 impl Shared {
-    fn new(runtime: LocalRuntime, waker: Waker) -> io::Result<Rc<Shared>> {
+    fn new(runtime: LocalRuntime, waker: Option<Waker>) -> io::Result<Rc<Shared>> {
         let handle = runtime.handle().clone();
         let shared = Rc::new(Shared {
             runtime,
@@ -142,6 +152,10 @@ impl Shared {
             reactor: OnceLock::new(),
             tid: std::thread::current().id(),
         });
+        #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+        let waker = waker.unwrap_or_else(|| reactor::hosted_waker(Rc::downgrade(&shared)));
+        #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
+        let waker = waker.expect("no ambient host loop on this target");
         shared.handle.inner.driver().set_host(waker);
         let reactor = Reactor::start(&shared)?;
         let _ = shared.reactor.set(reactor);
@@ -165,7 +179,7 @@ impl Shared {
         }
     }
 
-    fn drive(&self) {
+    pub(super) fn drive(&self) {
         self.check_thread();
         let handle = self.handle.inner.as_current_thread();
         let busy = context::enter_runtime(&self.handle.inner, false, |_| {
