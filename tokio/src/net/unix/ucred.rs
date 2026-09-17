@@ -68,6 +68,7 @@ pub(crate) use self::impl_solaris::get_peer_cred;
 pub(crate) use self::impl_aix::get_peer_cred;
 
 #[cfg(any(
+    target_os = "emscripten",
     target_os = "espidf",
     target_os = "fuchsia",
     target_os = "hurd",
@@ -400,6 +401,7 @@ pub(crate) mod impl_aix {
 }
 
 #[cfg(any(
+    target_os = "emscripten",
     target_os = "espidf",
     target_os = "fuchsia",
     target_os = "hurd",

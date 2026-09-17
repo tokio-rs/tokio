@@ -503,9 +503,17 @@ compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.
 
 #[cfg(all(
     target_os = "emscripten",
-    any(feature = "net", feature = "process", feature = "signal")
+    any(feature = "process", feature = "signal")
 ))]
-compile_error!("Features net,process,signal are not supported on wasm32-unknown-emscripten.");
+compile_error!("Features process,signal are not supported on wasm32-unknown-emscripten.");
+
+// "net" needs mio's emscripten selector, only implemented for the no-atomics case so far.
+#[cfg(all(
+    target_os = "emscripten",
+    target_feature = "atomics",
+    feature = "net"
+))]
+compile_error!("Feature net is not yet supported on wasm32-unknown-emscripten with atomics.");
 
 #[cfg(all(
     target_os = "emscripten",

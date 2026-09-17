@@ -186,6 +186,13 @@ impl Driver {
 
         handle.release_pending_registrations();
 
+        // wasm without atomics has no threads, so nothing can ever interrupt a blocking wait,
+        // and the JS event loop that actually delivers new I/O doesn't get a turn while this
+        // call blocks. Always poll non-blockingly there instead; real pacing is the caller's
+        // job (see Runtime::pump_once()).
+        #[cfg(all(target_family = "wasm", not(target_feature = "atomics")))]
+        let max_wait = Some(Duration::ZERO);
+
         // A poll that does not wait takes the busy batch. Events it leaves
         // behind stay queued in the kernel, so the next poll returns them.
         let events = match (&mut self.events_busy, max_wait) {

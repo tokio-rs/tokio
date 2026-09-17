@@ -3,7 +3,9 @@ use std::path::Path;
 
 use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 
-use crate::net::{UnixDatagram, UnixListener, UnixStream};
+#[cfg(not(target_os = "emscripten"))]
+use crate::net::UnixDatagram;
+use crate::net::{UnixListener, UnixStream};
 
 cfg_net_unix! {
     /// A Unix socket that has not yet been converted to a [`UnixStream`], [`UnixDatagram`], or
@@ -227,6 +229,8 @@ impl UnixSocket {
     /// Calling this function on a socket created by [`new_stream`] will return an error.
     ///
     /// [`new_stream`]: `UnixSocket::new_stream`
+    // Emscripten's node-backed sockets have no datagram primitive.
+    #[cfg(not(target_os = "emscripten"))]
     pub fn datagram(self) -> io::Result<UnixDatagram> {
         if self.ty() == socket2::Type::STREAM {
             return Err(io::Error::new(
