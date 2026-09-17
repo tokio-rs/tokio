@@ -51,8 +51,7 @@ pub struct LlcAwareConfig {
 }
 
 pub(crate) type CurrentPartition = Arc<dyn Fn(Option<usize>) -> Option<usize> + Send + Sync>;
-pub(crate) type TaskHintCallback =
-    Arc<dyn Fn(&TaskMeta<'_>) -> LlcTaskHint + Send + Sync>;
+pub(crate) type TaskHintCallback = Arc<dyn Fn(&TaskMeta<'_>) -> LlcTaskHint + Send + Sync>;
 
 const DEFAULT_REFRESH_INTERVAL: u32 = 61;
 const DEFAULT_CROSS_LLC_SCAN_LIMIT: usize = 4;
@@ -157,11 +156,8 @@ impl LlcAwareConfig {
     /// from growing linearly with a large machine's worker count. The default
     /// is 4. Zero restores that default.
     pub fn cross_llc_scan_limit(&mut self, limit: usize) -> &mut Self {
-        self.cross_llc_scan_limit = fallback_if_zero(
-            "cross_llc_scan_limit",
-            limit,
-            DEFAULT_CROSS_LLC_SCAN_LIMIT,
-        );
+        self.cross_llc_scan_limit =
+            fallback_if_zero("cross_llc_scan_limit", limit, DEFAULT_CROSS_LLC_SCAN_LIMIT);
         self
     }
 
@@ -447,9 +443,7 @@ mod linux {
             return Ok(key);
         }
 
-        read_trimmed(format!(
-            "/sys/devices/system/cpu/cpu{cpu}/topology/llc_id"
-        ))
+        read_trimmed(format!("/sys/devices/system/cpu/cpu{cpu}/topology/llc_id"))
     }
 
     fn read_trimmed(path: impl AsRef<std::path::Path>) -> io::Result<String> {

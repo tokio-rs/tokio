@@ -1,11 +1,11 @@
 #![allow(unreachable_pub)]
+#[cfg(feature = "rt-multi-thread")]
+use crate::runtime::{LlcTaskOptions, LlcTaskPlacement};
 use crate::{
     runtime::{AutoBox, Handle},
     task::{JoinHandle, LocalSet},
     util::trace::SpawnMeta,
 };
-#[cfg(feature = "rt-multi-thread")]
-use crate::runtime::{LlcTaskOptions, LlcTaskPlacement};
 use std::{future::Future, io, mem};
 
 /// Factory which is used to configure the properties of a new task.
@@ -67,10 +67,7 @@ use std::{future::Future, io, mem};
 #[derive(Default, Debug)]
 #[cfg_attr(
     docsrs,
-    doc(cfg(all(
-        tokio_unstable,
-        any(feature = "tracing", feature = "rt-multi-thread")
-    )))
+    doc(cfg(all(tokio_unstable, any(feature = "tracing", feature = "rt-multi-thread"))))
 )]
 pub struct Builder<'a> {
     name: Option<&'a str>,

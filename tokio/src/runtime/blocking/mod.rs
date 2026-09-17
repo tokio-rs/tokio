@@ -12,10 +12,7 @@ cfg_fs! {
     pub(crate) use pool::spawn_mandatory_blocking;
 }
 
-#[cfg(all(
-    tokio_unstable,
-    any(feature = "tracing", feature = "rt-multi-thread")
-))]
+#[cfg(all(tokio_unstable, any(feature = "tracing", feature = "rt-multi-thread")))]
 pub(crate) use pool::Mandatory;
 
 mod schedule;

@@ -38,16 +38,15 @@ fn wait_for_partitions(seen: &AtomicUsize, partitions: usize) {
     let expected = usize::MAX >> (usize::BITS as usize - partitions);
     let deadline = Instant::now() + Duration::from_secs(5);
     while seen.load(Ordering::Acquire) != expected {
-        assert!(Instant::now() < deadline, "workers did not publish their LLCs");
+        assert!(
+            Instant::now() < deadline,
+            "workers did not publish their LLCs"
+        );
         std::thread::yield_now();
     }
 }
 
-fn synthetic_runtime(
-    workers: usize,
-    partitions: usize,
-    external_partition: usize,
-) -> Runtime {
+fn synthetic_runtime(workers: usize, partitions: usize, external_partition: usize) -> Runtime {
     let (config, seen) = synthetic_topology(partitions, external_partition);
     let runtime = Builder::new_multi_thread()
         .worker_threads(workers)
@@ -188,9 +187,7 @@ fn local_spawn_and_remote_wake_preserve_last_polled_partition() {
     let child = child_rx.recv_timeout(Duration::from_secs(5)).unwrap();
 
     assert_eq!(
-        partition_rx
-            .recv_timeout(Duration::from_secs(5))
-            .unwrap(),
+        partition_rx.recv_timeout(Duration::from_secs(5)).unwrap(),
         1
     );
     external_checks.store(0, Ordering::Relaxed);
@@ -211,9 +208,7 @@ fn local_overflow_neither_loses_nor_duplicates_tasks() {
 
     let runtime = synthetic_runtime(2, 2, 0);
     let (release, gate) = block_partition(&runtime, 0);
-    let executions = (0..TASKS)
-        .map(|_| AtomicUsize::new(0))
-        .collect::<Vec<_>>();
+    let executions = (0..TASKS).map(|_| AtomicUsize::new(0)).collect::<Vec<_>>();
     let executions: Arc<[AtomicUsize]> = executions.into();
 
     let parent_executions = executions.clone();
@@ -238,11 +233,9 @@ fn local_overflow_neither_loses_nor_duplicates_tasks() {
         .unwrap();
 
     runtime.block_on(parent).unwrap();
-    assert!(
-        executions
-            .iter()
-            .all(|executions| executions.load(Ordering::Relaxed) == 1)
-    );
+    assert!(executions
+        .iter()
+        .all(|executions| executions.load(Ordering::Relaxed) == 1));
     release.send(()).unwrap();
     runtime.block_on(gate).unwrap();
 }
@@ -257,9 +250,7 @@ fn remote_spawn_uses_submitting_partition() {
         partition_tx.send(current_test_partition()).unwrap();
     });
     assert_eq!(
-        partition_rx
-            .recv_timeout(Duration::from_secs(5))
-            .unwrap(),
+        partition_rx.recv_timeout(Duration::from_secs(5)).unwrap(),
         1
     );
     release.send(()).unwrap();
@@ -352,9 +343,7 @@ fn global_and_invalid_placements_fall_back() {
 
     for _ in 0..2 {
         assert_eq!(
-            partition_rx
-                .recv_timeout(Duration::from_secs(5))
-                .unwrap(),
+            partition_rx.recv_timeout(Duration::from_secs(5)).unwrap(),
             1
         );
     }
@@ -394,9 +383,7 @@ fn partition_without_a_worker_falls_back_to_global_queue() {
         )
         .unwrap();
     assert_eq!(
-        partition_rx
-            .recv_timeout(Duration::from_secs(5))
-            .unwrap(),
+        partition_rx.recv_timeout(Duration::from_secs(5)).unwrap(),
         0
     );
     release.send(()).unwrap();
@@ -466,9 +453,7 @@ fn cross_llc_stealing_neither_loses_nor_duplicates_tasks() {
 
     let runtime = synthetic_runtime(2, 2, 0);
     let (release, gate) = block_partition(&runtime, 1);
-    let executions = (0..TASKS)
-        .map(|_| AtomicUsize::new(0))
-        .collect::<Vec<_>>();
+    let executions = (0..TASKS).map(|_| AtomicUsize::new(0)).collect::<Vec<_>>();
     let executions: Arc<[AtomicUsize]> = executions.into();
     let (done_tx, done_rx) = mpsc::channel();
     let mut tasks = Vec::with_capacity(TASKS);
@@ -494,11 +479,9 @@ fn cross_llc_stealing_neither_loses_nor_duplicates_tasks() {
     for _ in 0..TASKS {
         done_rx.recv_timeout(Duration::from_secs(5)).unwrap();
     }
-    assert!(
-        executions
-            .iter()
-            .all(|executions| executions.load(Ordering::Relaxed) == 1)
-    );
+    assert!(executions
+        .iter()
+        .all(|executions| executions.load(Ordering::Relaxed) == 1));
     release.send(()).unwrap();
     runtime.block_on(async {
         gate.await.unwrap();

@@ -26,9 +26,7 @@
 //! tasks assigned to each LLC.
 
 #[cfg(all(tokio_unstable, target_os = "linux"))]
-use criterion::{
-    black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
-};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 #[cfg(all(tokio_unstable, target_os = "linux"))]
 use std::collections::BTreeMap;
 #[cfg(all(tokio_unstable, target_os = "linux"))]
@@ -553,7 +551,9 @@ fn cache_affine_wake(c: &mut Criterion) {
                     for task in 0..tasks {
                         let ready_tx = ready_tx.clone();
                         let partition = task % partitions;
-                        let seed = iteration.wrapping_mul(tasks as u64).wrapping_add(task as u64);
+                        let seed = iteration
+                            .wrapping_mul(tasks as u64)
+                            .wrapping_add(task as u64);
                         handles.push(
                             tokio::task::Builder::new()
                                 .llc_partition(partition)
@@ -664,8 +664,8 @@ fn chase_pointers(links: &[usize], mut cursor: usize) -> usize {
 fn benchmark_topology() -> (usize, LlcAwareConfig) {
     let topology = LlcAwareConfig::from_linux_topology()
         .expect("the LLC benchmark requires Linux sysfs topology");
-    let cpus_by_llc = benchmark_cpus_by_llc()
-        .expect("the LLC benchmark requires Linux CPU affinity information");
+    let cpus_by_llc =
+        benchmark_cpus_by_llc().expect("the LLC benchmark requires Linux CPU affinity information");
     assert_eq!(
         cpus_by_llc.len(),
         topology.partition_count(),
@@ -719,8 +719,8 @@ fn run_task_work(iterations: usize, seed: usize) {
 
 #[cfg(all(tokio_unstable, target_os = "linux"))]
 fn benchmark_producers(partitions: usize) -> usize {
-    let cpus_by_llc = benchmark_cpus_by_llc()
-        .expect("the LLC benchmark requires Linux CPU affinity information");
+    let cpus_by_llc =
+        benchmark_cpus_by_llc().expect("the LLC benchmark requires Linux CPU affinity information");
     assert_eq!(
         cpus_by_llc.len(),
         partitions,
@@ -751,11 +751,7 @@ fn benchmark_producers(partitions: usize) -> usize {
 }
 
 #[cfg(all(tokio_unstable, target_os = "linux"))]
-fn producer_task_range(
-    tasks: usize,
-    producers: usize,
-    producer: usize,
-) -> std::ops::Range<usize> {
+fn producer_task_range(tasks: usize, producers: usize, producer: usize) -> std::ops::Range<usize> {
     let tasks_per_producer = tasks / producers;
     let remainder = tasks % producers;
     let start = producer * tasks_per_producer + producer.min(remainder);
@@ -890,10 +886,11 @@ fn llc_key(cpu: usize) -> io::Result<String> {
         else {
             continue;
         };
-        if best
-            .as_ref()
-            .map_or(true, |(best_level, _)| level > *best_level)
-        {
+        let is_higher_level = match &best {
+            Some((best_level, _)) => level > *best_level,
+            None => true,
+        };
+        if is_higher_level {
             best = Some((level, format!("{level}:{identity}")));
         }
     }
@@ -902,9 +899,7 @@ fn llc_key(cpu: usize) -> io::Result<String> {
         return Ok(key);
     }
 
-    read_trimmed(format!(
-        "/sys/devices/system/cpu/cpu{cpu}/topology/llc_id"
-    ))
+    read_trimmed(format!("/sys/devices/system/cpu/cpu{cpu}/topology/llc_id"))
 }
 
 #[cfg(all(tokio_unstable, target_os = "linux"))]

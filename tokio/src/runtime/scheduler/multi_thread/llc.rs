@@ -1,7 +1,7 @@
 use super::Handle;
 
-use crate::loom::sync::{Arc, Mutex};
 use crate::loom::sync::atomic::AtomicUsize;
+use crate::loom::sync::{Arc, Mutex};
 use crate::runtime::task;
 use crate::util::cacheline::CachePadded;
 
@@ -32,28 +32,24 @@ struct State<T> {
 impl LlcQueues {
     pub(super) fn new(partitions: usize, worker_count: usize) -> Self {
         let partitions: Box<[CachePadded<LlcQueue>]> = (0..partitions)
-            .map(|_| CachePadded::new(LlcQueue {
-                len: AtomicUsize::new(0),
-                state: Mutex::new(State {
-                    closed: false,
-                    entries: VecDeque::new(),
-                }),
-            }))
+            .map(|_| {
+                CachePadded::new(LlcQueue {
+                    len: AtomicUsize::new(0),
+                    state: Mutex::new(State {
+                        closed: false,
+                        entries: VecDeque::new(),
+                    }),
+                })
+            })
             .collect();
         let bits = usize::BITS as usize;
         let non_empty = (0..(partitions.len() + bits - 1) / bits)
             .map(|_| AtomicUsize::new(0))
             .collect();
-        let workers = (0..partitions.len())
-            .map(|_| AtomicUsize::new(0))
-            .collect();
+        let workers = (0..partitions.len()).map(|_| AtomicUsize::new(0)).collect();
         let worker_words = (worker_count + bits - 1) / bits;
         let worker_members = (0..partitions.len())
-            .map(|_| {
-                (0..worker_words)
-                    .map(|_| AtomicUsize::new(0))
-                    .collect()
-            })
+            .map(|_| (0..worker_words).map(|_| AtomicUsize::new(0)).collect())
             .collect();
         Self {
             partitions,
@@ -112,7 +108,9 @@ impl LlcQueues {
         for word_offset in 0..members.len() {
             let word_index = (start_word + word_offset) % members.len();
             let rotation = if word_offset == 0 { start_bit } else { 0 };
-            let mut candidates = members[word_index].load(Acquire).rotate_right(rotation as u32);
+            let mut candidates = members[word_index]
+                .load(Acquire)
+                .rotate_right(rotation as u32);
 
             while candidates != 0 {
                 let rotated_bit = candidates.trailing_zeros() as usize;

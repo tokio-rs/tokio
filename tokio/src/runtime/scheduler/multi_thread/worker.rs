@@ -295,7 +295,10 @@ struct LocalOverflow<'a> {
 }
 
 impl<'a> LocalOverflow<'a> {
-    fn new(handle: &'a Handle, #[cfg_attr(not(tokio_unstable), allow(unused))] core: &Core) -> Self {
+    fn new(
+        handle: &'a Handle,
+        #[cfg_attr(not(tokio_unstable), allow(unused))] core: &Core,
+    ) -> Self {
         Self {
             handle,
             #[cfg(tokio_unstable)]
@@ -1408,9 +1411,7 @@ impl Core {
                 let index = (start + offset) % num;
                 let candidate = worker.handle.shared.worker_llc_partition(index);
                 if index == worker.index
-                    || candidate.is_some_and(|candidate| {
-                        config.numa_node(candidate) == numa_node
-                    })
+                    || candidate.is_some_and(|candidate| config.numa_node(candidate) == numa_node)
                 {
                     continue;
                 }
@@ -1461,9 +1462,7 @@ impl Core {
             return;
         };
 
-        if !force
-            && self.tick.wrapping_sub(self.llc_refresh_tick) < config.refresh_interval
-        {
+        if !force && self.tick.wrapping_sub(self.llc_refresh_tick) < config.refresh_interval {
             return;
         }
         self.llc_refresh_tick = self.tick;
@@ -1487,14 +1486,10 @@ impl Core {
             // that partition rather than dragging the cache footprint along
             // with this migrated worker.
             if let Some(task) = self.lifo_slot.take() {
-                worker
-                    .handle
-                    .push_task_with_affinity(task, Some(previous));
+                worker.handle.push_task_with_affinity(task, Some(previous));
             }
             while let Some(task) = self.run_queue.pop() {
-                worker
-                    .handle
-                    .push_task_with_affinity(task, Some(previous));
+                worker.handle.push_task_with_affinity(task, Some(previous));
             }
         }
 
@@ -1911,17 +1906,16 @@ impl Handle {
 
         if !self.shared.inject.is_empty() {
             self.notify_parked_local();
-            return;
-        }
-
-        #[cfg(tokio_unstable)]
-        if self
-            .shared
-            .llc
-            .as_ref()
-            .is_some_and(|queues| !queues.all_empty())
-        {
-            self.notify_parked_local();
+        } else {
+            #[cfg(tokio_unstable)]
+            if self
+                .shared
+                .llc
+                .as_ref()
+                .is_some_and(|queues| !queues.all_empty())
+            {
+                self.notify_parked_local();
+            }
         }
     }
 
@@ -1978,7 +1972,10 @@ impl Handle {
 
 impl Overflow<Arc<Handle>> for LocalOverflow<'_> {
     fn push(&self, task: task::Notified<Arc<Handle>>) {
-        self.handle.shared.scheduler_metrics.inc_remote_schedule_count();
+        self.handle
+            .shared
+            .scheduler_metrics
+            .inc_remote_schedule_count();
         #[cfg(tokio_unstable)]
         self.handle.push_task_with_affinity(task, self.partition);
         #[cfg(not(tokio_unstable))]
@@ -1996,9 +1993,7 @@ impl Overflow<Arc<Handle>> for LocalOverflow<'_> {
             // callback, every task reaching local overflow can therefore
             // inherit the worker's current partition as one FIFO batch.
             if config.task_hint.is_none() {
-                if let (Some(partition), Some(queues)) =
-                    (self.partition, &self.handle.shared.llc)
-                {
+                if let (Some(partition), Some(queues)) = (self.partition, &self.handle.shared.llc) {
                     if queues.worker_count(partition) > 0 {
                         queues.push_batch(partition, iter);
                         return;

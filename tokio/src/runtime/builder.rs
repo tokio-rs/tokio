@@ -7,9 +7,9 @@ use crate::runtime::{
 #[cfg(tokio_unstable)]
 use crate::runtime::{metrics::HistogramConfiguration, TaskMeta};
 
-use crate::runtime::{LocalOptions, LocalRuntime};
 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
 use crate::runtime::LlcAwareConfig;
+use crate::runtime::{LocalOptions, LocalRuntime};
 use crate::util::rand::{RngSeed, RngSeedGenerator};
 
 use crate::runtime::blocking::BlockingPool;
@@ -644,10 +644,7 @@ impl Builder {
     ///
     /// [unstable]: crate#unstable-features
     #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(tokio_unstable, feature = "rt-multi-thread")))
-    )]
+    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt-multi-thread"))))]
     pub fn llc_aware(&mut self, config: LlcAwareConfig) -> &mut Self {
         self.llc_aware = LlcAwareSetting::Custom(config);
         self
@@ -679,18 +676,10 @@ impl Builder {
     /// **Note**: This is an [unstable API][unstable].
     ///
     /// [unstable]: crate#unstable-features
-    #[cfg(all(
-        tokio_unstable,
-        feature = "rt-multi-thread",
-        target_os = "linux"
-    ))]
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread", target_os = "linux"))]
     #[cfg_attr(
         docsrs,
-        doc(cfg(all(
-            tokio_unstable,
-            feature = "rt-multi-thread",
-            target_os = "linux"
-        )))
+        doc(cfg(all(tokio_unstable, feature = "rt-multi-thread", target_os = "linux")))
     )]
     pub fn enable_llc_aware(&mut self) -> &mut Self {
         self.llc_aware = LlcAwareSetting::Auto;
@@ -721,10 +710,7 @@ impl Builder {
     ///
     /// [unstable]: crate#unstable-features
     #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(tokio_unstable, feature = "rt-multi-thread")))
-    )]
+    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt-multi-thread"))))]
     pub fn disable_llc_aware(&mut self) -> &mut Self {
         self.llc_aware = LlcAwareSetting::Disabled;
         self
@@ -2465,12 +2451,7 @@ impl fmt::Debug for Builder {
     }
 }
 
-#[cfg(all(
-    test,
-    tokio_unstable,
-    feature = "rt-multi-thread",
-    target_os = "linux"
-))]
+#[cfg(all(test, tokio_unstable, feature = "rt-multi-thread", target_os = "linux"))]
 mod llc_tests {
     use super::{Builder, LlcAwareSetting};
 
