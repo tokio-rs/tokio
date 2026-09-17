@@ -16,6 +16,7 @@ pub(super) struct LlcQueues {
     partitions: Box<[CachePadded<LlcQueue>]>,
     non_empty: Box<[AtomicUsize]>,
     workers: Box<[AtomicUsize]>,
+    worker_members: Box<[Box<[AtomicUsize]>]>,
 }
 
 struct LlcQueue {
@@ -29,7 +30,7 @@ struct State<T> {
 }
 
 impl LlcQueues {
-    pub(super) fn new(partitions: usize) -> Self {
+    pub(super) fn new(partitions: usize, worker_count: usize) -> Self {
         let partitions: Box<[CachePadded<LlcQueue>]> = (0..partitions)
             .map(|_| CachePadded::new(LlcQueue {
                 len: AtomicUsize::new(0),
@@ -46,10 +47,19 @@ impl LlcQueues {
         let workers = (0..partitions.len())
             .map(|_| AtomicUsize::new(0))
             .collect();
+        let worker_words = (worker_count + bits - 1) / bits;
+        let worker_members = (0..partitions.len())
+            .map(|_| {
+                (0..worker_words)
+                    .map(|_| AtomicUsize::new(0))
+                    .collect()
+            })
+            .collect();
         Self {
             partitions,
             non_empty,
             workers,
+            worker_members,
         }
     }
 
@@ -65,17 +75,56 @@ impl LlcQueues {
         self.workers[partition].load(Acquire)
     }
 
-    pub(super) fn update_worker(&self, previous: Option<usize>, next: Option<usize>) {
+    pub(super) fn update_worker(
+        &self,
+        worker: usize,
+        previous: Option<usize>,
+        next: Option<usize>,
+    ) {
         if previous == next {
             return;
         }
+        let bits = usize::BITS as usize;
+        let word = worker / bits;
+        let bit = 1 << (worker % bits);
         if let Some(next) = next {
+            self.worker_members[next][word].fetch_or(bit, Release);
             self.workers[next].fetch_add(1, Release);
         }
         if let Some(previous) = previous {
+            self.worker_members[previous][word].fetch_and(!bit, Release);
             let count = self.workers[previous].fetch_sub(1, Release);
             debug_assert!(count > 0);
         }
+    }
+
+    pub(super) fn find_worker<R>(
+        &self,
+        partition: usize,
+        start: usize,
+        mut f: impl FnMut(usize) -> Option<R>,
+    ) -> Option<R> {
+        let bits = usize::BITS as usize;
+        let members = &self.worker_members[partition];
+        let start_word = (start / bits) % members.len();
+        let start_bit = start % bits;
+
+        for word_offset in 0..members.len() {
+            let word_index = (start_word + word_offset) % members.len();
+            let rotation = if word_offset == 0 { start_bit } else { 0 };
+            let mut candidates = members[word_index].load(Acquire).rotate_right(rotation as u32);
+
+            while candidates != 0 {
+                let rotated_bit = candidates.trailing_zeros() as usize;
+                candidates &= candidates - 1;
+                let bit = (rotated_bit + rotation) % bits;
+                let worker = word_index * bits + bit;
+                if let Some(value) = f(worker) {
+                    return Some(value);
+                }
+            }
+        }
+        None
     }
 
     pub(super) fn is_empty(&self, partition: usize) -> bool {
@@ -265,7 +314,7 @@ impl Drop for Pop<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::State;
+    use super::{LlcQueues, State};
     use std::collections::VecDeque;
 
     #[test]
@@ -281,5 +330,28 @@ mod tests {
         assert_eq!(state.entries.pop_front(), Some('a'));
         assert_eq!(state.entries.pop_front(), Some('b'));
         assert_eq!(state.entries.pop_front(), Some('c'));
+    }
+
+    #[test]
+    fn worker_members_follow_partition_changes() {
+        let queues = LlcQueues::new(3, 130);
+        queues.update_worker(0, None, Some(1));
+        queues.update_worker(64, None, Some(1));
+        queues.update_worker(129, None, Some(1));
+
+        let mut members = Vec::new();
+        queues.find_worker(1, 63, |worker| {
+            members.push(worker);
+            None::<()>
+        });
+        members.sort_unstable();
+        assert_eq!(members, [0, 64, 129]);
+        assert_eq!(queues.worker_count(1), 3);
+
+        queues.update_worker(64, Some(1), Some(2));
+        assert_eq!(queues.worker_count(1), 2);
+        assert_eq!(queues.worker_count(2), 1);
+        assert_eq!(queues.find_worker(1, 64, Some), Some(129));
+        assert_eq!(queues.find_worker(2, 0, Some), Some(64));
     }
 }

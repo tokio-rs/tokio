@@ -379,7 +379,7 @@ pub(super) fn create(
             llc: config
                 .llc_aware
                 .as_ref()
-                .map(|config| LlcQueues::new(config.partition_count)),
+                .map(|config| LlcQueues::new(config.partition_count, size)),
             idle,
             owned: OwnedTasks::new(size),
             synced: Mutex::new(Synced {
@@ -1315,25 +1315,28 @@ impl Core {
                 .as_ref()
                 .expect("LLC queues exist without configuration");
             let numa_node = config.numa_node(partition);
+            let queues = worker
+                .handle
+                .shared
+                .llc
+                .as_ref()
+                .expect("LLC config exists without queues");
 
             // Prefer workers which were most recently observed on this LLC.
-            for offset in 0..num {
-                let index = (start + offset) % num;
+            if let Some(task) = queues.find_worker(partition, start, |index| {
                 if index == worker.index
                     || worker.handle.shared.remotes[index]
                         .llc_partition
                         .load(Acquire)
                         != partition
                 {
-                    continue;
+                    return None;
                 }
-
-                if let Some(task) = worker.handle.shared.remotes[index]
+                worker.handle.shared.remotes[index]
                     .steal
                     .steal_into(&mut self.run_queue, &mut self.stats)
-                {
-                    return Some(task);
-                }
+            }) {
+                return Some(task);
             }
 
             if let Some(task) = worker.handle.pop_llc_task(partition) {
@@ -1345,12 +1348,6 @@ impl Core {
                 return Some(task);
             }
 
-            let queues = worker
-                .handle
-                .shared
-                .llc
-                .as_ref()
-                .expect("LLC queues exist without configuration");
             let partition_start = self.rand.fastrand_n(queues.partition_count() as u32) as usize;
 
             // Cross an LLC boundary, but remain on the same NUMA node. Shared
@@ -1483,7 +1480,7 @@ impl Core {
             .llc
             .as_ref()
             .expect("LLC config exists without queues");
-        queues.update_worker(previous, next);
+        queues.update_worker(worker.index, previous, next);
         if let Some(previous) = previous {
             // The local queue contains tasks whose working sets were last used
             // on the old LLC. Leave them there for a worker which is still in
