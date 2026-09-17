@@ -206,6 +206,48 @@ fn local_spawn_and_remote_wake_preserve_last_polled_partition() {
 }
 
 #[test]
+fn local_overflow_neither_loses_nor_duplicates_tasks() {
+    const TASKS: usize = 1_024;
+
+    let runtime = synthetic_runtime(2, 2, 0);
+    let (release, gate) = block_partition(&runtime, 0);
+    let executions = (0..TASKS)
+        .map(|_| AtomicUsize::new(0))
+        .collect::<Vec<_>>();
+    let executions: Arc<[AtomicUsize]> = executions.into();
+
+    let parent_executions = executions.clone();
+    let parent = tokio::task::Builder::new()
+        .llc_partition(1)
+        .spawn_on(
+            async move {
+                let tasks = (0..TASKS)
+                    .map(|index| {
+                        let executions = parent_executions.clone();
+                        tokio::spawn(async move {
+                            executions[index].fetch_add(1, Ordering::Relaxed);
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                for task in tasks {
+                    task.await.unwrap();
+                }
+            },
+            runtime.handle(),
+        )
+        .unwrap();
+
+    runtime.block_on(parent).unwrap();
+    assert!(
+        executions
+            .iter()
+            .all(|executions| executions.load(Ordering::Relaxed) == 1)
+    );
+    release.send(()).unwrap();
+    runtime.block_on(gate).unwrap();
+}
+
+#[test]
 fn remote_spawn_uses_submitting_partition() {
     let runtime = synthetic_runtime(2, 2, 1);
     let (release, gate) = block_partition(&runtime, 0);

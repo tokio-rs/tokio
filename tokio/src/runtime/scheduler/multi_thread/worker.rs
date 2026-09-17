@@ -1993,7 +1993,22 @@ impl Overflow<Arc<Handle>> for LocalOverflow<'_> {
         I: Iterator<Item = task::Notified<Arc<Handle>>>,
     {
         #[cfg(tokio_unstable)]
-        if self.handle.shared.config.llc_aware.is_some() {
+        if let Some(config) = &self.handle.shared.config.llc_aware {
+            // A task with global or cross-partition placement is routed away
+            // before it can enter the local queue. Without an enqueue
+            // callback, every task reaching local overflow can therefore
+            // inherit the worker's current partition as one FIFO batch.
+            if config.task_hint.is_none() {
+                if let (Some(partition), Some(queues)) =
+                    (self.partition, &self.handle.shared.llc)
+                {
+                    if queues.worker_count(partition) > 0 {
+                        queues.push_batch(partition, iter);
+                        return;
+                    }
+                }
+            }
+
             for task in iter {
                 self.handle.push_task_with_affinity(task, self.partition);
             }

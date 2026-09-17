@@ -101,6 +101,25 @@ impl LlcQueues {
         }
     }
 
+    pub(super) fn push_batch<I>(&self, partition: usize, tasks: I)
+    where
+        I: Iterator<Item = task::Notified<Arc<Handle>>>,
+    {
+        let queue = &self.partitions[partition];
+        let mut state = queue.state.lock();
+        if state.closed {
+            return;
+        }
+
+        let previous_len = state.entries.len();
+        state.entries.extend(tasks);
+        let len = state.entries.len();
+        queue.len.store(len, Release);
+        if previous_len == 0 && len != 0 {
+            self.mark_non_empty(partition);
+        }
+    }
+
     pub(super) fn pop(&self, partition: usize) -> Option<task::Notified<Arc<Handle>>> {
         let queue = &self.partitions[partition];
         if queue.len.load(Acquire) == 0 {
