@@ -14,6 +14,7 @@ use crate::sync::watch;
 
 use mio::net::UnixStream;
 use std::io::{self, Error, ErrorKind, Write};
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::OnceLock;
 use std::task::{Context, Poll};
 
@@ -72,6 +73,71 @@ impl Default for OsExtraData {
 
         Self { sender, receiver }
     }
+}
+
+impl OsExtraData {
+    /// Replaces the self-pipe with a freshly created one, redirecting the
+    /// existing file descriptor numbers at it via `dup2`.
+    ///
+    /// This is used by a forked child process, whose inherited descriptors
+    /// share the underlying pipe with the parent process. Keeping the
+    /// descriptor numbers stable means the already-installed signal handler,
+    /// which is also inherited across the fork, needs no re-registration nor
+    /// synchronization: a handler running concurrently with the swap writes
+    /// either to the old pipe (at worst a spurious wakeup for the parent) or
+    /// to the new one.
+    pub(crate) fn replace_pipe(&self) -> io::Result<()> {
+        let (new_receiver, new_sender) = UnixStream::pair()?;
+
+        // Replace the receiver first: if replacing the sender then fails, the
+        // sender still points at the old (shared) pipe, where a concurrent
+        // signal handler write is at worst a spurious wakeup for the parent
+        // process. The reverse order could leave the sender pointing at a
+        // pipe whose read end gets closed below, making later handler writes
+        // raise `SIGPIPE`. Either failure leaves the pid unpublished, so the
+        // whole replacement is retried on the next runtime creation.
+        replace_fd(new_receiver.as_raw_fd(), self.receiver.as_raw_fd())?;
+        replace_fd(new_sender.as_raw_fd(), self.sender.as_raw_fd())?;
+
+        // `new_sender`/`new_receiver` are dropped here, closing the temporary
+        // descriptors; the new pipe stays alive behind the original
+        // descriptor numbers.
+        Ok(())
+    }
+}
+
+/// Atomically redirects the `dst` file descriptor at the resource behind
+/// `src`, preserving `dst`'s number.
+fn replace_fd(src: RawFd, dst: RawFd) -> io::Result<()> {
+    loop {
+        // Safety: `dup2` replaces the descriptor slot atomically; both
+        // descriptors are owned by `OsExtraData`, which lives for the rest
+        // of the process.
+        if unsafe { libc::dup2(src, dst) } != -1 {
+            break;
+        }
+        // `dup2` may fail with `EINTR` on some platforms, and signals are
+        // very much expected here; retrying covers the POSIX-unspecified
+        // state of `dst` after such a failure.
+        let err = io::Error::last_os_error();
+        if err.kind() != io::ErrorKind::Interrupted {
+            return Err(err);
+        }
+    }
+
+    // `O_NONBLOCK` is carried over from `src`'s open file description, but
+    // `dup2` does not carry over the close-on-exec flag, which lives on the
+    // descriptor itself; restore it. The gap until the `fcntl` call below
+    // can leak the descriptor into a concurrently spawned process; this is
+    // accepted (the pair-creating syscalls have the same gap on platforms
+    // without `SOCK_CLOEXEC`) and harmless beyond the descriptor itself.
+    // Safety: setting a flag on a descriptor we own; `FD_CLOEXEC` is the
+    // only file descriptor flag, so overwriting loses nothing.
+    if unsafe { libc::fcntl(dst, libc::F_SETFD, libc::FD_CLOEXEC) } == -1 {
+        return Err(io::Error::last_os_error());
+    }
+
+    Ok(())
 }
 
 /// Represents the specific kind of signal to listen for.
