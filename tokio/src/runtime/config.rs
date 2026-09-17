@@ -66,4 +66,9 @@ pub(crate) struct Config {
     /// from polling the I/O driver to polling its own tasks (requires
     /// `tokio_unstable`).
     pub(crate) enable_eager_driver_handoff: bool,
+
+    /// When true, the multi-thread scheduler uses the sharded inject queue
+    /// implementation.
+    #[cfg_attr(not(feature = "rt-multi-thread"), allow(dead_code))]
+    pub(crate) sharded_inject_queue: bool,
 }

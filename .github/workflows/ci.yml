@@ -341,6 +341,30 @@ jobs:
         env:
           TOKIO_UNSTABLE_SHARDED_BLOCKING_QUEUE: "1"
 
+  # Run the test suite with the sharded inject queue.
+  test-sharded-inject-queue:
+    name: test tokio full with sharded inject queue
+    needs: basics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+            toolchain: ${{ env.rust_stable }}
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
+      - uses: Swatinem/rust-cache@v2
+      - name: test tokio full with sharded inject queue
+        run: cargo nextest run --features full
+        working-directory: tokio
+        env:
+          TOKIO_UNSTABLE_SHARDED_INJECT_QUEUE: "1"
+
   test-unstable-taskdump:
     name: test tokio full --unstable --taskdump
     needs: basics

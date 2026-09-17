@@ -103,11 +103,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-          - scope: loom_multi_thread::group_a
-          - scope: loom_multi_thread::group_b
-          - scope: loom_multi_thread::group_c
-          - scope: loom_multi_thread::group_d
+        # Run each scope against both the default and the sharded inject
+        # queue implementations.
+        sharded_inject_queue: ["0", "1"]
+        scope:
+          - loom_multi_thread::group_a
+          - loom_multi_thread::group_b
+          - loom_multi_thread::group_c
+          - loom_multi_thread::group_d
     steps:
       - uses: actions/checkout@v7
       - name: Install Rust ${{ env.rust_stable }}
@@ -120,6 +123,7 @@ jobs:
         working-directory: tokio
         env:
           SCOPE: ${{ matrix.scope }}
+          TOKIO_UNSTABLE_SHARDED_INJECT_QUEUE: ${{ matrix.sharded_inject_queue }}
 
   loom-util:
     name: loom tokio-util

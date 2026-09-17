@@ -159,6 +159,11 @@ pub struct Builder {
 
     /// When true, the blocking pool uses the sharded queue implementation.
     pub(super) sharded_blocking_queue: bool,
+
+    /// When true, the multi-thread scheduler uses the sharded inject queue
+    /// implementation.
+    #[cfg_attr(not(feature = "rt-multi-thread"), allow(dead_code))]
+    pub(super) sharded_inject_queue: bool,
 }
 
 cfg_unstable! {
@@ -252,6 +257,16 @@ pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync +
 /// value other than `0`.
 fn sharded_blocking_queue_default() -> bool {
     match std::env::var_os("TOKIO_UNSTABLE_SHARDED_BLOCKING_QUEUE") {
+        Some(value) => !value.is_empty() && value != "0",
+        None => false,
+    }
+}
+
+/// The default for the `sharded_inject_queue` option: enabled iff the
+/// `TOKIO_UNSTABLE_SHARDED_INJECT_QUEUE` environment variable is set to a
+/// value other than `0`.
+fn sharded_inject_queue_default() -> bool {
+    match std::env::var_os("TOKIO_UNSTABLE_SHARDED_INJECT_QUEUE") {
         Some(value) => !value.is_empty() && value != "0",
         None => false,
     }
@@ -373,6 +388,8 @@ impl Builder {
             enable_eager_driver_handoff: false,
 
             sharded_blocking_queue: sharded_blocking_queue_default(),
+
+            sharded_inject_queue: sharded_inject_queue_default(),
         }
     }
 
@@ -525,6 +542,47 @@ impl Builder {
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn enable_sharded_blocking_queue(&mut self) -> &mut Self {
         self.sharded_blocking_queue = true;
+        self
+    }
+
+    /// Use a sharded queue for tasks spawned from outside the runtime.
+    ///
+    /// By default, the multi-thread scheduler's inject queue is a single
+    /// queue behind a single mutex, which can become a bottleneck when many
+    /// threads spawn tasks into the runtime concurrently. When this option is
+    /// enabled, tasks are instead distributed across several
+    /// independently-locked queue shards.
+    ///
+    /// The sharded queue can also be enabled by setting the
+    /// `TOKIO_UNSTABLE_SHARDED_INJECT_QUEUE` environment variable to any
+    /// value other than `0`.
+    ///
+    /// When using the `current_thread` runtime this method has no effect.
+    ///
+    /// **Note**: This is an [unstable API][unstable]. The sharded inject
+    /// queue is an experimental feature that may be removed or become the
+    /// default behavior in 1.x releases. See
+    /// [the documentation on unstable features][unstable] for details.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///   .enable_sharded_inject_queue()
+    ///   .build()
+    ///   .unwrap();
+    /// # }
+    /// ```
+    ///
+    /// [unstable]: crate#unstable-features
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    pub fn enable_sharded_inject_queue(&mut self) -> &mut Self {
+        self.sharded_inject_queue = true;
         self
     }
 
@@ -1796,6 +1854,8 @@ impl Builder {
                 // as it only configures how the I/O driver is stolen across
                 // workers.
                 enable_eager_driver_handoff: false,
+                // The current thread runtime's inject queue is not sharded.
+                sharded_inject_queue: false,
                 seed_generator: seed_generator_1,
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
                 track_task_schedule_latency: self.track_task_schedule_latency,
@@ -2216,6 +2276,7 @@ cfg_rt_multi_thread! {
                     unhandled_panic: self.unhandled_panic.clone(),
                     disable_lifo_slot: self.disable_lifo_slot,
                     enable_eager_driver_handoff: self.enable_eager_driver_handoff,
+                    sharded_inject_queue: self.sharded_inject_queue,
                     seed_generator: seed_generator_1,
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
                     track_task_schedule_latency: self.track_task_schedule_latency,
