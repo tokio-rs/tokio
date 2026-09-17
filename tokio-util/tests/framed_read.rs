@@ -3,7 +3,7 @@
 use tokio::io::{AsyncRead, ReadBuf};
 use tokio_test::assert_ready;
 use tokio_test::task;
-use tokio_util::codec::{Decoder, FramedRead};
+use tokio_util::codec::{Decoder, FramedParts, FramedRead};
 
 use bytes::{Buf, BytesMut};
 use futures::Stream;
@@ -33,6 +33,9 @@ macro_rules! pin {
         Pin::new(&mut $id)
     };
 }
+
+// Should be equal to the INITIAL_CAPACITY from src/codec/framed_impl.rs
+const INITIAL_CAPACITY: usize = 8 * 1024;
 
 struct U32Decoder;
 
@@ -309,6 +312,78 @@ fn read_eof_then_resume() {
         assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
         assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
     });
+}
+
+#[test]
+fn not_readable_from_empty_parts() {
+    let mut task = task::spawn(());
+    let mut parts = FramedParts::new_parts(
+        mock! {
+            Err(io::Error::new(io::ErrorKind::WouldBlock, "")),
+        },
+        U32Decoder,
+    );
+    parts.read_buf = BytesMut::new();
+
+    let mut framed = FramedRead::from_parts(parts);
+
+    task.enter(|cx, _| {
+        assert!(pin!(framed).poll_next(cx).is_pending());
+        assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
+    });
+}
+
+#[test]
+fn readable_from_not_empty_parts() {
+    let mut task = task::spawn(());
+    let mut parts = FramedParts::new_parts(
+        mock! {
+            Err(io::Error::new(io::ErrorKind::WouldBlock, "")),
+        },
+        U32Decoder,
+    );
+    parts.read_buf = BytesMut::from(&[0, 0, 0, 42][..]);
+
+    let mut framed = FramedRead::from_parts(parts);
+
+    task.enter(|cx, _| {
+        assert_read!(pin!(framed).poll_next(cx), 42);
+        assert!(pin!(framed).poll_next(cx).is_pending());
+        assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
+    });
+}
+
+#[test]
+fn external_buf_grows_to_init() {
+    let mut parts = FramedParts::new_parts(mock!(), U32Decoder);
+
+    parts.read_buf = BytesMut::from(&[0, 0, 0, 42][..]);
+
+    let framed = FramedRead::from_parts(parts);
+    let FramedParts {
+        read_buf,
+        write_buf,
+        ..
+    } = framed.into_parts();
+
+    assert!(write_buf.is_empty());
+    assert_eq!(read_buf.capacity(), INITIAL_CAPACITY);
+}
+
+#[test]
+fn external_buf_does_not_shrink() {
+    let mut parts = FramedParts::new_parts(mock!(), U32Decoder);
+    parts.read_buf = BytesMut::from(&vec![0; INITIAL_CAPACITY * 2][..]);
+
+    let framed = FramedRead::from_parts(parts);
+    let FramedParts {
+        read_buf,
+        write_buf,
+        ..
+    } = framed.into_parts();
+
+    assert!(write_buf.is_empty());
+    assert_eq!(read_buf.capacity(), INITIAL_CAPACITY * 2);
 }
 
 // ===== Mock ======
