@@ -5,6 +5,7 @@ use tokio::time::{sleep, Sleep};
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 use std::time::Duration;
 
@@ -88,5 +89,11 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
         let lower = (lower / self.cap).saturating_add(chunk_len);
         let upper = upper.and_then(|x| x.checked_add(chunk_len));
         (lower, upper)
+    }
+}
+
+impl<S: Stream> FusedStream for ChunksTimeout<S> {
+    fn is_terminated(&self) -> bool {
+        self.items.is_empty() && self.stream.is_terminated()
     }
 }
