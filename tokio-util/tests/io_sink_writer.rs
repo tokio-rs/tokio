@@ -4,6 +4,7 @@ use bytes::Bytes;
 use futures_util::SinkExt;
 use std::io::{self, Error, ErrorKind};
 use tokio::io::AsyncWriteExt;
+use tokio_test::{assert_ready_ok, task};
 use tokio_util::codec::{Encoder, FramedWrite};
 use tokio_util::io::{CopyToBytes, SinkWriter};
 use tokio_util::sync::PollSender;
@@ -26,6 +27,23 @@ async fn test_copied_sink_writer() -> Result<(), Error> {
 
     // ... and receive it.
     assert_eq!(data.to_vec(), rx.recv().await.unwrap().to_vec());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_empty_write_does_not_wait_for_sink() -> Result<(), Error> {
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Bytes>(1);
+    tx.send(Bytes::from_static(b"full")).await.unwrap();
+
+    let mut writer = SinkWriter::new(CopyToBytes::new(
+        PollSender::new(tx).sink_map_err(|_| io::Error::from(ErrorKind::BrokenPipe)),
+    ));
+
+    let mut write = task::spawn(writer.write(&[]));
+    assert_eq!(assert_ready_ok!(write.poll()), 0);
+    assert_eq!(rx.try_recv().unwrap(), Bytes::from_static(b"full"));
+    assert!(rx.try_recv().is_err());
 
     Ok(())
 }

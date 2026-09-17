@@ -100,6 +100,10 @@ where
     ) -> Poll<Result<usize, io::Error>> {
         let mut this = self.project();
 
+        if buf.is_empty() {
+            return Poll::Ready(Ok(0));
+        }
+
         ready!(this.inner.as_mut().poll_ready(cx).map_err(Into::into))?;
         match this.inner.as_mut().start_send(buf) {
             Ok(()) => Poll::Ready(Ok(buf.len())),
