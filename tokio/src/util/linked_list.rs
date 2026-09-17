@@ -15,7 +15,7 @@
 
 use core::cell::UnsafeCell;
 use core::fmt;
-use core::marker::PhantomPinned;
+use core::marker::{PhantomData, PhantomPinned};
 use core::mem::ManuallyDrop;
 use core::ptr::{self, NonNull};
 
@@ -232,6 +232,17 @@ impl<L: Link> LinkedList<L> {
 
         Some(L::from_raw(node))
     }
+
+    pub(crate) fn iter_back(&self) -> IterBack<'_, L> {
+        IterBack {
+            list: PhantomData,
+            curr: self.tail,
+        }
+    }
+
+    pub(crate) fn drain_back(&mut self) -> DrainBack<'_, L> {
+        DrainBack { list: self }
+    }
 }
 
 impl<L: Link> fmt::Debug for LinkedList<L> {
@@ -260,6 +271,47 @@ impl<L: Link> LinkedList<L> {
 impl<L: Link> Default for LinkedList<L> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<L: Link> Extend<L::Handle> for LinkedList<L> {
+    fn extend<T: IntoIterator<Item = L::Handle>>(&mut self, iter: T) {
+        iter.into_iter().for_each(|handle| self.push_front(handle));
+    }
+}
+
+impl<L: Link> FromIterator<L::Handle> for LinkedList<L> {
+    fn from_iter<T: IntoIterator<Item = L::Handle>>(iter: T) -> Self {
+        let mut list = Self::new();
+        list.extend(iter);
+        list
+    }
+}
+
+pub(crate) struct IterBack<'a, L: Link> {
+    list: PhantomData<&'a LinkedList<L>>,
+    curr: Option<NonNull<L::Target>>,
+}
+
+impl<'a, L: Link> Iterator for IterBack<'a, L> {
+    type Item = &'a L::Target;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let curr = self.curr?;
+        self.curr = unsafe { L::pointers(curr).as_ref() }.get_prev();
+        Some(unsafe { curr.as_ref() })
+    }
+}
+
+pub(crate) struct DrainBack<'a, L: Link> {
+    list: &'a mut LinkedList<L>,
+}
+
+impl<'a, L: Link> Iterator for DrainBack<'a, L> {
+    type Item = L::Handle;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.list.pop_back()
     }
 }
 
