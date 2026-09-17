@@ -732,6 +732,35 @@ fn encode_overflow() {
 }
 
 #[test]
+fn encode_min_length_adjustment() {
+    let mut codec = length_delimited::Builder::new()
+        .length_field_length(8)
+        .length_adjustment(isize::MIN)
+        .new_codec();
+    let mut dst = BytesMut::new();
+
+    codec.encode(Bytes::new(), &mut dst).unwrap();
+
+    assert_eq!(
+        dst,
+        BytesMut::from(&(isize::MIN.unsigned_abs() as u64).to_be_bytes()[..])
+    );
+}
+
+#[cfg(target_pointer_width = "32")]
+#[test]
+fn decode_min_length_adjustment() {
+    let mut codec = length_delimited::Builder::new()
+        .length_field_length(8)
+        .max_frame_length(isize::MIN.unsigned_abs())
+        .length_adjustment(isize::MIN)
+        .new_codec();
+    let mut src = BytesMut::from(&(isize::MIN.unsigned_abs() as u64).to_be_bytes()[..]);
+
+    assert_eq!(codec.decode(&mut src).unwrap(), Some(BytesMut::new()));
+}
+
+#[test]
 fn frame_does_not_fit() {
     let codec = LengthDelimitedCodec::builder()
         .length_field_length(1)
