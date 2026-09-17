@@ -503,6 +503,14 @@
 //! [`AsyncFd`](crate::io::unix::AsyncFd) behave as on native. Node has no
 //! `socketpair(2)` (so `UnixStream::pair`), no datagram `AF_UNIX` (so
 //! `UnixDatagram`), and no `SO_PEERCRED` (so `peer_cred`).
+//!
+//! With `--cfg tokio_unstable`, `Builder::build_hosted_local_event_loop`
+//! builds a `LocalEventLoop` driven by the JavaScript host event loop
+//! itself, which needs neither JSPI nor pthreads: the runtime schedules its
+//! own drives on the host loop, for its reactor's readiness and its timer
+//! deadlines, and tasks run once control returns to the host. It keeps the
+//! Emscripten runtime alive while it has tasks, so `main` may return with
+//! work in flight.
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at
 // least 32 bits, which a lot of components in Tokio currently assumes.

@@ -635,7 +635,8 @@ macro_rules! cfg_unstable {
 }
 
 /// `LocalEventLoop`: the runtime driven from a host loop, under
-/// `tokio_unstable`. Its driver parks on a thread of its own.
+/// `tokio_unstable`. Its driver parks on a thread of its own, or on
+/// Emscripten without threads, on the JavaScript host's callbacks.
 macro_rules! cfg_event_loop {
     ($($item:item)*) => {
         $(
@@ -643,7 +644,10 @@ macro_rules! cfg_event_loop {
                 tokio_unstable,
                 feature = "rt",
                 not(loom),
-                not(target_family = "wasm"),
+                not(all(
+                    target_family = "wasm",
+                    any(not(target_os = "emscripten"), target_feature = "atomics")
+                )),
             ))]
             #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt"))))]
             $item

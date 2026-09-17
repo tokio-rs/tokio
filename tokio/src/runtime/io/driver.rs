@@ -281,6 +281,19 @@ impl fmt::Debug for Driver {
 }
 
 impl Handle {
+    /// The reactor's own epoll descriptor, for the host loop's readiness
+    /// listener.
+    #[cfg(all(
+        tokio_unstable,
+        feature = "rt",
+        target_os = "emscripten",
+        not(target_feature = "atomics")
+    ))]
+    pub(crate) fn registry_raw_fd(&self) -> std::os::fd::RawFd {
+        use std::os::fd::AsRawFd;
+        self.registry.as_raw_fd()
+    }
+
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
     /// makes the next call to `turn` return immediately.
     ///
