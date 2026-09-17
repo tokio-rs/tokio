@@ -24,6 +24,12 @@
 //! tasks per LLC. Each task first-touches its allocation on its target LLC.
 //! `TOKIO_LLC_BENCH_CACHE_TASKS_PER_LLC` overrides the number of cache-heavy
 //! tasks assigned to each LLC.
+//!
+//! The mixed-service benchmark leaves workers and producers unpinned. It uses
+//! one persistent producer per LLC and keeps four requests in flight per
+//! allowed logical CPU by default. `TOKIO_LLC_BENCH_MIXED_PRODUCERS` and
+//! `TOKIO_LLC_BENCH_MIXED_IN_FLIGHT` override those defaults. Setting
+//! `TOKIO_LLC_BENCH_REPORT_LATENCY=1` prints per-request latency percentiles.
 
 #[cfg(all(tokio_unstable, target_os = "linux"))]
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
@@ -43,7 +49,7 @@ use std::task::{Poll, Waker};
 #[cfg(all(tokio_unstable, target_os = "linux"))]
 use std::time::{Duration, Instant};
 #[cfg(all(tokio_unstable, target_os = "linux"))]
-use tokio::runtime::{Builder, LlcAwareConfig, Runtime};
+use tokio::runtime::{Builder, Handle, LlcAwareConfig, Runtime};
 
 #[cfg(all(tokio_unstable, target_os = "linux"))]
 const DEFAULT_TASKS: usize = 4_096;
@@ -62,6 +68,9 @@ const CACHE_TASKS_PER_PARTITION: usize = 2;
 
 #[cfg(all(tokio_unstable, target_os = "linux"))]
 const CACHE_ROUNDS: usize = 4;
+
+#[cfg(all(tokio_unstable, target_os = "linux"))]
+const MIXED_IN_FLIGHT_PER_CPU: usize = 4;
 
 #[cfg(all(tokio_unstable, target_os = "linux"))]
 #[derive(Clone, Copy)]
@@ -277,6 +286,163 @@ fn remote_spawn(c: &mut Criterion) {
     }
 
     group.finish();
+}
+
+/// Models a service receiving work from persistent external threads. Unlike
+/// the saturation microbenchmarks, workers and producers are not pinned, work
+/// arrives through a bounded in-flight window, and requests have a mixture of
+/// CPU, cache, and multi-poll behavior.
+#[cfg(all(tokio_unstable, target_os = "linux"))]
+fn mixed_service(c: &mut Criterion) {
+    let (workers, topology) = benchmark_topology();
+    let partitions = topology.partition_count();
+    let tasks = benchmark_tasks();
+    let producers = benchmark_mixed_producers(partitions, tasks);
+    let in_flight = benchmark_mixed_in_flight().min(tasks).max(producers);
+    let report_latency = std::env::var_os("TOKIO_LLC_BENCH_REPORT_LATENCY").is_some();
+    let mut group = c.benchmark_group(format!(
+        "llc_aware/mixed_service_unpinned/{workers}_workers/{producers}_producers/{in_flight}_in_flight/{tasks}_tasks"
+    ));
+    group.throughput(Throughput::Elements(tasks as u64));
+
+    for mode in [Mode::Disabled, Mode::Enabled] {
+        let runtime = unpinned_runtime(mode, workers, topology.clone());
+        group.bench_with_input(BenchmarkId::from_parameter(mode.name()), &mode, |b, _| {
+            let barrier = Arc::new(Barrier::new(producers + 1));
+            let (results_tx, results_rx) = mpsc::channel::<Vec<Duration>>();
+            let mut command_txs = Vec::with_capacity(producers);
+            let mut producer_threads = Vec::with_capacity(producers);
+
+            for producer in 0..producers {
+                let (command_tx, command_rx) = mpsc::channel::<()>();
+                command_txs.push(command_tx);
+                let barrier = barrier.clone();
+                let results_tx = results_tx.clone();
+                let runtime = runtime.handle().clone();
+                let task_range = producer_task_range(tasks, producers, producer);
+                let producer_in_flight = producer_task_range(in_flight, producers, producer)
+                    .len()
+                    .max(1);
+                producer_threads.push(std::thread::spawn(move || {
+                    let cache: Arc<[usize]> =
+                        pointer_cycle(CACHE_BYTES_PER_TASK, producer as u64).into();
+                    while command_rx.recv().is_ok() {
+                        barrier.wait();
+                        let (done_tx, done_rx) = mpsc::channel();
+                        let mut next = task_range.start;
+                        let mut outstanding = 0;
+                        let mut latencies = Vec::with_capacity(task_range.len());
+
+                        while next < task_range.end && outstanding < producer_in_flight {
+                            spawn_mixed_request(&runtime, next, cache.clone(), done_tx.clone());
+                            next += 1;
+                            outstanding += 1;
+                        }
+
+                        while outstanding != 0 {
+                            latencies.push(done_rx.recv().unwrap());
+                            outstanding -= 1;
+                            if next < task_range.end {
+                                spawn_mixed_request(&runtime, next, cache.clone(), done_tx.clone());
+                                next += 1;
+                                outstanding += 1;
+                            }
+                        }
+                        results_tx.send(latencies).unwrap();
+                    }
+                }));
+            }
+            drop(results_tx);
+
+            let mut latency_summary = (0.0, 0.0, 0_u64);
+            b.iter_custom(|iterations| {
+                let mut elapsed = Duration::ZERO;
+                latency_summary = (0.0, 0.0, 0);
+
+                for _ in 0..iterations {
+                    for command_tx in &command_txs {
+                        command_tx.send(()).unwrap();
+                    }
+
+                    let start = Instant::now();
+                    barrier.wait();
+                    let mut latencies = Vec::with_capacity(tasks);
+                    for _ in 0..producers {
+                        latencies.extend(results_rx.recv().unwrap());
+                    }
+                    elapsed += start.elapsed();
+                    if report_latency {
+                        latencies.sort_unstable();
+                        latency_summary.0 += percentile(&latencies, 50).as_secs_f64();
+                        latency_summary.1 += percentile(&latencies, 99).as_secs_f64();
+                        latency_summary.2 += 1;
+                    }
+                }
+
+                elapsed
+            });
+
+            if report_latency {
+                let samples = latency_summary.2 as f64;
+                eprintln!(
+                    "mixed_service {mode}: p50_us={:.3} p99_us={:.3}",
+                    latency_summary.0 * 1_000_000.0 / samples,
+                    latency_summary.1 * 1_000_000.0 / samples,
+                );
+            }
+
+            drop(command_txs);
+            for producer in producer_threads {
+                producer.join().unwrap();
+            }
+        });
+    }
+
+    group.finish();
+}
+
+#[cfg(all(tokio_unstable, target_os = "linux"))]
+impl std::fmt::Display for Mode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
+#[cfg(all(tokio_unstable, target_os = "linux"))]
+fn spawn_mixed_request(
+    runtime: &Handle,
+    task: usize,
+    cache: Arc<[usize]>,
+    done: mpsc::Sender<Duration>,
+) {
+    let submitted = Instant::now();
+    drop(runtime.spawn(async move {
+        match task % 8 {
+            0..=3 => run_task_work(64, task),
+            4 | 5 => {
+                for phase in 0..4 {
+                    run_task_work(64, task ^ phase);
+                    tokio::task::yield_now().await;
+                }
+            }
+            6 => {
+                let mut cursor = task % cache.len();
+                for _ in 0..4 {
+                    cursor = chase_pointer_steps(&cache, cursor, 256);
+                    tokio::task::yield_now().await;
+                }
+                black_box(cursor);
+            }
+            _ => run_task_work(4_096, task),
+        }
+        done.send(submitted.elapsed()).unwrap();
+    }));
+}
+
+#[cfg(all(tokio_unstable, target_os = "linux"))]
+fn percentile(samples: &[Duration], percentile: usize) -> Duration {
+    let index = (samples.len() - 1) * percentile / 100;
+    samples[index]
 }
 
 /// Measures explicit per-task placement through `task::Builder`.
@@ -661,6 +827,14 @@ fn chase_pointers(links: &[usize], mut cursor: usize) -> usize {
 }
 
 #[cfg(all(tokio_unstable, target_os = "linux"))]
+fn chase_pointer_steps(links: &[usize], mut cursor: usize, steps: usize) -> usize {
+    for _ in 0..steps {
+        cursor = links[cursor];
+    }
+    black_box(cursor)
+}
+
+#[cfg(all(tokio_unstable, target_os = "linux"))]
 fn benchmark_topology() -> (usize, LlcAwareConfig) {
     let topology = LlcAwareConfig::from_linux_topology()
         .expect("the LLC benchmark requires Linux sysfs topology");
@@ -704,6 +878,30 @@ fn benchmark_task_work() -> usize {
         .ok()
         .and_then(|value| value.parse().ok())
         .unwrap_or(0)
+}
+
+#[cfg(all(tokio_unstable, target_os = "linux"))]
+fn benchmark_mixed_producers(partitions: usize, tasks: usize) -> usize {
+    std::env::var("TOKIO_LLC_BENCH_MIXED_PRODUCERS")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|producers| *producers > 0)
+        .unwrap_or(partitions)
+        .min(tasks)
+}
+
+#[cfg(all(tokio_unstable, target_os = "linux"))]
+fn benchmark_mixed_in_flight() -> usize {
+    let allowed_cpus = benchmark_cpus_by_llc()
+        .expect("the LLC benchmark requires Linux CPU affinity information")
+        .values()
+        .map(Vec::len)
+        .sum::<usize>();
+    std::env::var("TOKIO_LLC_BENCH_MIXED_IN_FLIGHT")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .filter(|in_flight| *in_flight > 0)
+        .unwrap_or(allowed_cpus * MIXED_IN_FLIGHT_PER_CPU)
 }
 
 #[cfg(all(tokio_unstable, target_os = "linux"))]
@@ -775,6 +973,21 @@ fn pinned_runtime(
             pin_current_thread(cpu);
         }
     });
+    match mode {
+        Mode::Disabled => {
+            builder.disable_llc_aware();
+        }
+        Mode::Enabled => {
+            builder.llc_aware(topology);
+        }
+    }
+    builder.build().unwrap()
+}
+
+#[cfg(all(tokio_unstable, target_os = "linux"))]
+fn unpinned_runtime(mode: Mode, workers: usize, topology: LlcAwareConfig) -> Runtime {
+    let mut builder = Builder::new_multi_thread();
+    builder.worker_threads(workers).enable_all();
     match mode {
         Mode::Disabled => {
             builder.disable_llc_aware();
@@ -941,6 +1154,7 @@ criterion_group!(
     llc_aware_benches,
     local_spawn,
     remote_spawn,
+    mixed_service,
     hinted_spawn,
     same_llc_wake,
     cross_llc_wake,
