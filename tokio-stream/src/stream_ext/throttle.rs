@@ -1,6 +1,7 @@
 //! Slow down a stream by enforcing a delay between items.
 
 use crate::Stream;
+use futures_core::FusedStream;
 use tokio::time::{sleep, Duration, Sleep};
 
 use std::future::Future;
@@ -94,6 +95,12 @@ impl<T: Stream> Stream for Throttle<T> {
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.stream.size_hint()
+    }
+}
+
+impl<T: FusedStream> FusedStream for Throttle<T> {
+    fn is_terminated(&self) -> bool {
+        (self.has_delayed || is_zero(self.duration)) && self.stream.is_terminated()
     }
 }
 
