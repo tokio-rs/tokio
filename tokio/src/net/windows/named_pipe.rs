@@ -2370,6 +2370,7 @@ impl ServerOptions {
 }
 
 impl Default for ServerOptions {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -2598,6 +2599,7 @@ impl ClientOptions {
 }
 
 impl Default for ClientOptions {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
