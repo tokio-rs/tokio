@@ -1,5 +1,9 @@
 use crate::io::util::DEFAULT_BUF_SIZE;
 use crate::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
+#[cfg(all(feature = "net", not(loom)))]
+use crate::net::{tcp, TcpStream};
+#[cfg(all(unix, feature = "net", not(loom)))]
+use crate::net::{unix, UnixStream};
 
 use pin_project_lite::pin_project;
 use std::io::{self, IoSlice, SeekFrom};
@@ -94,6 +98,122 @@ impl<R: AsyncRead> BufReader<R> {
         let me = self.project();
         *me.pos = 0;
         *me.cap = 0;
+    }
+}
+
+#[cfg(all(feature = "net", not(loom)))]
+impl BufReader<TcpStream> {
+    /// Splits a `BufReader<TcpStream>` into a read half and a write half, which can be used
+    /// to read and write the stream concurrently.
+    ///
+    /// Unlike [`split`], the owned halves can be moved to separate tasks, however
+    /// this comes at the cost of a heap allocation.
+    ///
+    /// **Note:** Dropping the write half will shut down the write half of the TCP
+    /// stream. This is equivalent to calling [`shutdown()`] on the `TcpStream`.
+    ///
+    /// [`split`]: TcpStream::split()
+    /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
+    pub fn into_split(self) -> (BufReader<tcp::OwnedReadHalf>, tcp::OwnedWriteHalf) {
+        let (rx, tx) = self.inner.into_split();
+        let rx = BufReader {
+            inner: rx,
+            buf: self.buf,
+            pos: self.pos,
+            cap: self.cap,
+            seek_state: self.seek_state,
+        };
+
+        (rx, tx)
+    }
+}
+
+#[cfg(all(feature = "net", not(loom)))]
+impl BufReader<tcp::OwnedReadHalf> {
+    /// Attempts to put the two halves of a `TcpStream` back together and
+    /// recover the original socket. Succeeds only if the two halves
+    /// originated from the same call to `into_split`.
+    pub fn reunite(
+        self,
+        other: tcp::OwnedWriteHalf,
+    ) -> Result<BufReader<TcpStream>, tcp::BufReuniteError> {
+        match self.inner.reunite(other) {
+            Ok(stream) => Ok(BufReader {
+                inner: stream,
+                buf: self.buf,
+                pos: self.pos,
+                cap: self.cap,
+                seek_state: self.seek_state,
+            }),
+            Err(e) => Err(tcp::BufReuniteError(
+                BufReader {
+                    inner: e.0,
+                    buf: self.buf,
+                    pos: self.pos,
+                    cap: self.cap,
+                    seek_state: self.seek_state,
+                },
+                e.1,
+            )),
+        }
+    }
+}
+
+#[cfg(all(unix, feature = "net", not(loom)))]
+impl BufReader<UnixStream> {
+    /// Splits a `UnixStream` into a read half and a write half, which can be used
+    /// to read and write the stream concurrently.
+    ///
+    /// Unlike [`split`], the owned halves can be moved to separate tasks, however
+    /// this comes at the cost of a heap allocation.
+    ///
+    /// **Note:** Dropping the write half will only shut down the write half of the
+    /// stream. This is equivalent to calling [`shutdown()`] on the `UnixStream`.
+    ///
+    /// [`split`]: UnixStream::split()
+    /// [`shutdown()`]: fn@crate::io::AsyncWriteExt::shutdown
+    pub fn into_split(self) -> (BufReader<unix::OwnedReadHalf>, unix::OwnedWriteHalf) {
+        let (rx, tx) = self.inner.into_split();
+        let rx = BufReader {
+            inner: rx,
+            buf: self.buf,
+            pos: self.pos,
+            cap: self.cap,
+            seek_state: self.seek_state,
+        };
+
+        (rx, tx)
+    }
+}
+
+#[cfg(all(unix, feature = "net", not(loom)))]
+impl BufReader<unix::OwnedReadHalf> {
+    /// Attempts to put the two halves of a `UnixStream` back together and
+    /// recover the original socket. Succeeds only if the two halves
+    /// originated from the same call to `into_split`.
+    pub fn reunite(
+        self,
+        other: unix::OwnedWriteHalf,
+    ) -> Result<BufReader<UnixStream>, unix::BufReuniteError> {
+        match self.inner.reunite(other) {
+            Ok(stream) => Ok(BufReader {
+                inner: stream,
+                buf: self.buf,
+                pos: self.pos,
+                cap: self.cap,
+                seek_state: self.seek_state,
+            }),
+            Err(e) => Err(unix::BufReuniteError(
+                BufReader {
+                    inner: e.0,
+                    buf: self.buf,
+                    pos: self.pos,
+                    cap: self.cap,
+                    seek_state: self.seek_state,
+                },
+                e.1,
+            )),
+        }
     }
 }
 
