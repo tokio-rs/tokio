@@ -13,7 +13,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::task::{Wake, Waker};
 use std::time::{Duration, Instant};
 
-use tokio::runtime::{Builder, LocalEventLoop, WouldBlock};
+use tokio::runtime::{Builder, LocalEventLoop};
 use tokio::sync::oneshot;
 
 /// The host's side of the contract: a flag the runtime raises.
@@ -169,7 +169,7 @@ fn block_on_leaving_inject_tasks_wakes() {
         });
     }
     // The future is ready first, before any batch runs.
-    assert_eq!(el.block_on(async { 1 }), Ok(1));
+    assert_eq!(el.block_on(async { 1 }), 1);
     assert!(ran.load(SeqCst) < 6);
     assert!(host.is_woken());
     host.pump(|| el.drive(), || ran.load(SeqCst) == 6);
@@ -239,7 +239,7 @@ fn wake_from_another_thread() {
     assert!(host.woken_now());
     el.drive();
     assert!(jh.is_finished());
-    assert_eq!(el.block_on(jh).unwrap().unwrap(), 7);
+    assert_eq!(el.block_on(jh).unwrap(), 7);
 }
 
 #[test]
@@ -307,7 +307,7 @@ fn tcp_round_trip() {
 #[test]
 fn block_on_ready_future() {
     let (_host, el) = event_loop();
-    assert_eq!(el.block_on(async { 1 + 2 }), Ok(3));
+    assert_eq!(el.block_on(async { 1 + 2 }), 3);
 }
 
 #[test]
@@ -323,7 +323,7 @@ fn block_on_drives_ready_tasks() {
         });
         a.await.unwrap() + b.await.unwrap()
     });
-    assert_eq!(out, Ok(42));
+    assert_eq!(out, 42);
     // The spawns woke the host; a drive now finds nothing.
     el.drive();
     assert!(!host.wait(Duration::from_millis(20)));
@@ -345,25 +345,37 @@ fn block_on_leaving_ready_tasks_wakes() {
         });
         1
     });
-    assert_eq!(out, Ok(1));
+    assert_eq!(out, 1);
     assert!(host.is_woken());
     host.pump(|| el.drive(), || turns.load(SeqCst) == 10);
 }
 
+/// The panic `block_on` raises where a native runtime would park.
+fn cannot_wait(res: std::thread::Result<()>) -> bool {
+    let Err(err) = res else {
+        return false;
+    };
+    let msg = err
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| err.downcast_ref::<&str>().copied())
+        .unwrap_or("");
+    msg.contains("cannot wait")
+}
+
 #[test]
-fn block_on_would_block_on_timer() {
+fn block_on_pending_on_timer_panics() {
     let (host, el) = event_loop();
     let start = Instant::now();
-    let res = el.block_on(async {
-        tokio::time::sleep(Duration::from_millis(50)).await;
-        1
-    });
-    let err: WouldBlock = res.unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "the future did not complete without blocking"
-    );
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        el.block_on(async {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        })
+    }));
+    assert!(cannot_wait(res));
     assert!(start.elapsed() < Duration::from_millis(50), "must not wait");
+    // The dropped future's timer is gone: nothing fires.
+    assert!(!host.wait(Duration::from_millis(70)));
 
     // The runtime is intact: spawned work still runs.
     let jh = el.spawn_local(async { 2 });
@@ -371,22 +383,24 @@ fn block_on_would_block_on_timer() {
 }
 
 #[test]
-fn block_on_would_block_leaves_spawned_tasks() {
+fn block_on_pending_leaves_spawned_tasks() {
     let (host, el) = event_loop();
     let (tx, rx) = oneshot::channel::<u32>();
-    let res = el.block_on(async {
-        tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(10)).await;
-            tx.send(5).unwrap();
-        });
-        std::future::pending::<()>().await;
-    });
-    assert!(res.is_err());
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        el.block_on(async {
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                tx.send(5).unwrap();
+            });
+            std::future::pending::<()>().await;
+        })
+    }));
+    assert!(cannot_wait(res));
 
     // The task the future spawned outlives it and completes from drives.
     let jh = el.spawn_local(async move { rx.await.unwrap() });
     host.pump(|| el.drive(), || jh.is_finished());
-    assert_eq!(el.block_on(jh).unwrap().unwrap(), 5);
+    assert_eq!(el.block_on(jh).unwrap(), 5);
 }
 
 #[test]
@@ -394,10 +408,10 @@ fn block_on_inside_runtime_panics() {
     let (_host, el) = event_loop();
     let el = Rc::new(el);
     let el2 = el.clone();
-    let res = el.block_on(async move {
+    let nested = el.block_on(async move {
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| el2.block_on(async {}))).is_err()
     });
-    assert_eq!(res, Ok(true));
+    assert!(nested);
 }
 
 #[test]
@@ -477,7 +491,7 @@ fn spawn_local_with_rc() {
     });
     host.pump(|| el.drive(), || jh.is_finished());
     assert_eq!(value.get(), 5);
-    assert_eq!(el.block_on(async { value.get() }), Ok(5));
+    assert_eq!(el.block_on(async { value.get() }), 5);
 }
 
 #[test]
@@ -505,7 +519,7 @@ fn drive_inside_runtime_panics() {
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| el2.drive())).is_err()
     });
     el.drive();
-    assert!(el.block_on(jh).unwrap().unwrap());
+    assert!(el.block_on(jh).unwrap());
 }
 
 #[test]
@@ -535,7 +549,7 @@ fn without_any_driver() {
         .join()
         .unwrap();
     host.pump(|| el.drive(), || jh.is_finished());
-    assert_eq!(el.block_on(jh).unwrap().unwrap(), 3);
+    assert_eq!(el.block_on(jh).unwrap(), 3);
 }
 
 // `LocalEventLoop` is `!Send` and `!Sync`, like `LocalRuntime`: the method
