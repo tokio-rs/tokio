@@ -5,7 +5,6 @@
 use super::{Context, Core, CoreGuard, CurrentThread, Handle};
 use crate::loom::sync::Arc;
 use crate::runtime::driver::Driver;
-use crate::runtime::event_loop::WouldBlock;
 
 use std::future::Future;
 use std::task::Poll::Ready;
@@ -23,14 +22,14 @@ impl CurrentThread {
         core.drive_batch()
     }
 
-    /// Poll `future` to completion from ready work alone, failing where a
-    /// native `block_on` would park. Also returns whether ready work remains
-    /// queued. Must be called inside `enter_runtime`.
+    /// Poll `future` to completion from ready work alone: `None` where a
+    /// native `block_on` would park, the future dropped. Also returns whether
+    /// ready work remains queued. Must be called inside `enter_runtime`.
     pub(crate) fn block_on_ready<F: Future>(
         &self,
         handle: &Arc<Handle>,
         future: F,
-    ) -> (Result<F::Output, WouldBlock>, bool) {
+    ) -> (Option<F::Output>, bool) {
         // Nested entry and foreign threads are rejected before this point.
         let core = self.take_core(handle).expect("core checked out");
         handle
@@ -129,7 +128,7 @@ impl CoreGuard<'_> {
         }
     }
 
-    fn block_on_ready<F: Future>(self, future: F) -> (Result<F::Output, WouldBlock>, bool) {
+    fn block_on_ready<F: Future>(self, future: F) -> (Option<F::Output>, bool) {
         let ret = self.enter(|mut core, context| {
             let waker = Handle::waker_ref(&context.handle);
             let mut cx = std::task::Context::from_waker(&waker);
@@ -146,7 +145,7 @@ impl CoreGuard<'_> {
                     core = c;
                     if let Ready(v) = res {
                         let busy = core.has_ready_work(handle);
-                        return (core, Some((Ok(v), busy)));
+                        return (core, Some((Some(v), busy)));
                     }
                 }
 
@@ -156,7 +155,7 @@ impl CoreGuard<'_> {
                     Batch::Panicked => return (core, None),
                     Batch::Interval => {}
                     Batch::Exhausted if context.has_pending_work(&core) => {}
-                    Batch::Exhausted => return (core, Some((Err(WouldBlock(())), false))),
+                    Batch::Exhausted => return (core, Some((None, false))),
                 }
             }
         });
