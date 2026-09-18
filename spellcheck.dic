@@ -112,6 +112,7 @@ WebAssembly
 ZST
 \
 accessors
+activations
 adaptor
 adaptors
 ambient
