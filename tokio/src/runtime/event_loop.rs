@@ -37,7 +37,7 @@ use std::thread::ThreadId;
 /// Tasks are submitted with [`spawn_local`](Self::spawn_local), or from any
 /// thread through the [`Handle`], and run in batches from those drives.
 /// [`block_on`](Self::block_on) runs a future only as far as ready work
-/// carries it, and errors rather than wait.
+/// carries it, and panics rather than wait.
 ///
 /// Like `LocalRuntime` the event loop is `!Send`: the host drives it on the
 /// thread that built it. [`Handle::block_on`] from another thread works as
@@ -52,22 +52,6 @@ use std::thread::ThreadId;
 pub struct LocalEventLoop {
     shared: Rc<Shared>,
 }
-
-/// The error returned by [`LocalEventLoop::block_on`] when the future did
-/// not complete without waiting.
-///
-/// The future has been dropped. Progress it made, and any tasks it spawned,
-/// remain: the tasks continue from later drives.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct WouldBlock(pub(crate) ());
-
-impl std::fmt::Display for WouldBlock {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("the future did not complete without blocking")
-    }
-}
-
-impl std::error::Error for WouldBlock {}
 
 impl LocalEventLoop {
     pub(crate) fn new(runtime: LocalRuntime, waker: Waker) -> io::Result<LocalEventLoop> {
@@ -116,21 +100,25 @@ impl LocalEventLoop {
     }
 
     /// Runs `future` to completion on the runtime, along with any tasks that
-    /// become ready, without ever waiting. Where a [`Runtime::block_on`]
-    /// would park the thread, this returns [`WouldBlock`] and drops the
-    /// future instead; spawned tasks it left behind continue from later
-    /// drives.
+    /// become ready, without ever waiting. The wait belongs to the host event
+    /// loop: where a [`Runtime::block_on`] would park the thread, nothing
+    /// could wake this future from here, so the future is dropped and this
+    /// panics. Tasks the future spawned continue from later drives.
+    ///
+    /// That includes waiting on I/O that is already readable, since readiness
+    /// arrives through the driver, not through a turn inside `block_on`.
     ///
     /// # Panics
     ///
-    /// Panics if called from within a runtime, or on a thread other than the
-    /// one that built the event loop, or if a task panicked and the runtime
-    /// is configured to [shut down on unhandled panics].
+    /// Panics if the future is still pending once no ready work remains, if
+    /// called from within a runtime, or on a thread other than the one that
+    /// built the event loop, or if a task panicked and the runtime is
+    /// configured to [shut down on unhandled panics].
     ///
     /// [`Runtime::block_on`]: crate::runtime::Runtime::block_on
     /// [shut down on unhandled panics]: crate::runtime::Builder::unhandled_panic
     #[track_caller]
-    pub fn block_on<F: Future>(&self, future: F) -> Result<F::Output, WouldBlock> {
+    pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         self.shared.block_on(future)
     }
 }
@@ -186,14 +174,21 @@ impl Shared {
         self.after_turn(busy);
     }
 
-    fn block_on<F: Future>(&self, future: F) -> Result<F::Output, WouldBlock> {
+    #[track_caller]
+    fn block_on<F: Future>(&self, future: F) -> F::Output {
         self.check_thread();
         let handle = self.handle.inner.as_current_thread();
         let (ret, busy) = context::enter_runtime(&self.handle.inner, false, |_| {
             self.runtime.current_thread().block_on_ready(handle, future)
         });
+        // The dropped future's timers and registrations are gone; settle the
+        // host's side before reporting.
         self.after_turn(busy);
-        ret
+        ret.unwrap_or_else(|| {
+            panic!(
+                "`LocalEventLoop::block_on` cannot wait: the future is still pending                  with no ready work, and its wait belongs to the host event loop, so                  nothing could wake it from here"
+            )
+        })
     }
 }
 
