@@ -472,10 +472,10 @@
 //! ### Emscripten support
 //!
 //! The `wasm32-unknown-emscripten` target supports the single-threaded runtime
-//! with the `rt`, `time`, `sync`, `macros`, `fs`, `io-util`, `io-std`, and
-//! `test-util` features. The `rt-multi-thread` feature is additionally
-//! supported when building with Emscripten pthreads (`-pthread`). The `net`,
-//! `process`, and `signal` features are not supported.
+//! with the `rt`, `time`, `sync`, `macros`, `io-util`, and `test-util`
+//! features. The `rt-multi-thread`, `fs`, and `io-std` features are
+//! additionally supported when building with Emscripten pthreads (`-pthread`).
+//! The `net`, `process`, and `signal` features are not supported.
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at
 // least 32 bits, which a lot of components in Tokio currently assumes.
@@ -514,6 +514,15 @@ compile_error!("Features net,process,signal are not supported on wasm32-unknown-
 ))]
 compile_error!(
     "The `rt-multi-thread` feature on wasm32-unknown-emscripten requires pthreads support (build with `-pthread`)."
+);
+
+#[cfg(all(
+    target_os = "emscripten",
+    any(feature = "fs", feature = "io-std"),
+    not(target_feature = "atomics")
+))]
+compile_error!(
+    "The `fs` and `io-std` features on wasm32-unknown-emscripten require pthreads support (build with `-pthread`)."
 );
 
 #[cfg(all(
