@@ -1187,6 +1187,74 @@ impl Builder {
         }
     }
 
+    cfg_event_loop! {
+        /// Creates the configured runtime as an [`EventLoop`]: a `current_thread`
+        /// runtime driven by a host event loop instead of by parking a thread.
+        /// The host watches the event loop's descriptor and calls
+        /// [`EventLoop::drive`] when it is readable.
+        ///
+        /// The I/O driver must be enabled ([`enable_io`]): the reactor's
+        /// descriptor is what the host watches. With the time driver enabled,
+        /// the platform must provide a timer descriptor (Linux `timerfd`).
+        ///
+        /// # Panics
+        ///
+        /// This will panic if the runtime is configured with [`new_multi_thread()`].
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the I/O driver is disabled, if the platform has no
+        /// timer descriptor and the time driver is enabled, or if OS resources
+        /// required by the runtime cannot be initialized.
+        ///
+        /// [`new_multi_thread()`]: Builder::new_multi_thread
+        /// [`enable_io`]: Builder::enable_io
+        /// [`EventLoop`]: crate::runtime::EventLoop
+        /// [`EventLoop::drive`]: crate::runtime::EventLoop::drive
+        pub fn build_event_loop(&mut self) -> io::Result<crate::runtime::EventLoop> {
+            self.check_event_loop_cfg()?;
+            let runtime = match &self.kind {
+                Kind::CurrentThread => self.build_current_thread_runtime()?,
+                #[cfg(feature = "rt-multi-thread")]
+                Kind::MultiThread => panic!("multi_thread is not supported for EventLoop"),
+            };
+            crate::runtime::EventLoop::new(runtime)
+        }
+
+        /// Creates the configured runtime as a [`LocalEventLoop`]: a
+        /// [`LocalRuntime`] driven by a host event loop. See
+        /// [`build_event_loop`](Self::build_event_loop).
+        ///
+        /// # Panics
+        ///
+        /// This will panic if the runtime is configured with [`new_multi_thread()`].
+        ///
+        /// # Errors
+        ///
+        /// As [`build_event_loop`](Self::build_event_loop).
+        ///
+        /// [`new_multi_thread()`]: Builder::new_multi_thread
+        /// [`LocalEventLoop`]: crate::runtime::LocalEventLoop
+        pub fn build_local_event_loop(
+            &mut self,
+            options: LocalOptions,
+        ) -> io::Result<crate::runtime::LocalEventLoop> {
+            self.check_event_loop_cfg()?;
+            let runtime = self.build_local(options)?;
+            crate::runtime::LocalEventLoop::new(runtime)
+        }
+
+        fn check_event_loop_cfg(&self) -> io::Result<()> {
+            if !self.enable_io {
+                return Err(io::Error::new(
+                    io::ErrorKind::Unsupported,
+                    "an event loop needs the I/O driver: its descriptor is what the host watches",
+                ));
+            }
+            Ok(())
+        }
+    }
+
     fn get_cfg(&self) -> driver::Cfg {
         driver::Cfg {
             enable_pause_time: match self.kind {
