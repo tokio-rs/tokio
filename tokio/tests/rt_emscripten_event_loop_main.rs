@@ -36,12 +36,21 @@ mod emscripten {
 
     extern "C" {
         fn emscripten_run_script(script: *const std::ffi::c_char);
+        fn emscripten_run_script_int(script: *const std::ffi::c_char) -> i32;
+        /// Emscripten's `ASYNCIFY` build mode; 2 is JSPI.
+        fn emscripten_has_asyncify() -> i32;
     }
 
     fn run_js(script: &str) {
         let script = std::ffi::CString::new(script).unwrap();
         // SAFETY: a NUL-terminated script evaluated on the host.
         unsafe { emscripten_run_script(script.as_ptr()) }
+    }
+
+    fn run_js_int(script: &str) -> i32 {
+        let script = std::ffi::CString::new(script).unwrap();
+        // SAFETY: a NUL-terminated script evaluated on the host.
+        unsafe { emscripten_run_script_int(script.as_ptr()) }
     }
 
     fn event_loop() -> &'static LocalEventLoop {
@@ -88,6 +97,25 @@ mod emscripten {
         // the runtime alive with nothing armed.
         for _ in 0..6 {
             root(el_b, async {});
+        }
+
+        // A drive scheduled while another runtime's `block_on` is suspended
+        // on this thread must wait for its exit, not poll for it: the
+        // immediates the host sees during the suspension stay in single
+        // digits rather than one per turn (`rt_emscripten_pre.js` counts).
+        // SAFETY: an Emscripten libc query with no arguments.
+        if unsafe { emscripten_has_asyncify() } == 2 {
+            let before = run_js_int("Module.tokioImmediates");
+            Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(async { tokio::time::sleep(Duration::from_millis(100)).await });
+            let during = run_js_int("Module.tokioImmediates") - before;
+            assert!(
+                during < 10,
+                "{during} immediates during a suspended block_on"
+            );
         }
 
         root(el_a, async move {

@@ -11,6 +11,7 @@ use crate::runtime::driver::Driver;
 use crate::runtime::Handle;
 
 use std::io;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -21,7 +22,7 @@ pub(super) struct Reactor {
 }
 
 impl Reactor {
-    pub(super) fn start(shared: &Shared) -> io::Result<Reactor> {
+    pub(super) fn start(shared: &Rc<Shared>) -> io::Result<Reactor> {
         let scheduler = shared.handle.inner.as_current_thread();
         let mut driver = shared
             .runtime
@@ -42,6 +43,10 @@ impl Reactor {
                 })?
         };
         Ok(Reactor { thread, stop })
+    }
+
+    pub(super) fn attach(&self) -> io::Result<()> {
+        Ok(())
     }
 
     pub(super) fn after_turn(&self, _handle: &Handle) {}
