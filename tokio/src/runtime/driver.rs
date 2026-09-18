@@ -32,6 +32,10 @@ pub(crate) struct Handle {
     /// Source of `Instant::now()`
     #[cfg_attr(not(all(feature = "time", feature = "test-util")), allow(dead_code))]
     pub(crate) clock: Clock,
+
+    /// An event loop's host, woken whenever the driver is unparked.
+    #[cfg(all(tokio_unstable, feature = "rt", not(loom), not(target_family = "wasm")))]
+    host: std::sync::OnceLock<std::task::Waker>,
 }
 
 pub(crate) struct Cfg {
@@ -61,6 +65,8 @@ impl Driver {
                 signal: signal_handle,
                 time: time_handle,
                 clock,
+                #[cfg(all(tokio_unstable, feature = "rt", not(loom), not(target_family = "wasm")))]
+                host: std::sync::OnceLock::new(),
             },
         ))
     }
@@ -86,6 +92,24 @@ impl Handle {
         }
 
         self.io.unpark();
+
+        #[cfg(all(tokio_unstable, feature = "rt", not(loom), not(target_family = "wasm")))]
+        self.wake_host();
+    }
+
+    cfg_event_loop! {
+        /// Wakes the event loop's host, if any: it should call `drive` soon.
+        pub(crate) fn wake_host(&self) {
+            if let Some(host) = self.host.get() {
+                host.wake_by_ref();
+            }
+        }
+
+        pub(crate) fn set_host(&self, waker: std::task::Waker) {
+            if self.host.set(waker).is_err() {
+                panic!("the runtime already has an event loop host");
+            }
+        }
     }
 
     cfg_io_driver! {

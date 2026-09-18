@@ -222,10 +222,10 @@
 //!
 //! - Under `tokio_unstable`, an `EventLoop` (or `LocalEventLoop`), built with
 //!   `Builder::build_event_loop`, is a current-thread runtime driven by a host
-//!   event loop: instead of blocking a thread, the runtime exposes its
-//!   reactor's descriptor, and the host calls `drive` whenever it is
-//!   readable. This is for embedding in an existing loop (a GUI toolkit, or a
-//!   JavaScript host under WebAssembly), where the runtime must never block.
+//!   event loop: instead of blocking a thread, the runtime wakes a `Waker` the
+//!   host provided, and the host calls `drive` in response. This is for
+//!   embedding in an existing loop (a GUI toolkit, or a JavaScript host under
+//!   WebAssembly), where the runtime must never block.
 //!
 //! Please be aware that [`Handle::block_on`] does not drive the runtime.
 //! There must be at least one call to [`Runtime::block_on`] when using the current
@@ -633,7 +633,7 @@ cfg_rt! {
 
     cfg_event_loop! {
         pub(crate) mod event_loop;
-        pub use event_loop::{EventLoop, LocalEventLoop};
+        pub use event_loop::{EventLoop, LocalEventLoop, WouldBlock};
     }
 
     mod id;
