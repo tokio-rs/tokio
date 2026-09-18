@@ -28,14 +28,15 @@ impl CurrentThread {
     }
 
     /// Poll `future` to completion from ready work alone, failing where a
-    /// native `block_on` would park. Must be called inside `enter_runtime`.
+    /// native `block_on` would park. Also returns whether ready work remains
+    /// in the local queue. Must be called inside `enter_runtime`.
     pub(crate) fn block_on_ready<F: Future>(
         &self,
         handle: &Arc<Handle>,
         future: F,
-    ) -> Result<F::Output, WouldBlock> {
+    ) -> (Result<F::Output, WouldBlock>, bool) {
         let Some(core) = self.take_core(handle) else {
-            return Err(WouldBlock(()));
+            return (Err(WouldBlock(())), false);
         };
         handle
             .shared
@@ -123,7 +124,7 @@ impl CoreGuard<'_> {
         }
     }
 
-    fn block_on_ready<F: Future>(self, future: F) -> Result<F::Output, WouldBlock> {
+    fn block_on_ready<F: Future>(self, future: F) -> (Result<F::Output, WouldBlock>, bool) {
         let ret = self.enter(|mut core, context| {
             let waker = Handle::waker_ref(&context.handle);
             let mut cx = std::task::Context::from_waker(&waker);
@@ -139,7 +140,8 @@ impl CoreGuard<'_> {
                     });
                     core = c;
                     if let Ready(v) = res {
-                        return (core, Some(Ok(v)));
+                        let busy = !core.tasks.is_empty();
+                        return (core, Some((Ok(v), busy)));
                     }
                 }
 
@@ -149,7 +151,7 @@ impl CoreGuard<'_> {
                     Batch::Panicked => return (core, None),
                     Batch::Interval => {}
                     Batch::Exhausted if context.has_pending_work(&core) => {}
-                    Batch::Exhausted => return (core, Some(Err(WouldBlock(())))),
+                    Batch::Exhausted => return (core, Some((Err(WouldBlock(())), false))),
                 }
             }
         });
