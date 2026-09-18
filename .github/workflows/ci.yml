@@ -1235,7 +1235,7 @@ jobs:
           RUSTFLAGS: "-Dwarnings -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sJSPI -Clink-args=-sSTACK_SIZE=1048576"
 
       - name: Test tokio for emscripten (non-JSPI)
-        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,fs,io-util,io-std,test-util" --test rt_emscripten_block_on
+        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,fs,io-util,io-std,test-util" --test rt_emscripten_block_on --test sync_emscripten_blocking
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node

@@ -2,9 +2,11 @@
 //!
 //! [`park`] suspends the calling activation on a promise held in a per-parker
 //! slot on the JS side, settled by a host timer at the deadline or by
-//! [`unpark`] from a later activation (a host callback entering tokio). The
-//! runtime stays entered while parked, so a `block_on` from another
-//! activation on the thread during the park panics as a nested runtime.
+//! [`unpark`] from a later activation (a host callback entering tokio). Both
+//! the runtime driver and the thread parker behind `blocking_recv` and
+//! friends park through here, so neither needs the `rt` feature. The runtime
+//! stays entered while parked, so a `block_on` from another activation on the
+//! thread during the park panics as a nested runtime.
 
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -26,15 +28,34 @@ use std::time::Duration;
 // them. Hosts without an immediate keep the clamped timeout. Timeouts above
 // the host's 32-bit millisecond limit would be clamped to one, so they are
 // capped; a spurious resume at the cap re-parks.
+//
+// A slot is only removed by its own `wake`. A park whose suspension failed
+// (see `SuspendError` below) leaves its timer pending, and the slot id (the
+// parker's address) may be reused before that fires; the stale timer must not
+// remove the successor's entry.
 #[allow(non_upper_case_globals)]
 #[no_mangle]
 #[used]
-static __em_js____asyncjs__tokio_jspi_park: [u8; 508] = *b"(id, ms)<::>{ return Asyncify.handleAsync(async () => { const parks = Module.tokioParks || (Module.tokioParks = new Map()); await new Promise((resolve) => { const immediate = ms === 0 && typeof setImmediate == 'function'; const done = () => { parks.delete(id); resolve(); }; const timer = ms < 0 ? undefined : immediate ? setImmediate(done) : setTimeout(done, Math.min(ms, 0x7fffffff)); parks.set(id, () => { if (timer !== undefined) (immediate ? clearImmediate : clearTimeout)(timer); done(); }); }); }); }\0";
+static __em_js____asyncjs__tokio_jspi_park: [u8; 555] = *b"(id, ms)<::>{ \
+    return Asyncify.handleAsync(async () => { \
+      const parks = Module.tokioParks || (Module.tokioParks = new Map()); \
+      await new Promise((resolve) => { \
+        const immediate = ms === 0 && typeof setImmediate == 'function'; \
+        const done = () => { if (parks.get(id) === wake) parks.delete(id); resolve(); }; \
+        const timer = ms < 0 ? undefined : immediate ? setImmediate(done) : setTimeout(done, Math.min(ms, 0x7fffffff)); \
+        const wake = () => { if (timer !== undefined) (immediate ? clearImmediate : clearTimeout)(timer); done(); }; \
+        parks.set(id, wake); \
+      }); \
+    }); \
+  }\0";
 
 #[allow(non_upper_case_globals)]
 #[no_mangle]
 #[used]
-static __em_js__tokio_jspi_unpark: [u8; 91] = *b"(id)<::>{ const wake = Module.tokioParks && Module.tokioParks.get(id); if (wake) wake(); }\0";
+static __em_js__tokio_jspi_unpark: [u8; 91] = *b"(id)<::>{ \
+    const wake = Module.tokioParks && Module.tokioParks.get(id); \
+    if (wake) wake(); \
+  }\0";
 
 extern "C" {
     /// Reports the `ASYNCIFY` build mode: 0 = none, 1 = legacy `Asyncify`,
@@ -44,9 +65,14 @@ extern "C" {
 
 #[link(wasm_import_module = "env")]
 extern "C-unwind" {
-    // Suspending import: parks on the slot for `id`. Unit return, never
-    // rejects, `Asyncify.handleAsync` keeps the runtime alive across the
-    // suspension.
+    // Suspending import: parks on the slot for `id`. Unit return.
+    // `Asyncify.handleAsync` keeps the runtime alive across the suspension.
+    //
+    // Suspension needs a `WebAssembly.promising` activation on the stack.
+    // From any other activation (a plain host callback into the module) the
+    // engine throws `WebAssembly.SuspendError` out of this import instead. It
+    // is a foreign exception to Rust: drops run as it unwinds, `catch_unwind`
+    // does not catch it, and it aborts at the first `extern "C"` frame.
     #[link_name = "__asyncjs__tokio_jspi_park"]
     fn tokio_jspi_park_import(id: usize, ms: f64);
 
@@ -71,14 +97,12 @@ pub(crate) fn park(id: usize, dur: Option<Duration>) {
     // thread's locals but is not on the runtime: with the scheduler context
     // left set, its wakes would take the on-runtime shortcut and never
     // unpark.
-    super::CONTEXT.with(|c| {
-        let scheduler = c.scheduler.inner.replace(std::ptr::null());
-        // SAFETY: the import takes plain scalars and returns nothing. Under
-        // `-sJSPI` it suspends this activation; the caller has checked
-        // `jspi_enabled`.
-        unsafe { tokio_jspi_park_import(id, ms) }
-        c.scheduler.inner.set(scheduler);
-    });
+    #[cfg(feature = "rt")]
+    let _scheduler = crate::runtime::context::clear_scheduler();
+    // SAFETY: the import takes plain scalars and returns nothing. Under
+    // `-sJSPI` it suspends this activation; the caller has checked
+    // `jspi_enabled`.
+    unsafe { tokio_jspi_park_import(id, ms) }
 }
 
 /// Resume the activation parked under `id`, if any.

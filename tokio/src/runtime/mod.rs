@@ -418,6 +418,9 @@ pub(crate) mod context;
 
 pub(crate) mod park;
 
+#[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+pub(crate) mod jspi;
+
 pub(crate) mod driver;
 
 pub(crate) mod scheduler;
