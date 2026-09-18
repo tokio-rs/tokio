@@ -186,7 +186,9 @@ impl Shared {
         self.after_turn(busy);
         ret.unwrap_or_else(|| {
             panic!(
-                "`LocalEventLoop::block_on` cannot wait: the future is still pending                  with no ready work, and its wait belongs to the host event loop, so                  nothing could wake it from here"
+                "`LocalEventLoop::block_on` cannot wait: the future is still pending \
+                 with no ready work, and its wait belongs to the host event loop, so \
+                 nothing could wake it from here"
             )
         })
     }
