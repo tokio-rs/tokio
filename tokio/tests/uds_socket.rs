@@ -3,6 +3,7 @@
 #![cfg(unix)]
 
 use futures::future::try_join;
+#[cfg(not(target_os = "emscripten"))]
 use std::io;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -11,6 +12,7 @@ use tokio::{
 
 #[tokio::test]
 #[cfg_attr(miri, ignore)] // No Unix domain sockets in miri.
+#[cfg(not(target_os = "emscripten"))] // No datagram AF_UNIX on emscripten's node backend.
 async fn datagram_echo_server() -> io::Result<()> {
     let dir = tempfile::tempdir().unwrap();
     let server_path = dir.path().join("server.sock");
@@ -73,6 +75,9 @@ async fn listen_and_stream() -> std::io::Result<()> {
 
     let ((mut server, _), mut client) = try_join(accept, connect).await?;
 
+    // A bound client's source path only propagates to the peer once node's
+    // `net.BoundSocket` supports AF_UNIX paths (nodejs/node#64399).
+    #[cfg(not(target_os = "emscripten"))]
     assert_eq!(
         server.peer_addr().unwrap().as_pathname().unwrap(),
         &peer_path
@@ -93,6 +98,7 @@ async fn listen_and_stream() -> std::io::Result<()> {
 
 #[tokio::test]
 #[cfg_attr(miri, ignore)] // No Unix domain sockets in miri.
+#[cfg(not(target_os = "emscripten"))] // Exercises datagram AF_UNIX, absent on emscripten.
 async fn assert_usage() -> std::io::Result<()> {
     let datagram_socket = UnixSocket::new_datagram()?;
     let result = datagram_socket

@@ -46,6 +46,7 @@ test_accept! {
     // requiring a worker thread, so this test could be ungated if/when that's
     // implemented.
     #[cfg_attr(target_os = "wasi", ignore = "net::lookup_host requires multithreading, which WASI does not yet support")]
+    #[cfg_attr(target_os = "emscripten", ignore = "emscripten resolves `localhost` to a synthetic address, which cannot be bound")]
     (host_str, "localhost:0"),
     (socket_addr, "127.0.0.1:0".parse::<SocketAddr>().unwrap()),
     (str_port_tuple, ("127.0.0.1", 0)),

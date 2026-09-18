@@ -102,6 +102,8 @@ fn timeout_elapses_without_jspi() {
     assert!(res.is_err());
 }
 
+// With `net` the wait is a real `epoll_wait`, which a socket could wake.
+#[cfg(not(feature = "net"))]
 #[test]
 fn wait_without_a_deadline_needs_jspi() {
     // A oneshot sent from a host callback: the only wake is an unpark from a
@@ -125,6 +127,7 @@ fn wait_without_a_deadline_needs_jspi() {
     }
 }
 
+#[cfg(not(feature = "net"))]
 extern "C" {
     fn emscripten_async_call(
         func: extern "C" fn(*mut std::ffi::c_void),
@@ -134,6 +137,7 @@ extern "C" {
 }
 
 /// Run `f` from a fresh wasm activation after a host timeout.
+#[cfg(not(feature = "net"))]
 fn host_callback(millis: i32, f: impl FnOnce() + 'static) {
     extern "C" fn trampoline(arg: *mut std::ffi::c_void) {
         // SAFETY: `arg` is the `Box<Box<dyn FnOnce()>>` leaked below, and
