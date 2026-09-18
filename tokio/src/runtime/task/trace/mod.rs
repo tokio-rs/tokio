@@ -306,10 +306,10 @@ pub(crate) fn trace_leaf(cx: &mut task::Context<'_>) -> Poll<()> {
         };
         leaf_fn(&meta);
 
-        // Returning `Pending` from `trace_leaf` may prevent the calling future
-        // from registering its waker. Wake that future so it can be polled again
-        // outside `trace_with`. As with `yield_now`, defer the wake until the
-        // scheduler regains control.
+        // Callers using `ready!(trace_leaf(cx))` return early on `Pending`,
+        // potentially before registering their waker. Wake that future so it
+        // can be polled again outside `trace_with`. As with `yield_now`, defer
+        // the wake until the scheduler regains control.
         context::with_scheduler(|scheduler| {
             if let Some(scheduler) = scheduler {
                 match scheduler {
