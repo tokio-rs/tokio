@@ -1,7 +1,7 @@
 //! Minimal JSPI primitives for `wasm32-unknown-emscripten`.
 //!
 //! [`park`] suspends the calling activation on a promise held in a per-parker
-//! slot on the JS side, settled by a host timer at the deadline or by
+//! slot on the host side, settled by a host timer at the deadline or by
 //! [`unpark`] from a later activation (a host callback entering tokio). Both
 //! the runtime driver and the thread parker behind `blocking_recv` and
 //! friends park through here, so neither needs the `rt` feature. The runtime
