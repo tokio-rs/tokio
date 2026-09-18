@@ -11,11 +11,11 @@ use super::Shared;
 use crate::runtime::driver::Driver;
 use crate::runtime::Handle;
 
+use std::cell::Cell;
 use std::ffi::c_void;
 use std::io;
 use std::rc::Weak;
-use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::task::{Wake, Waker};
 use std::time::Duration;
 
@@ -46,10 +46,10 @@ extern "C" {
 #[derive(Debug)]
 pub(super) struct Reactor {
     /// The armed deadline's timeout id.
-    deadline: Mutex<Option<i32>>,
+    deadline: Cell<Option<i32>>,
     /// The event loop's hold on the Emscripten runtime: the process lives
     /// while the loop has tasks, as a native one lives while `block_on` runs.
-    held: AtomicBool,
+    held: Cell<bool>,
     #[cfg(feature = "net")]
     epfd: Option<i32>,
 }
@@ -76,8 +76,8 @@ impl Reactor {
         #[cfg(not(feature = "net"))]
         let _ = handle;
         Ok(Reactor {
-            deadline: Mutex::new(None),
-            held: AtomicBool::new(false),
+            deadline: Cell::new(None),
+            held: Cell::new(false),
             #[cfg(feature = "net")]
             epfd,
         })
@@ -104,8 +104,7 @@ impl Reactor {
     /// The runtime owns the timer: a changed or dropped deadline never fires
     /// stale.
     fn arm(&self, handle: &Handle, after: Option<Duration>) {
-        let mut armed = self.deadline.lock().unwrap();
-        if let Some(id) = armed.take() {
+        if let Some(id) = self.deadline.take() {
             // SAFETY: a pending timeout armed below.
             unsafe { emscripten_clear_timeout(id) };
         }
@@ -113,12 +112,14 @@ impl Reactor {
             let ms = after.as_secs_f64() * 1000.0;
             // SAFETY: `user_data` is the driver handle, cleared in `stop`
             // before the runtime drops.
-            *armed = Some(unsafe { emscripten_set_timeout(wake, ms, driver_ptr(handle)) });
+            self.deadline.set(Some(unsafe {
+                emscripten_set_timeout(wake, ms, driver_ptr(handle))
+            }));
         }
     }
 
     fn hold(&self, alive: bool) {
-        if self.held.swap(alive, Relaxed) != alive {
+        if self.held.replace(alive) != alive {
             // SAFETY: Emscripten runtime calls; every push is paired with one
             // pop here.
             unsafe {
@@ -167,10 +168,11 @@ fn next_deadline(_handle: &Handle) -> Option<Duration> {
 /// and let a self-waking task starve them. Pending drives coalesce.
 struct Hosted {
     target: Weak<Shared>,
-    scheduled: AtomicBool,
+    scheduled: Cell<bool>,
 }
 
-// SAFETY: this target has no threads; `Waker` requires the bounds.
+// SAFETY: `Waker` requires the bounds, and this module is compiled only for
+// `not(target_feature = "atomics")`, where the program has a single thread.
 unsafe impl Send for Hosted {}
 unsafe impl Sync for Hosted {}
 
@@ -180,9 +182,15 @@ impl Wake for Hosted {
     }
 
     fn wake_by_ref(self: &Arc<Self>) {
-        if self.scheduled.swap(true, Relaxed) {
+        if self.scheduled.replace(true) {
             return;
         }
+        self.schedule();
+    }
+}
+
+impl Hosted {
+    fn schedule(self: &Arc<Self>) {
         // SAFETY: the `Arc` is reclaimed in `drive`, which the host calls
         // exactly once per immediate.
         unsafe { emscripten_set_immediate(drive, Arc::into_raw(self.clone()) as *mut c_void) };
@@ -190,18 +198,30 @@ impl Wake for Hosted {
 }
 
 unsafe extern "C-unwind" fn drive(user_data: *mut c_void) {
-    // SAFETY: the `Arc<Hosted>` leaked in `wake_by_ref`.
+    // SAFETY: the `Arc<Hosted>` leaked in `schedule`.
     let hosted = unsafe { Arc::from_raw(user_data as *const Hosted) };
+    // A runtime entered on this thread, such as a `block_on` suspended
+    // through JSPI, owns it until it returns: try again next turn.
+    if crate::runtime::context::runtime_entered() {
+        hosted.schedule();
+        return;
+    }
     // Cleared first: a busy drive re-wakes for the next batch.
-    hosted.scheduled.store(false, Relaxed);
-    if let Some(target) = hosted.target.upgrade() {
-        target.drive();
+    hosted.scheduled.set(false);
+    let Some(target) = hosted.target.upgrade() else {
+        return;
+    };
+    // No Rust frame is above this callback to catch a panic (a task panic
+    // under `UnhandledPanic::ShutdownRuntime`); it would unwind into the
+    // host's JavaScript. Abort as an uncaught panic on `main` would.
+    if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| target.drive())).is_err() {
+        std::process::abort();
     }
 }
 
 pub(super) fn hosted_waker(target: Weak<Shared>) -> Waker {
     Waker::from(Arc::new(Hosted {
         target,
-        scheduled: AtomicBool::new(false),
+        scheduled: Cell::new(false),
     }))
 }

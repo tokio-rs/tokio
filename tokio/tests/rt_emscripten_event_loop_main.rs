@@ -50,6 +50,7 @@ mod emscripten {
         Box::leak(Box::new(
             Builder::new_current_thread()
                 .enable_all()
+                .event_interval(4)
                 .build_hosted_local_event_loop(Default::default())
                 .unwrap(),
         ))
@@ -72,6 +73,22 @@ mod emscripten {
         let el_a = event_loop();
         let el_b = event_loop();
         let (tx, rx) = tokio::sync::oneshot::channel::<u32>();
+
+        // A `block_on` that would wait drops its future, and with it the
+        // timer it registered: nothing may stay armed for it, or the process
+        // would live on to that deadline (`rt_emscripten_pre.js` bounds the
+        // run).
+        assert!(el_a
+            .block_on(async { tokio::time::sleep(Duration::from_secs(30)).await })
+            .is_err());
+        run_js("Module.tokioDeadline = Date.now() + 10_000");
+
+        // More spawns than one batch runs: the drive the hosted loop
+        // schedules for the leftovers must run them, or the loop would hold
+        // the runtime alive with nothing armed.
+        for _ in 0..6 {
+            root(el_b, async {});
+        }
 
         root(el_a, async move {
             // A real deadline: only the host timer can resume this.
