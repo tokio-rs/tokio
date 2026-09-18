@@ -139,6 +139,16 @@ impl Inner {
         feature = "rt"
     ))]
     fn park(&self) {
+        self.park_jspi(None);
+    }
+
+    /// Parks the activation until unparked or `dur` elapses, if given.
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        feature = "rt"
+    ))]
+    fn park_jspi(&self, dur: Option<Duration>) {
         // If we were previously notified then we consume this notification and
         // return quickly.
         if self
@@ -149,25 +159,47 @@ impl Inner {
             return;
         }
 
-        // A wait with no deadline can never be woken here: host timers are
-        // the only mid-park wake source, since there is no reactor and every
-        // tokio-internal waker fires during the drive, before the park. Fail
-        // fast instead of deadlocking the host loop.
-        panic!(
-            "cannot block on wasm32-unknown-emscripten: this wait has no \
-             deadline, and host timers are the only mid-park wake source, \
-             so nothing could ever deliver the wake"
-        );
+        // Without JSPI a real wait is impossible: suspending would trap and
+        // busy-waiting would starve the host loop the wake depends on. A
+        // zero-duration park returns immediately as on native.
+        if !crate::runtime::context::jspi::jspi_enabled() {
+            if dur == Some(Duration::ZERO) {
+                return;
+            }
+            panic!(
+                "cannot block on wasm32-unknown-emscripten: this wait would \
+                 suspend on the host event loop, which needs the build to \
+                 link `-sJSPI`"
+            );
+        }
+
+        // Suspend until a host timer fires or a later activation (a host
+        // callback entering tokio) unparks us. A zero-duration park still
+        // takes a host turn so timers and microtasks run mid-drive (the
+        // scheduler's maintenance yield). No threads: nothing runs between
+        // here and the suspension, so an unpark can only land while parked,
+        // where it settles the promise.
+        let old = self.state.swap(PARKED, SeqCst);
+        debug_assert_eq!(old, EMPTY, "inconsistent park state");
+
+        crate::runtime::context::jspi::park(self.id(), dur);
+
+        // Consume any notification delivered during the park so the token
+        // does not leak into the next one.
+        match self.state.swap(EMPTY, SeqCst) {
+            NOTIFIED => {} // got a notification, hurray!
+            PARKED => {}   // timer deadline, alas
+            n => panic!("inconsistent park state: {n}"),
+        }
     }
 
-    /// Consume a pending notification token, if any.
     #[cfg(all(
         target_os = "emscripten",
         not(target_feature = "atomics"),
         feature = "rt"
     ))]
-    fn consume_notified(&self) {
-        let _ = self.state.compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst);
+    fn id(&self) -> usize {
+        self as *const Inner as usize
     }
 
     /// Parks the current thread for at most `dur`.
@@ -226,43 +258,13 @@ impl Inner {
         }
     }
 
-    /// Parks the current thread for at most `dur`.
     #[cfg(all(
         target_os = "emscripten",
         not(target_feature = "atomics"),
         feature = "rt"
     ))]
     fn park_timeout(&self, dur: Duration) {
-        // Consume a pending notification and return quickly.
-        if self
-            .state
-            .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
-            .is_ok()
-        {
-            return;
-        }
-
-        // With JSPI linked the wait is real: suspend on a host timer, then
-        // consume any notification delivered during the sleep so the token
-        // does not leak into the next park. Without it a zero-duration park
-        // is a no-op as on native, and a real wait is impossible, since
-        // suspending would trap and busy-waiting would starve the host loop
-        // the wake depends on.
-        if crate::runtime::context::jspi::jspi_enabled() {
-            // Includes `dur == 0`: a genuine host turn, letting timers
-            // and microtasks run mid-drive (the scheduler's maintenance
-            // yield).
-            crate::runtime::context::jspi::sleep(dur);
-            self.consume_notified();
-        } else if dur == Duration::from_millis(0) {
-            // Native semantics: a zero-duration park returns immediately.
-        } else {
-            panic!(
-                "cannot block on wasm32-unknown-emscripten: this wait has a \
-                 deadline, but suspending on the host event loop needs the \
-                 build to link `-sJSPI`"
-            );
-        }
+        self.park_jspi(Some(dur));
     }
 
     fn unpark(&self) {
@@ -277,6 +279,14 @@ impl Inner {
             PARKED => {}        // gotta go wake someone up
             _ => panic!("inconsistent state in unpark"),
         }
+
+        // The parked activation is suspended in the host; settle its promise.
+        #[cfg(all(
+            target_os = "emscripten",
+            not(target_feature = "atomics"),
+            feature = "rt"
+        ))]
+        crate::runtime::context::jspi::unpark(self.id());
 
         // There is a period between when the parked thread sets `state` to
         // `PARKED` (or last checked `state` in the case of a spurious wake
