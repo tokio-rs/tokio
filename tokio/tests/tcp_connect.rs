@@ -109,6 +109,10 @@ async fn connect_addr_ip_str_slice() {
     target_os = "wasi",
     ignore = "net::lookup_host requires multithreading, which WASI does not yet support"
 )]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "emscripten resolves `localhost` to a synthetic address, which cannot be connected"
+)]
 #[tokio::test]
 async fn connect_addr_host_string() {
     let srv = assert_ok!(TcpListener::bind("127.0.0.1:0").await);
@@ -166,6 +170,10 @@ async fn connect_addr_ip_str_port_tuple() {
 #[cfg_attr(
     target_os = "wasi",
     ignore = "net::lookup_host requires multithreading, which WASI does not yet support"
+)]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "emscripten resolves `localhost` to a synthetic address, which cannot be connected"
 )]
 #[tokio::test]
 async fn connect_addr_host_str_port_tuple() {
