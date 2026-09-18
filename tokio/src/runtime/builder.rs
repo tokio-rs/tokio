@@ -1188,10 +1188,10 @@ impl Builder {
     }
 
     cfg_event_loop! {
-        /// Creates the configured runtime as an [`EventLoop`]: a `current_thread`
-        /// runtime driven by a host event loop instead of by parking a thread.
-        /// The runtime wakes `waker` whenever it has work, and the host calls
-        /// [`EventLoop::drive`] in response.
+        /// Creates the configured runtime as a [`LocalEventLoop`]: a
+        /// [`LocalRuntime`] driven by a host event loop instead of by parking
+        /// a thread. The runtime wakes `waker` whenever it has work, and the
+        /// host calls [`LocalEventLoop::drive`] in response.
         ///
         /// # Panics
         ///
@@ -1203,31 +1203,8 @@ impl Builder {
         /// initialized.
         ///
         /// [`new_multi_thread()`]: Builder::new_multi_thread
-        /// [`EventLoop`]: crate::runtime::EventLoop
-        /// [`EventLoop::drive`]: crate::runtime::EventLoop::drive
-        pub fn build_event_loop(&mut self, waker: std::task::Waker) -> io::Result<crate::runtime::EventLoop> {
-            let runtime = match &self.kind {
-                Kind::CurrentThread => self.build_current_thread_runtime()?,
-                #[cfg(feature = "rt-multi-thread")]
-                Kind::MultiThread => panic!("multi_thread is not supported for EventLoop"),
-            };
-            crate::runtime::EventLoop::new(runtime, waker)
-        }
-
-        /// Creates the configured runtime as a [`LocalEventLoop`]: a
-        /// [`LocalRuntime`] driven by a host event loop. See
-        /// [`build_event_loop`](Self::build_event_loop).
-        ///
-        /// # Panics
-        ///
-        /// This will panic if the runtime is configured with [`new_multi_thread()`].
-        ///
-        /// # Errors
-        ///
-        /// As [`build_event_loop`](Self::build_event_loop).
-        ///
-        /// [`new_multi_thread()`]: Builder::new_multi_thread
         /// [`LocalEventLoop`]: crate::runtime::LocalEventLoop
+        /// [`LocalEventLoop::drive`]: crate::runtime::LocalEventLoop::drive
         pub fn build_local_event_loop(
             &mut self,
             options: LocalOptions,
