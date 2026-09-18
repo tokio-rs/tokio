@@ -1,7 +1,7 @@
 //! JSPI suspension contracts. With `-sJSPI` a would-block wait suspends the
 //! activation until a host timer fires or a later activation unparks it;
-//! without it the wait panics (see `rt_emscripten_block_on`). Only the JSPI
-//! CI lane runs this file.
+//! without it the wait panics (see `rt_emscripten_block_on`), so every test
+//! here returns early unless the build linked JSPI.
 //!
 //! NOTE: This is the only Emscripten test file with real timer tests.
 
@@ -25,6 +25,24 @@ fn rt() -> tokio::runtime::Runtime {
     Builder::new_current_thread().enable_all().build().unwrap()
 }
 
+extern "C" {
+    /// Emscripten's `ASYNCIFY` build mode; 2 is JSPI.
+    fn emscripten_has_asyncify() -> i32;
+}
+
+fn jspi_linked() -> bool {
+    // SAFETY: an Emscripten libc query with no arguments and no side effects.
+    unsafe { emscripten_has_asyncify() == 2 }
+}
+
+macro_rules! require_jspi {
+    () => {
+        if !jspi_linked() {
+            return;
+        }
+    };
+}
+
 fn is_nested_runtime_panic(e: &Box<dyn std::any::Any + Send>) -> bool {
     e.downcast_ref::<&str>()
         .map(|m| m.contains("Cannot start a runtime from within a runtime"))
@@ -33,6 +51,7 @@ fn is_nested_runtime_panic(e: &Box<dyn std::any::Any + Send>) -> bool {
 
 #[test]
 fn nested_block_on_still_panics() {
+    require_jspi!();
     if cfg!(not(panic = "unwind")) {
         return;
     }
@@ -49,6 +68,7 @@ fn nested_block_on_still_panics() {
 
 #[test]
 fn block_on_yield_now_takes_a_host_turn() {
+    require_jspi!();
     let out = rt().block_on(async {
         tokio::task::yield_now().await;
         7
@@ -58,6 +78,7 @@ fn block_on_yield_now_takes_a_host_turn() {
 
 #[tokio::test]
 async fn root_sleep_parks_and_resumes() {
+    require_jspi!();
     let start = tokio::time::Instant::now();
     tokio::time::sleep(Duration::from_millis(20)).await;
     assert!(
@@ -68,6 +89,7 @@ async fn root_sleep_parks_and_resumes() {
 
 #[tokio::test]
 async fn root_spawned_tasks_with_timers() {
+    require_jspi!();
     let out = async {
         let a = tokio::spawn(async {
             tokio::time::sleep(Duration::from_millis(5)).await;
@@ -85,6 +107,7 @@ async fn root_spawned_tasks_with_timers() {
 
 #[tokio::test]
 async fn sequential_parks_inside_one_root() {
+    require_jspi!();
     // Each park must suspend and resume independently; leaf bookkeeping
     // must balance across them.
     for i in 0..3u32 {
@@ -96,6 +119,7 @@ async fn sequential_parks_inside_one_root() {
 
 #[tokio::test]
 async fn root_park_resumes_on_timer_driven_wake() {
+    require_jspi!();
     // The spawned task's timer bounds the driver park; on resume it sends
     // and wakes the root future.
     let (tx, rx) = tokio::sync::oneshot::channel::<u32>();
@@ -131,6 +155,7 @@ fn host_callback(millis: i32, f: impl FnOnce() + 'static) {
 // activation is parked with no deadline; its send must resume the park.
 #[test]
 fn host_activation_wakes_park_without_deadline() {
+    require_jspi!();
     let (tx, mut rx) = tokio::sync::mpsc::channel::<u32>(1);
     host_callback(10, move || tx.try_send(11).unwrap());
     let out = rt().block_on(async { rx.recv().await.unwrap() });
@@ -141,6 +166,7 @@ fn host_activation_wakes_park_without_deadline() {
 // it at once rather than at that deadline.
 #[test]
 fn host_activation_wakes_timed_park_early() {
+    require_jspi!();
     let (tx, mut rx) = tokio::sync::mpsc::channel::<u32>(1);
     host_callback(10, move || tx.try_send(11).unwrap());
     let start = Instant::now();
@@ -157,6 +183,7 @@ fn host_activation_wakes_timed_park_early() {
 // A spawned task woken from a host activation, with the root awaiting it.
 #[test]
 fn host_activation_wakes_spawned_task() {
+    require_jspi!();
     let notify = Arc::new(Notify::new());
     let n = notify.clone();
     host_callback(10, move || n.notify_one());
@@ -175,6 +202,7 @@ fn host_activation_wakes_spawned_task() {
 // event-interval park yields a 0ms host turn so the timer still fires.
 #[tokio::test]
 async fn greedy_task_does_not_starve_host_timer() {
+    require_jspi!();
     tokio::spawn(async {
         loop {
             tokio::task::yield_now().await;
@@ -187,6 +215,7 @@ async fn greedy_task_does_not_starve_host_timer() {
 // farther timer rather than dropping it.
 #[tokio::test]
 async fn farther_timer_survives_nearer_timer_firing() {
+    require_jspi!();
     let start = Instant::now();
 
     let notify = Arc::new(Notify::new());
