@@ -1270,6 +1270,11 @@ impl<'a> SemaphorePermit<'a> {
         })
     }
 
+    /// Returns the [`Semaphore`] from which this permit was acquired.
+    pub fn semaphore(&self) -> &Semaphore {
+        self.sem
+    }
+
     /// Returns the number of permits held by `self`.
     pub fn num_permits(&self) -> usize {
         self.permits
