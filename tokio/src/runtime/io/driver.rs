@@ -106,7 +106,6 @@ pub(super) enum Tick {
 
 const TOKEN_WAKEUP: mio::Token = mio::Token(0);
 const TOKEN_SIGNAL: mio::Token = mio::Token(1);
-const TOKEN_EVENT_LOOP_TIMER: mio::Token = mio::Token(2);
 
 fn _assert_kinds() {
     fn _assert<T: Send + Sync>() {}
@@ -227,9 +226,6 @@ impl Driver {
 
             if token == TOKEN_WAKEUP {
                 // Nothing to do, the event is used to unblock the I/O driver
-            } else if token == TOKEN_EVENT_LOOP_TIMER {
-                // The event loop's deadline: the time driver's turn processes
-                // it, and the next drive re-programs the descriptor.
             } else if token == TOKEN_SIGNAL {
                 self.signal_ready = true;
             } else {
@@ -285,29 +281,6 @@ impl fmt::Debug for Driver {
 }
 
 impl Handle {
-    cfg_event_loop! {
-        /// The reactor's own descriptor (the `epoll` or `kqueue` instance),
-        /// readable when it has ready events.
-        pub(crate) fn registry_raw_fd(&self) -> std::os::fd::RawFd {
-            use std::os::fd::AsRawFd;
-            self.registry.as_raw_fd()
-        }
-    }
-
-    /// Registers an event loop's timer descriptor with the reactor.
-    #[cfg(all(
-        tokio_unstable,
-        feature = "rt",
-        any(target_os = "linux", target_os = "android")
-    ))]
-    pub(crate) fn register_event_loop_timer(&self, fd: std::os::fd::RawFd) -> io::Result<()> {
-        self.registry.register(
-            &mut mio::unix::SourceFd(&fd),
-            TOKEN_EVENT_LOOP_TIMER,
-            mio::Interest::READABLE,
-        )
-    }
-
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
     /// makes the next call to `turn` return immediately.
     ///

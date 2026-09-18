@@ -1190,12 +1190,8 @@ impl Builder {
     cfg_event_loop! {
         /// Creates the configured runtime as an [`EventLoop`]: a `current_thread`
         /// runtime driven by a host event loop instead of by parking a thread.
-        /// The host watches the event loop's descriptor and calls
-        /// [`EventLoop::drive`] when it is readable.
-        ///
-        /// The I/O driver must be enabled ([`enable_io`]): the reactor's
-        /// descriptor is what the host watches. With the time driver enabled,
-        /// the platform must provide a timer descriptor (Linux `timerfd`).
+        /// The runtime wakes `waker` whenever it has work, and the host calls
+        /// [`EventLoop::drive`] in response.
         ///
         /// # Panics
         ///
@@ -1203,22 +1199,19 @@ impl Builder {
         ///
         /// # Errors
         ///
-        /// Returns an error if the I/O driver is disabled, if the platform has no
-        /// timer descriptor and the time driver is enabled, or if OS resources
-        /// required by the runtime cannot be initialized.
+        /// Returns an error if OS resources required by the runtime cannot be
+        /// initialized.
         ///
         /// [`new_multi_thread()`]: Builder::new_multi_thread
-        /// [`enable_io`]: Builder::enable_io
         /// [`EventLoop`]: crate::runtime::EventLoop
         /// [`EventLoop::drive`]: crate::runtime::EventLoop::drive
-        pub fn build_event_loop(&mut self) -> io::Result<crate::runtime::EventLoop> {
-            self.check_event_loop_cfg()?;
+        pub fn build_event_loop(&mut self, waker: std::task::Waker) -> io::Result<crate::runtime::EventLoop> {
             let runtime = match &self.kind {
                 Kind::CurrentThread => self.build_current_thread_runtime()?,
                 #[cfg(feature = "rt-multi-thread")]
                 Kind::MultiThread => panic!("multi_thread is not supported for EventLoop"),
             };
-            crate::runtime::EventLoop::new(runtime)
+            crate::runtime::EventLoop::new(runtime, waker)
         }
 
         /// Creates the configured runtime as a [`LocalEventLoop`]: a
@@ -1238,20 +1231,10 @@ impl Builder {
         pub fn build_local_event_loop(
             &mut self,
             options: LocalOptions,
+            waker: std::task::Waker,
         ) -> io::Result<crate::runtime::LocalEventLoop> {
-            self.check_event_loop_cfg()?;
             let runtime = self.build_local(options)?;
-            crate::runtime::LocalEventLoop::new(runtime)
-        }
-
-        fn check_event_loop_cfg(&self) -> io::Result<()> {
-            if !self.enable_io {
-                return Err(io::Error::new(
-                    io::ErrorKind::Unsupported,
-                    "an event loop needs the I/O driver: its descriptor is what the host watches",
-                ));
-            }
-            Ok(())
+            crate::runtime::LocalEventLoop::new(runtime, waker)
         }
     }
 
