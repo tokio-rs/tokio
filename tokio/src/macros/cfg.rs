@@ -634,8 +634,8 @@ macro_rules! cfg_unstable {
     };
 }
 
-/// `EventLoop`: the runtime driven from a host loop, under `tokio_unstable`.
-/// Its driver parks on a thread of its own.
+/// `LocalEventLoop`: the runtime driven from a host loop, under
+/// `tokio_unstable`. Its driver parks on a thread of its own.
 macro_rules! cfg_event_loop {
     ($($item:item)*) => {
         $(
