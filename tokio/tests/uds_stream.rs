@@ -433,7 +433,9 @@ async fn try_read_buf() -> std::io::Result<()> {
 
 // https://github.com/tokio-rs/tokio/issues/3879
 #[tokio::test]
-#[cfg(not(target_os = "macos"))]
+// emscripten's node-backed AF_UNIX inherits BSD accept-queue semantics (a
+// queued connection survives the listener close), same as macOS.
+#[cfg(not(any(target_os = "macos", target_os = "emscripten")))]
 async fn epollhup() -> io::Result<()> {
     let dir = tempfile::Builder::new()
         .prefix("tokio-uds-tests")
