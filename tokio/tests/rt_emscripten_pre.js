@@ -6,6 +6,15 @@
 // A binary that sets `Module.tokioExpectDone` must also set `Module.tokioDone`
 // before the runtime exits: an event loop that stops holding the runtime too
 // early exits cleanly with its roots unfinished.
+// Immediates scheduled since load, for tests that bound them.
+Module.tokioImmediates = 0;
+if (globalThis.setImmediate) {
+  const setImmediateHost = globalThis.setImmediate;
+  globalThis.setImmediate = (...args) => {
+    Module.tokioImmediates++;
+    return setImmediateHost(...args);
+  };
+}
 var tokioRuntimeExited = false;
 Module['onExit'] = () => { tokioRuntimeExited = true; };
 process.on('exit', (code) => {

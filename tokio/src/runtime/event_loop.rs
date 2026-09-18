@@ -58,14 +58,13 @@ use std::thread::ThreadId;
 /// `LocalRuntime` does. The waker may be woken once more during the drop.
 ///
 /// On `wasm32-unknown-emscripten` without threads, a *hosted* event loop
-/// ([`Builder::build_hosted_local_event_loop`]) needs no waker: the
-/// JavaScript host loop drives it, so the program spawns and returns to the
-/// host. Such a loop keeps the Emscripten runtime alive while it has tasks.
-/// A [`Handle::block_on`] suspended through JSPI on the same thread defers
+/// (`Builder::build_hosted_local_event_loop`) needs no waker: the JavaScript
+/// host loop drives it, so the program spawns and returns to the host. Such
+/// a loop keeps the Emscripten runtime alive while it has tasks. A
+/// [`Handle::block_on`] suspended through JSPI on the same thread defers
 /// hosted drives until it returns, and timers it registers itself are armed
 /// only by the next drive.
 ///
-/// [`Builder::build_hosted_local_event_loop`]: crate::runtime::Builder::build_hosted_local_event_loop
 /// [`Builder::build_local_event_loop`]: crate::runtime::Builder::build_local_event_loop
 /// [`Handle::block_on`]: crate::runtime::Handle::block_on
 #[derive(Debug)]
@@ -170,6 +169,7 @@ impl Shared {
         shared.handle.inner.driver().set_host(waker);
         let reactor = Reactor::start(&shared)?;
         let _ = shared.reactor.set(reactor);
+        shared.reactor.get().expect("just set").attach()?;
         Ok(shared)
     }
 

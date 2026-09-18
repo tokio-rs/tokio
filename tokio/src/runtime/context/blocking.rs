@@ -30,18 +30,6 @@ pub(crate) fn try_enter_blocking_region() -> Option<BlockingRegionGuard> {
         .unwrap_or_else(|_| Some(BlockingRegionGuard::new()))
 }
 
-/// Whether a runtime is entered on this thread.
-#[cfg(all(
-    tokio_unstable,
-    target_os = "emscripten",
-    not(target_feature = "atomics")
-))]
-pub(crate) fn runtime_entered() -> bool {
-    CONTEXT
-        .try_with(|c| c.runtime.get().is_entered())
-        .unwrap_or(false)
-}
-
 /// Disallows blocking in the current runtime context until the guard is dropped.
 pub(crate) fn disallow_block_in_place() -> DisallowBlockInPlaceGuard {
     let reset = CONTEXT.try_with(|c| {

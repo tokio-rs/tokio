@@ -14,7 +14,7 @@ use crate::runtime::Handle;
 use std::cell::Cell;
 use std::ffi::c_void;
 use std::io;
-use std::rc::Weak;
+use std::rc::{Rc, Weak};
 use std::sync::Arc;
 use std::task::{Wake, Waker};
 use std::time::Duration;
@@ -43,8 +43,13 @@ extern "C" {
 }
 
 /// The host loop's callbacks into the runtime, and what they hold.
+///
+/// Both callbacks land in [`wake`] with the `Reactor` as their argument; it
+/// lives in the event loop's shared state, which unregisters them in `stop`
+/// before it drops.
 #[derive(Debug)]
 pub(super) struct Reactor {
+    shared: Weak<Shared>,
     /// The armed deadline's timeout id.
     deadline: Cell<Option<i32>>,
     /// The event loop's hold on the Emscripten runtime: the process lives
@@ -52,35 +57,38 @@ pub(super) struct Reactor {
     held: Cell<bool>,
     #[cfg(feature = "net")]
     epfd: Option<i32>,
+    /// Whether the readiness listener is registered.
+    #[cfg(feature = "net")]
+    listening: Cell<bool>,
 }
 
 impl Reactor {
-    pub(super) fn start(shared: &Shared) -> io::Result<Reactor> {
-        let handle = &shared.handle;
-        #[cfg(feature = "net")]
-        let epfd = handle
-            .inner
-            .driver()
-            .io
-            .as_ref()
-            .map(|io| io.registry_raw_fd());
-        #[cfg(feature = "net")]
-        if let Some(epfd) = epfd {
-            // SAFETY: the reactor's live epoll fd; `user_data` is the driver
-            // handle, which outlives the listener (removed in `stop`).
-            let rc = unsafe { emscripten_epoll_add_listener(epfd, wake, driver_ptr(handle)) };
-            if rc != 0 {
-                return Err(io::Error::from_raw_os_error(rc));
-            }
-        }
-        #[cfg(not(feature = "net"))]
-        let _ = handle;
-        Ok(Reactor {
+    pub(super) fn start(shared: &Rc<Shared>) -> io::Result<Reactor> {
+        let reactor = Reactor {
+            shared: Rc::downgrade(shared),
             deadline: Cell::new(None),
             held: Cell::new(false),
             #[cfg(feature = "net")]
-            epfd,
-        })
+            epfd: shared
+                .handle
+                .inner
+                .driver()
+                .io
+                .as_ref()
+                .map(|io| io.registry_raw_fd()),
+            #[cfg(feature = "net")]
+            listening: Cell::new(false),
+        };
+        // The listener's argument is this `Reactor`'s final address in the
+        // shared state; `Shared::new` moves it there before returning.
+        Ok(reactor)
+    }
+
+    /// Registers the host callbacks, once the `Reactor` is in place.
+    pub(super) fn attach(&self) -> io::Result<()> {
+        #[cfg(feature = "net")]
+        self.listen(true)?;
+        Ok(())
     }
 
     /// Arm the host timer for the soonest deadline, and hold the runtime
@@ -94,11 +102,35 @@ impl Reactor {
         self.arm(handle, None);
         self.hold(false);
         #[cfg(feature = "net")]
-        if let Some(epfd) = self.epfd {
-            // SAFETY: the listener added in `start`, on the still-open fd.
-            unsafe { emscripten_epoll_remove_listener(epfd, wake) };
-        }
+        let _ = self.listen(false);
         None
+    }
+
+    /// Adds or removes the readiness listener on the reactor's epoll set. The
+    /// listener fires every host turn while the set has uncollected events,
+    /// so it is removed while a drive cannot run (see [`wake`]).
+    #[cfg(feature = "net")]
+    fn listen(&self, on: bool) -> io::Result<()> {
+        let Some(epfd) = self.epfd else {
+            return Ok(());
+        };
+        if self.listening.replace(on) == on {
+            return Ok(());
+        }
+        let this = self as *const Reactor as *mut c_void;
+        // SAFETY: the reactor's live epoll fd; `user_data` is this `Reactor`,
+        // which removes the listener in `stop` before the loop drops.
+        let rc = unsafe {
+            if on {
+                emscripten_epoll_add_listener(epfd, wake, this)
+            } else {
+                emscripten_epoll_remove_listener(epfd, wake)
+            }
+        };
+        if rc != 0 {
+            return Err(io::Error::from_raw_os_error(rc));
+        }
+        Ok(())
     }
 
     /// The runtime owns the timer: a changed or dropped deadline never fires
@@ -110,12 +142,13 @@ impl Reactor {
         }
         if let Some(after) = after {
             let ms = after.as_secs_f64() * 1000.0;
-            // SAFETY: `user_data` is the driver handle, cleared in `stop`
-            // before the runtime drops.
-            self.deadline.set(Some(unsafe {
-                emscripten_set_timeout(wake, ms, driver_ptr(handle))
-            }));
+            let this = self as *const Reactor as *mut c_void;
+            // SAFETY: `user_data` is this `Reactor`, which clears the
+            // timeout in `stop` before the loop drops.
+            self.deadline
+                .set(Some(unsafe { emscripten_set_timeout(wake, ms, this) }));
         }
+        let _ = handle;
     }
 
     fn hold(&self, alive: bool) {
@@ -131,18 +164,40 @@ impl Reactor {
             }
         }
     }
-}
 
-fn driver_ptr(handle: &Handle) -> *mut c_void {
-    handle.inner.driver() as *const crate::runtime::driver::Handle as *mut c_void
+    fn wake_host(&self) {
+        if let Some(shared) = self.shared.upgrade() {
+            shared.handle.inner.driver().wake_host();
+        }
+    }
 }
 
 /// Readiness or a deadline: the host should drive.
+///
+/// While a runtime is entered on this thread (a `block_on` suspended through
+/// JSPI) no drive can run, and the readiness listener would otherwise fire
+/// every host turn until the events are collected. The listener comes off
+/// until that runtime exits; then it is restored and the host woken.
 unsafe extern "C-unwind" fn wake(user_data: *mut c_void) {
-    // SAFETY: `user_data` is the driver handle armed by `Reactor`, which
-    // unregisters both callbacks before the runtime drops.
-    let driver = unsafe { &*(user_data as *const crate::runtime::driver::Handle) };
-    driver.wake_host();
+    // SAFETY: `user_data` is the `Reactor` that armed this callback, alive
+    // until `stop` unregisters it.
+    let reactor = unsafe { &*(user_data as *const Reactor) };
+    let shared = reactor.shared.clone();
+    let deferred = crate::runtime::context::defer_after_runtime_exit(move || {
+        if let Some(shared) = shared.upgrade() {
+            if let Some(reactor) = shared.reactor.get() {
+                #[cfg(feature = "net")]
+                let _ = reactor.listen(true);
+                reactor.wake_host();
+            }
+        }
+    });
+    if deferred {
+        #[cfg(feature = "net")]
+        let _ = reactor.listen(false);
+        return;
+    }
+    reactor.wake_host();
 }
 
 #[cfg(feature = "time")]
@@ -201,21 +256,28 @@ unsafe extern "C-unwind" fn drive(user_data: *mut c_void) {
     // SAFETY: the `Arc<Hosted>` leaked in `schedule`.
     let hosted = unsafe { Arc::from_raw(user_data as *const Hosted) };
     // A runtime entered on this thread, such as a `block_on` suspended
-    // through JSPI, owns it until it returns: try again next turn.
-    if crate::runtime::context::runtime_entered() {
-        hosted.schedule();
-        return;
+    // through JSPI, owns it until it returns; the drive is rescheduled at
+    // its exit, with the wake still pending so it coalesces meanwhile.
+    let again = hosted.clone();
+    if !crate::runtime::context::defer_after_runtime_exit(move || again.schedule()) {
+        hosted.run();
     }
-    // Cleared first: a busy drive re-wakes for the next batch.
-    hosted.scheduled.set(false);
-    let Some(target) = hosted.target.upgrade() else {
-        return;
-    };
-    // No Rust frame is above this callback to catch a panic (a task panic
-    // under `UnhandledPanic::ShutdownRuntime`); it would unwind into the
-    // host's JavaScript. Abort as an uncaught panic on `main` would.
-    if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| target.drive())).is_err() {
-        std::process::abort();
+}
+
+impl Hosted {
+    fn run(self: Arc<Self>) {
+        // Cleared first: a busy drive re-wakes for the next batch.
+        self.scheduled.set(false);
+        let Some(target) = self.target.upgrade() else {
+            return;
+        };
+        // No Rust frame is above the host's callback to catch a panic (a
+        // task panic under `UnhandledPanic::ShutdownRuntime`); it would
+        // unwind into the host's JavaScript. Abort as an uncaught panic on
+        // `main` would.
+        if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| target.drive())).is_err() {
+            std::process::abort();
+        }
     }
 }
 
