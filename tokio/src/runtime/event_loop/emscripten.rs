@@ -114,7 +114,7 @@ impl Reactor {
         let Some(epfd) = self.epfd else {
             return Ok(());
         };
-        if self.listening.replace(on) == on {
+        if self.listening.get() == on {
             return Ok(());
         }
         let this = self as *const Reactor as *mut c_void;
@@ -130,6 +130,7 @@ impl Reactor {
         if rc != 0 {
             return Err(io::Error::from_raw_os_error(rc));
         }
+        self.listening.set(on);
         Ok(())
     }
 
@@ -183,7 +184,7 @@ unsafe extern "C-unwind" fn wake(user_data: *mut c_void) {
     // until `stop` unregisters it.
     let reactor = unsafe { &*(user_data as *const Reactor) };
     let shared = reactor.shared.clone();
-    let deferred = crate::runtime::context::defer_after_runtime_exit(move || {
+    let deferred = crate::runtime::jspi::defer_after_runtime_exit(move || {
         if let Some(shared) = shared.upgrade() {
             if let Some(reactor) = shared.reactor.get() {
                 #[cfg(feature = "net")]
@@ -259,7 +260,7 @@ unsafe extern "C-unwind" fn drive(user_data: *mut c_void) {
     // through JSPI, owns it until it returns; the drive is rescheduled at
     // its exit, with the wake still pending so it coalesces meanwhile.
     let again = hosted.clone();
-    if !crate::runtime::context::defer_after_runtime_exit(move || again.schedule()) {
+    if !crate::runtime::jspi::defer_after_runtime_exit(move || again.schedule()) {
         hosted.run();
     }
 }

@@ -27,6 +27,15 @@ pub(crate) struct EnterRuntimeGuard {
 
     // Tracks the previous random number generator seed
     old_seed: RngSeed,
+
+    /// Runs work deferred to the runtime's exit; last, so it drops after
+    /// `handle` and that work sees no runtime as current.
+    #[cfg(all(
+        tokio_unstable,
+        target_os = "emscripten",
+        not(target_feature = "atomics")
+    ))]
+    _exit: crate::runtime::jspi::RuntimeExit,
 }
 
 /// Marks the current thread as being within the dynamic extent of an
@@ -57,6 +66,12 @@ where
                 blocking: BlockingRegionGuard::new(),
                 handle: c.set_current(handle),
                 old_seed,
+                #[cfg(all(
+                    tokio_unstable,
+                    target_os = "emscripten",
+                    not(target_feature = "atomics")
+                ))]
+                _exit: crate::runtime::jspi::RuntimeExit,
             })
         }
     });
@@ -90,44 +105,19 @@ impl Drop for EnterRuntimeGuard {
             rng.replace_seed(self.old_seed.clone());
             c.rng.set(Some(rng));
         });
-        #[cfg(all(
-            tokio_unstable,
-            target_os = "emscripten",
-            not(target_feature = "atomics")
-        ))]
-        for f in AFTER_EXIT.take() {
-            f();
-        }
     }
 }
 
+/// Whether a runtime is entered on this thread.
 #[cfg(all(
     tokio_unstable,
     target_os = "emscripten",
     not(target_feature = "atomics")
 ))]
-std::thread_local! {
-    /// Work for the moment no runtime is entered on this thread. A hosted
-    /// event loop's drive arriving while a `block_on` is suspended through
-    /// JSPI waits here rather than polling for the exit.
-    static AFTER_EXIT: std::cell::RefCell<Vec<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(Vec::new()) };
-}
-
-/// If a runtime is entered on this thread, queues `f` to run once it exits
-/// and returns `true`; otherwise returns `false` without running it.
-#[cfg(all(
-    tokio_unstable,
-    target_os = "emscripten",
-    not(target_feature = "atomics")
-))]
-pub(crate) fn defer_after_runtime_exit(f: impl FnOnce() + 'static) -> bool {
-    let entered = CONTEXT
+pub(crate) fn is_entered() -> bool {
+    CONTEXT
         .try_with(|c| c.runtime.get().is_entered())
-        .unwrap_or(false);
-    if entered {
-        AFTER_EXIT.with(|q| q.borrow_mut().push(Box::new(f)));
-    }
-    entered
+        .unwrap_or(false)
 }
 
 impl EnterRuntime {
