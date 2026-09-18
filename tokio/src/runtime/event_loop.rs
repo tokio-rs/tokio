@@ -1,61 +1,51 @@
-//! A `current_thread` runtime whose wait is a host event loop.
+//! A `current_thread` runtime whose wait belongs to a host event loop.
 //!
 //! The scheduler drives to a fixed point, then waits. A native runtime waits
-//! by parking the thread in the reactor; an event loop instead returns to the
-//! host, which watches the reactor's file descriptor and calls
-//! [`EventLoop::drive`] when it is readable. Everything the runtime can wait
-//! for is readiness on that one descriptor:
+//! by parking its thread in the driver; an event loop instead returns to the
+//! host, and asks to be called back through a [`Waker`] the host provided.
+//! Whatever would have unparked the thread (a spawn, a task woken from
+//! another thread, I/O readiness, a timer deadline) wakes the host instead,
+//! and the host calls [`EventLoop::drive`].
 //!
-//! * I/O: the sockets registered with the reactor.
-//! * Timers: the soonest timer deadline is armed on a timer descriptor in the
-//!   reactor's set after each drive ([`deadline`]).
-//! * Wakes from outside a drive (a spawn, a task woken from another thread):
-//!   the reactor's waker, written by the driver's unpark as on a native
-//!   runtime.
-//! * More ready work after a batch: the runtime writes its own waker, so the
-//!   host gets a turn between batches.
-//!
-//! The runtime owns the timer, so arming, re-arming and cancelling never
-//! involve the host, and dropping the [`EventLoop`] drops it with everything
-//! else, with native `Runtime::drop` semantics.
+//! The driver still parks somewhere: a thread owned by the event loop blocks
+//! in it exactly as a native runtime's thread would, and readiness reaches
+//! tasks through the same cross-thread schedule that wakes the host. Nothing
+//! about the platform's reactor or timers is exposed; the host's whole
+//! contract is the waker and `drive`.
 
-mod deadline;
-
-use crate::loom::sync::Mutex;
+use crate::runtime::driver::Driver;
 use crate::runtime::local_runtime::LocalRuntime;
+use crate::runtime::scheduler::current_thread::CurrentThread;
 use crate::runtime::{context, Handle, Runtime};
 use crate::task::JoinHandle;
 use crate::util::trace::SpawnMeta;
 
 use std::future::Future;
 use std::io;
-use std::marker::PhantomData;
-use std::os::fd::{AsFd, BorrowedFd};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::task::Waker;
 use std::thread::ThreadId;
 
 /// A [`Runtime`] driven by a host event loop instead of by parking a thread.
 ///
-/// Built with [`Builder::build_event_loop`]. The host watches the reactor's
-/// file descriptor ([`AsFd`]) for readability and calls
-/// [`drive`](Self::drive) when it is; the runtime does the rest, including
-/// arming a timer descriptor in the same set for its soonest deadline. Tasks
+/// Built with [`Builder::build_event_loop`], which takes a [`Waker`] the host
+/// owns. Whenever the runtime has work, it wakes that waker, and the host
+/// calls [`drive`](Self::drive) in response; the runtime does the rest. Tasks
 /// are submitted with [`spawn`](Self::spawn) and run in batches from those
-/// drives, so there is no `block_on`: a result is received by awaiting the
-/// [`JoinHandle`] from another task, or through any completion the embedder
-/// chooses.
+/// drives. [`block_on`](Self::block_on) runs a future only as far as ready
+/// work carries it, and errors rather than wait.
 ///
 /// The runtime is single-threaded (`current_thread`), but like `Runtime` it
 /// is `Send + Sync`: it may be driven from any thread, one at a time.
 ///
 /// Dropping the `EventLoop` shuts the runtime down as dropping a `Runtime`
-/// does. The descriptor is closed with it, so the host must stop watching
-/// it first.
+/// does. The waker may be woken once more during the drop.
 ///
 /// [`Builder::build_event_loop`]: crate::runtime::Builder::build_event_loop
 #[derive(Debug)]
 pub struct EventLoop {
-    state: Arc<EventLoopState>,
+    shared: Shared<Runtime>,
 }
 
 /// A [`LocalRuntime`] driven by a host event loop instead of by parking a
@@ -68,70 +58,87 @@ pub struct EventLoop {
 /// [`Builder::build_local_event_loop`]: crate::runtime::Builder::build_local_event_loop
 #[derive(Debug)]
 pub struct LocalEventLoop {
-    state: Arc<EventLoopState>,
-    _not_send: PhantomData<*mut u8>,
+    shared: Shared<LocalRuntime>,
 }
 
+/// The error returned by [`EventLoop::block_on`] when the future did not
+/// complete without waiting.
+///
+/// The future has been dropped. Progress it made, and any tasks it spawned,
+/// remain: the tasks continue from later drives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WouldBlock(pub(crate) ());
+
+impl std::fmt::Display for WouldBlock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("the future did not complete without blocking")
+    }
+}
+
+impl std::error::Error for WouldBlock {}
+
 impl EventLoop {
-    pub(crate) fn new(runtime: Runtime) -> io::Result<EventLoop> {
-        let handle = runtime.handle().clone();
+    pub(crate) fn new(runtime: Runtime, waker: Waker) -> io::Result<EventLoop> {
         Ok(EventLoop {
-            state: EventLoopState::new(Inner::Runtime(runtime), handle, None)?,
+            shared: Shared::new(runtime, waker, None)?,
         })
     }
 
-    /// Spawns a future onto the runtime. It is queued and the reactor's
-    /// descriptor becomes readable; it never runs before `spawn` returns.
+    /// Spawns a future onto the runtime. It is queued and the host woken; it
+    /// never runs before `spawn` returns.
     #[track_caller]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        self.state.handle.spawn(future)
+        self.shared.handle.spawn(future)
     }
 
     /// Returns a handle to the runtime.
     pub fn handle(&self) -> &Handle {
-        &self.state.handle
+        &self.shared.handle
     }
 
-    /// Runs one batch: ready tasks, then a non-blocking reactor turn (I/O
-    /// readiness, due timers, deferred wakers). If ready work remains
-    /// afterwards the descriptor is readable again at once; otherwise the
-    /// timer descriptor is armed for the soonest deadline, if any.
+    /// Runs one batch of ready tasks (at most `event_interval`). If ready work
+    /// remains afterwards the host is woken again at once, so it gets a turn
+    /// between batches.
     ///
-    /// Call this whenever the descriptor is readable. Calling it at other
-    /// times is harmless.
+    /// Call this whenever the waker is woken. Calling it at other times is
+    /// harmless.
     ///
     /// # Panics
     ///
     /// Panics if called from within a runtime.
     pub fn drive(&self) {
-        self.state.drive();
+        self.shared.drive();
     }
-}
 
-impl AsFd for EventLoop {
-    /// The reactor's descriptor: readable when a drive is needed.
-    fn as_fd(&self) -> BorrowedFd<'_> {
-        self.state.fd()
+    /// Runs `future` to completion on the runtime, along with any tasks that
+    /// become ready, without ever waiting. Where a [`Runtime::block_on`]
+    /// would park the thread, this returns [`WouldBlock`] and drops the
+    /// future instead; spawned tasks it left behind continue from later
+    /// drives.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called from within a runtime.
+    #[track_caller]
+    pub fn block_on<F: Future>(&self, future: F) -> Result<F::Output, WouldBlock> {
+        self.shared.block_on(future)
     }
 }
 
 impl LocalEventLoop {
-    pub(crate) fn new(runtime: LocalRuntime) -> io::Result<LocalEventLoop> {
-        let handle = runtime.handle().clone();
+    pub(crate) fn new(runtime: LocalRuntime, waker: Waker) -> io::Result<LocalEventLoop> {
         let tid = std::thread::current().id();
         Ok(LocalEventLoop {
-            state: EventLoopState::new(Inner::Local(runtime), handle, Some(tid))?,
-            _not_send: PhantomData,
+            shared: Shared::new(runtime, waker, Some(tid))?,
         })
     }
 
-    /// Spawns a future onto the runtime. It is queued and the reactor's
-    /// descriptor becomes readable; it never runs before `spawn_local`
-    /// returns.
+    /// Spawns a future onto the runtime. It is queued and the host woken; it
+    /// never runs before `spawn_local` returns.
     #[track_caller]
     pub fn spawn_local<F>(&self, future: F) -> JoinHandle<F::Output>
     where
@@ -141,12 +148,12 @@ impl LocalEventLoop {
         let meta = SpawnMeta::new_unnamed(std::mem::size_of::<F>());
         // SAFETY: `LocalEventLoop` is `!Send`, so this is the thread that
         // built the runtime, and `drive` polls only on that thread.
-        unsafe { self.state.handle.spawn_local_named(future, meta) }
+        unsafe { self.shared.handle.spawn_local_named(future, meta) }
     }
 
     /// Returns a handle to the runtime.
     pub fn handle(&self) -> &Handle {
-        &self.state.handle
+        &self.shared.handle
     }
 
     /// Runs one batch; see [`EventLoop::drive`].
@@ -156,84 +163,51 @@ impl LocalEventLoop {
     /// Panics if called from within a runtime, or on a thread other than the
     /// one that built the event loop.
     pub fn drive(&self) {
-        self.state.drive();
+        self.shared.drive();
+    }
+
+    /// Runs `future` as far as ready work carries it; see
+    /// [`EventLoop::block_on`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if called from within a runtime, or on a thread other than the
+    /// one that built the event loop.
+    #[track_caller]
+    pub fn block_on<F: Future>(&self, future: F) -> Result<F::Output, WouldBlock> {
+        self.shared.block_on(future)
     }
 }
 
-impl AsFd for LocalEventLoop {
-    /// The reactor's descriptor: readable when a drive is needed.
-    fn as_fd(&self) -> BorrowedFd<'_> {
-        self.state.fd()
-    }
-}
-
-impl Drop for EventLoop {
-    fn drop(&mut self) {
-        self.state.inner.lock().take();
-    }
-}
-
-impl Drop for LocalEventLoop {
-    fn drop(&mut self) {
-        self.state.inner.lock().take();
-    }
+/// Either runtime kind, as the `current_thread` scheduler it wraps.
+pub(crate) trait Scheduler {
+    fn current_thread(&self) -> &CurrentThread;
+    fn handle(&self) -> &Handle;
 }
 
 #[derive(Debug)]
-enum Inner {
-    Runtime(Runtime),
-    Local(LocalRuntime),
-}
-
-pub(crate) struct EventLoopState {
-    /// Taken on drop of the owning event loop, so the runtime is dropped
-    /// there.
-    inner: Mutex<Option<Inner>>,
+struct Shared<R: Scheduler> {
+    /// Dropped last: its shutdown needs the driver back.
+    runtime: R,
     handle: Handle,
-    deadline: deadline::Deadline,
+    reactor: Option<Reactor>,
     local_tid: Option<ThreadId>,
 }
 
-// SAFETY: `Inner::Local` is `!Send` only by marker. It is polled by `drive`,
-// which checks the owning thread first, and dropped by `LocalEventLoop`,
-// which is itself `!Send`; every other field is `Send + Sync`.
-unsafe impl Send for EventLoopState {}
-unsafe impl Sync for EventLoopState {}
-
-impl std::fmt::Debug for EventLoopState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("EventLoopState")
-            .field("handle", &self.handle)
-            .finish_non_exhaustive()
-    }
-}
-
-impl EventLoopState {
-    fn new(
-        inner: Inner,
-        handle: Handle,
-        local_tid: Option<ThreadId>,
-    ) -> io::Result<Arc<EventLoopState>> {
-        let deadline = deadline::Deadline::new(&handle)?;
-        Ok(Arc::new(EventLoopState {
-            inner: Mutex::new(Some(inner)),
+impl<R: Scheduler> Shared<R> {
+    fn new(runtime: R, waker: Waker, local_tid: Option<ThreadId>) -> io::Result<Shared<R>> {
+        let handle = runtime.handle().clone();
+        handle.inner.driver().set_host(waker);
+        let reactor = Reactor::start(&runtime, &handle)?;
+        Ok(Shared {
+            runtime,
             handle,
-            deadline,
+            reactor: Some(reactor),
             local_tid,
-        }))
+        })
     }
 
-    fn fd(&self) -> BorrowedFd<'_> {
-        use std::os::fd::AsRawFd;
-        let raw = self.handle.inner.driver().io().registry_raw_fd();
-        // SAFETY: the reactor lives as long as the handle borrowed here.
-        unsafe { BorrowedFd::borrow_raw(raw.as_raw_fd()) }
-    }
-
-    /// One batch (`event_interval` tasks, then the non-blocking reactor
-    /// turn), then the continuation: the waker if work remains, so the host
-    /// gets a turn between batches, and the timer for the soonest deadline.
-    pub(crate) fn drive(self: &Arc<Self>) {
+    fn check_thread(&self) {
         if let Some(tid) = self.local_tid {
             assert_eq!(
                 std::thread::current().id(),
@@ -241,44 +215,78 @@ impl EventLoopState {
                 "a `LocalEventLoop` must be driven on the thread that built it"
             );
         }
+    }
+
+    fn drive(&self) {
+        self.check_thread();
         let handle = self.handle.inner.as_current_thread();
-
         let busy = context::enter_runtime(&self.handle.inner, false, |_| {
-            let inner = self.inner.lock();
-            match &*inner {
-                Some(Inner::Runtime(rt)) => rt.current_thread().drive_batch(handle),
-                Some(Inner::Local(rt)) => rt.current_thread().drive_batch(handle),
-                None => false,
-            }
+            self.runtime.current_thread().drive_batch(handle)
         });
-
-        let next = next_deadline(handle);
-        // A deadline already due is a wake, not a timer: a zero `it_value`
-        // would disarm.
-        let due = matches!(next, Some(d) if d.is_zero());
-        if busy || due {
-            handle.driver.unpark();
+        if busy {
+            self.handle.inner.driver().wake_host();
         }
-        self.deadline.arm(next.filter(|_| !due));
+    }
+
+    fn block_on<F: Future>(&self, future: F) -> Result<F::Output, WouldBlock> {
+        self.check_thread();
+        let handle = self.handle.inner.as_current_thread();
+        context::enter_runtime(&self.handle.inner, false, |_| {
+            self.runtime.current_thread().block_on_ready(handle, future)
+        })
     }
 }
 
-#[cfg(feature = "time")]
-fn next_deadline(
-    handle: &crate::runtime::scheduler::current_thread::Handle,
-) -> Option<std::time::Duration> {
-    let time = handle.driver.time.as_ref()?;
-    let tick = time.next_expiration_tick()?;
-    let now = time.time_source().now(&handle.driver.clock);
-    Some(
-        time.time_source()
-            .tick_to_duration(tick.saturating_sub(now)),
-    )
+impl<R: Scheduler> Drop for Shared<R> {
+    fn drop(&mut self) {
+        if let Some(driver) = self.reactor.take().and_then(|r| r.stop(&self.handle)) {
+            let handle = self.handle.inner.as_current_thread();
+            self.runtime
+                .current_thread()
+                .restore_driver(handle, driver);
+        }
+    }
 }
 
-#[cfg(not(feature = "time"))]
-fn next_deadline(
-    _handle: &crate::runtime::scheduler::current_thread::Handle,
-) -> Option<std::time::Duration> {
-    None
+/// The thread that parks in the driver on the runtime's behalf.
+///
+/// It runs the same `park` a native runtime's thread would, so I/O
+/// readiness, timer deadlines and signal delivery all happen here, and reach
+/// the scheduler through the cross-thread schedule, which wakes the host.
+/// A nearer timer registered from a drive unparks it to re-arm, as on a
+/// multi-thread runtime.
+#[derive(Debug)]
+struct Reactor {
+    thread: std::thread::JoinHandle<Driver>,
+    stop: Arc<AtomicBool>,
+}
+
+impl Reactor {
+    fn start<R: Scheduler>(runtime: &R, handle: &Handle) -> io::Result<Reactor> {
+        let scheduler = handle.inner.as_current_thread();
+        let mut driver = runtime
+            .current_thread()
+            .take_driver(scheduler)
+            .expect("driver missing");
+        let stop = Arc::new(AtomicBool::new(false));
+        let thread = {
+            let handle = handle.clone();
+            let stop = stop.clone();
+            std::thread::Builder::new()
+                .name("tokio-event-loop-driver".into())
+                .spawn(move || {
+                    while !stop.load(Ordering::Acquire) {
+                        driver.park(handle.inner.driver());
+                    }
+                    driver
+                })?
+        };
+        Ok(Reactor { thread, stop })
+    }
+
+    fn stop(self, handle: &Handle) -> Option<Driver> {
+        self.stop.store(true, Ordering::Release);
+        handle.inner.driver().unpark();
+        self.thread.join().ok()
+    }
 }

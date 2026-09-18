@@ -1,4 +1,4 @@
-336
+335
 &
 +
 <
@@ -107,7 +107,6 @@ dns
 DNS
 DoS
 dwOpenMode
-embedder
 Emscripten
 Emscripten's
 endian
