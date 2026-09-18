@@ -28,11 +28,7 @@ const EMPTY: usize = 0;
 const PARKED: usize = 1;
 const NOTIFIED: usize = 2;
 
-#[cfg(not(all(
-    target_os = "emscripten",
-    not(target_feature = "atomics"),
-    feature = "rt"
-)))]
+#[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
 tokio_thread_local! {
     static CURRENT_PARKER: ParkThread = ParkThread::new();
 }
@@ -81,11 +77,7 @@ impl ParkThread {
 // ==== impl Inner ====
 
 impl Inner {
-    #[cfg(not(all(
-        target_os = "emscripten",
-        not(target_feature = "atomics"),
-        feature = "rt"
-    )))]
+    #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
     fn park(&self) {
         // If we were previously notified then we consume this notification and
         // return quickly.
@@ -133,21 +125,13 @@ impl Inner {
         }
     }
 
-    #[cfg(all(
-        target_os = "emscripten",
-        not(target_feature = "atomics"),
-        feature = "rt"
-    ))]
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
     fn park(&self) {
         self.park_jspi(None);
     }
 
     /// Parks the activation until unparked or `dur` elapses, if given.
-    #[cfg(all(
-        target_os = "emscripten",
-        not(target_feature = "atomics"),
-        feature = "rt"
-    ))]
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
     fn park_jspi(&self, dur: Option<Duration>) {
         // If we were previously notified then we consume this notification and
         // return quickly.
@@ -162,7 +146,7 @@ impl Inner {
         // Without JSPI a real wait is impossible: suspending would trap and
         // busy-waiting would starve the host loop the wake depends on. A
         // zero-duration park returns immediately as on native.
-        if !crate::runtime::context::jspi::jspi_enabled() {
+        if !crate::runtime::jspi::jspi_enabled() {
             if dur == Some(Duration::ZERO) {
                 return;
             }
@@ -182,32 +166,31 @@ impl Inner {
         let old = self.state.swap(PARKED, SeqCst);
         debug_assert_eq!(old, EMPTY, "inconsistent park state");
 
-        crate::runtime::context::jspi::park(self.id(), dur);
-
         // Consume any notification delivered during the park so the token
-        // does not leak into the next one.
-        match self.state.swap(EMPTY, SeqCst) {
-            NOTIFIED => {} // got a notification, hurray!
-            PARKED => {}   // timer deadline, alas
-            n => panic!("inconsistent park state: {n}"),
+        // does not leak into the next one. A `SuspendError` unwinding out of
+        // the import must also leave the parker `EMPTY` for its next park.
+        struct Unpark<'a>(&'a Inner);
+        impl Drop for Unpark<'_> {
+            fn drop(&mut self) {
+                match self.0.state.swap(EMPTY, SeqCst) {
+                    NOTIFIED => {} // got a notification, hurray!
+                    PARKED => {}   // timer deadline, alas
+                    n => debug_assert!(false, "inconsistent park state: {n}"),
+                }
+            }
         }
+        let _unpark = Unpark(self);
+
+        crate::runtime::jspi::park(self.id(), dur);
     }
 
-    #[cfg(all(
-        target_os = "emscripten",
-        not(target_feature = "atomics"),
-        feature = "rt"
-    ))]
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
     fn id(&self) -> usize {
         self as *const Inner as usize
     }
 
     /// Parks the current thread for at most `dur`.
-    #[cfg(not(all(
-        target_os = "emscripten",
-        not(target_feature = "atomics"),
-        feature = "rt"
-    )))]
+    #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
     fn park_timeout(&self, dur: Duration) {
         // Like `park` above we have a fast path for an already-notified thread,
         // and afterwards we start coordinating for a sleep. Return quickly.
@@ -258,11 +241,7 @@ impl Inner {
         }
     }
 
-    #[cfg(all(
-        target_os = "emscripten",
-        not(target_feature = "atomics"),
-        feature = "rt"
-    ))]
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
     fn park_timeout(&self, dur: Duration) {
         self.park_jspi(Some(dur));
     }
@@ -281,12 +260,8 @@ impl Inner {
         }
 
         // The parked activation is suspended in the host; settle its promise.
-        #[cfg(all(
-            target_os = "emscripten",
-            not(target_feature = "atomics"),
-            feature = "rt"
-        ))]
-        crate::runtime::context::jspi::unpark(self.id());
+        #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+        crate::runtime::jspi::unpark(self.id());
 
         // There is a period between when the parked thread sets `state` to
         // `PARKED` (or last checked `state` in the case of a spurious wake
@@ -336,11 +311,7 @@ pub(crate) struct CachedParkThread {
     // code on this thread, and a shared thread-local parker would hand this
     // stack's notification token to that code. Each blocking call gets its
     // own parker instead.
-    #[cfg(all(
-        target_os = "emscripten",
-        not(target_feature = "atomics"),
-        feature = "rt"
-    ))]
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
     park: ParkThread,
     _anchor: PhantomData<Rc<()>>,
 }
@@ -352,11 +323,7 @@ impl CachedParkThread {
     /// the thread that the caller intends to park.
     pub(crate) fn new() -> CachedParkThread {
         CachedParkThread {
-            #[cfg(all(
-                target_os = "emscripten",
-                not(target_feature = "atomics"),
-                feature = "rt"
-            ))]
+            #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
             park: ParkThread::new(),
             _anchor: PhantomData,
         }
@@ -385,19 +352,11 @@ impl CachedParkThread {
     where
         F: FnOnce(&ParkThread) -> R,
     {
-        #[cfg(not(all(
-            target_os = "emscripten",
-            not(target_feature = "atomics"),
-            feature = "rt"
-        )))]
+        #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
         return CURRENT_PARKER.try_with(|inner| f(inner));
 
         // See the comment on the `park` field.
-        #[cfg(all(
-            target_os = "emscripten",
-            not(target_feature = "atomics"),
-            feature = "rt"
-        ))]
+        #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
         return Ok(f(&self.park));
     }
 
