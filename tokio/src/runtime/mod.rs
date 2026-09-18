@@ -633,7 +633,7 @@ cfg_rt! {
 
     cfg_event_loop! {
         pub(crate) mod event_loop;
-        pub use event_loop::{LocalEventLoop, WouldBlock};
+        pub use event_loop::LocalEventLoop;
     }
 
     mod id;
