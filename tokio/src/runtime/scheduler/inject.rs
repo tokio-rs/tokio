@@ -36,7 +36,16 @@ impl<T: 'static> Inject<T> {
         }
     }
 
-    #[cfg(all(tokio_unstable, not(feature = "rt-multi-thread")))]
+    // The event loop's cfg, without `rt-multi-thread`, which has its own.
+    #[cfg(all(
+        tokio_unstable,
+        not(feature = "rt-multi-thread"),
+        not(loom),
+        not(all(
+            target_family = "wasm",
+            any(not(target_os = "emscripten"), target_feature = "atomics")
+        ))
+    ))]
     pub(crate) fn is_empty(&self) -> bool {
         self.shared.is_empty()
     }
