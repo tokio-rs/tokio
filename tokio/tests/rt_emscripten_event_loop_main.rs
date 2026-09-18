@@ -83,13 +83,19 @@ mod emscripten {
         let el_b = event_loop();
         let (tx, rx) = tokio::sync::oneshot::channel::<u32>();
 
-        // A `block_on` that would wait drops its future, and with it the
-        // timer it registered: nothing may stay armed for it, or the process
-        // would live on to that deadline (`rt_emscripten_pre.js` bounds the
-        // run).
-        assert!(el_a
-            .block_on(async { tokio::time::sleep(Duration::from_secs(30)).await })
-            .is_err());
+        // A `block_on` that would wait panics and drops its future, and with
+        // it the timer it registered: nothing may stay armed for it, or the
+        // process would live on to that deadline (`rt_emscripten_pre.js`
+        // bounds the run).
+        if cfg!(panic = "unwind") {
+            let hook = std::panic::take_hook();
+            std::panic::set_hook(Box::new(|_| {}));
+            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                el_a.block_on(async { tokio::time::sleep(Duration::from_secs(30)).await })
+            }));
+            std::panic::set_hook(hook);
+            assert!(res.is_err(), "a pending future must panic rather than wait");
+        }
         run_js("Module.tokioDeadline = Date.now() + 10_000");
 
         // More spawns than one batch runs: the drive the hosted loop

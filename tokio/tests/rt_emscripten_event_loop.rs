@@ -1,7 +1,7 @@
 //! `LocalEventLoop` contracts that hold on the caller's stack under
 //! Emscripten: `spawn_local` queues only, `drive` runs one batch without
 //! suspending, wakes from host context never run tasks inline, `block_on`
-//! never waits, and a pending deadline waits for the host. Plain `#[test]`s,
+//! panics rather than wait, and a pending deadline waits for the host. Plain `#[test]`s,
 //! so the bodies run outside any drive. What needs the host loop itself
 //! (the drives it schedules after `main` returns) is
 //! `rt_emscripten_event_loop_main`.
@@ -90,7 +90,7 @@ fn inject_leftovers_run_from_later_drives() {
 #[test]
 fn block_on_ready_future() {
     let el = event_loop();
-    assert_eq!(el.block_on(async { 1 + 2 }), Ok(3));
+    assert_eq!(el.block_on(async { 1 + 2 }), 3);
 }
 
 #[test]
@@ -104,21 +104,35 @@ fn block_on_drives_ready_tasks() {
         });
         a.await.unwrap() + b.await.unwrap()
     });
-    assert_eq!(out, Ok(42));
+    assert_eq!(out, 42);
 }
 
 #[test]
-fn block_on_would_block_on_timer() {
+fn block_on_pending_on_timer_panics() {
+    if cfg!(not(panic = "unwind")) {
+        return;
+    }
     let el = event_loop();
     let start = Instant::now();
-    let res = el.block_on(async {
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    });
-    assert!(res.is_err());
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        el.block_on(async {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        })
+    }));
+    let err = res.expect_err("a pending future must panic rather than wait");
+    let msg = err
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| err.downcast_ref::<&str>().copied())
+        .unwrap_or("");
+    assert!(
+        msg.contains("cannot wait"),
+        "unexpected panic message: {msg}"
+    );
     assert!(start.elapsed() < Duration::from_millis(50), "must not wait");
 
     // The runtime is intact.
-    assert_eq!(el.block_on(async { 1 }), Ok(1));
+    assert_eq!(el.block_on(async { 1 }), 1);
 }
 
 #[test]
@@ -128,7 +142,7 @@ fn task_panic_is_a_join_error() {
         panic!("task panicked");
     });
     el.drive();
-    assert!(el.block_on(async { jh.await.unwrap_err().is_panic() }) == Ok(true));
+    assert!(el.block_on(async { jh.await.unwrap_err().is_panic() }));
 }
 
 #[test]
