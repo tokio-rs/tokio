@@ -184,13 +184,14 @@ impl Shared {
         // The dropped future's timers and registrations are gone; settle the
         // host's side before reporting.
         self.after_turn(busy);
-        ret.unwrap_or_else(|| {
-            panic!(
+        match ret {
+            Some(out) => out,
+            None => panic!(
                 "`LocalEventLoop::block_on` cannot wait: the future is still pending \
                  with no ready work, and its wait belongs to the host event loop, so \
                  nothing could wake it from here"
-            )
-        })
+            ),
+        }
     }
 }
 
