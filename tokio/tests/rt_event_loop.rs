@@ -300,6 +300,27 @@ fn block_on_drives_ready_tasks() {
 }
 
 #[test]
+fn block_on_leaving_ready_tasks_wakes() {
+    // The future completes while a spawned task is still queued: the host
+    // must be woken to run it, as after a busy drive.
+    let (host, el) = event_loop();
+    let turns = Arc::new(AtomicUsize::new(0));
+    let t = turns.clone();
+    let out = el.block_on(async move {
+        tokio::spawn(async move {
+            for _ in 0..10 {
+                tokio::task::yield_now().await;
+                t.fetch_add(1, SeqCst);
+            }
+        });
+        1
+    });
+    assert_eq!(out, Ok(1));
+    assert!(host.is_woken());
+    host.pump(|| el.drive(), || turns.load(SeqCst) == 10);
+}
+
+#[test]
 fn block_on_would_block_on_timer() {
     let (host, el) = event_loop();
     let start = Instant::now();
