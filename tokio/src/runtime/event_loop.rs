@@ -43,11 +43,11 @@ use std::thread::ThreadId;
 /// thread that built it. [`Handle::block_on`] from another thread works as
 /// on a native runtime, since the driver is parked on a thread of its own.
 ///
-/// [`Handle::block_on`]: crate::runtime::Handle::block_on
 /// Dropping the `LocalEventLoop` shuts the runtime down as dropping a
 /// `LocalRuntime` does. The waker may be woken once more during the drop.
 ///
 /// [`Builder::build_local_event_loop`]: crate::runtime::Builder::build_local_event_loop
+/// [`Handle::block_on`]: crate::runtime::Handle::block_on
 #[derive(Debug)]
 pub struct LocalEventLoop {
     shared: Rc<Shared>,
