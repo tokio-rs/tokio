@@ -1224,11 +1224,11 @@ jobs:
           tool: cargo-hack
 
       - name: Check tokio feature matrix for emscripten
-        run: cargo hack check -p tokio --each-feature --exclude-features full,net,process,signal,rt-multi-thread,io-uring,taskdump,schedule-latency --target wasm32-unknown-emscripten
+        run: cargo hack check -p tokio --each-feature --exclude-features full,net,process,signal,rt-multi-thread,io-uring,taskdump,schedule-latency,fs,io-std --target wasm32-unknown-emscripten
         working-directory: tokio
 
       - name: Test tokio for emscripten
-        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,fs,io-util,io-std,test-util" --tests
+        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,io-util,test-util" --tests
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
@@ -1242,7 +1242,7 @@ jobs:
           components: rust-src
 
       - name: Test tokio multi-thread runtime for emscripten (pthreads)
-        run: cargo +${{ env.rust_emscripten_nightly }} test -Zbuild-std=std,panic_abort -p tokio --target wasm32-unknown-emscripten --features "rt,rt-multi-thread,time,sync,macros" --test rt_multi_thread_emscripten
+        run: cargo +${{ env.rust_emscripten_nightly }} test -Zbuild-std=std,panic_abort -p tokio --target wasm32-unknown-emscripten --features "rt,rt-multi-thread,time,sync,macros,fs,io-std,io-util,test-util" --test rt_multi_thread_emscripten --test io_emscripten
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node

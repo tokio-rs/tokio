@@ -11,6 +11,7 @@
 
 #![cfg(all(
     target_os = "emscripten",
+    target_feature = "atomics",
     feature = "io-std",
     feature = "io-util",
     feature = "rt",
