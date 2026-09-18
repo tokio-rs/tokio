@@ -33,6 +33,9 @@ fn rt() -> tokio::runtime::Runtime {
 
 /// Assert `f` panics with the targeted would-suspend message.
 fn assert_panics_cannot_block_on(f: impl FnOnce()) {
+    if cfg!(not(panic = "unwind")) {
+        return;
+    }
     let err = catch_unwind(AssertUnwindSafe(f)).expect_err("expected a would-suspend panic");
     let msg = err
         .downcast_ref::<String>()
@@ -61,6 +64,23 @@ fn block_on_drives_ready_spawned_tasks() {
         a.await.unwrap() + b.await.unwrap()
     });
     assert_eq!(out, 42);
+}
+
+#[test]
+fn block_on_drives_many_ready_spawned_tasks() {
+    // Well past `event_interval`, so the scheduler's maintenance park runs
+    // mid-drive: a host turn under JSPI and a no-op without.
+    let out = rt().block_on(async {
+        let handles: Vec<_> = (0..1000u32)
+            .map(|i| tokio::spawn(async move { i }))
+            .collect();
+        let mut sum = 0;
+        for h in handles {
+            sum += h.await.unwrap();
+        }
+        sum
+    });
+    assert_eq!(out, 499_500);
 }
 
 #[test]

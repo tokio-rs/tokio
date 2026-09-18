@@ -33,6 +33,9 @@ fn is_nested_runtime_panic(e: &Box<dyn std::any::Any + Send>) -> bool {
 
 #[test]
 fn nested_block_on_still_panics() {
+    if cfg!(not(panic = "unwind")) {
+        return;
+    }
     let outer = rt();
     let res = outer.block_on(async {
         let hook = std::panic::take_hook();
