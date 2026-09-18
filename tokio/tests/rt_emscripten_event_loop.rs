@@ -69,6 +69,25 @@ fn drive_is_one_batch() {
 }
 
 #[test]
+fn inject_leftovers_run_from_later_drives() {
+    // Spawns from host context land in the inject queue; a batch that ends
+    // at `event_interval` with more queued must leave a drive scheduled (on
+    // the hosted loop, via its own waker), or with the runtime held alive
+    // and nothing armed the process would hang. Here the drives are made by
+    // hand; `rt_emscripten_event_loop_main` covers the scheduled ones.
+    let el = event_loop();
+    let ran = Rc::new(Cell::new(0));
+    for _ in 0..6 {
+        let r = ran.clone();
+        el.spawn_local(async move { r.set(r.get() + 1) });
+    }
+    el.drive();
+    assert_eq!(ran.get(), 4, "one event_interval(4) batch");
+    el.drive();
+    assert_eq!(ran.get(), 6);
+}
+
+#[test]
 fn block_on_ready_future() {
     let el = event_loop();
     assert_eq!(el.block_on(async { 1 + 2 }), Ok(3));

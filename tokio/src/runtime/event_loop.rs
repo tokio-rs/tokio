@@ -7,16 +7,18 @@
 //! another thread, I/O readiness, a timer deadline) wakes the host instead,
 //! and the host calls [`LocalEventLoop::drive`].
 //!
-//! The driver still parks somewhere: a thread owned by the event loop blocks
-//! in it exactly as a native runtime's thread would, and readiness reaches
-//! tasks through the same cross-thread schedule that wakes the host. Nothing
-//! about the platform's reactor or timers is exposed; the host's whole
-//! contract is the waker and `drive`.
+//! The driver still parks somewhere. On targets with threads, a thread owned
+//! by the event loop blocks in it exactly as a native runtime's thread
+//! would, and readiness reaches tasks through the same cross-thread schedule
+//! that wakes the host. On `wasm32-unknown-emscripten` without threads the
+//! JavaScript host is the reactor: its callbacks stand in for that thread,
+//! and the driver's turn runs inside each drive ([`reactor`]). Either way
+//! nothing about the platform's reactor or timers is exposed; the host's
+//! whole contract is the waker and `drive`.
 //!
-//! On `wasm32-unknown-emscripten` without threads the JavaScript host is
-//! the reactor: its callbacks stand in for that thread, and a hosted event
-//! loop supplies its own waker, which schedules the drive on the host loop
-//! ([`reactor`]).
+//! A *hosted* event loop is one whose host is the ambient JavaScript loop:
+//! it supplies its own waker, which schedules the drive on that loop, so the
+//! program spawns and returns to the host.
 
 #[cfg_attr(
     all(target_os = "emscripten", not(target_feature = "atomics")),
@@ -55,6 +57,15 @@ use std::thread::ThreadId;
 /// Dropping the `LocalEventLoop` shuts the runtime down as dropping a
 /// `LocalRuntime` does. The waker may be woken once more during the drop.
 ///
+/// On `wasm32-unknown-emscripten` without threads, a *hosted* event loop
+/// ([`Builder::build_hosted_local_event_loop`]) needs no waker: the
+/// JavaScript host loop drives it, so the program spawns and returns to the
+/// host. Such a loop keeps the Emscripten runtime alive while it has tasks.
+/// A [`Handle::block_on`] suspended through JSPI on the same thread defers
+/// hosted drives until it returns, and timers it registers itself are armed
+/// only by the next drive.
+///
+/// [`Builder::build_hosted_local_event_loop`]: crate::runtime::Builder::build_hosted_local_event_loop
 /// [`Builder::build_local_event_loop`]: crate::runtime::Builder::build_local_event_loop
 /// [`Handle::block_on`]: crate::runtime::Handle::block_on
 #[derive(Debug)]

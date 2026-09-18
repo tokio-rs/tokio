@@ -510,7 +510,7 @@
 //! own drives on the host loop, for its reactor's readiness and its timer
 //! deadlines, and tasks run once control returns to the host. It keeps the
 //! Emscripten runtime alive while it has tasks, so `main` may return with
-//! work in flight.
+//! work in flight. Event loops are not available in pthreads builds.
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at
 // least 32 bits, which a lot of components in Tokio currently assumes.

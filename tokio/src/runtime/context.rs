@@ -9,6 +9,8 @@ use crate::util::rand::FastRand;
 cfg_rt! {
     mod blocking;
     pub(crate) use blocking::{disallow_block_in_place, try_enter_blocking_region, BlockingRegionGuard};
+    #[cfg(all(tokio_unstable, target_os = "emscripten", not(target_feature = "atomics")))]
+    pub(crate) use blocking::runtime_entered;
 
     mod current;
     pub(crate) use current::{with_current, try_set_current, SetCurrentGuard};

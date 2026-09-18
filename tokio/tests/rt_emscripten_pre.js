@@ -17,4 +17,8 @@ process.on('exit', (code) => {
     console.error('rt_emscripten_pre.js: runtime exited before the roots completed');
     process.exitCode = 1;
   }
+  if (code === 0 && Module.tokioDeadline && Date.now() > Module.tokioDeadline) {
+    console.error('rt_emscripten_pre.js: the runtime outlived its work');
+    process.exitCode = 1;
+  }
 });
