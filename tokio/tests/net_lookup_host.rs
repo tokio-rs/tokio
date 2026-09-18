@@ -36,6 +36,10 @@ async fn lookup_str_socket_addr() {
     target_os = "wasi",
     ignore = "net::lookup_host requires multithreading, which WASI does not yet support"
 )]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "emscripten resolves `localhost` to a synthetic address, not 127.0.0.1"
+)]
 #[tokio::test]
 async fn resolve_dns() -> io::Result<()> {
     let mut hosts = net::lookup_host("localhost:3000").await?;

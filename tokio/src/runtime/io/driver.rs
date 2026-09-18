@@ -195,7 +195,20 @@ impl Driver {
 
         // Block waiting for an event to happen, peeling out how many events
         // happened.
-        match self.poll.poll(events, max_wait) {
+        #[cfg(not(all(
+            target_os = "emscripten",
+            not(target_feature = "atomics"),
+            feature = "rt"
+        )))]
+        let polled = self.poll.poll(events, max_wait);
+        #[cfg(all(
+            target_os = "emscripten",
+            not(target_feature = "atomics"),
+            feature = "rt"
+        ))]
+        let polled = crate::runtime::jspi::io_wait(max_wait, || self.poll.poll(events, max_wait));
+
+        match polled {
             Ok(()) => {}
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
             #[cfg(target_os = "wasi")]
@@ -268,6 +281,19 @@ impl fmt::Debug for Driver {
 }
 
 impl Handle {
+    /// The reactor's own epoll descriptor, for the host loop's readiness
+    /// listener.
+    #[cfg(all(
+        tokio_unstable,
+        feature = "rt",
+        target_os = "emscripten",
+        not(target_feature = "atomics")
+    ))]
+    pub(crate) fn registry_raw_fd(&self) -> std::os::fd::RawFd {
+        use std::os::fd::AsRawFd;
+        self.registry.as_raw_fd()
+    }
+
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
     /// makes the next call to `turn` return immediately.
     ///
@@ -355,7 +381,15 @@ impl Direction {
     }
 }
 
-#[cfg(all(test, unix, feature = "net", not(loom), not(miri)))]
+// Node has no `socketpair(2)`.
+#[cfg(all(
+    test,
+    unix,
+    feature = "net",
+    not(loom),
+    not(miri),
+    not(target_os = "emscripten")
+))]
 mod tests {
     use super::*;
     use std::io::Write;

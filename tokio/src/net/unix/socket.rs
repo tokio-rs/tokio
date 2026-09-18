@@ -3,7 +3,10 @@ use std::path::Path;
 
 use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 
-use crate::net::{UnixDatagram, UnixListener, UnixStream};
+use crate::net::{UnixListener, UnixStream};
+// Datagram AF_UNIX is unavailable on emscripten's node backend (stream-only).
+#[cfg(not(target_os = "emscripten"))]
+use crate::net::UnixDatagram;
 
 cfg_net_unix! {
     /// A Unix socket that has not yet been converted to a [`UnixStream`], [`UnixDatagram`], or
@@ -92,6 +95,14 @@ cfg_net_unix! {
 }
 
 impl UnixSocket {
+    // emscripten's node backend has no `getsockopt(SO_TYPE)`, and datagram
+    // sockets are unavailable there, so every `UnixSocket` is a stream.
+    #[cfg(target_os = "emscripten")]
+    fn ty(&self) -> socket2::Type {
+        socket2::Type::STREAM
+    }
+
+    #[cfg(not(target_os = "emscripten"))]
     fn ty(&self) -> socket2::Type {
         self.inner.r#type().unwrap()
     }
@@ -104,6 +115,7 @@ impl UnixSocket {
     ///
     /// On success, the newly created [`UnixSocket`] is returned. If an error is
     /// encountered, it is returned instead.
+    #[cfg(not(target_os = "emscripten"))]
     pub fn new_datagram() -> io::Result<UnixSocket> {
         UnixSocket::new(socket2::Type::DGRAM)
     }
@@ -227,6 +239,7 @@ impl UnixSocket {
     /// Calling this function on a socket created by [`new_stream`] will return an error.
     ///
     /// [`new_stream`]: `UnixSocket::new_stream`
+    #[cfg(not(target_os = "emscripten"))]
     pub fn datagram(self) -> io::Result<UnixDatagram> {
         if self.ty() == socket2::Type::STREAM {
             return Err(io::Error::new(
