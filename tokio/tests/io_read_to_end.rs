@@ -16,6 +16,11 @@ use tokio::io::{AsyncRead, AsyncReadExt, ReadBuf};
 use tokio_test::assert_ok;
 use tokio_test::io::Builder;
 
+mod support {
+    pub mod io_coop;
+}
+use support::io_coop::ByteAtATimeReader;
+
 #[tokio::test]
 async fn read_to_end() {
     let mut buf = vec![];
@@ -145,4 +150,33 @@ async fn read_to_end_grows_capacity_if_unfit() {
         .unwrap();
     // *4 since it doubles when it doesn't fit and again when reaching EOF
     assert_eq!(buf.capacity(), initial_capacity * 4);
+}
+
+#[tokio::test]
+async fn always_ready_reads_are_cooperative() {
+    let expected = b"abcd".repeat(64);
+    let mut reader = ByteAtATimeReader {
+        data: &expected,
+        interruptions_remaining: 0,
+    };
+    let mut output = Vec::new();
+    let mut read = tokio_test::task::spawn(reader.read_to_end(&mut output));
+
+    tokio_test::assert_pending!(read.poll());
+    assert_eq!(read.await.unwrap(), expected.len());
+    assert_eq!(output, expected);
+}
+#[tokio::test]
+async fn read_to_end_interrupted_is_cooperative() {
+    let expected = b"abcd";
+    let mut reader = ByteAtATimeReader {
+        data: expected,
+        interruptions_remaining: 256,
+    };
+    let mut output = Vec::new();
+    let mut read = tokio_test::task::spawn(reader.read_to_end(&mut output));
+
+    tokio_test::assert_pending!(read.poll());
+    assert_eq!(read.await.unwrap(), expected.len());
+    assert_eq!(output, expected);
 }
