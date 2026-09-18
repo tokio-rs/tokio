@@ -306,9 +306,10 @@ pub(crate) fn trace_leaf(cx: &mut task::Context<'_>) -> Poll<()> {
         };
         leaf_fn(&meta);
 
-        // Wake the leaf, not just the enclosing Tokio task: sub-executors may
-        // only poll children whose own wakers have fired. As with `yield_now`,
-        // defer the wake until the scheduler regains control.
+        // Returning `Pending` from `trace_leaf` may prevent the calling future
+        // from registering its waker. Wake that future so it can be polled again
+        // outside `trace_with`. As with `yield_now`, defer the wake until the
+        // scheduler regains control.
         context::with_scheduler(|scheduler| {
             if let Some(scheduler) = scheduler {
                 match scheduler {
