@@ -24,6 +24,8 @@ pin_project! {
 /// This function writes multiple (possibly non-contiguous) buffers into the writer,
 /// using the `writev` syscall to potentially write in a single system call.
 ///
+/// Interrupted writes are retried. Other errors are returned immediately.
+///
 /// Equivalent to:
 ///
 /// ```ignore
@@ -32,7 +34,11 @@ pin_project! {
 ///     mut bufs: &mut [IoSlice<'_>]
 /// ) -> io::Result<()> {
 ///     while !bufs.is_empty() {
-///         let n = write_vectored(writer, bufs).await?;
+///         let n = match write_vectored(writer, bufs).await {
+///             Ok(n) => n,
+///             Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+///             Err(e) => return Err(e),
+///         };
 ///         if n == 0 {
 ///             return Err(io::ErrorKind::WriteZero.into());
 ///         }
@@ -115,7 +121,10 @@ where
             // drop empty buffers at the start
             *me.bufs = &mut mem::take(me.bufs)[non_empty..];
 
-            let n = ready!(Pin::new(&mut *me.writer).poll_write_vectored(cx, me.bufs))?;
+            let n = match ready!(Pin::new(&mut *me.writer).poll_write_vectored(cx, me.bufs)) {
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                res => res?,
+            };
             if n == 0 {
                 return Poll::Ready(Err(io::ErrorKind::WriteZero.into()));
             }
