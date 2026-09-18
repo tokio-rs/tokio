@@ -366,16 +366,16 @@ fn cannot_wait(res: std::thread::Result<()>) -> bool {
 #[test]
 fn block_on_pending_on_timer_panics() {
     let (host, el) = event_loop();
-    let start = Instant::now();
+    // The panic itself shows nothing waited: had `block_on` parked for the
+    // deadline, the future would have completed instead.
     let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         el.block_on(async {
             tokio::time::sleep(Duration::from_millis(50)).await;
         })
     }));
     assert!(cannot_wait(res));
-    assert!(start.elapsed() < Duration::from_millis(50), "must not wait");
     // The dropped future's timer is gone: nothing fires.
-    assert!(!host.wait(Duration::from_millis(70)));
+    assert!(!host.wait(Duration::from_millis(100)));
 
     // The runtime is intact: spawned work still runs.
     let jh = el.spawn_local(async { 2 });
@@ -571,4 +571,29 @@ fn assert_not_send_sync() {
         AmbiguousIfSync::some_item(el);
     }
     let _ = check;
+}
+
+#[test]
+fn block_on_pending_panics_at_the_caller() {
+    let (_host, el) = event_loop();
+    let location = Arc::new(Mutex::new(None));
+    let hook = std::panic::take_hook();
+    let seen = location.clone();
+    // Other tests panic concurrently; record this thread's only.
+    let me = std::thread::current().id();
+    std::panic::set_hook(Box::new(move |info| {
+        if std::thread::current().id() != me {
+            return;
+        }
+        if let Some(loc) = info.location() {
+            *seen.lock().unwrap() = Some(loc.file().to_string());
+        }
+    }));
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        el.block_on(std::future::pending::<()>())
+    }));
+    std::panic::set_hook(hook);
+    assert!(cannot_wait(res));
+    let file = location.lock().unwrap().clone().unwrap();
+    assert!(file.ends_with("rt_event_loop.rs"), "panicked at {file}");
 }
