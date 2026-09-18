@@ -634,6 +634,37 @@ macro_rules! cfg_unstable {
     };
 }
 
+/// `EventLoop`: a reactor the host can watch (mio's fd-backed selectors),
+/// under `tokio_unstable`.
+macro_rules! cfg_event_loop {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(
+                tokio_unstable,
+                unix,
+                feature = "rt",
+                feature = "net",
+                not(mio_unsupported_force_poll_poll),
+                not(any(
+                    target_os = "aix",
+                    target_os = "espidf",
+                    target_os = "nuttx",
+                    target_os = "fuchsia",
+                    target_os = "haiku",
+                    target_os = "hermit",
+                    target_os = "hurd",
+                    target_os = "nto",
+                    target_os = "vita",
+                    target_os = "cygwin",
+                    target_os = "horizon"
+                )),
+            ))]
+            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, unix, feature = "rt", feature = "net"))))]
+            $item
+        )*
+    };
+}
+
 macro_rules! cfg_not_trace {
     ($($item:item)*) => {
         $(

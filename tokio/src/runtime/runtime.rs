@@ -129,6 +129,16 @@ pub(super) enum Scheduler {
 }
 
 impl Runtime {
+    cfg_event_loop! {
+        pub(crate) fn current_thread(&self) -> &CurrentThread {
+            match &self.scheduler {
+                Scheduler::CurrentThread(s) => s,
+                #[cfg(feature = "rt-multi-thread")]
+                Scheduler::MultiThread(_) => unreachable!("event loops are current_thread"),
+            }
+        }
+    }
+
     pub(super) fn from_parts(
         scheduler: Scheduler,
         handle: Handle,
