@@ -65,7 +65,12 @@ impl Driver {
                 signal: signal_handle,
                 time: time_handle,
                 clock,
-                #[cfg(all(tokio_unstable, feature = "rt", not(loom), not(target_family = "wasm")))]
+                #[cfg(all(
+                    tokio_unstable,
+                    feature = "rt",
+                    not(loom),
+                    not(target_family = "wasm")
+                ))]
                 host: std::sync::OnceLock::new(),
             },
         ))

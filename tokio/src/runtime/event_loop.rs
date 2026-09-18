@@ -241,9 +241,7 @@ impl<R: Scheduler> Drop for Shared<R> {
     fn drop(&mut self) {
         if let Some(driver) = self.reactor.take().and_then(|r| r.stop(&self.handle)) {
             let handle = self.handle.inner.as_current_thread();
-            self.runtime
-                .current_thread()
-                .restore_driver(handle, driver);
+            self.runtime.current_thread().restore_driver(handle, driver);
         }
     }
 }
