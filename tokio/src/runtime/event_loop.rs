@@ -231,9 +231,13 @@ impl<R: Scheduler> Shared<R> {
     fn block_on<F: Future>(&self, future: F) -> Result<F::Output, WouldBlock> {
         self.check_thread();
         let handle = self.handle.inner.as_current_thread();
-        context::enter_runtime(&self.handle.inner, false, |_| {
+        let (ret, busy) = context::enter_runtime(&self.handle.inner, false, |_| {
             self.runtime.current_thread().block_on_ready(handle, future)
-        })
+        });
+        if busy {
+            self.handle.inner.driver().wake_host();
+        }
+        ret
     }
 }
 
