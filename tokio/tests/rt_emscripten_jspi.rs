@@ -237,3 +237,20 @@ async fn farther_timer_survives_nearer_timer_firing() {
     near.await.unwrap();
     waiter.await.unwrap();
 }
+
+// A host activation can spawn onto the parked runtime: `tokio::spawn` sees
+// the entered runtime's handle, and the spawn unparks the root to run it.
+#[test]
+fn host_activation_spawns_onto_parked_runtime() {
+    require_jspi!();
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<u32>(2);
+    let tx2 = tx.clone();
+    let runtime = rt();
+    let handle = runtime.handle().clone();
+    host_callback(10, move || {
+        tokio::spawn(async move { tx.send(1).await.unwrap() });
+        handle.spawn(async move { tx2.send(2).await.unwrap() });
+    });
+    let out = runtime.block_on(async { rx.recv().await.unwrap() + rx.recv().await.unwrap() });
+    assert_eq!(out, 3);
+}
