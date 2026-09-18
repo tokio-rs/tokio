@@ -37,6 +37,40 @@ pub(crate) fn host_turn<R>(f: impl FnOnce() -> R) -> R {
     f()
 }
 
+#[cfg(all(tokio_unstable, feature = "rt"))]
+thread_local! {
+    /// Work for the moment no runtime is entered on this thread. A hosted
+    /// event loop's callback arriving while a `block_on` is suspended through
+    /// JSPI waits here rather than polling for the exit.
+    static AFTER_EXIT: std::cell::RefCell<Vec<Box<dyn FnOnce()>>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// If a runtime is entered on this thread, queues `f` to run once it exits
+/// and returns `true`; otherwise returns `false` without running it.
+#[cfg(all(tokio_unstable, feature = "rt"))]
+pub(crate) fn defer_after_runtime_exit(f: impl FnOnce() + 'static) -> bool {
+    let entered = crate::runtime::context::is_entered();
+    if entered {
+        AFTER_EXIT.with(|q| q.borrow_mut().push(Box::new(f)));
+    }
+    entered
+}
+
+/// Held by the runtime's enter guard; its drop runs the deferred work, after
+/// the guard has cleared the entered state and the current handle.
+#[cfg(all(tokio_unstable, feature = "rt"))]
+pub(crate) struct RuntimeExit;
+
+#[cfg(all(tokio_unstable, feature = "rt"))]
+impl Drop for RuntimeExit {
+    fn drop(&mut self) {
+        for f in AFTER_EXIT.take() {
+            f();
+        }
+    }
+}
+
 pub(crate) fn in_host_turn() -> bool {
     #[cfg(all(tokio_unstable, feature = "rt"))]
     return HOST_TURN.with(Cell::get);
