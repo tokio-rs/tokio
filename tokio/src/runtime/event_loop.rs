@@ -40,8 +40,10 @@ use std::thread::ThreadId;
 /// carries it, and errors rather than wait.
 ///
 /// Like `LocalRuntime` the event loop is `!Send`: the host drives it on the
-/// thread that built it.
+/// thread that built it. [`Handle::block_on`] from another thread works as
+/// on a native runtime, since the driver is parked on a thread of its own.
 ///
+/// [`Handle::block_on`]: crate::runtime::Handle::block_on
 /// Dropping the `LocalEventLoop` shuts the runtime down as dropping a
 /// `LocalRuntime` does. The waker may be woken once more during the drop.
 ///
@@ -97,13 +99,18 @@ impl LocalEventLoop {
     /// remains afterwards the host is woken again at once, so it gets a turn
     /// between batches.
     ///
-    /// Call this whenever the waker is woken. Calling it at other times is
-    /// harmless.
+    /// Call this whenever the waker is woken. A wake does not guarantee work:
+    /// the runtime wakes the host from every path that would unpark a native
+    /// runtime's thread, some of which find nothing to run, so a drive that
+    /// does nothing is normal. Calling it without a wake is harmless too.
     ///
     /// # Panics
     ///
     /// Panics if called from within a runtime, or on a thread other than the
-    /// one that built the event loop.
+    /// one that built the event loop, or if a task panicked and the runtime
+    /// is configured to [shut down on unhandled panics].
+    ///
+    /// [shut down on unhandled panics]: crate::runtime::Builder::unhandled_panic
     pub fn drive(&self) {
         self.shared.drive();
     }
@@ -117,9 +124,11 @@ impl LocalEventLoop {
     /// # Panics
     ///
     /// Panics if called from within a runtime, or on a thread other than the
-    /// one that built the event loop.
+    /// one that built the event loop, or if a task panicked and the runtime
+    /// is configured to [shut down on unhandled panics].
     ///
     /// [`Runtime::block_on`]: crate::runtime::Runtime::block_on
+    /// [shut down on unhandled panics]: crate::runtime::Builder::unhandled_panic
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> Result<F::Output, WouldBlock> {
         self.shared.block_on(future)
@@ -128,7 +137,8 @@ impl LocalEventLoop {
 
 #[derive(Debug)]
 struct Shared {
-    /// Dropped last: its shutdown needs the driver back.
+    /// Its shutdown needs the driver back, which `Drop` restores before the
+    /// fields drop.
     runtime: LocalRuntime,
     handle: Handle,
     reactor: OnceLock<Reactor>,

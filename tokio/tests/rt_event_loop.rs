@@ -136,6 +136,46 @@ fn busy_batch_wakes_again() {
 }
 
 #[test]
+fn inject_leftovers_wake_again() {
+    // Spawns from host context land in the inject queue. A batch that ends
+    // at `event_interval` with more of them queued must wake the host: the
+    // wake those spawns caused was consumed by this drive.
+    let (host, el) = event_loop();
+    let ran = Arc::new(AtomicUsize::new(0));
+    for _ in 0..6 {
+        let r = ran.clone();
+        el.spawn_local(async move {
+            r.fetch_add(1, SeqCst);
+        });
+    }
+    assert!(host.woken_now());
+    el.drive();
+    assert_eq!(ran.load(SeqCst), 4, "one event_interval(4) batch");
+    assert!(
+        host.is_woken(),
+        "the remaining two are queued and need a drive"
+    );
+    host.pump(|| el.drive(), || ran.load(SeqCst) == 6);
+}
+
+#[test]
+fn block_on_leaving_inject_tasks_wakes() {
+    let (host, el) = event_loop();
+    let ran = Arc::new(AtomicUsize::new(0));
+    for _ in 0..6 {
+        let r = ran.clone();
+        el.spawn_local(async move {
+            r.fetch_add(1, SeqCst);
+        });
+    }
+    // The future is ready first, before any batch runs.
+    assert_eq!(el.block_on(async { 1 }), Ok(1));
+    assert!(ran.load(SeqCst) < 6);
+    assert!(host.is_woken());
+    host.pump(|| el.drive(), || ran.load(SeqCst) == 6);
+}
+
+#[test]
 fn timer_wakes_at_deadline() {
     let (host, el) = event_loop();
     let start = Instant::now();
@@ -361,6 +401,18 @@ fn block_on_inside_runtime_panics() {
 }
 
 #[test]
+fn unhandled_panic_shutdown_panics_drive() {
+    let host = Arc::new(Host::default());
+    let el = Builder::new_current_thread()
+        .unhandled_panic(tokio::runtime::UnhandledPanic::ShutdownRuntime)
+        .build_local_event_loop(Default::default(), host.waker())
+        .unwrap();
+    el.spawn_local(async { panic!("task panicked") });
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| el.drive()));
+    assert!(res.is_err(), "drive reports the shutdown as a panic");
+}
+
+#[test]
 fn drop_cancels_tasks() {
     struct Flag(Arc<AtomicUsize>);
     impl Drop for Flag {
@@ -484,4 +536,25 @@ fn without_any_driver() {
         .unwrap();
     host.pump(|| el.drive(), || jh.is_finished());
     assert_eq!(el.block_on(jh).unwrap().unwrap(), 3);
+}
+
+// `LocalEventLoop` is `!Send` and `!Sync`, like `LocalRuntime`: the method
+// resolves to the blanket impl only when the auto trait is absent.
+#[allow(dead_code)]
+fn assert_not_send_sync() {
+    trait AmbiguousIfSend<A> {
+        fn some_item(&self) {}
+    }
+    impl<T: ?Sized> AmbiguousIfSend<()> for T {}
+    impl<T: ?Sized + Send> AmbiguousIfSend<u8> for T {}
+    trait AmbiguousIfSync<A> {
+        fn some_item(&self) {}
+    }
+    impl<T: ?Sized> AmbiguousIfSync<()> for T {}
+    impl<T: ?Sized + Sync> AmbiguousIfSync<u8> for T {}
+    fn check(el: &LocalEventLoop) {
+        AmbiguousIfSend::some_item(el);
+        AmbiguousIfSync::some_item(el);
+    }
+    let _ = check;
 }

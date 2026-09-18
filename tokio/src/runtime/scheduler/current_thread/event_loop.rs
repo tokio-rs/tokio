@@ -13,13 +13,9 @@ use std::thread;
 
 impl CurrentThread {
     /// Run up to `event_interval` tasks. Returns whether ready work remains
-    /// in the local queue. Must be called inside `enter_runtime`.
+    /// queued. Must be called inside `enter_runtime`.
     pub(crate) fn drive_batch(&self, handle: &Arc<Handle>) -> bool {
-        // The core is checked out further up this stack, which observes any
-        // work this drive was requested for.
-        let Some(core) = self.take_core(handle) else {
-            return false;
-        };
+        let core = self.take_core(handle).expect("core checked out");
         handle
             .shared
             .worker_metrics
@@ -29,15 +25,14 @@ impl CurrentThread {
 
     /// Poll `future` to completion from ready work alone, failing where a
     /// native `block_on` would park. Also returns whether ready work remains
-    /// in the local queue. Must be called inside `enter_runtime`.
+    /// queued. Must be called inside `enter_runtime`.
     pub(crate) fn block_on_ready<F: Future>(
         &self,
         handle: &Arc<Handle>,
         future: F,
     ) -> (Result<F::Output, WouldBlock>, bool) {
-        let Some(core) = self.take_core(handle) else {
-            return (Err(WouldBlock(())), false);
-        };
+        // Nested entry and foreign threads are rejected before this point.
+        let core = self.take_core(handle).expect("core checked out");
         handle
             .shared
             .worker_metrics
@@ -61,6 +56,16 @@ impl CurrentThread {
                 core.driver = Some(driver);
             }
         }
+    }
+}
+
+impl Core {
+    /// Ready work in either queue. A batch ending by `Interval` can leave
+    /// tasks in the inject queue with the local one empty; the wake that
+    /// queued them was consumed by this drive, so the host must be woken
+    /// again for them.
+    fn has_ready_work(&self, handle: &Handle) -> bool {
+        !self.tasks.is_empty() || !handle.shared.inject.is_empty()
     }
 }
 
@@ -111,7 +116,7 @@ impl CoreGuard<'_> {
             let (core, batch) = context.run_batch(core);
             let busy = match batch {
                 Batch::Panicked => None,
-                _ => Some(!core.tasks.is_empty()),
+                _ => Some(core.has_ready_work(&context.handle)),
             };
             (core, busy)
         });
@@ -140,7 +145,7 @@ impl CoreGuard<'_> {
                     });
                     core = c;
                     if let Ready(v) = res {
-                        let busy = !core.tasks.is_empty();
+                        let busy = core.has_ready_work(handle);
                         return (core, Some((Ok(v), busy)));
                     }
                 }
