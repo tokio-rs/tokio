@@ -42,6 +42,9 @@ fn host_callback(f: impl FnOnce() + 'static) {
 
 /// Assert `f` panics with the targeted would-suspend message.
 fn assert_panics_cannot_block_on(f: impl FnOnce()) {
+    if cfg!(not(panic = "unwind")) {
+        return;
+    }
     let err = catch_unwind(AssertUnwindSafe(f)).expect_err("expected a would-suspend panic");
     let msg = err
         .downcast_ref::<String>()
