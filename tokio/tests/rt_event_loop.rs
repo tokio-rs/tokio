@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", tokio_unstable, not(target_family = "wasm")))]
 
-//! `EventLoop` / `LocalEventLoop` driven the way a host would: a waker that
+//! `LocalEventLoop` driven the way a host would: a waker that
 //! flags "drive me", and a host loop that drives when flagged. The waker is
 //! the whole contract, so the tests pin when it is and is not woken as much
 //! as what a drive does.
@@ -13,7 +13,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::task::{Wake, Waker};
 use std::time::{Duration, Instant};
 
-use tokio::runtime::{Builder, EventLoop, LocalEventLoop, WouldBlock};
+use tokio::runtime::{Builder, LocalEventLoop, WouldBlock};
 use tokio::sync::oneshot;
 
 /// The host's side of the contract: a flag the runtime raises.
@@ -69,17 +69,7 @@ impl Host {
     }
 }
 
-fn event_loop() -> (Arc<Host>, EventLoop) {
-    let host = Arc::new(Host::default());
-    let el = Builder::new_current_thread()
-        .enable_all()
-        .event_interval(4)
-        .build_event_loop(host.waker())
-        .unwrap();
-    (host, el)
-}
-
-fn local_event_loop() -> (Arc<Host>, LocalEventLoop) {
+fn event_loop() -> (Arc<Host>, LocalEventLoop) {
     let host = Arc::new(Host::default());
     let el = Builder::new_current_thread()
         .enable_all()
@@ -101,7 +91,7 @@ fn spawn_wakes_and_queues_until_driven() {
     let ran = Arc::new(AtomicUsize::new(0));
 
     let ran2 = ran.clone();
-    let jh = el.spawn(async move {
+    let jh = el.spawn_local(async move {
         ran2.fetch_add(1, SeqCst);
         3
     });
@@ -127,7 +117,7 @@ fn busy_batch_wakes_again() {
     let turns = Arc::new(AtomicUsize::new(0));
 
     let t = turns.clone();
-    let jh = el.spawn(async move {
+    let jh = el.spawn_local(async move {
         for _ in 0..20 {
             tokio::task::yield_now().await;
             t.fetch_add(1, SeqCst);
@@ -149,7 +139,7 @@ fn busy_batch_wakes_again() {
 fn timer_wakes_at_deadline() {
     let (host, el) = event_loop();
     let start = Instant::now();
-    let jh = el.spawn(async { tokio::time::sleep(Duration::from_millis(50)).await });
+    let jh = el.spawn_local(async { tokio::time::sleep(Duration::from_millis(50)).await });
 
     host.pump(|| el.drive(), || jh.is_finished());
     assert!(start.elapsed() >= Duration::from_millis(50));
@@ -165,13 +155,13 @@ fn timer_wakes_at_deadline() {
 #[test]
 fn nearer_timer_rearms() {
     let (host, el) = event_loop();
-    let jh_far = el.spawn(async { tokio::time::sleep(Duration::from_secs(10)).await });
+    let jh_far = el.spawn_local(async { tokio::time::sleep(Duration::from_secs(10)).await });
     assert!(host.woken_now());
     el.drive();
 
     // The driver is parked for the far deadline; a nearer timer must
     // re-arm it rather than wait it out.
-    let jh_near = el.spawn(async { tokio::time::sleep(Duration::from_millis(10)).await });
+    let jh_near = el.spawn_local(async { tokio::time::sleep(Duration::from_millis(10)).await });
     let start = Instant::now();
     host.pump(|| el.drive(), || jh_near.is_finished());
     assert!(start.elapsed() < Duration::from_secs(1));
@@ -181,7 +171,7 @@ fn nearer_timer_rearms() {
 #[test]
 fn cancelled_timer_does_not_wake() {
     let (host, el) = event_loop();
-    let jh = el.spawn(async {
+    let jh = el.spawn_local(async {
         tokio::time::timeout(Duration::from_millis(30), std::future::ready(1))
             .await
             .unwrap()
@@ -197,7 +187,7 @@ fn cancelled_timer_does_not_wake() {
 fn wake_from_another_thread() {
     let (host, el) = event_loop();
     let (tx, rx) = oneshot::channel::<u32>();
-    let jh = el.spawn(async move { rx.await.unwrap() });
+    let jh = el.spawn_local(async move { rx.await.unwrap() });
     assert!(host.woken_now());
     el.drive();
     assert!(!jh.is_finished());
@@ -218,8 +208,8 @@ fn cross_loop_wake() {
     let (host_b, b) = event_loop();
     let (tx, rx) = oneshot::channel::<u32>();
 
-    let jh_b = b.spawn(async move { rx.await.unwrap() });
-    let jh_a = a.spawn(async move {
+    let jh_b = b.spawn_local(async move { rx.await.unwrap() });
+    let jh_a = a.spawn_local(async move {
         tokio::time::sleep(Duration::from_millis(5)).await;
         tx.send(9).unwrap();
     });
@@ -244,7 +234,7 @@ fn tcp_round_trip() {
     let (host_c, client) = event_loop();
     let (addr_tx, addr_rx) = oneshot::channel();
 
-    let jh_s = server.spawn(async move {
+    let jh_s = server.spawn_local(async move {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         addr_tx.send(listener.local_addr().unwrap()).unwrap();
         let (mut sock, _) = listener.accept().await.unwrap();
@@ -253,7 +243,7 @@ fn tcp_round_trip() {
         assert_eq!(&buf, b"hello");
         sock.write_all(b"world").await.unwrap();
     });
-    let jh_c = client.spawn(async move {
+    let jh_c = client.spawn_local(async move {
         let addr = addr_rx.await.unwrap();
         let mut sock = TcpStream::connect(addr).await.unwrap();
         sock.write_all(b"hello").await.unwrap();
@@ -336,7 +326,7 @@ fn block_on_would_block_on_timer() {
     assert!(start.elapsed() < Duration::from_millis(50), "must not wait");
 
     // The runtime is intact: spawned work still runs.
-    let jh = el.spawn(async { 2 });
+    let jh = el.spawn_local(async { 2 });
     host.pump(|| el.drive(), || jh.is_finished());
 }
 
@@ -354,7 +344,7 @@ fn block_on_would_block_leaves_spawned_tasks() {
     assert!(res.is_err());
 
     // The task the future spawned outlives it and completes from drives.
-    let jh = el.spawn(async move { rx.await.unwrap() });
+    let jh = el.spawn_local(async move { rx.await.unwrap() });
     host.pump(|| el.drive(), || jh.is_finished());
     assert_eq!(el.block_on(jh).unwrap().unwrap(), 5);
 }
@@ -362,7 +352,7 @@ fn block_on_would_block_leaves_spawned_tasks() {
 #[test]
 fn block_on_inside_runtime_panics() {
     let (_host, el) = event_loop();
-    let el = Arc::new(el);
+    let el = Rc::new(el);
     let el2 = el.clone();
     let res = el.block_on(async move {
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| el2.block_on(async {}))).is_err()
@@ -382,7 +372,7 @@ fn drop_cancels_tasks() {
     let (_host, el) = event_loop();
     let dropped = Arc::new(AtomicUsize::new(0));
     let flag = Flag(dropped.clone());
-    el.spawn(async move {
+    el.spawn_local(async move {
         let _flag = flag;
         std::future::pending::<()>().await;
     });
@@ -397,7 +387,7 @@ fn drop_while_parked_on_io_and_timer() {
     // The driver thread is parked in the reactor with a timer armed and a
     // listener registered; drop must unpark and join it.
     let (host, el) = event_loop();
-    let jh = el.spawn(async {
+    let jh = el.spawn_local(async {
         let _listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         tokio::time::sleep(Duration::from_secs(10)).await;
     });
@@ -410,8 +400,22 @@ fn drop_while_parked_on_io_and_timer() {
 }
 
 #[test]
-fn local_event_loop_spawn_local() {
-    let (host, el) = local_event_loop();
+fn spawn_from_another_thread_via_handle() {
+    let (host, el) = event_loop();
+    let handle = el.handle().clone();
+    std::thread::spawn(move || {
+        handle.spawn(async { 4 });
+    })
+    .join()
+    .unwrap();
+    assert!(host.woken_now());
+    el.drive();
+    assert_eq!(el.handle().metrics().num_alive_tasks(), 0);
+}
+
+#[test]
+fn spawn_local_with_rc() {
+    let (host, el) = event_loop();
     let value = Rc::new(Cell::new(0));
     let v = value.clone();
     let jh = el.spawn_local(async move {
@@ -425,8 +429,8 @@ fn local_event_loop_spawn_local() {
 }
 
 #[test]
-fn local_event_loop_rejects_foreign_thread_drive() {
-    let (_host, el) = local_event_loop();
+fn rejects_foreign_thread_drive() {
+    let (_host, el) = event_loop();
     struct SendPtr(*const LocalEventLoop);
     unsafe impl Send for SendPtr {}
     let ptr = SendPtr(&el);
@@ -443,13 +447,13 @@ fn local_event_loop_rejects_foreign_thread_drive() {
 #[test]
 fn drive_inside_runtime_panics() {
     let (_host, el) = event_loop();
-    let el = Arc::new(el);
+    let el = Rc::new(el);
     let el2 = el.clone();
-    let jh = el.spawn(async move {
+    let jh = el.spawn_local(async move {
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| el2.drive())).is_err()
     });
     el.drive();
-    assert_eq!(el.block_on(jh).unwrap().unwrap(), true);
+    assert!(el.block_on(jh).unwrap().unwrap());
 }
 
 #[test]
@@ -457,9 +461,9 @@ fn without_io_driver() {
     let host = Arc::new(Host::default());
     let el = Builder::new_current_thread()
         .enable_time()
-        .build_event_loop(host.waker())
+        .build_local_event_loop(Default::default(), host.waker())
         .unwrap();
-    let jh = el.spawn(async {
+    let jh = el.spawn_local(async {
         tokio::time::sleep(Duration::from_millis(5)).await;
         1
     });
@@ -470,19 +474,14 @@ fn without_io_driver() {
 fn without_any_driver() {
     let host = Arc::new(Host::default());
     let el = Builder::new_current_thread()
-        .build_event_loop(host.waker())
+        .build_local_event_loop(Default::default(), host.waker())
         .unwrap();
     let (tx, rx) = oneshot::channel::<u32>();
-    let jh = el.spawn(async move { rx.await.unwrap() });
+    let jh = el.spawn_local(async move { rx.await.unwrap() });
     el.drive();
     std::thread::spawn(move || tx.send(3).unwrap())
         .join()
         .unwrap();
     host.pump(|| el.drive(), || jh.is_finished());
     assert_eq!(el.block_on(jh).unwrap().unwrap(), 3);
-}
-
-fn _assert_bounds() {
-    fn send_sync<T: Send + Sync>() {}
-    send_sync::<EventLoop>();
 }

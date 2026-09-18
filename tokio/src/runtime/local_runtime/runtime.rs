@@ -51,14 +51,10 @@ pub(crate) enum LocalRuntimeScheduler {
 }
 
 cfg_event_loop! {
-    impl crate::runtime::event_loop::Scheduler for LocalRuntime {
-        fn current_thread(&self) -> &CurrentThread {
+    impl LocalRuntime {
+        pub(crate) fn current_thread(&self) -> &CurrentThread {
             let LocalRuntimeScheduler::CurrentThread(s) = &self.scheduler;
             s
-        }
-
-        fn handle(&self) -> &Handle {
-            &self.handle
         }
     }
 }
