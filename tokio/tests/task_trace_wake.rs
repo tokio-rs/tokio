@@ -38,9 +38,10 @@ fn channels(count: usize) -> (Vec<oneshot::Receiver<usize>>, impl Future<Output 
 }
 
 async fn assert_progress<F: Future>(task: &mut Spawn<F>) -> F::Output {
-    // Yield so Tokio can drain the deferred-wake queue.
-    // Poll the parent even without a wake: a parent re-poll alone cannot repair
-    // a lost child notification. Bound the loop so regressions fail, not hang.
+    // Poll the parent even without a wake. For combinators with a ready queue,
+    // this cannot poll a dequeued child until the child's waker re-enqueues it.
+    // Yield to let Tokio deliver deferred wakes, and bound retries so a missing
+    // wake fails the test instead of hanging.
     for _ in 0..10 {
         yield_now().await;
         if let Poll::Ready(output) = task.poll() {
@@ -206,7 +207,8 @@ async fn trace_with_futures_unordered_mutex_handoff() {
         .join()
         .unwrap();
 
-    // A releases the mutex to B, then both stop at their Tokio leaves.
+    // A releases the mutex to B. During capture, trace_leaf interrupts
+    // A's semaphore acquisition and B's mutex acquisition.
     let mut leaves = 0;
     assert!(trace_with(|| actor.as_mut().poll(&mut cx), |_| leaves += 1).is_pending());
     assert_eq!(leaves, 2);
@@ -215,8 +217,9 @@ async fn trace_with_futures_unordered_mutex_handoff() {
     assert!(mutex.try_lock().is_err());
     assert_eq!(sem.available_permits(), 4);
 
-    // Even repeated parent polls cannot recover a lost child wake. Yield
-    // between polls so Tokio can drain the deferred-wake queue.
+    // FuturesUnordered only polls children in its ready queue. The deferred
+    // wakes must re-enqueue A and B; polling the parent alone cannot do that.
+    // Yield between polls so Tokio can deliver those wakes.
     for _ in 0..50 {
         if actor.as_mut().poll(&mut cx).is_ready() {
             assert!(done_a.load(Ordering::SeqCst));
