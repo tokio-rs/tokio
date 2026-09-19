@@ -26,6 +26,20 @@ async fn read_to_string() {
 }
 
 #[tokio::test]
+async fn read_to_string_retries_interrupted() {
+    let mut mock = Builder::new()
+        .read(b"hello")
+        .read_error(io::Error::from(io::ErrorKind::Interrupted))
+        .read(b" world")
+        .build();
+    let mut buf = String::new();
+
+    let n = mock.read_to_string(&mut buf).await.unwrap();
+    assert_eq!(n, 11);
+    assert_eq!(buf, "hello world");
+}
+
+#[tokio::test]
 async fn to_string_does_not_truncate_on_utf8_error() {
     let data = vec![0xff, 0xff, 0xff];
 

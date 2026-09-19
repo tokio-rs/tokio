@@ -9,7 +9,13 @@
 //! the runner's stdin is `/dev/null`. The contract worth pinning is "a stdin
 //! read returns rather than deadlocking", not a specific errno.
 
-#![cfg(all(target_os = "emscripten", feature = "io-std"))]
+#![cfg(all(
+    target_os = "emscripten",
+    feature = "io-std",
+    feature = "io-util",
+    feature = "rt",
+    feature = "macros"
+))]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 

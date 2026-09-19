@@ -21,6 +21,12 @@ use tokio::runtime::{Builder, Runtime};
 use tokio_test::assert_pending;
 use tokio_util::task::TaskTracker;
 
+use crate::support::io_uring::uring_fs_op_in_use;
+
+mod support {
+    pub(crate) mod io_uring;
+}
+
 fn multi_rt(n: usize) -> Box<dyn Fn() -> Runtime> {
     Box::new(move || {
         Builder::new_multi_thread()
@@ -48,6 +54,10 @@ fn rt_combinations() -> Vec<Box<dyn Fn() -> Runtime>> {
 
 #[test]
 fn shutdown_runtime_while_performing_io_uring_ops() {
+    if !uring_fs_op_in_use(io_uring::opcode::Read::CODE) {
+        return;
+    }
+
     fn run(rt: Runtime) {
         let (done_tx, done_rx) = mpsc::channel();
         let (_tmp, path) = create_tmp_files(1);
@@ -133,6 +143,10 @@ async fn read_small_large_files() {
 
 #[tokio::test]
 async fn cancel_op_future() {
+    if !uring_fs_op_in_use(io_uring::opcode::Read::CODE) {
+        return;
+    }
+
     let (_tmp_file, path): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(1);
     let path = path[0].clone();
 
@@ -143,7 +157,6 @@ async fn cancel_op_future() {
         tokio::pin!(fut);
 
         poll_fn(move |_| {
-            // If io_uring is enabled (and not falling back to the thread pool),
             // the first poll should return Pending.
             assert_pending!(fut.as_mut().poll(&mut Context::from_waker(Waker::noop())));
             tx.send(true).unwrap();

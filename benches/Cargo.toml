@@ -106,5 +106,10 @@ name = "remote_spawn"
 path = "remote_spawn.rs"
 harness = false
 
+[[bench]]
+name = "net_accept"
+path = "net_accept.rs"
+harness = false
+
 [lints]
 workspace = true

@@ -165,7 +165,6 @@ cfg_rt! {
         CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or_default()
     }
 
-    #[cfg(tokio_unstable)]
     pub(crate) fn worker_index() -> Option<usize> {
         with_scheduler(|ctx| ctx.and_then(|c| c.worker_index()))
     }

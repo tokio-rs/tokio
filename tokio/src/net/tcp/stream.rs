@@ -165,6 +165,18 @@ impl TcpStream {
         Ok(TcpStream { io })
     }
 
+    /// A stream returned by `accept`: assumed readable and writable, so that
+    /// its first read and write try the socket instead of waiting for the
+    /// driver's first event (see `Registration::assume_ready`).
+    pub(crate) fn new_accepted(connected: mio::net::TcpStream) -> io::Result<TcpStream> {
+        let stream = TcpStream::new(connected)?;
+        stream
+            .io
+            .registration()
+            .assume_ready(Ready::READABLE | Ready::WRITABLE);
+        Ok(stream)
+    }
+
     /// Creates new `TcpStream` from a `std::net::TcpStream`.
     ///
     /// This function is intended to be used to wrap a TCP stream from the

@@ -1,5 +1,5 @@
 use crate::runtime::{scheduler, Timer};
-use crate::time::{error::Error, Duration, Instant};
+use crate::time::{error::Error, safe_delay, Duration, Instant};
 use crate::util::trace;
 
 use pin_project_lite::pin_project;
@@ -121,12 +121,8 @@ pub fn sleep_until(deadline: Instant) -> Sleep {
 #[cfg_attr(docsrs, doc(alias = "wait"))]
 #[track_caller]
 pub fn sleep(duration: Duration) -> Sleep {
-    let location = trace::caller_location();
-
-    match Instant::now().checked_add(duration) {
-        Some(deadline) => Sleep::new_timeout(deadline, location),
-        None => Sleep::new_timeout(Instant::far_future(), location),
-    }
+    let deadline = Instant::now() + safe_delay(duration);
+    Sleep::new_timeout(deadline, trace::caller_location())
 }
 
 pin_project! {
@@ -296,10 +292,6 @@ impl Sleep {
         }
     }
 
-    pub(crate) fn far_future(location: Option<&'static Location<'static>>) -> Sleep {
-        Self::new_timeout(Instant::far_future(), location)
-    }
-
     /// Returns the instant at which the future will complete.
     pub fn deadline(&self) -> Instant {
         self.deadline
@@ -346,6 +338,8 @@ impl Sleep {
         *this.deadline = deadline;
 
         let handle = this.driver;
+        let time_source = handle.driver().time().time_source();
+        let deadline = time_source.deadline_to_tick(deadline);
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         {
@@ -358,12 +352,10 @@ impl Sleep {
                 tracing::trace_span!("runtime.resource.async_op.poll");
 
             let clock = handle.driver().clock();
-            let time_source = handle.driver().time().time_source();
             let now = time_source.now(clock);
-            let tick = time_source.deadline_to_tick(deadline);
             tracing::trace!(
                 target: "runtime::resource::state_update",
-                duration = tick.saturating_sub(now),
+                duration = deadline.saturating_sub(now),
                 duration.unit = "ms",
                 duration.op = "override",
             );
@@ -413,25 +405,25 @@ impl Sleep {
             Some(timer) => timer,
             None => {
                 let handle = this.driver;
+                let time_source = handle.driver().time().time_source();
+                let deadline = time_source.deadline_to_tick(*this.deadline);
 
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 {
                     let clock = handle.driver().clock();
-                    let time_source = handle.driver().time().time_source();
                     let now = time_source.now(clock);
-                    let tick = time_source.deadline_to_tick(*this.deadline);
                     tracing::trace!(
                         target: "runtime::resource::state_update",
-                        duration = tick.saturating_sub(now),
+                        duration = deadline.saturating_sub(now),
                         duration.unit = "ms",
                         duration.op = "override",
                     );
                 }
 
-                let timer = Timer::new(handle.clone(), *this.deadline);
+                let timer = Timer::new(handle.clone(), deadline);
                 this.timer.set(Some(timer));
                 let mut timer = this.timer.as_pin_mut().unwrap();
-                timer.as_mut().init(*this.deadline);
+                timer.as_mut().init(deadline);
                 timer
             }
         };

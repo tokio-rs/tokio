@@ -16,8 +16,15 @@ cfg_rt! {
     // runs the closure inline and hands back an already-completed future. The
     // public `task::spawn_blocking` is not routed through here and keeps its
     // native semantics. Pthread builds (`+atomics`) use the native pool.
+    //
+    // The completed future is wrapped in `Coop` so that polling it consumes
+    // task budget exactly like the native `task::JoinHandle::poll` does. The
+    // `fs` and `io-std` consumers rely on that budget for their yield points:
+    // without it a loop of always-ready file reads never returns `Pending`
+    // and starves every other task on the single-threaded runtime.
     #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
-    pub(crate) type JoinHandle<T> = std::future::Ready<Result<T, crate::task::JoinError>>;
+    pub(crate) type JoinHandle<T> =
+        crate::task::coop::Coop<std::future::Ready<Result<T, crate::task::JoinError>>>;
 
     #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
     pub(crate) fn spawn_blocking<F, R>(f: F) -> JoinHandle<R>
@@ -25,7 +32,7 @@ cfg_rt! {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        std::future::ready(Ok(f()))
+        crate::task::coop::cooperative(std::future::ready(Ok(f())))
     }
 
     #[cfg(all(target_os = "emscripten", not(target_feature = "atomics"), feature = "fs"))]

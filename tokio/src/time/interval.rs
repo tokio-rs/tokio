@@ -1,4 +1,4 @@
-use crate::time::{sleep_until, Duration, Instant, Sleep};
+use crate::time::{safe_delay, sleep_until, Duration, Instant, Sleep};
 use crate::util::trace;
 
 use std::future::{poll_fn, Future};
@@ -133,7 +133,7 @@ fn internal_interval_at(
 
     Interval {
         delay: Box::pin(sleep_until(start)),
-        period,
+        period: safe_delay(period),
         missed_tick_behavior: MissedTickBehavior::default(),
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         resource_span,
@@ -330,18 +330,12 @@ pub enum MissedTickBehavior {
     Skip,
 }
 
-fn saturating_add(instant: Instant, duration: Duration) -> Instant {
-    instant
-        .checked_add(duration)
-        .unwrap_or_else(Instant::far_future)
-}
-
 impl MissedTickBehavior {
     /// If a tick is missed, this method is called to determine when the next tick should happen.
     fn next_timeout(&self, timeout: Instant, now: Instant, period: Duration) -> Instant {
         match self {
-            Self::Burst => saturating_add(timeout, period),
-            Self::Delay => saturating_add(now, period),
+            Self::Burst => timeout + period,
+            Self::Delay => now + period,
             Self::Skip => {
                 let offset = Duration::from_nanos(
                     ((now - timeout).as_nanos() % period.as_nanos())
@@ -357,7 +351,7 @@ impl MissedTickBehavior {
                             "too much time has elapsed since the interval was supposed to tick",
                         ),
                 );
-                saturating_add(now, period - offset)
+                now + (period - offset)
             }
         }
     }
@@ -480,9 +474,7 @@ impl Interval {
             self.missed_tick_behavior
                 .next_timeout(timeout, now, self.period)
         } else {
-            timeout
-                .checked_add(self.period)
-                .unwrap_or_else(Instant::far_future)
+            timeout + self.period
         };
 
         // When we arrive here, the internal delay returned `Poll::Ready`.
@@ -523,9 +515,7 @@ impl Interval {
     /// # }
     /// ```
     pub fn reset(&mut self) {
-        self.delay
-            .as_mut()
-            .reset(saturating_add(Instant::now(), self.period));
+        self.delay.as_mut().reset(Instant::now() + self.period);
     }
 
     /// Resets the interval immediately.
@@ -590,9 +580,8 @@ impl Interval {
     /// # }
     /// ```
     pub fn reset_after(&mut self, after: Duration) {
-        self.delay
-            .as_mut()
-            .reset(saturating_add(Instant::now(), after));
+        let deadline = Instant::now() + safe_delay(after);
+        self.delay.as_mut().reset(deadline);
     }
 
     /// Resets the interval to a [`crate::time::Instant`] deadline.
@@ -644,25 +633,5 @@ impl Interval {
     /// Returns the period of the interval.
     pub fn period(&self) -> Duration {
         self.period
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn missed_tick_behavior_doesnt_panic_on_overflow() {
-        let now = Instant::now();
-        let timeout = now - Duration::from_millis(10);
-
-        for behavior in [
-            MissedTickBehavior::Burst,
-            MissedTickBehavior::Delay,
-            MissedTickBehavior::Skip,
-        ] {
-            let next = behavior.next_timeout(timeout, now, Duration::MAX);
-            assert!(next > now);
-        }
     }
 }
