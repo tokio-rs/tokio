@@ -42,8 +42,12 @@ impl<R: AsyncRead> BufReader<R> {
     }
 
     /// Creates a new `BufReader` with the specified buffer capacity.
+    ///
+    /// A capacity of zero is rounded up to one byte, because a zero-length
+    /// buffer can never be filled and would make every `AsyncBufRead`
+    /// operation report end-of-file.
     pub fn with_capacity(capacity: usize, inner: R) -> Self {
-        let buffer = vec![0; capacity];
+        let buffer = vec![0; capacity.max(1)];
         Self {
             inner,
             buf: buffer.into_boxed_slice(),
