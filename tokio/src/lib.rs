@@ -481,20 +481,14 @@
 //! their operations inline on the calling thread rather than on the blocking
 //! pool, in pthreads builds too.
 //!
-//! When the build links [JSPI], a wait that would block, whether in
-//! `block_on` or a blocking call such as `blocking_recv`, suspends on the
-//! host event loop rather than blocking, resuming when a timer fires or when
-//! a later call into the module wakes it. Without JSPI, such a wait panics;
-//! the panic unwinds out of `block_on` and leaves the runtime usable.
+//! When the build links WebAssembly JavaScript Promise Integration (JSPI), a
+//! wait that would block suspends on the host event loop rather than blocking.
+//! Without JSPI, such a wait panics.
 //!
 //! Suspension requires the current export to have been wrapped with
-//! `WebAssembly.promising` (Emscripten's `ASYNCIFY_EXPORTS`). A wait from any
-//! other activation, such as a plain host callback into the module, throws
+//! `WebAssembly.promising`. A wait from any other activation throws
 //! `WebAssembly.SuspendError`. That is a foreign exception rather than a Rust
-//! panic: it is not caught by `catch_unwind` and aborts at the first
-//! `extern "C"` frame it reaches.
-//!
-//! [JSPI]: https://github.com/WebAssembly/js-promise-integration
+//! panic, so it can't be caught by `catch_unwind`.
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at
 // least 32 bits, which a lot of components in Tokio currently assumes.
