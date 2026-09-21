@@ -46,6 +46,7 @@ impl<R: AsyncRead> BufReader<R> {
     /// # Panics
     ///
     /// Panics if `capacity` is zero.
+    #[track_caller]
     pub fn with_capacity(capacity: usize, inner: R) -> Self {
         assert!(capacity > 0, "capacity must be greater than zero");
         let buffer = vec![0; capacity];

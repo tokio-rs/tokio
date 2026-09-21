@@ -40,6 +40,7 @@ impl<RW: AsyncRead + AsyncWrite> BufStream<RW> {
     /// # Panics
     ///
     /// Panics if `reader_capacity` is zero.
+    #[track_caller]
     pub fn with_capacity(
         reader_capacity: usize,
         writer_capacity: usize,
