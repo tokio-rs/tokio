@@ -1,5 +1,7 @@
-use futures::{Stream, StreamExt};
+use futures::{task::noop_waker_ref, Stream, StreamExt};
 use futures_core::FusedStream;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -119,10 +121,12 @@ async fn fused_stream_termination_includes_outstanding_permit() {
     stream.close();
 
     assert!(!stream.is_terminated());
+    let mut cx = Context::from_waker(noop_waker_ref());
+    assert_eq!(Pin::new(&mut stream).poll_next(&mut cx), Poll::Pending);
     permit.send(1);
     assert_eq!(stream.next().await, Some(1));
     assert!(!stream.is_terminated());
-    assert_eq!(stream.next().await, None);
+    assert_eq!(Pin::new(&mut stream).poll_next(&mut cx), Poll::Ready(None));
     assert!(stream.is_terminated());
-    assert_eq!(stream.next().await, None);
+    assert_eq!(Pin::new(&mut stream).poll_next(&mut cx), Poll::Ready(None));
 }
