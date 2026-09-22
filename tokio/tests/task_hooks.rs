@@ -180,7 +180,6 @@ fn task_hook_spawn_location_multi_thread() {
     assert_eq!(poll_starts, poll_ends.fetch_add(0, Ordering::SeqCst));
 }
 
-#[track_caller]
 fn assert_spawn_location(
     spawns: &Mutex<HashMap<tokio::task::Id, std::panic::Location<'static>>>,
     task_id: tokio::task::Id,
