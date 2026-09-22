@@ -102,7 +102,7 @@ impl<T> Stream for ReceiverStream<T> {
 
 impl<T> FusedStream for ReceiverStream<T> {
     fn is_terminated(&self) -> bool {
-        self.terminated
+        self.size_hint() == (0, Some(0))
     }
 }
 
