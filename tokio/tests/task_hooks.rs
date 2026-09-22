@@ -1,7 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", tokio_unstable, target_has_atomic = "64"))]
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 #[cfg(feature = "schedule-latency")]
@@ -178,6 +178,170 @@ fn task_hook_spawn_location_multi_thread() {
     let poll_starts = poll_starts.fetch_add(0, Ordering::SeqCst);
     assert!(poll_starts > 2);
     assert_eq!(poll_starts, poll_ends.fetch_add(0, Ordering::SeqCst));
+}
+
+/// Test that the exact call-site line is provided to task hooks for core spawning APIs.
+#[test]
+fn task_hook_spawn_location_callsite_exact_line() {
+    let spawns = Arc::new(Mutex::new(HashMap::new()));
+    let spawns_clone = Arc::clone(&spawns);
+
+    let runtime = Builder::new_current_thread()
+        .on_task_spawn(move |meta| {
+            spawns_clone
+                .lock()
+                .unwrap()
+                .insert(meta.id(), *meta.spawned_at());
+        })
+        .build()
+        .unwrap();
+
+    // Runtime::spawn
+    let (task, expected_line) = (runtime.spawn(async {}), line!());
+    let loc = spawns
+        .lock()
+        .unwrap()
+        .remove(&task.id())
+        .expect("spawn hook called for Runtime::spawn");
+    assert_eq!(loc.file(), file!());
+    assert_eq!(loc.line(), expected_line);
+
+    // Handle::spawn
+    let handle = runtime.handle().clone();
+    let (task, expected_line) = (handle.spawn(async {}), line!());
+    let loc = spawns
+        .lock()
+        .unwrap()
+        .remove(&task.id())
+        .expect("spawn hook called for Handle::spawn");
+    assert_eq!(loc.file(), file!());
+    assert_eq!(loc.line(), expected_line);
+
+    runtime.block_on(async {
+        // tokio::spawn within runtime context
+        let (task, expected_line) = (tokio::spawn(async {}), line!());
+        let loc = spawns
+            .lock()
+            .unwrap()
+            .remove(&task.id())
+            .expect("spawn hook called for tokio::spawn");
+        assert_eq!(loc.file(), file!());
+        assert_eq!(loc.line(), expected_line);
+        task.await.unwrap();
+    });
+
+    #[cfg(not(target_os = "wasi"))]
+    {
+        let spawns = Arc::new(Mutex::new(HashMap::new()));
+        let spawns_clone = Arc::clone(&spawns);
+
+        let mt_runtime = Builder::new_multi_thread()
+            .worker_threads(2)
+            .on_task_spawn(move |meta| {
+                spawns_clone
+                    .lock()
+                    .unwrap()
+                    .insert(meta.id(), *meta.spawned_at());
+            })
+            .build()
+            .unwrap();
+
+        let (task, expected_line) = (mt_runtime.spawn(async {}), line!());
+        let loc = spawns
+            .lock()
+            .unwrap()
+            .remove(&task.id())
+            .expect("spawn hook called for multi-thread Runtime::spawn");
+        assert_eq!(loc.file(), file!());
+        assert_eq!(loc.line(), expected_line);
+
+        mt_runtime.block_on(async {
+            let (task, expected_line) = (tokio::spawn(async {}), line!());
+            let loc = spawns
+                .lock()
+                .unwrap()
+                .remove(&task.id())
+                .expect("spawn hook called for multi-thread tokio::spawn");
+            assert_eq!(loc.file(), file!());
+            assert_eq!(loc.line(), expected_line);
+            task.await.unwrap();
+        });
+    }
+}
+
+/// Test that task::Builder properly propagates exact user call-site location.
+#[cfg(feature = "tracing")]
+#[test]
+fn task_hook_spawn_location_builder() {
+    let spawns = Arc::new(Mutex::new(HashMap::new()));
+    let spawns_clone = Arc::clone(&spawns);
+
+    let runtime = Builder::new_current_thread()
+        .on_task_spawn(move |meta| {
+            spawns_clone
+                .lock()
+                .unwrap()
+                .insert(meta.id(), *meta.spawned_at());
+        })
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        // task::Builder::spawn
+        let builder = tokio::task::Builder::new().name("builder_spawn_test");
+        let (task, expected_line) = (builder.spawn(async {}).unwrap(), line!());
+        let loc = spawns
+            .lock()
+            .unwrap()
+            .remove(&task.id())
+            .expect("spawn hook called for task::Builder::spawn");
+        assert_eq!(loc.file(), file!());
+        assert_eq!(loc.line(), expected_line);
+        task.await.unwrap();
+
+        // task::Builder::spawn_on
+        let handle = tokio::runtime::Handle::current();
+        let builder = tokio::task::Builder::new().name("builder_spawn_on_test");
+        let (task, expected_line) = (builder.spawn_on(async {}, &handle).unwrap(), line!());
+        let loc = spawns
+            .lock()
+            .unwrap()
+            .remove(&task.id())
+            .expect("spawn hook called for task::Builder::spawn_on");
+        assert_eq!(loc.file(), file!());
+        assert_eq!(loc.line(), expected_line);
+        task.await.unwrap();
+    });
+
+    #[cfg(not(target_os = "wasi"))]
+    {
+        let spawns = Arc::new(Mutex::new(HashMap::new()));
+        let spawns_clone = Arc::clone(&spawns);
+
+        let mt_runtime = Builder::new_multi_thread()
+            .worker_threads(2)
+            .on_task_spawn(move |meta| {
+                spawns_clone
+                    .lock()
+                    .unwrap()
+                    .insert(meta.id(), *meta.spawned_at());
+            })
+            .build()
+            .unwrap();
+
+        mt_runtime.block_on(async {
+            let builder = tokio::task::Builder::new().name("mt_builder_spawn");
+            let (task, expected_line) = (builder.spawn(async {}).unwrap(), line!());
+            let loc = spawns
+                .lock()
+                .unwrap()
+                .remove(&task.id())
+                .expect("spawn hook called for multi-thread task::Builder::spawn");
+            assert_eq!(loc.file(), file!());
+            assert_eq!(loc.line(), expected_line);
+            task.await.unwrap();
+        });
+    }
 }
 
 #[cfg(feature = "schedule-latency")]
