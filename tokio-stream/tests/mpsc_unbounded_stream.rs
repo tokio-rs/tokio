@@ -63,15 +63,17 @@ fn size_hint_stream_instantly_closed() {
     stream.close();
 
     assert_eq!(stream.size_hint(), (0, Some(0)));
+    assert!(stream.is_terminated());
 }
 
 #[tokio::test]
-async fn fused_stream_termination_is_latched() {
+async fn fused_stream_terminates_when_sender_is_dropped() {
     let (tx, rx) = mpsc::unbounded_channel::<i32>();
     let mut stream = UnboundedReceiverStream::new(rx);
     assert!(!stream.is_terminated());
     drop(tx);
 
+    assert!(stream.is_terminated());
     assert_eq!(stream.next().await, None);
     assert!(stream.is_terminated());
     assert_eq!(stream.next().await, None);

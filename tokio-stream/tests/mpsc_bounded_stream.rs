@@ -65,6 +65,7 @@ fn size_hint_stream_instantly_closed() {
     stream.close();
 
     assert_eq!(stream.size_hint(), (0, Some(0)));
+    assert!(stream.is_terminated());
 }
 
 #[tokio::test]
@@ -124,8 +125,9 @@ async fn fused_stream_waits_for_outstanding_permit() {
     let mut cx = Context::from_waker(noop_waker_ref());
     assert_eq!(Pin::new(&mut stream).poll_next(&mut cx), Poll::Pending);
     permit.send(1);
-    assert_eq!(stream.next().await, Some(1));
     assert!(!stream.is_terminated());
+    assert_eq!(stream.next().await, Some(1));
+    assert!(stream.is_terminated());
     assert_eq!(stream.next().await, None);
     assert!(stream.is_terminated());
     assert_eq!(stream.next().await, None);
