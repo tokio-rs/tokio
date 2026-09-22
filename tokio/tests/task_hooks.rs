@@ -180,6 +180,22 @@ fn task_hook_spawn_location_multi_thread() {
     assert_eq!(poll_starts, poll_ends.fetch_add(0, Ordering::SeqCst));
 }
 
+#[track_caller]
+fn assert_spawn_location(
+    spawns: &Mutex<HashMap<tokio::task::Id, std::panic::Location<'static>>>,
+    task_id: tokio::task::Id,
+    expected_file: &str,
+    expected_line: u32,
+) {
+    let loc = spawns
+        .lock()
+        .unwrap()
+        .remove(&task_id)
+        .expect("spawn hook called for task");
+    assert_eq!(loc.file(), expected_file);
+    assert_eq!(loc.line(), expected_line);
+}
+
 /// Test that the exact call-site line is provided to task hooks for core spawning APIs.
 #[test]
 fn task_hook_spawn_location_callsite_exact_line() {
@@ -198,35 +214,17 @@ fn task_hook_spawn_location_callsite_exact_line() {
 
     // Runtime::spawn
     let (task, expected_line) = (runtime.spawn(async {}), line!());
-    let loc = spawns
-        .lock()
-        .unwrap()
-        .remove(&task.id())
-        .expect("spawn hook called for Runtime::spawn");
-    assert_eq!(loc.file(), file!());
-    assert_eq!(loc.line(), expected_line);
+    assert_spawn_location(&spawns, task.id(), file!(), expected_line);
 
     // Handle::spawn
     let handle = runtime.handle().clone();
     let (task, expected_line) = (handle.spawn(async {}), line!());
-    let loc = spawns
-        .lock()
-        .unwrap()
-        .remove(&task.id())
-        .expect("spawn hook called for Handle::spawn");
-    assert_eq!(loc.file(), file!());
-    assert_eq!(loc.line(), expected_line);
+    assert_spawn_location(&spawns, task.id(), file!(), expected_line);
 
     runtime.block_on(async {
         // tokio::spawn within runtime context
         let (task, expected_line) = (tokio::spawn(async {}), line!());
-        let loc = spawns
-            .lock()
-            .unwrap()
-            .remove(&task.id())
-            .expect("spawn hook called for tokio::spawn");
-        assert_eq!(loc.file(), file!());
-        assert_eq!(loc.line(), expected_line);
+        assert_spawn_location(&spawns, task.id(), file!(), expected_line);
         task.await.unwrap();
     });
 
@@ -247,23 +245,11 @@ fn task_hook_spawn_location_callsite_exact_line() {
             .unwrap();
 
         let (task, expected_line) = (mt_runtime.spawn(async {}), line!());
-        let loc = spawns
-            .lock()
-            .unwrap()
-            .remove(&task.id())
-            .expect("spawn hook called for multi-thread Runtime::spawn");
-        assert_eq!(loc.file(), file!());
-        assert_eq!(loc.line(), expected_line);
+        assert_spawn_location(&spawns, task.id(), file!(), expected_line);
 
         mt_runtime.block_on(async {
             let (task, expected_line) = (tokio::spawn(async {}), line!());
-            let loc = spawns
-                .lock()
-                .unwrap()
-                .remove(&task.id())
-                .expect("spawn hook called for multi-thread tokio::spawn");
-            assert_eq!(loc.file(), file!());
-            assert_eq!(loc.line(), expected_line);
+            assert_spawn_location(&spawns, task.id(), file!(), expected_line);
             task.await.unwrap();
         });
     }
@@ -290,26 +276,14 @@ fn task_hook_spawn_location_builder() {
         // task::Builder::spawn
         let builder = tokio::task::Builder::new().name("builder_spawn_test");
         let (task, expected_line) = (builder.spawn(async {}).unwrap(), line!());
-        let loc = spawns
-            .lock()
-            .unwrap()
-            .remove(&task.id())
-            .expect("spawn hook called for task::Builder::spawn");
-        assert_eq!(loc.file(), file!());
-        assert_eq!(loc.line(), expected_line);
+        assert_spawn_location(&spawns, task.id(), file!(), expected_line);
         task.await.unwrap();
 
         // task::Builder::spawn_on
         let handle = tokio::runtime::Handle::current();
         let builder = tokio::task::Builder::new().name("builder_spawn_on_test");
         let (task, expected_line) = (builder.spawn_on(async {}, &handle).unwrap(), line!());
-        let loc = spawns
-            .lock()
-            .unwrap()
-            .remove(&task.id())
-            .expect("spawn hook called for task::Builder::spawn_on");
-        assert_eq!(loc.file(), file!());
-        assert_eq!(loc.line(), expected_line);
+        assert_spawn_location(&spawns, task.id(), file!(), expected_line);
         task.await.unwrap();
     });
 
@@ -332,13 +306,7 @@ fn task_hook_spawn_location_builder() {
         mt_runtime.block_on(async {
             let builder = tokio::task::Builder::new().name("mt_builder_spawn");
             let (task, expected_line) = (builder.spawn(async {}).unwrap(), line!());
-            let loc = spawns
-                .lock()
-                .unwrap()
-                .remove(&task.id())
-                .expect("spawn hook called for multi-thread task::Builder::spawn");
-            assert_eq!(loc.file(), file!());
-            assert_eq!(loc.line(), expected_line);
+            assert_spawn_location(&spawns, task.id(), file!(), expected_line);
             task.await.unwrap();
         });
     }
