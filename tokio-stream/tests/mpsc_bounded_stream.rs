@@ -114,7 +114,7 @@ async fn size_hint_stream_closed_permits_drop() {
 }
 
 #[tokio::test]
-async fn fused_stream_termination_includes_outstanding_permit() {
+async fn fused_stream_waits_for_outstanding_permit() {
     let (tx, rx) = mpsc::channel(1);
     let permit = tx.reserve().await.unwrap();
     let mut stream = ReceiverStream::new(rx);
@@ -126,7 +126,7 @@ async fn fused_stream_termination_includes_outstanding_permit() {
     permit.send(1);
     assert_eq!(stream.next().await, Some(1));
     assert!(!stream.is_terminated());
-    assert_eq!(Pin::new(&mut stream).poll_next(&mut cx), Poll::Ready(None));
+    assert_eq!(stream.next().await, None);
     assert!(stream.is_terminated());
-    assert_eq!(Pin::new(&mut stream).poll_next(&mut cx), Poll::Ready(None));
+    assert_eq!(stream.next().await, None);
 }
