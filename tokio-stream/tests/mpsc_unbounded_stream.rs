@@ -1,4 +1,5 @@
 use futures::{Stream, StreamExt};
+use futures_core::FusedStream;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
@@ -11,6 +12,7 @@ async fn size_hint_stream_open() {
 
     let mut stream = UnboundedReceiverStream::new(rx);
 
+    assert!(!stream.is_terminated());
     assert_eq!(stream.size_hint(), (2, None));
     stream.next().await;
     assert_eq!(stream.size_hint(), (1, None));
@@ -45,6 +47,7 @@ async fn size_hint_sender_dropped() {
     let mut stream = UnboundedReceiverStream::new(rx);
     drop(tx);
 
+    assert!(!stream.is_terminated());
     assert_eq!(stream.size_hint(), (2, Some(2)));
     stream.next().await;
     assert_eq!(stream.size_hint(), (1, Some(1)));
@@ -60,4 +63,16 @@ fn size_hint_stream_instantly_closed() {
     stream.close();
 
     assert_eq!(stream.size_hint(), (0, Some(0)));
+}
+
+#[tokio::test]
+async fn fused_stream_termination_is_latched() {
+    let (tx, rx) = mpsc::unbounded_channel::<i32>();
+    let mut stream = UnboundedReceiverStream::new(rx);
+    assert!(!stream.is_terminated());
+    drop(tx);
+
+    assert_eq!(stream.next().await, None);
+    assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
 }

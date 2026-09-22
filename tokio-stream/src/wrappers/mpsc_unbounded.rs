@@ -1,4 +1,5 @@
 use crate::Stream;
+use futures_core::FusedStream;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -33,12 +34,16 @@ use tokio::sync::mpsc::UnboundedReceiver;
 #[derive(Debug)]
 pub struct UnboundedReceiverStream<T> {
     inner: UnboundedReceiver<T>,
+    terminated: bool,
 }
 
 impl<T> UnboundedReceiverStream<T> {
     /// Create a new `UnboundedReceiverStream`.
     pub fn new(recv: UnboundedReceiver<T>) -> Self {
-        Self { inner: recv }
+        Self {
+            inner: recv,
+            terminated: false,
+        }
     }
 
     /// Get back the inner `UnboundedReceiver`.
@@ -59,7 +64,14 @@ impl<T> Stream for UnboundedReceiverStream<T> {
     type Item = T;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        self.inner.poll_recv(cx)
+        if self.terminated {
+            return Poll::Ready(None);
+        }
+        let poll = self.inner.poll_recv(cx);
+        if let Poll::Ready(None) = poll {
+            self.terminated = true;
+        }
+        poll
     }
 
     /// Returns the bounds of the stream based on the underlying receiver.
@@ -74,6 +86,12 @@ impl<T> Stream for UnboundedReceiverStream<T> {
         } else {
             (self.inner.len(), None)
         }
+    }
+}
+
+impl<T> FusedStream for UnboundedReceiverStream<T> {
+    fn is_terminated(&self) -> bool {
+        self.terminated
     }
 }
 
