@@ -20,7 +20,7 @@ env:
   # Pin a specific miri version
   rust_miri_nightly: nightly-2026-06-29
   rust_emscripten_nightly: nightly-2026-08-17
-  emsdk_version: '6.0.8'
+  emsdk_version: '6.0.10'
   rust_clippy: '1.88'
   # When updating this, also update:
   # - README.md
