@@ -11,7 +11,7 @@
 
 use std::ffi::c_void;
 use std::ptr;
-use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
+use std::sync::atomic::{AtomicPtr, Ordering::SeqCst};
 use std::sync::OnceLock;
 use std::time::Duration;
 
@@ -60,17 +60,17 @@ pub(crate) fn jspi_enabled() -> bool {
     *ENABLED.get_or_init(|| unsafe { emscripten_has_asyncify() == 2 })
 }
 
-/// The promise a parked activation is suspended on, `0` while not parked.
+/// The promise a parked activation is suspended on, null while not parked.
 ///
 /// Set before the suspension and cleared on resumption, with nothing running
 /// in between on this thread, so an [`unpark`] that observes it holds a live
 /// handle.
 #[derive(Debug)]
-pub(crate) struct Slot(AtomicUsize);
+pub(crate) struct Slot(AtomicPtr<c_void>);
 
 impl Slot {
     pub(crate) const fn new() -> Self {
-        Self(AtomicUsize::new(0))
+        Self(AtomicPtr::new(ptr::null_mut()))
     }
 }
 
@@ -130,7 +130,7 @@ struct Park<'a> {
 
 impl Drop for Park<'_> {
     fn drop(&mut self) {
-        self.slot.0.store(0, SeqCst);
+        self.slot.0.store(ptr::null_mut(), SeqCst);
         drop(self.timer.take());
         // SAFETY: created by `park` and not yet destroyed; the timer that
         // could resolve it has been cleared.
@@ -155,7 +155,8 @@ pub(crate) fn park(slot: &Slot, dur: Option<Duration>) {
         promise,
         timer: dur.map(|dur| Timer::set(promise, dur)),
     };
-    slot.0.store(promise as usize, SeqCst);
+    let prev = slot.0.swap(promise, SeqCst);
+    debug_assert!(prev.is_null(), "parker already parked");
 
     // SAFETY: the handle is live. Under `-sJSPI` this suspends the
     // activation; the caller has checked `jspi_enabled`. A `SuspendError`
@@ -166,12 +167,10 @@ pub(crate) fn park(slot: &Slot, dur: Option<Duration>) {
 /// Resume the activation parked on `slot`, if any.
 pub(crate) fn unpark(slot: &Slot) {
     let promise = slot.0.load(SeqCst);
-    if promise != 0 {
-        // SAFETY: a nonzero slot is a live handle (see `Slot`). Resolving an
+    if !promise.is_null() {
+        // SAFETY: a non-null slot is a live handle (see `Slot`). Resolving an
         // already-settled promise is a no-op, so a race with the timer is
         // harmless. Does not suspend.
-        unsafe {
-            emscripten_promise_resolve(promise as Promise, EM_PROMISE_FULFILL, ptr::null_mut())
-        }
+        unsafe { emscripten_promise_resolve(promise, EM_PROMISE_FULFILL, ptr::null_mut()) }
     }
 }
