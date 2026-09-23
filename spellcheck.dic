@@ -1,4 +1,4 @@
-332
+333
 &
 +
 <
@@ -329,5 +329,6 @@ wakeups
 WASI
 Wasm
 watchOS
+WebAssembly
 workstealing
 ZST
