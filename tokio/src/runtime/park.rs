@@ -22,6 +22,8 @@ struct Inner {
     state: AtomicUsize,
     mutex: Mutex<()>,
     condvar: Condvar,
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    jspi: crate::runtime::jspi::Slot,
 }
 
 const EMPTY: usize = 0;
@@ -48,6 +50,8 @@ impl ParkThread {
                 state: AtomicUsize::new(EMPTY),
                 mutex: Mutex::new(()),
                 condvar: Condvar::new(),
+                #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+                jspi: crate::runtime::jspi::Slot::new(),
             }),
         }
     }
@@ -181,12 +185,7 @@ impl Inner {
         }
         let _unpark = Unpark(self);
 
-        crate::runtime::jspi::park(self.id(), dur);
-    }
-
-    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
-    fn id(&self) -> usize {
-        self as *const Inner as usize
+        crate::runtime::jspi::park(&self.jspi, dur);
     }
 
     /// Parks the current thread for at most `dur`.
@@ -261,7 +260,7 @@ impl Inner {
 
         // The parked activation is suspended in the host; settle its promise.
         #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
-        crate::runtime::jspi::unpark(self.id());
+        crate::runtime::jspi::unpark(&self.jspi);
 
         // There is a period between when the parked thread sets `state` to
         // `PARKED` (or last checked `state` in the case of a spurious wake
