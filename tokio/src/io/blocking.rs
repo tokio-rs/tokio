@@ -30,8 +30,8 @@ pub(crate) const DEFAULT_MAX_BUF_SIZE: usize = 2 * 1024 * 1024;
 
 #[derive(Debug)]
 enum State<T> {
-    /// Holds `None` if an operation could not be spawned because the runtime
-    /// is shutting down. `inner` is gone in that case, so all further
+    /// Holds `None` if an operation could not be spawned, normally because the
+    /// runtime is shutting down. `inner` is gone in that case, so all further
     /// operations fail.
     Idle(Option<Buf>),
     Busy(sys::Blocking<(io::Result<usize>, Buf, T)>),
@@ -75,7 +75,8 @@ cfg_io_blocking! {
 
 /// Runs `f` on the blocking pool.
 ///
-/// Returns `None` if `mandatory` is set and the runtime is shutting down.
+/// Returns `None` if `mandatory` is set and the operation could not be
+/// spawned, normally because the runtime is shutting down.
 fn spawn<F, R>(mandatory: bool, f: F) -> Option<sys::Blocking<R>>
 where
     F: FnOnce() -> R + Send + 'static,
@@ -114,7 +115,8 @@ where
 
                     let max_buf_size = cmp::min(dst.remaining(), DEFAULT_MAX_BUF_SIZE);
                     let rx = spawn(self.mandatory, move || {
-                        // SAFETY: the requirements are satisfied by `Blocking::new`.
+                        // SAFETY: the caller of `Blocking::new` or `Blocking::new_mandatory`
+                        // promised that `inner` meets the requirements of `read_from`.
                         let res = unsafe { buf.read_from(&mut inner, max_buf_size) };
                         (res, buf, inner)
                     });

@@ -40,7 +40,9 @@ cfg_rt! {
         not(target_feature = "atomics"),
         any(feature = "fs", feature = "io-std"),
     ))]
-    #[allow(dead_code)] // unit tests replace this with the `fs::mocks` version
+    // `fs` unit tests use the `fs::mocks` version instead, so this is unused
+    // when `io-std` is disabled.
+    #[allow(dead_code)]
     pub(crate) fn spawn_mandatory_blocking<F, R>(f: F) -> Option<JoinHandle<R>>
     where
         F: FnOnce() -> R + Send + 'static,
