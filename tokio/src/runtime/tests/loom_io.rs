@@ -69,7 +69,7 @@ fn deregister_races_with_prior_event_delivery() {
     });
 }
 
-/// Tests readiness monotonicity and consistency under concurrent event delivery and deregistration.
+/// Tests that readiness already observed by a task is not lost during concurrent event delivery and deregistration.
 #[test]
 fn deregister_and_readiness_interleaving() {
     loom::model(|| {
