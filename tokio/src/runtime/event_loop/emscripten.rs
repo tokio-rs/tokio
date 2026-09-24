@@ -39,7 +39,7 @@ extern "C" {
     /// the host loop whenever the set has uncollected ready events. Holds
     /// nothing itself.
     fn emscripten_epoll_add_listener(epfd: i32, cb: Callback, user_data: *mut c_void) -> i32;
-    fn emscripten_epoll_remove_listener(epfd: i32, cb: Callback) -> i32;
+    fn emscripten_epoll_remove_listener(epfd: i32, cb: Callback, user_data: *mut c_void) -> i32;
 }
 
 /// The host loop's callbacks into the runtime, and what they hold.
@@ -124,7 +124,7 @@ impl Reactor {
             if on {
                 emscripten_epoll_add_listener(epfd, wake, this)
             } else {
-                emscripten_epoll_remove_listener(epfd, wake)
+                emscripten_epoll_remove_listener(epfd, wake, this)
             }
         };
         if rc != 0 {
