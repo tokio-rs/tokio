@@ -57,6 +57,7 @@ macro_rules! reader {
 
                     *me.read += match me.src.as_mut().poll_read(cx, &mut buf) {
                         Poll::Pending => return Poll::Pending,
+                        Poll::Ready(Err(e)) if e.kind() == io::ErrorKind::Interrupted => continue,
                         Poll::Ready(Err(e)) => return Poll::Ready(Err(e.into())),
                         Poll::Ready(Ok(())) => {
                             let n = buf.filled().len();
@@ -108,19 +109,22 @@ macro_rules! reader8 {
             type Output = io::Result<$ty>;
 
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                let me = self.project();
+                let mut me = self.project();
 
                 let mut buf = [0; 1];
                 let mut buf = ReadBuf::new(&mut buf);
-                match me.reader.poll_read(cx, &mut buf) {
-                    Poll::Pending => Poll::Pending,
-                    Poll::Ready(Err(e)) => Poll::Ready(Err(e.into())),
-                    Poll::Ready(Ok(())) => {
-                        if buf.filled().len() == 0 {
-                            return Poll::Ready(Err(UnexpectedEof.into()));
-                        }
+                loop {
+                    match me.reader.as_mut().poll_read(cx, &mut buf) {
+                        Poll::Pending => return Poll::Pending,
+                        Poll::Ready(Err(e)) if e.kind() == io::ErrorKind::Interrupted => continue,
+                        Poll::Ready(Err(e)) => return Poll::Ready(Err(e.into())),
+                        Poll::Ready(Ok(())) => {
+                            if buf.filled().len() == 0 {
+                                return Poll::Ready(Err(UnexpectedEof.into()));
+                            }
 
-                        Poll::Ready(Ok(buf.filled()[0] as $ty))
+                            return Poll::Ready(Ok(buf.filled()[0] as $ty));
+                        }
                     }
                 }
             }

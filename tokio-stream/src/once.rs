@@ -15,7 +15,8 @@ impl<I> Unpin for Once<I> {}
 
 /// Creates a stream that emits an element exactly once.
 ///
-/// The returned stream is immediately ready and emits the provided value once.
+/// The returned stream emits the provided value once. It may return
+/// `Poll::Pending` to cooperate with the executor.
 ///
 /// # Examples
 ///

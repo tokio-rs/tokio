@@ -60,6 +60,7 @@ macro_rules! writer {
                         .poll_write(cx, &me.buf[*me.written as usize..])
                     {
                         Poll::Pending => return Poll::Pending,
+                        Poll::Ready(Err(e)) if e.kind() == io::ErrorKind::Interrupted => continue,
                         Poll::Ready(Err(e)) => return Poll::Ready(Err(e.into())),
                         Poll::Ready(Ok(0)) => {
                             return Poll::Ready(Err(io::ErrorKind::WriteZero.into()));
@@ -105,16 +106,21 @@ macro_rules! writer8 {
             type Output = io::Result<()>;
 
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                let me = self.project();
+                let mut me = self.project();
 
                 let buf = [*me.byte as u8];
 
-                match me.dst.poll_write(cx, &buf[..]) {
-                    Poll::Pending => Poll::Pending,
-                    Poll::Ready(Err(e)) => Poll::Ready(Err(e.into())),
-                    Poll::Ready(Ok(0)) => Poll::Ready(Err(io::ErrorKind::WriteZero.into())),
-                    Poll::Ready(Ok(1)) => Poll::Ready(Ok(())),
-                    Poll::Ready(Ok(_)) => unreachable!(),
+                loop {
+                    match me.dst.as_mut().poll_write(cx, &buf[..]) {
+                        Poll::Pending => return Poll::Pending,
+                        Poll::Ready(Err(e)) if e.kind() == io::ErrorKind::Interrupted => continue,
+                        Poll::Ready(Err(e)) => return Poll::Ready(Err(e.into())),
+                        Poll::Ready(Ok(0)) => {
+                            return Poll::Ready(Err(io::ErrorKind::WriteZero.into()))
+                        }
+                        Poll::Ready(Ok(1)) => return Poll::Ready(Ok(())),
+                        Poll::Ready(Ok(_)) => unreachable!(),
+                    }
                 }
             }
         }
