@@ -18,7 +18,7 @@ use crate::runtime::io::{IoDriverMetrics, RegistrationSet, ScheduledIo};
 use mio::event::Source;
 use std::fmt;
 use std::io;
-use std::sync::Arc;
+use crate::loom::sync::Arc;
 use std::time::Duration;
 
 /// I/O driver, backed by Mio.
@@ -40,6 +40,7 @@ pub(crate) struct Driver {
 /// A reference to an I/O driver.
 pub(crate) struct Handle {
     /// Registers I/O resources.
+    #[cfg(not(loom))]
     registry: mio::Registry,
 
     /// Tracks all registrations
@@ -50,7 +51,7 @@ pub(crate) struct Handle {
 
     /// Used to wake up the reactor from a call to `turn`.
     /// Not supported on `Wasi` due to lack of threading support.
-    #[cfg(not(target_os = "wasi"))]
+    #[cfg(all(not(target_os = "wasi"), not(loom)))]
     waker: mio::Waker,
 
     pub(crate) metrics: IoDriverMetrics,
@@ -94,7 +95,7 @@ cfg_net_unix!(
 );
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
-pub(super) enum Direction {
+pub(crate) enum Direction {
     Read,
     Write,
 }
@@ -120,8 +121,9 @@ impl Driver {
     /// creation.
     pub(crate) fn new(nevents: usize, nevents_busy: Option<usize>) -> io::Result<(Driver, Handle)> {
         let poll = mio::Poll::new()?;
-        #[cfg(not(target_os = "wasi"))]
+        #[cfg(all(not(target_os = "wasi"), not(loom)))]
         let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
+        #[cfg(not(loom))]
         let registry = poll.registry().try_clone()?;
 
         let driver = Driver {
@@ -134,10 +136,11 @@ impl Driver {
         let (registrations, synced) = RegistrationSet::new();
 
         let handle = Handle {
+            #[cfg(not(loom))]
             registry,
             registrations,
             synced: Mutex::new(synced),
-            #[cfg(not(target_os = "wasi"))]
+            #[cfg(all(not(target_os = "wasi"), not(loom)))]
             waker,
             metrics: IoDriverMetrics::default(),
             #[cfg(all(
@@ -217,16 +220,12 @@ impl Driver {
                 self.signal_ready = true;
             } else {
                 let ready = Ready::from_mio(event);
-                let ptr = super::EXPOSE_IO.from_exposed_addr(token.0);
 
                 // Safety: we ensure that the pointers used as tokens are not freed
                 // until they are both deregistered from mio **and** we know the I/O
                 // driver is not concurrently polling. The I/O driver holds ownership of
                 // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
-                let io: &ScheduledIo = unsafe { &*ptr };
-
-                io.set_readiness(Tick::Set, |curr| curr | ready);
-                io.wake(ready);
+                unsafe { handle.dispatch_event(token, ready) };
 
                 ready_count += 1;
             }
@@ -278,7 +277,7 @@ impl Handle {
     /// blocked in `turn`, then the next call to `turn` will not block and
     /// return immediately.
     pub(crate) fn unpark(&self) {
-        #[cfg(not(target_os = "wasi"))]
+        #[cfg(all(not(target_os = "wasi"), not(loom)))]
         self.waker.wake().expect("failed to wake I/O driver");
     }
 
@@ -295,6 +294,7 @@ impl Handle {
 
         // we should remove the `scheduled_io` from the `registrations` set if registering
         // the `source` with the OS fails. Otherwise it will leak the `scheduled_io`.
+        #[cfg(not(loom))]
         if let Err(e) = self.registry.register(source, token, interest.to_mio()) {
             // safety: `scheduled_io` is part of the `registrations` set.
             unsafe {
@@ -304,11 +304,24 @@ impl Handle {
 
             return Err(e);
         }
+        #[cfg(loom)]
+        let _ = (source, interest, token);
 
         // TODO: move this logic to `RegistrationSet` and use a `CountedLinkedList`
         self.metrics.incr_fd_count();
 
         Ok(scheduled_io)
+    }
+
+    fn deregister_inner(&self, registration: &Arc<ScheduledIo>) {
+        if self
+            .registrations
+            .deregister(&mut self.synced.lock(), registration)
+        {
+            self.unpark();
+        }
+
+        self.metrics.dec_fd_count();
     }
 
     /// Deregisters an I/O resource from the reactor.
@@ -319,23 +332,80 @@ impl Handle {
     ) -> io::Result<()> {
         // Deregister the source with the OS poller **first**
         // Cleanup ALWAYS happens
+        #[cfg(not(loom))]
         let os_result = self.registry.deregister(source);
+        #[cfg(loom)]
+        let os_result = {
+            let _ = source;
+            Ok(())
+        };
 
-        if self
-            .registrations
-            .deregister(&mut self.synced.lock(), registration)
-        {
-            self.unpark();
-        }
-
-        self.metrics.dec_fd_count();
+        self.deregister_inner(registration);
 
         os_result // Return error after cleanup
     }
 
-    fn release_pending_registrations(&self) {
+    #[cfg(any(test, loom))]
+    pub(crate) fn deregister_io(&self, registration: &Arc<ScheduledIo>) {
+        self.deregister_inner(registration);
+    }
+
+    #[cfg(any(test, loom))]
+    pub(crate) fn allocate(&self) -> io::Result<Arc<ScheduledIo>> {
+        let scheduled_io = self.registrations.allocate(&mut self.synced.lock())?;
+        self.metrics.incr_fd_count();
+        Ok(scheduled_io)
+    }
+
+    /// Dispatches an event received from the poller to the corresponding `ScheduledIo`.
+    ///
+    /// # Safety
+    ///
+    /// The token must be an exposed pointer to a `ScheduledIo` belonging to this driver
+    /// that has not been freed by `release_pending_registrations`.
+    pub(crate) unsafe fn dispatch_event(&self, token: mio::Token, ready: Ready) {
+        let ptr = super::EXPOSE_IO.from_exposed_addr(token.0);
+
+        // Safety: we ensure that the pointers used as tokens are not freed
+        // until they are both deregistered from mio **and** we know the I/O
+        // driver is not concurrently polling. The I/O driver holds ownership of
+        // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
+        let io: &ScheduledIo = unsafe { &*ptr };
+
+        io.set_readiness(Tick::Set, |curr| curr | ready);
+        io.wake(ready);
+    }
+
+    pub(crate) fn release_pending_registrations(&self) {
         if self.registrations.needs_release() {
             self.registrations.release(&mut self.synced.lock());
+        }
+    }
+
+    #[cfg(loom)]
+    pub(crate) fn new_mock() -> Handle {
+        let (registrations, synced) = RegistrationSet::new();
+
+        Handle {
+            registrations,
+            synced: Mutex::new(synced),
+            metrics: IoDriverMetrics::default(),
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux",
+            ))]
+            uring_context: Mutex::new(UringContext::new()),
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux",
+            ))]
+            uring_probe: OnceCell::new(),
         }
     }
 }

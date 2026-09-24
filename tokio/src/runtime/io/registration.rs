@@ -6,7 +6,7 @@ use crate::runtime::scheduler;
 
 use mio::event::Source;
 use std::io;
-use std::sync::Arc;
+use crate::loom::sync::Arc;
 use std::task::{ready, Context, Poll};
 
 cfg_io_driver! {

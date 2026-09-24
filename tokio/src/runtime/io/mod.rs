@@ -3,8 +3,8 @@
     allow(dead_code)
 )]
 mod driver;
-use driver::{Direction, Tick};
-pub(crate) use driver::{Driver, Handle, ReadyEvent};
+use driver::Tick;
+pub(crate) use driver::{Direction, Driver, Handle, ReadyEvent};
 
 mod registration;
 pub(crate) use registration::Registration;
