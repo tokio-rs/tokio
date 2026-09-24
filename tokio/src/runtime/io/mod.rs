@@ -3,9 +3,9 @@
     allow(dead_code)
 )]
 mod driver;
-use driver::Tick;
 #[cfg(all(test, loom))]
 pub(crate) use driver::dispatch_event;
+use driver::Tick;
 pub(crate) use driver::{Direction, Driver, Handle, ReadyEvent};
 
 mod registration;

@@ -15,10 +15,10 @@ use crate::runtime::driver;
 use crate::runtime::io::registration_set;
 use crate::runtime::io::{IoDriverMetrics, RegistrationSet, ScheduledIo};
 
+use crate::loom::sync::Arc;
 use mio::event::Source;
 use std::fmt;
 use std::io;
-use crate::loom::sync::Arc;
 use std::time::Duration;
 
 /// I/O driver, backed by Mio.

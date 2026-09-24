@@ -17,7 +17,10 @@ struct Registrations {
 impl Registrations {
     fn new() -> Self {
         let (set, synced) = RegistrationSet::new();
-        Self { set, synced: Mutex::new(synced) }
+        Self {
+            set,
+            synced: Mutex::new(synced),
+        }
     }
 
     fn allocate(&self) -> Arc<ScheduledIo> {
