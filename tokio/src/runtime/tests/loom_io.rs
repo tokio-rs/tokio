@@ -1,19 +1,47 @@
 use crate::io::ready::Ready;
 use crate::io::Interest;
 use crate::loom::sync::Arc;
+use crate::loom::sync::Mutex;
 use crate::loom::thread;
-use crate::runtime::io::{Direction, Handle};
+use crate::runtime::io::{dispatch_event, Direction, RegistrationSet, ScheduledIo, Synced};
 use loom::future::block_on;
 use std::task::Poll;
 
-/// Tests that when an I/O source is deregistered and its user-facing `Arc<ScheduledIo>`
-/// is dropped, an already-obtained event delivered via the raw pointer `Token` does
-/// not cause a use-after-free or data race because release is deferred until before the next poll.
+// Models only Tokio's registration lifetime. Mio polling and OS deregistration
+// are outside the model; the production Handle remains unchanged under Loom.
+struct Registrations {
+    set: RegistrationSet,
+    synced: Mutex<Synced>,
+}
+
+impl Registrations {
+    fn new() -> Self {
+        let (set, synced) = RegistrationSet::new();
+        Self { set, synced: Mutex::new(synced) }
+    }
+
+    fn allocate(&self) -> Arc<ScheduledIo> {
+        self.set.allocate(&mut self.synced.lock()).unwrap()
+    }
+
+    fn deregister(&self, io: &Arc<ScheduledIo>) {
+        self.set.deregister(&mut self.synced.lock(), io);
+    }
+
+    fn release(&self) {
+        if self.set.needs_release() {
+            self.set.release(&mut self.synced.lock());
+        }
+    }
+}
+
+/// Models deregistration racing with delivery of an event already returned by
+/// the poller. The driver completes delivery before its next release step.
 #[test]
-fn deregister_event_delivery_race_lifetime() {
+fn deregister_races_with_prior_event_delivery() {
     loom::model(|| {
-        let handle = Arc::new(Handle::new_mock());
-        let scheduled_io = handle.allocate().unwrap();
+        let handle = Arc::new(Registrations::new());
+        let scheduled_io = handle.allocate();
         let token = scheduled_io.token();
 
         let handle_clone = handle.clone();
@@ -21,20 +49,20 @@ fn deregister_event_delivery_race_lifetime() {
             // Driver thread: has already obtained an event from poll() for `token`.
             // Delivers event to ScheduledIo via its exposed raw pointer token.
             unsafe {
-                handle_clone.dispatch_event(token, Ready::READABLE);
+                dispatch_event(token, Ready::READABLE);
             }
             // Simulates deferred release performed at the start of the next turn/poll.
-            handle_clone.release_pending_registrations();
+            handle_clone.release();
         });
 
         // Worker thread: deregisters the resource and drops its Arc handle.
-        handle.deregister_io(&scheduled_io);
+        handle.deregister(&scheduled_io);
         drop(scheduled_io);
 
         driver_th.join().unwrap();
 
         // Flush any remaining release if worker deregistered after driver's release step.
-        handle.release_pending_registrations();
+        handle.release();
     });
 }
 
@@ -42,26 +70,26 @@ fn deregister_event_delivery_race_lifetime() {
 #[test]
 fn deregister_and_readiness_interleaving() {
     loom::model(|| {
-        let handle = Arc::new(Handle::new_mock());
-        let scheduled_io = handle.allocate().unwrap();
+        let handle = Arc::new(Registrations::new());
+        let scheduled_io = handle.allocate();
         let token = scheduled_io.token();
 
         let handle_clone = handle.clone();
         let driver_th = thread::spawn(move || {
             unsafe {
-                handle_clone.dispatch_event(token, Ready::READABLE);
+                dispatch_event(token, Ready::READABLE);
             }
-            handle_clone.release_pending_registrations();
+            handle_clone.release();
         });
 
         // Worker inspects ready event, deregisters, and drops.
         let ev_before = scheduled_io.ready_event(Interest::READABLE);
-        handle.deregister_io(&scheduled_io);
+        handle.deregister(&scheduled_io);
         let ev_after = scheduled_io.ready_event(Interest::READABLE);
         drop(scheduled_io);
 
         driver_th.join().unwrap();
-        handle.release_pending_registrations();
+        handle.release();
 
         // Monotonicity: if readiness was observed before deregistration, it must remain ready after.
         if ev_before.ready.is_readable() {
@@ -75,8 +103,8 @@ fn deregister_and_readiness_interleaving() {
 #[test]
 fn event_delivery_wakes_waiter() {
     loom::model(|| {
-        let handle = Arc::new(Handle::new_mock());
-        let scheduled_io = handle.allocate().unwrap();
+        let handle = Arc::new(Registrations::new());
+        let scheduled_io = handle.allocate();
         let token = scheduled_io.token();
 
         let io_clone = scheduled_io.clone();
@@ -92,37 +120,37 @@ fn event_delivery_wakes_waiter() {
 
         // Driver delivers event and wakes the waiter.
         unsafe {
-            handle.dispatch_event(token, Ready::READABLE);
+            dispatch_event(token, Ready::READABLE);
         }
 
         waiter_th.join().unwrap();
 
-        handle.deregister_io(&scheduled_io);
+        handle.deregister(&scheduled_io);
         drop(scheduled_io);
-        handle.release_pending_registrations();
+        handle.release();
     });
 }
 
-/// Sequential invariant: dropping the user's Arc after deregistration preserves
-/// the ScheduledIo in pending_release so that a delayed dispatch_event remains safe
-/// until release_pending_registrations is explicitly called.
+/// Models delivery after deregistration and dropping the caller's Arc, but
+/// before the driver's next release step. This does not model Mio's guarantee
+/// about whether a deregistered source can produce a new event.
 #[test]
-fn deferred_release_keeps_scheduled_io_alive_after_deregister() {
+fn deferred_release_allows_prior_event_delivery() {
     loom::model(|| {
-        let handle = Handle::new_mock();
-        let scheduled_io = handle.allocate().unwrap();
+        let handle = Registrations::new();
+        let scheduled_io = handle.allocate();
         let token = scheduled_io.token();
 
         // Deregister and drop user handle.
-        handle.deregister_io(&scheduled_io);
+        handle.deregister(&scheduled_io);
         drop(scheduled_io);
 
-        // Raw-pointer dispatch must still succeed without UAF.
+        // Delivery precedes the next release step in this model.
         unsafe {
-            handle.dispatch_event(token, Ready::READABLE);
+            dispatch_event(token, Ready::READABLE);
         }
 
         // Release on next turn frees the memory.
-        handle.release_pending_registrations();
+        handle.release();
     });
 }
