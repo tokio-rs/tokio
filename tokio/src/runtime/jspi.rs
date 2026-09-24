@@ -84,6 +84,9 @@ pub(crate) fn in_host_turn() -> bool {
 /// `em_promise_t`: an index into the host's promise table, never null.
 type Promise = *mut c_void;
 
+/// Host timer callback ABI, shared with the hosted event loop.
+type Callback = unsafe extern "C-unwind" fn(*mut c_void);
+
 const EM_PROMISE_FULFILL: i32 = 0;
 
 extern "C" {
@@ -95,13 +98,9 @@ extern "C" {
     fn emscripten_promise_destroy(promise: Promise);
     fn emscripten_promise_resolve(promise: Promise, result: i32, value: *mut c_void);
 
-    fn emscripten_set_timeout(
-        cb: extern "C" fn(*mut c_void),
-        msecs: f64,
-        user_data: *mut c_void,
-    ) -> i32;
+    fn emscripten_set_timeout(cb: Callback, msecs: f64, user_data: *mut c_void) -> i32;
     fn emscripten_clear_timeout(id: i32);
-    fn emscripten_set_immediate(cb: extern "C" fn(*mut c_void), user_data: *mut c_void) -> i32;
+    fn emscripten_set_immediate(cb: Callback, user_data: *mut c_void) -> i32;
     fn emscripten_clear_immediate(id: i32);
 }
 
@@ -182,7 +181,7 @@ impl Drop for Timer {
     }
 }
 
-extern "C" fn resolve(promise: *mut c_void) {
+unsafe extern "C-unwind" fn resolve(promise: *mut c_void) {
     // SAFETY: the timer holding this pointer is cleared before the promise
     // is destroyed, so it is live.
     unsafe { emscripten_promise_resolve(promise, EM_PROMISE_FULFILL, ptr::null_mut()) }
