@@ -1,6 +1,5 @@
 cfg_rt! {
     #[cfg(any(not(target_os = "emscripten"), target_feature = "atomics"))]
-    #[allow(unused_imports)]
     pub(crate) use crate::runtime::spawn_blocking;
 
     cfg_io_blocking! {
@@ -36,7 +35,11 @@ cfg_rt! {
         crate::task::coop::cooperative(std::future::ready(Ok(f())))
     }
 
-    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics"), feature = "fs"))]
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        any(feature = "fs", feature = "io-std"),
+    ))]
     #[allow(dead_code)] // unit tests replace this with the `fs::mocks` version
     pub(crate) fn spawn_mandatory_blocking<F, R>(f: F) -> Option<JoinHandle<R>>
     where
@@ -53,7 +56,6 @@ cfg_not_rt! {
     use std::pin::Pin;
     use std::task::{Context, Poll};
 
-    #[allow(dead_code)]
     pub(crate) fn spawn_blocking<F, R>(_f: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
@@ -97,7 +99,6 @@ cfg_not_rt! {
         }
     }
 
-    #[allow(dead_code)]
     fn assert_send_sync<T: Send + Sync>() {
     }
 }

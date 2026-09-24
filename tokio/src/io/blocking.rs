@@ -16,6 +16,8 @@ pub(crate) struct Blocking<T> {
     state: State<T>,
     /// `true` if the lower IO layer needs flushing.
     need_flush: bool,
+    /// `true` if operations are spawned with `spawn_mandatory_blocking`.
+    mandatory: bool,
 }
 
 #[derive(Debug)]
@@ -28,9 +30,11 @@ pub(crate) const DEFAULT_MAX_BUF_SIZE: usize = 2 * 1024 * 1024;
 
 #[derive(Debug)]
 enum State<T> {
+    /// Holds `None` if an operation could not be spawned because the runtime
+    /// is shutting down. `inner` is gone in that case, so all further
+    /// operations fail.
     Idle(Option<Buf>),
     Busy(sys::Blocking<(io::Result<usize>, Buf, T)>),
-    Shutdown,
 }
 
 cfg_io_blocking! {
@@ -46,8 +50,41 @@ cfg_io_blocking! {
                 inner: Some(inner),
                 state: State::Idle(Some(Buf::with_capacity(0))),
                 need_flush: false,
+                mandatory: false,
             }
         }
+
+        /// Like `new`, but operations are spawned with
+        /// `spawn_mandatory_blocking`, so an operation that was started before
+        /// the runtime began shutting down still runs.
+        ///
+        /// # Safety
+        ///
+        /// Same as `new`.
+        #[cfg_attr(not(feature = "io-std"), allow(dead_code))]
+        pub(crate) unsafe fn new_mandatory(inner: T) -> Blocking<T> {
+            Blocking {
+                inner: Some(inner),
+                state: State::Idle(Some(Buf::with_capacity(0))),
+                need_flush: false,
+                mandatory: true,
+            }
+        }
+    }
+}
+
+/// Runs `f` on the blocking pool.
+///
+/// Returns `None` if `mandatory` is set and the runtime is shutting down.
+fn spawn<F, R>(mandatory: bool, f: F) -> Option<sys::Blocking<R>>
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
+{
+    if mandatory {
+        sys::spawn_mandatory_blocking(f)
+    } else {
+        Some(sys::run(f))
     }
 }
 
@@ -63,7 +100,9 @@ where
         loop {
             match self.state {
                 State::Idle(ref mut buf_cell) => {
-                    let mut buf = buf_cell.take().unwrap();
+                    let Some(mut buf) = buf_cell.take() else {
+                        return Poll::Ready(Err(gone()));
+                    };
 
                     if !buf.is_empty() {
                         buf.copy_to(dst);
@@ -74,18 +113,16 @@ where
                     let mut inner = self.inner.take().unwrap();
 
                     let max_buf_size = cmp::min(dst.remaining(), DEFAULT_MAX_BUF_SIZE);
-
-                    let rx = sys::run(move || {
+                    let rx = spawn(self.mandatory, move || {
                         // SAFETY: the requirements are satisfied by `Blocking::new`.
                         let res = unsafe { buf.read_from(&mut inner, max_buf_size) };
                         (res, buf, inner)
                     });
 
-                    self.state = if let Some(rx) = rx {
-                        State::Busy(rx)
-                    } else {
-                        State::Shutdown
+                    let Some(rx) = rx else {
+                        return Poll::Ready(Err(gone()));
                     };
+                    self.state = State::Busy(rx);
                 }
                 State::Busy(ref mut rx) => {
                     let (res, mut buf, inner) = ready!(Pin::new(rx).poll(cx))?;
@@ -105,9 +142,6 @@ where
                         }
                     }
                 }
-                State::Shutdown => {
-                    return Poll::Ready(Err(gone()));
-                }
             }
         }
     }
@@ -125,26 +159,26 @@ where
         loop {
             match self.state {
                 State::Idle(ref mut buf_cell) => {
-                    let mut buf = buf_cell.take().unwrap();
+                    let Some(mut buf) = buf_cell.take() else {
+                        return Poll::Ready(Err(gone()));
+                    };
 
                     assert!(buf.is_empty());
 
                     let n = buf.copy_from(src, DEFAULT_MAX_BUF_SIZE);
                     let mut inner = self.inner.take().unwrap();
 
-                    let rx = sys::run(move || {
+                    let rx = spawn(self.mandatory, move || {
                         let n = buf.len();
                         let res = buf.write_to(&mut inner).map(|()| n);
 
                         (res, buf, inner)
                     });
 
-                    self.state = if let Some(rx) = rx {
-                        State::Busy(rx)
-                    } else {
-                        State::Shutdown
+                    let Some(rx) = rx else {
+                        return Poll::Ready(Err(gone()));
                     };
-
+                    self.state = State::Busy(rx);
                     self.need_flush = true;
 
                     return Poll::Ready(Ok(n));
@@ -157,9 +191,6 @@ where
                     // If error, return
                     res?;
                 }
-                State::Shutdown => {
-                    return Poll::Ready(Err(gone()));
-                }
             }
         }
     }
@@ -171,19 +202,20 @@ where
                 // The buffer is not used here
                 State::Idle(ref mut buf_cell) => {
                     if need_flush {
-                        let buf = buf_cell.take().unwrap();
+                        let Some(buf) = buf_cell.take() else {
+                            return Poll::Ready(Err(gone()));
+                        };
                         let mut inner = self.inner.take().unwrap();
 
-                        let rx = sys::run(move || {
+                        let rx = spawn(self.mandatory, move || {
                             let res = inner.flush().map(|()| 0);
                             (res, buf, inner)
                         });
 
-                        self.state = if let Some(rx) = rx {
-                            State::Busy(rx)
-                        } else {
-                            State::Shutdown
+                        let Some(rx) = rx else {
+                            return Poll::Ready(Err(gone()));
                         };
+                        self.state = State::Busy(rx);
 
                         self.need_flush = false;
                     } else {
@@ -197,9 +229,6 @@ where
 
                     // If error, return
                     res?;
-                }
-                State::Shutdown => {
-                    return Poll::Ready(Err(gone()));
                 }
             }
         }
