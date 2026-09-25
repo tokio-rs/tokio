@@ -85,20 +85,32 @@ fn block_partition(
     runtime: &Runtime,
     partition: usize,
 ) -> (mpsc::Sender<()>, tokio::task::JoinHandle<()>) {
-    let (started_tx, started_rx) = mpsc::channel();
-    let (release_tx, release_rx) = mpsc::channel();
-    let task = tokio::task::Builder::new()
-        .llc_partition(partition)
-        .spawn_on(
-            async move {
-                started_tx.send(()).unwrap();
-                release_rx.recv_timeout(Duration::from_secs(10)).unwrap();
-            },
-            runtime.handle(),
-        )
-        .unwrap();
-    started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
-    (release_tx, task)
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let (started_tx, started_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let task = tokio::task::Builder::new()
+            .llc_partition(partition)
+            .spawn_on(
+                async move {
+                    let current = current_test_partition();
+                    started_tx.send(current).unwrap();
+                    if current == partition {
+                        release_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+                    }
+                },
+                runtime.handle(),
+            )
+            .unwrap();
+        if started_rx.recv_timeout(Duration::from_secs(5)).unwrap() == partition {
+            return (release_tx, task);
+        }
+        runtime.block_on(task).unwrap();
+        assert!(
+            Instant::now() < deadline,
+            "partition {partition} did not become ready"
+        );
+    }
 }
 
 #[test]
@@ -276,6 +288,7 @@ fn enqueue_callback_runs_with_task_override() {
         .unwrap();
     wait_for_partitions(&seen, 2);
     wait_for_partition_queues(&runtime, 2);
+    let (release, gate) = block_partition(&runtime, 0);
     callback_calls.store(0, Ordering::Relaxed);
 
     let override_task = tokio::task::Builder::new()
@@ -287,6 +300,8 @@ fn enqueue_callback_runs_with_task_override() {
 
     runtime.block_on(runtime.spawn(async {})).unwrap();
     assert_eq!(callback_calls.load(Ordering::Relaxed), 2);
+    release.send(()).unwrap();
+    runtime.block_on(gate).unwrap();
 }
 
 #[test]
