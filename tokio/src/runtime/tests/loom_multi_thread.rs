@@ -102,6 +102,12 @@ mod group_a {
         });
     }
 
+    #[cfg(tokio_unstable)]
+    #[test]
+    fn llc_two_partition_queue_races() {
+        crate::runtime::scheduler::multi_thread::model_two_partition_queue_races();
+    }
+
     #[test]
     fn racy_shutdown() {
         loom::model(|| {

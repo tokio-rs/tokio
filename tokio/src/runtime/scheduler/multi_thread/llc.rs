@@ -12,16 +12,18 @@ pub(super) const NO_PARTITION: usize = usize::MAX;
 
 /// Per-LLC queues are sharded to avoid a single runtime-wide injection lock.
 /// Entries within each LLC queue are scheduled in FIFO order.
-pub(super) struct LlcQueues {
-    partitions: Box<[CachePadded<LlcQueue>]>,
+pub(super) type LlcQueues = Queues<task::Notified<Arc<Handle>>>;
+
+pub(super) struct Queues<T> {
+    partitions: Box<[CachePadded<LlcQueue<T>>]>,
     non_empty: Box<[AtomicUsize]>,
     workers: Box<[AtomicUsize]>,
     worker_members: Box<[Box<[AtomicUsize]>]>,
 }
 
-struct LlcQueue {
+struct LlcQueue<T> {
     len: AtomicUsize,
-    state: Mutex<State<task::Notified<Arc<Handle>>>>,
+    state: Mutex<State<T>>,
 }
 
 struct State<T> {
@@ -29,9 +31,9 @@ struct State<T> {
     entries: VecDeque<T>,
 }
 
-impl LlcQueues {
+impl<T> Queues<T> {
     pub(super) fn new(partitions: usize, worker_count: usize) -> Self {
-        let partitions: Box<[CachePadded<LlcQueue>]> = (0..partitions)
+        let partitions: Box<[CachePadded<LlcQueue<T>>]> = (0..partitions)
             .map(|_| {
                 CachePadded::new(LlcQueue {
                     len: AtomicUsize::new(0),
@@ -133,7 +135,7 @@ impl LlcQueues {
         self.non_empty.iter().all(|word| word.load(Acquire) == 0)
     }
 
-    pub(super) fn push(&self, partition: usize, task: task::Notified<Arc<Handle>>) {
+    pub(super) fn push(&self, partition: usize, task: T) {
         let queue = &self.partitions[partition];
         let mut state = queue.state.lock();
         if state.closed {
@@ -150,7 +152,7 @@ impl LlcQueues {
 
     pub(super) fn push_batch<I>(&self, partition: usize, tasks: I)
     where
-        I: Iterator<Item = task::Notified<Arc<Handle>>>,
+        I: Iterator<Item = T>,
     {
         let queue = &self.partitions[partition];
         let mut state = queue.state.lock();
@@ -167,7 +169,7 @@ impl LlcQueues {
         }
     }
 
-    pub(super) fn pop(&self, partition: usize) -> Option<task::Notified<Arc<Handle>>> {
+    pub(super) fn pop(&self, partition: usize) -> Option<T> {
         let queue = &self.partitions[partition];
         if queue.len.load(Acquire) == 0 {
             return None;
@@ -186,7 +188,7 @@ impl LlcQueues {
         &self,
         partition: usize,
         count: usize,
-        f: impl FnOnce(Pop<'_>) -> R,
+        f: impl FnOnce(Pop<'_, T>) -> R,
     ) -> R {
         let queue = &self.partitions[partition];
         let mut state = queue.state.lock();
@@ -211,7 +213,7 @@ impl LlcQueues {
         start: usize,
         max_probes: usize,
         mut matches: impl FnMut(usize) -> bool,
-    ) -> Option<task::Notified<Arc<Handle>>> {
+    ) -> Option<T> {
         let bits = usize::BITS as usize;
         let start_word = (start / bits) % self.non_empty.len();
         let start_bit = start % bits;
@@ -254,7 +256,7 @@ impl LlcQueues {
     }
 
     #[cfg(all(tokio_unstable, feature = "taskdump"))]
-    pub(super) fn drain_into(&self, dst: &mut Vec<task::Notified<Arc<Handle>>>) {
+    pub(super) fn drain_into(&self, dst: &mut Vec<T>) {
         for (partition, queue) in self.partitions.iter().enumerate() {
             let mut state = queue.state.lock();
             while let Some(task) = state.entries.pop_front() {
@@ -279,13 +281,57 @@ impl LlcQueues {
     }
 }
 
-pub(super) struct Pop<'a> {
-    entries: &'a mut VecDeque<task::Notified<Arc<Handle>>>,
+pub(super) struct Pop<'a, T> {
+    entries: &'a mut VecDeque<T>,
     remaining: usize,
 }
 
-impl Iterator for Pop<'_> {
-    type Item = task::Notified<Arc<Handle>>;
+#[cfg(all(test, loom))]
+pub(crate) fn model_two_partition_queue_races() {
+    loom::model(|| {
+        let queues = Arc::new(Queues::<usize>::new(2, 2));
+        queues.update_worker(0, None, Some(0));
+        queues.update_worker(1, None, Some(1));
+        queues.push(0, 0);
+        queues.push(1, 1);
+
+        let first = queues.clone();
+        let first = loom::thread::spawn(move || {
+            assert_eq!(first.pop(0), Some(0));
+            first.push(1, 2);
+        });
+
+        let second = queues.clone();
+        let second = loom::thread::spawn(move || {
+            assert_eq!(second.pop(1), Some(1));
+            second.push(0, 3);
+        });
+
+        first.join().unwrap();
+        second.join().unwrap();
+        assert_eq!(queues.pop(0), Some(3));
+        assert_eq!(queues.pop(1), Some(2));
+        assert!(queues.all_empty());
+
+        let first = queues.clone();
+        let first = loom::thread::spawn(move || first.push(0, 4));
+        let second = queues.clone();
+        let second = loom::thread::spawn(move || second.push(1, 5));
+        queues.close();
+        first.join().unwrap();
+        second.join().unwrap();
+        assert!(matches!(queues.pop(0), None | Some(4)));
+        assert!(matches!(queues.pop(1), None | Some(5)));
+        assert!(queues.all_empty());
+
+        queues.push(0, 6);
+        queues.push(1, 7);
+        assert!(queues.all_empty());
+    });
+}
+
+impl<T> Iterator for Pop<'_, T> {
+    type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining == 0 {
@@ -300,9 +346,9 @@ impl Iterator for Pop<'_> {
     }
 }
 
-impl ExactSizeIterator for Pop<'_> {}
+impl<T> ExactSizeIterator for Pop<'_, T> {}
 
-impl Drop for Pop<'_> {
+impl<T> Drop for Pop<'_, T> {
     fn drop(&mut self) {
         // Keep the queue's accounting exact even if the consumer intentionally
         // stops early.
