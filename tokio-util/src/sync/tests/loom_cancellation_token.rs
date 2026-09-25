@@ -1,5 +1,7 @@
 use crate::sync::CancellationToken;
 
+use loom::sync::atomic::{AtomicUsize, Ordering};
+use loom::sync::Arc;
 use loom::{future::block_on, thread};
 use tokio_test::assert_ok;
 
@@ -42,6 +44,65 @@ fn cancel_token_owned() {
 
         assert_ok!(th1.join());
         assert_ok!(th2.join());
+    });
+}
+
+// Verifies that the lock-free `is_cancelled()` fast path establishes a
+// happens-before relationship with `cancel()`. A data write performed before
+// `cancel()` must be visible from another thread that has observed
+// `is_cancelled() == true`.
+#[test]
+fn is_cancelled_publishes_writes_from_cancel() {
+    loom::model(|| {
+        let token = Arc::new(CancellationToken::new());
+        let data = Arc::new(AtomicUsize::new(0));
+
+        let writer_token = token.clone();
+        let writer_data = data.clone();
+        let writer = thread::spawn(move || {
+            writer_data.store(42, Ordering::Relaxed);
+            writer_token.cancel();
+        });
+
+        let reader_token = token.clone();
+        let reader_data = data.clone();
+        let reader = thread::spawn(move || {
+            if reader_token.is_cancelled() {
+                assert_eq!(reader_data.load(Ordering::Relaxed), 42);
+            }
+        });
+
+        assert_ok!(writer.join());
+        assert_ok!(reader.join());
+    });
+}
+
+// Regression test for the lost-wakeup scenario: if a thread creates the
+// `cancelled()` future and polls it (reading `is_cancelled` as `false`)
+// concurrently with `cancel()` flipping the flag and calling
+// `notify_waiters()`, the future must still complete. This would fail under
+// loom if `is_cancelled()` used only `load(Acquire)` against a
+// `store(Release)`, because that pair only orders one direction and would
+// permit a missed wakeup.
+#[test]
+fn cancelled_future_no_lost_wakeup() {
+    loom::model(|| {
+        let token = Arc::new(CancellationToken::new());
+
+        let cancel_token = token.clone();
+        let canceller = thread::spawn(move || {
+            cancel_token.cancel();
+        });
+
+        let awaiter_token = token.clone();
+        let awaiter = thread::spawn(move || {
+            block_on(async {
+                awaiter_token.cancelled().await;
+            });
+        });
+
+        assert_ok!(canceller.join());
+        assert_ok!(awaiter.join());
     });
 }
 
