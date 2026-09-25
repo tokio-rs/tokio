@@ -580,37 +580,41 @@ impl Handle {
     ))]
     pub(crate) fn dump(&self) -> crate::runtime::Dump {
         use crate::runtime::dump;
-        use task::trace::trace_current_thread;
+        use task::trace::drain_current_thread;
+        use task::trace::trace_owned;
 
         let mut traces = vec![];
 
         // todo: how to make this work outside of a runtime context?
         context::with_scheduler(|maybe_context| {
-            // drain the local queue
             let context = if let Some(context) = maybe_context {
                 context.expect_current_thread()
             } else {
                 return;
             };
-            let mut maybe_core = context.core.borrow_mut();
-            let core = if let Some(core) = maybe_core.as_mut() {
-                core
-            } else {
-                return;
-            };
-            let local = &mut core.tasks;
 
             if self.shared.inject.is_closed() {
                 return;
             }
 
-            traces = trace_current_thread(&self.shared.owned, local, &self.shared.inject)
+            // Drain the local and injection queues. The core borrow is released
+            // before any task is polled by `trace_owned`: a task polled during
+            // tracing may wake another task, and `Schedule::schedule` would then
+            // re-borrow the core and panic with "RefCell already borrowed".
+            let dequeued = {
+                let mut maybe_core = context.core.borrow_mut();
+                let core = if let Some(core) = maybe_core.as_mut() {
+                    core
+                } else {
+                    return;
+                };
+                drain_current_thread(&mut core.tasks, &self.shared.inject)
+            };
+
+            traces = trace_owned(&self.shared.owned, dequeued)
                 .into_iter()
                 .map(|(id, trace)| dump::Task::new(id, trace))
                 .collect();
-
-            // Avoid double borrow panic
-            drop(maybe_core);
 
             // Taking a taskdump could wakes every task, but we probably don't want
             // the `yield_now` vector to be that large under normal circumstances.
