@@ -107,8 +107,11 @@ mod emscripten {
 
         // A drive scheduled while another runtime's `block_on` is suspended
         // on this thread must wait for its exit, not poll for it: the
-        // immediates the host sees during the suspension stay in single
-        // digits rather than one per turn (`rt_emscripten_pre.js` counts).
+        // immediates the host sees during the suspension stay in the tens
+        // rather than one per turn (`rt_emscripten_pre.js` counts). With the
+        // JSPI fiber hooks the drives run as siblings instead, one per
+        // leftover batch, and the host's listener defers an exit check per
+        // turn it does not deliver; a poll would be thousands either way.
         // SAFETY: an Emscripten libc query with no arguments.
         if unsafe { emscripten_has_asyncify() } == 2 {
             let before = run_js_int("Module.tokioImmediates");
@@ -119,7 +122,7 @@ mod emscripten {
                 .block_on(async { tokio::time::sleep(Duration::from_millis(100)).await });
             let during = run_js_int("Module.tokioImmediates") - before;
             assert!(
-                during < 10,
+                during < 50,
                 "{during} immediates during a suspended block_on"
             );
         }

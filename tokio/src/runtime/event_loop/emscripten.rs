@@ -14,6 +14,7 @@ use crate::runtime::Handle;
 use std::cell::Cell;
 use std::ffi::c_void;
 use std::io;
+use std::ptr;
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
 use std::task::{Wake, Waker};
@@ -31,6 +32,41 @@ extern "C" {
     fn emscripten_set_immediate(cb: Callback, user_data: *mut c_void) -> i32;
     fn emscripten_runtime_keepalive_push();
     fn emscripten_runtime_keepalive_pop();
+    fn emscripten_promise_create() -> *mut c_void;
+    fn emscripten_promise_destroy(promise: *mut c_void);
+    fn emscripten_promise_resolve(promise: *mut c_void, result: i32, value: *mut c_void);
+    /// Chains `on_fulfilled(result, user_data, value)` as a microtask,
+    /// holding the runtime alive until it runs.
+    fn emscripten_promise_then(
+        promise: *mut c_void,
+        on_fulfilled: PromiseCallback,
+        on_rejected: Option<PromiseCallback>,
+        user_data: *mut c_void,
+    ) -> *mut c_void;
+}
+
+type PromiseCallback =
+    unsafe extern "C-unwind" fn(*mut *mut c_void, *mut c_void, *mut c_void) -> i32;
+
+thread_local! {
+    /// Set while a hosted drive or the deadline timer's callback is on the
+    /// stack: a wake from there schedules its drive as an immediate rather
+    /// than a microtask (see [`Hosted`]).
+    static IMMEDIATE_WAKES: Cell<bool> = const { Cell::new(false) };
+}
+
+struct ImmediateWakes(bool);
+
+impl ImmediateWakes {
+    fn enter() -> ImmediateWakes {
+        ImmediateWakes(IMMEDIATE_WAKES.with(|w| w.replace(true)))
+    }
+}
+
+impl Drop for ImmediateWakes {
+    fn drop(&mut self) {
+        IMMEDIATE_WAKES.with(|w| w.set(self.0));
+    }
 }
 
 #[cfg(feature = "net")]
@@ -147,7 +183,7 @@ impl Reactor {
             // SAFETY: `user_data` is this `Reactor`, which clears the
             // timeout in `stop` before the loop drops.
             self.deadline
-                .set(Some(unsafe { emscripten_set_timeout(wake, ms, this) }));
+                .set(Some(unsafe { emscripten_set_timeout(deadline, ms, this) }));
         }
         let _ = handle;
     }
@@ -171,6 +207,14 @@ impl Reactor {
             shared.handle.inner.driver().wake_host();
         }
     }
+}
+
+/// The deadline timer fired: a host turn of its own, so the drive takes the
+/// next one.
+unsafe extern "C-unwind" fn deadline(user_data: *mut c_void) {
+    let _immediate = ImmediateWakes::enter();
+    // SAFETY: as `wake`.
+    unsafe { wake(user_data) }
 }
 
 /// Readiness or a deadline: the host should drive.
@@ -219,9 +263,14 @@ fn next_deadline(_handle: &Handle) -> Option<Duration> {
 }
 
 /// The waker of a hosted event loop: a wake schedules a drive on the host
-/// loop. An immediate rather than a timeout, which the host clamps to a
-/// millisecond, and never a microtask, which would run before host timers
-/// and let a self-waking task starve them. Pending drives coalesce.
+/// loop. Woken from a host callback (the readiness listener, which the host
+/// delivers as a microtask of the notifying event, or any other call into
+/// the module), the drive is a microtask, so it runs once that callback
+/// unwinds but in the host context that woke it. A wake from inside a drive
+/// (a task waking another) or from the deadline timer takes an immediate
+/// instead: a microtask there would run before host timers and I/O and let
+/// a self-waking task starve them; a timeout the host clamps to a
+/// millisecond. Pending drives coalesce.
 struct Hosted {
     target: Weak<Shared>,
     scheduled: Cell<bool>,
@@ -241,16 +290,40 @@ impl Wake for Hosted {
         if self.scheduled.replace(true) {
             return;
         }
-        self.schedule();
+        self.schedule(!IMMEDIATE_WAKES.with(Cell::get));
     }
 }
 
 impl Hosted {
-    fn schedule(self: &Arc<Self>) {
-        // SAFETY: the `Arc` is reclaimed in `drive`, which the host calls
-        // exactly once per immediate.
-        unsafe { emscripten_set_immediate(drive, Arc::into_raw(self.clone()) as *mut c_void) };
+    fn schedule(self: &Arc<Self>, microtask: bool) {
+        let this = Arc::into_raw(self.clone()) as *mut c_void;
+        if !microtask {
+            // SAFETY: the `Arc` is reclaimed in `drive`, which the host
+            // calls exactly once per immediate.
+            unsafe { emscripten_set_immediate(drive, this) };
+            return;
+        }
+        // SAFETY: a settled promise whose `then` runs `drive_microtask`
+        // once, reclaiming the `Arc`; the handles are freed at once, which
+        // leaves the chained callback in place.
+        unsafe {
+            let settled = emscripten_promise_create();
+            emscripten_promise_resolve(settled, 0, ptr::null_mut());
+            let chained = emscripten_promise_then(settled, drive_microtask, None, this);
+            emscripten_promise_destroy(settled);
+            emscripten_promise_destroy(chained);
+        }
     }
+}
+
+unsafe extern "C-unwind" fn drive_microtask(
+    _result: *mut *mut c_void,
+    user_data: *mut c_void,
+    _value: *mut c_void,
+) -> i32 {
+    // SAFETY: as `drive`; the `Arc<Hosted>` leaked in `schedule`.
+    unsafe { drive(user_data) };
+    0
 }
 
 unsafe extern "C-unwind" fn drive(user_data: *mut c_void) {
@@ -260,7 +333,7 @@ unsafe extern "C-unwind" fn drive(user_data: *mut c_void) {
     // through JSPI, owns it until it returns; the drive is rescheduled at
     // its exit, with the wake still pending so it coalesces meanwhile.
     let again = hosted.clone();
-    if !crate::runtime::jspi::defer_after_runtime_exit(move || again.schedule()) {
+    if !crate::runtime::jspi::defer_after_runtime_exit(move || again.schedule(false)) {
         hosted.run();
     }
 }
@@ -276,6 +349,7 @@ impl Hosted {
         // task panic under `UnhandledPanic::ShutdownRuntime`); it would
         // unwind into the host's JavaScript. Abort as an uncaught panic on
         // `main` would.
+        let _immediate = ImmediateWakes::enter();
         if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| target.drive())).is_err() {
             std::process::abort();
         }
