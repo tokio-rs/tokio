@@ -49,6 +49,9 @@ cfg_not_rt! {
     use std::pin::Pin;
     use std::task::{Context, Poll};
 
+    // On Emscripten `net` resolves names through the host, so without `rt`
+    // nothing reaches these.
+    #[cfg_attr(target_os = "emscripten", allow(dead_code))]
     pub(crate) fn spawn_blocking<F, R>(_f: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
@@ -68,6 +71,7 @@ cfg_not_rt! {
         }
     }
 
+    #[cfg_attr(target_os = "emscripten", allow(dead_code))]
     pub(crate) struct JoinHandle<R> {
         _p: std::marker::PhantomData<R>,
     }
@@ -92,6 +96,7 @@ cfg_not_rt! {
         }
     }
 
+    #[cfg_attr(target_os = "emscripten", allow(dead_code))]
     fn assert_send_sync<T: Send + Sync>() {
     }
 }
