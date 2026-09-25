@@ -97,20 +97,6 @@ fn backlog_to_c_int(backlog: u32) -> i32 {
     backlog.min(i32::MAX as u32) as i32
 }
 
-#[cfg(test)]
-mod tests {
-    use super::backlog_to_c_int;
-
-    #[test]
-    fn backlog_to_c_int_saturates() {
-        assert_eq!(backlog_to_c_int(0), 0);
-        assert_eq!(backlog_to_c_int(1), 1);
-        assert_eq!(backlog_to_c_int(i32::MAX as u32), i32::MAX);
-        assert_eq!(backlog_to_c_int(i32::MAX as u32 + 1), i32::MAX);
-        assert_eq!(backlog_to_c_int(u32::MAX), i32::MAX);
-    }
-}
-
 impl TcpSocket {
     /// Creates a new socket configured for IPv4.
     ///
@@ -1078,5 +1064,19 @@ cfg_windows! {
             let inner = unsafe { socket2::Socket::from_raw_socket(socket) };
             TcpSocket { inner }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::backlog_to_c_int;
+
+    #[test]
+    fn backlog_to_c_int_saturates() {
+        assert_eq!(backlog_to_c_int(0), 0);
+        assert_eq!(backlog_to_c_int(1), 1);
+        assert_eq!(backlog_to_c_int(i32::MAX as u32), i32::MAX);
+        assert_eq!(backlog_to_c_int(i32::MAX as u32 + 1), i32::MAX);
+        assert_eq!(backlog_to_c_int(u32::MAX), i32::MAX);
     }
 }
