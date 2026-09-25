@@ -37,7 +37,7 @@ const DEFAULT_SEQUENCE_WRITER: &[u8] = b",";
 /// # }
 /// ```
 ///
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct AnyDelimiterCodec {
     // Stored index of the next index to examine for the delimiter character.
     // This is used to optimize searching.
@@ -60,6 +60,9 @@ pub struct AnyDelimiterCodec {
 
     /// The bytes that are using for encoding
     sequence_writer: Vec<u8>,
+
+    /// `seek_delimiters` as a lookup table indexed by byte value
+    delimiter_table: [bool; 256],
 }
 
 impl AnyDelimiterCodec {
@@ -73,12 +76,18 @@ impl AnyDelimiterCodec {
     ///
     /// [`new_with_max_length`]: crate::codec::AnyDelimiterCodec::new_with_max_length()
     pub fn new(seek_delimiters: Vec<u8>, sequence_writer: Vec<u8>) -> AnyDelimiterCodec {
+        let mut delimiter_table = [false; 256];
+        for &b in &seek_delimiters {
+            delimiter_table[b as usize] = true;
+        }
+
         AnyDelimiterCodec {
             next_index: 0,
             max_length: usize::MAX,
             is_discarding: false,
             seek_delimiters,
             sequence_writer,
+            delimiter_table,
         }
     }
 
@@ -140,9 +149,13 @@ impl Decoder for AnyDelimiterCodec {
             // there's no max_length set, we'll read to the end of the buffer.
             let read_to = cmp::min(self.max_length.saturating_add(1), buf.len());
 
-            let new_chunk_offset = buf[self.next_index..read_to]
-                .iter()
-                .position(|b| self.seek_delimiters.contains(b));
+            let haystack = &buf[self.next_index..read_to];
+            let new_chunk_offset = match self.seek_delimiters[..] {
+                [delimiter] => crate::util::memchr::memchr(delimiter, haystack),
+                _ => haystack
+                    .iter()
+                    .position(|&b| self.delimiter_table[b as usize]),
+            };
 
             match (self.is_discarding, new_chunk_offset) {
                 (true, Some(offset)) => {
@@ -228,6 +241,19 @@ impl Default for AnyDelimiterCodec {
             DEFAULT_SEEK_DELIMITERS.to_vec(),
             DEFAULT_SEQUENCE_WRITER.to_vec(),
         )
+    }
+}
+
+// `delimiter_table` is built from `seek_delimiters`, so leave it out.
+impl fmt::Debug for AnyDelimiterCodec {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AnyDelimiterCodec")
+            .field("next_index", &self.next_index)
+            .field("max_length", &self.max_length)
+            .field("is_discarding", &self.is_discarding)
+            .field("seek_delimiters", &self.seek_delimiters)
+            .field("sequence_writer", &self.sequence_writer)
+            .finish()
     }
 }
 
