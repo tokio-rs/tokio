@@ -166,7 +166,6 @@ cfg_net! {
         type Future = sealed::MaybeReady;
 
         fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
-            use crate::blocking::spawn_blocking;
             use sealed::MaybeReady;
 
             // First check if the input parses as a socket address
@@ -176,12 +175,7 @@ cfg_net! {
                 return MaybeReady(sealed::State::Ready(Some(addr)));
             }
 
-            // Run DNS lookup on the blocking pool
-            let s = self.to_owned();
-
-            MaybeReady(sealed::State::Blocking(spawn_blocking(move || {
-                std::net::ToSocketAddrs::to_socket_addrs(&s)
-            })))
+            MaybeReady(sealed::lookup_str(self.to_owned()))
         }
     }
 
@@ -194,7 +188,6 @@ cfg_net! {
         type Future = sealed::MaybeReady;
 
         fn to_socket_addrs(&self, _: sealed::Internal) -> Self::Future {
-            use crate::blocking::spawn_blocking;
             use sealed::MaybeReady;
 
             let (host, port) = *self;
@@ -214,11 +207,7 @@ cfg_net! {
                 return MaybeReady(sealed::State::Ready(Some(addr)));
             }
 
-            let host = host.to_owned();
-
-            MaybeReady(sealed::State::Blocking(spawn_blocking(move || {
-                std::net::ToSocketAddrs::to_socket_addrs(&(&host[..], port))
-            })))
+            MaybeReady(sealed::lookup_host(host.to_owned(), port))
         }
     }
 
@@ -270,8 +259,6 @@ pub(crate) mod sealed {
     pub struct Internal;
 
     cfg_net! {
-        use crate::blocking::JoinHandle;
-
         use std::option;
         use std::pin::Pin;
         use std::task::{ready,Context, Poll};
@@ -284,7 +271,53 @@ pub(crate) mod sealed {
         #[derive(Debug)]
         pub(super) enum State {
             Ready(Option<SocketAddr>),
-            Blocking(JoinHandle<io::Result<vec::IntoIter<SocketAddr>>>),
+            Lookup(Lookup),
+        }
+
+        // A hostname lookup in flight: `std`'s resolver on the blocking pool,
+        // or on emscripten, whose synchronous `getaddrinfo` has nothing to
+        // block on, its asynchronous one awaited through the I/O driver.
+        #[cfg(not(target_os = "emscripten"))]
+        pub(super) type Lookup = crate::blocking::JoinHandle<io::Result<vec::IntoIter<SocketAddr>>>;
+        #[cfg(target_os = "emscripten")]
+        pub(super) struct Lookup(Pin<Box<dyn Future<Output = io::Result<vec::IntoIter<SocketAddr>>> + Send>>);
+
+        #[cfg(target_os = "emscripten")]
+        impl std::fmt::Debug for Lookup {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("Lookup")
+            }
+        }
+
+        /// Resolves `host:port` as `std::net::ToSocketAddrs` does for a string.
+        #[cfg(not(target_os = "emscripten"))]
+        pub(super) fn lookup_str(s: String) -> State {
+            State::Lookup(crate::blocking::spawn_blocking(move || {
+                std::net::ToSocketAddrs::to_socket_addrs(&s)
+            }))
+        }
+
+        #[cfg(target_os = "emscripten")]
+        pub(super) fn lookup_str(s: String) -> State {
+            match s.rsplit_once(':').and_then(|(h, p)| Some((h.to_owned(), p.parse().ok()?))) {
+                Some((host, port)) => lookup_host(host, port),
+                None => State::Lookup(Lookup(Box::pin(std::future::ready(Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "invalid socket address",
+                )))))),
+            }
+        }
+
+        #[cfg(not(target_os = "emscripten"))]
+        pub(super) fn lookup_host(host: String, port: u16) -> State {
+            State::Lookup(crate::blocking::spawn_blocking(move || {
+                std::net::ToSocketAddrs::to_socket_addrs(&(&host[..], port))
+            }))
+        }
+
+        #[cfg(target_os = "emscripten")]
+        pub(super) fn lookup_host(host: String, port: u16) -> State {
+            State::Lookup(Lookup(Box::pin(crate::net::emscripten_dns::resolve(host, port))))
         }
 
         #[doc(hidden)]
@@ -303,8 +336,15 @@ pub(crate) mod sealed {
                         let iter = OneOrMore::One(i.take().into_iter());
                         Poll::Ready(Ok(iter))
                     }
-                    State::Blocking(ref mut rx) => {
+                    #[cfg(not(target_os = "emscripten"))]
+                    State::Lookup(ref mut rx) => {
                         let res = ready!(Pin::new(rx).poll(cx))?.map(OneOrMore::More);
+
+                        Poll::Ready(res)
+                    }
+                    #[cfg(target_os = "emscripten")]
+                    State::Lookup(ref mut fut) => {
+                        let res = ready!(fut.0.as_mut().poll(cx)).map(OneOrMore::More);
 
                         Poll::Ready(res)
                     }

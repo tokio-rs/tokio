@@ -36,6 +36,9 @@ cfg_not_wasip1! {
 pub use addr::ToSocketAddrs;
 
 cfg_net! {
+    #[cfg(target_os = "emscripten")]
+    pub(crate) mod emscripten_dns;
+
     mod lookup_host;
     pub use lookup_host::lookup_host;
 
