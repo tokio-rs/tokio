@@ -199,6 +199,9 @@ cfg_not_wasi! {
         async_assert_fn!(
             tokio::fs::File::set_permissions(_, std::fs::Permissions): Send & Sync & !Unpin
         );
+        async_assert_fn!(
+            tokio::fs::File::set_times(_, std::fs::FileTimes): Send & Sync & !Unpin
+        );
     }
 }
 

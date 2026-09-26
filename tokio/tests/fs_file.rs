@@ -211,6 +211,28 @@ async fn empty_read() {
     assert_eq!(&buf[..n], HELLO);
 }
 
+#[tokio::test]
+async fn set_times() {
+    use std::time::{Duration, SystemTime};
+
+    let tempfile = tempfile();
+
+    let file = File::create(tempfile.path()).await.unwrap();
+
+    // Whole seconds to avoid filesystem timestamp precision loss.
+    let accessed = SystemTime::UNIX_EPOCH + Duration::from_secs(1_600_000_000);
+    let modified = SystemTime::UNIX_EPOCH + Duration::from_secs(1_500_000_000);
+    let times = std::fs::FileTimes::new()
+        .set_accessed(accessed)
+        .set_modified(modified);
+
+    file.set_times(times).await.unwrap();
+
+    let metadata = file.metadata().await.unwrap();
+    assert_eq!(metadata.accessed().unwrap(), accessed);
+    assert_eq!(metadata.modified().unwrap(), modified);
+}
+
 fn tempfile() -> NamedTempFile {
     NamedTempFile::new().unwrap()
 }
