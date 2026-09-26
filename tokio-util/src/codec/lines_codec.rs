@@ -75,7 +75,6 @@ impl LinesCodec {
     /// Returns the maximum line length when decoding.
     ///
     /// ```
-    /// use std::usize;
     /// use tokio_util::codec::LinesCodec;
     ///
     /// let codec = LinesCodec::new();

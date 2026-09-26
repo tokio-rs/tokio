@@ -4,9 +4,9 @@ name = "tokio-test"
 # - Remove path dependencies (if any)
 # - Update CHANGELOG.md.
 # - Create "tokio-test-0.4.x" git tag.
-version = "0.4.5"
+version = "0.4.6"
 edition = "2021"
-rust-version = "1.71"
+rust-version = "1.85"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"

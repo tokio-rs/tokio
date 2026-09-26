@@ -13,7 +13,7 @@ use crate::signal::RxFuture;
 use crate::sync::watch;
 
 use mio::net::UnixStream;
-use std::io::{self, Error, ErrorKind, Write};
+use std::io::{self, Error, Write};
 use std::sync::OnceLock;
 use std::task::{Context, Poll};
 
@@ -269,10 +269,9 @@ fn action(globals: &'static Globals, signal: libc::c_int) {
 fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     let signal = signal.0;
     if signal <= 0 || signal_hook_registry::FORBIDDEN.contains(&signal) {
-        return Err(Error::new(
-            ErrorKind::Other,
-            format!("Refusing to register signal {signal}"),
-        ));
+        return Err(Error::other(format!(
+            "Refusing to register signal {signal}"
+        )));
     }
 
     // Check that we have a signal driver running
@@ -281,7 +280,7 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     let globals = globals();
     let siginfo = match globals.storage().get(signal as EventId) {
         Some(slot) => slot,
-        None => return Err(io::Error::new(io::ErrorKind::Other, "signal too large")),
+        None => return Err(io::Error::other("signal too large")),
     };
 
     siginfo
@@ -293,7 +292,7 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
         })
         .map_err(|e| {
             e.map_or_else(
-                || Error::new(ErrorKind::Other, "registering signal handler failed"),
+                || Error::other("registering signal handler failed"),
                 Error::from_raw_os_error,
             )
         })
@@ -518,7 +517,7 @@ mod tests {
                 signal_enable(SignalKind::from_raw(input), &Handle::default())
                     .unwrap_err()
                     .kind(),
-                ErrorKind::Other,
+                io::ErrorKind::Other,
             );
         }
     }
@@ -532,7 +531,7 @@ mod tests {
                 signal_enable(SignalKind::from_raw(input), &Handle::default())
                     .unwrap_err()
                     .kind(),
-                ErrorKind::Other,
+                io::ErrorKind::Other,
             );
         }
     }
