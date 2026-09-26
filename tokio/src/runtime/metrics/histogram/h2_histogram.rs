@@ -176,7 +176,7 @@ impl LogHistogramBuilder {
         assert!(max_error > 0.0, "max_error must be greater than 0");
         assert!(max_error < 1.0, "max_error must be less than 1");
         let mut p = 2;
-        while 2_f64.powf(-(p as f64)) > max_error && p <= MAX_PRECISION {
+        while p < MAX_PRECISION && 2_f64.powf(-(p as f64)) > max_error {
             p += 1;
         }
         self.precision = Some(p);
@@ -516,6 +516,12 @@ mod test {
             } => required_bucket_count,
         };
         assert_eq!(num_buckets, 27291);
+    }
+
+    #[test]
+    fn max_error_caps_precision() {
+        let conf = LogHistogram::builder().max_error(0.0001).build();
+        assert_eq!(conf.p, super::MAX_PRECISION);
     }
 
     #[test]
