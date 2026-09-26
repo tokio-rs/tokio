@@ -57,3 +57,8 @@ impl Reactor {
         self.thread.join().ok()
     }
 }
+
+/// The host is a thread; nothing to coalesce.
+pub(super) fn drive_scope<R>(_handle: &Handle, f: impl FnOnce() -> R) -> R {
+    f()
+}

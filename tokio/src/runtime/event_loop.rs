@@ -192,23 +192,28 @@ impl Shared {
 
     fn drive(&self) {
         self.check_thread();
-        let handle = self.handle.inner.as_current_thread();
-        let busy = context::enter_runtime(&self.handle.inner, false, |_| {
-            self.runtime.current_thread().drive_batch(handle)
-        });
-        self.after_turn(busy);
+        reactor::drive_scope(&self.handle, || {
+            let handle = self.handle.inner.as_current_thread();
+            let busy = context::enter_runtime(&self.handle.inner, false, |_| {
+                self.runtime.current_thread().drive_batch(handle)
+            });
+            self.after_turn(busy);
+        })
     }
 
     #[track_caller]
     fn block_on<F: Future>(&self, future: F) -> F::Output {
         self.check_thread();
-        let handle = self.handle.inner.as_current_thread();
-        let (ret, busy) = context::enter_runtime(&self.handle.inner, false, |_| {
-            self.runtime.current_thread().block_on_ready(handle, future)
+        let ret = reactor::drive_scope(&self.handle, || {
+            let handle = self.handle.inner.as_current_thread();
+            let (ret, busy) = context::enter_runtime(&self.handle.inner, false, |_| {
+                self.runtime.current_thread().block_on_ready(handle, future)
+            });
+            // The dropped future's timers and registrations are gone; settle
+            // the host's side before reporting.
+            self.after_turn(busy);
+            ret
         });
-        // The dropped future's timers and registrations are gone; settle the
-        // host's side before reporting.
-        self.after_turn(busy);
         match ret {
             Some(out) => out,
             None => panic!(

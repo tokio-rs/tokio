@@ -29,6 +29,80 @@ fn event_loop() -> LocalEventLoop {
         .unwrap()
 }
 
+extern "C" {
+    fn emscripten_run_script_int(script: *const std::ffi::c_char) -> i32;
+}
+
+fn host_count(name: &str) -> i32 {
+    let script = std::ffi::CString::new(format!("Module.{name}")).unwrap();
+    // SAFETY: a NUL-terminated script evaluated on the host.
+    unsafe { emscripten_run_script_int(script.as_ptr()) }
+}
+
+/// Promise reactions the host has seen (`rt_emscripten_pre.js` counts): a
+/// hosted drive scheduled from a host callback is one.
+fn thens() -> i32 {
+    host_count("tokioThens")
+}
+
+/// Immediates the host has seen: a drive's follow-up is one.
+fn immediates() -> i32 {
+    host_count("tokioImmediates")
+}
+
+// A wake outside a drive schedules its own drive, as a microtask of the
+// waking host callback. It never folds into a drive armed earlier: that one
+// belongs to the context that armed it, and may run there long after.
+#[test]
+fn wake_outside_a_drive_arms_its_own_drive() {
+    let el = event_loop();
+    let before = thens();
+    el.spawn_local(async {});
+    assert_eq!(thens() - before, 1, "the spawn arms one drive");
+    let before = thens();
+    el.spawn_local(async {});
+    assert_eq!(
+        thens() - before,
+        1,
+        "so does the next, pending drive or not"
+    );
+    el.drive();
+    let before = thens();
+    el.spawn_local(async {});
+    assert_eq!(
+        thens() - before,
+        1,
+        "and one after a drive on the caller's stack"
+    );
+}
+
+// Wakes from inside a drive (tasks waking tasks, the batch leaving work)
+// coalesce into one follow-up, an immediate so the host gets a turn.
+#[test]
+fn wakes_inside_a_drive_coalesce_into_one_immediate() {
+    let el = event_loop();
+    let ran = Rc::new(Cell::new(0));
+    for _ in 0..6 {
+        let r = ran.clone();
+        el.spawn_local(async move { r.set(r.get() + 1) });
+    }
+    let (thens_before, immediates_before) = (thens(), immediates());
+    el.drive();
+    assert_eq!(ran.get(), 4, "one event_interval(4) batch");
+    assert_eq!(
+        thens() - thens_before,
+        0,
+        "no microtask drive from inside a drive"
+    );
+    assert_eq!(
+        immediates() - immediates_before,
+        1,
+        "one follow-up for the leftovers"
+    );
+    el.drive();
+    assert_eq!(ran.get(), 6);
+}
+
 #[test]
 fn spawn_queues_and_drive_runs() {
     let el = event_loop();

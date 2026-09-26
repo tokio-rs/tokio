@@ -15,6 +15,17 @@ if (globalThis.setImmediate) {
     return setImmediateHost(...args);
   };
 }
+// Promise reactions chained since load: the hosted event loop's microtask
+// drives are `then`s, for tests that count drives scheduled in a synchronous
+// window.
+Module.tokioThens = 0;
+{
+  const thenHost = Promise.prototype.then;
+  Promise.prototype.then = function (...args) {
+    Module.tokioThens++;
+    return thenHost.apply(this, args);
+  };
+}
 var tokioRuntimeExited = false;
 Module['onExit'] = () => { tokioRuntimeExited = true; };
 process.on('exit', (code) => {

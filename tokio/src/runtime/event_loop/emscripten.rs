@@ -49,10 +49,35 @@ type PromiseCallback =
     unsafe extern "C-unwind" fn(*mut *mut c_void, *mut c_void, *mut c_void) -> i32;
 
 thread_local! {
-    /// Set while a hosted drive or the deadline timer's callback is on the
-    /// stack: a wake from there schedules its drive as an immediate rather
-    /// than a microtask (see [`Hosted`]).
+    /// Set while the deadline timer's callback or a drive's follow-up wake
+    /// is on the stack: a wake from there schedules its drive as an
+    /// immediate rather than a microtask (see [`Hosted`]).
     static IMMEDIATE_WAKES: Cell<bool> = const { Cell::new(false) };
+    /// Set while a drive is on the stack: its wakes collect into `WOKEN`
+    /// and one follow-up drive is scheduled when it ends.
+    static IN_DRIVE: Cell<bool> = const { Cell::new(false) };
+    static WOKEN: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Runs a drive or `block_on` of the event loop: the wakes it causes, its
+/// own leftover wake included, coalesce into one follow-up drive scheduled
+/// at its end as an immediate, so a busy loop yields a host turn between
+/// batches. Wakes outside any drive each schedule their own drive.
+pub(super) fn drive_scope<R>(handle: &Handle, f: impl FnOnce() -> R) -> R {
+    struct Reset(bool);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            IN_DRIVE.with(|d| d.set(self.0));
+        }
+    }
+    let reset = Reset(IN_DRIVE.with(|d| d.replace(true)));
+    let out = f();
+    drop(reset);
+    if !IN_DRIVE.with(Cell::get) && WOKEN.with(|w| w.replace(false)) {
+        let _immediate = ImmediateWakes::enter();
+        handle.inner.driver().wake_host();
+    }
+    out
 }
 
 struct ImmediateWakes(bool);
@@ -266,14 +291,16 @@ fn next_deadline(_handle: &Handle) -> Option<Duration> {
 /// loop. Woken from a host callback (the readiness listener, which the host
 /// delivers as a microtask of the notifying event, or any other call into
 /// the module), the drive is a microtask, so it runs once that callback
-/// unwinds but in the host context that woke it. A wake from inside a drive
-/// (a task waking another) or from the deadline timer takes an immediate
-/// instead: a microtask there would run before host timers and I/O and let
-/// a self-waking task starve them; a timeout the host clamps to a
-/// millisecond. Pending drives coalesce.
+/// unwinds but in the host context that woke it. Every such wake schedules
+/// its own drive: a pending drive belongs to the context that armed it, and
+/// a wake from another context must not fold into it (see [`drive_scope`]).
+/// Wakes from inside a drive (a task waking another, or the batch leaving
+/// work) coalesce into one follow-up, and it and the deadline timer's wake
+/// take an immediate instead: a microtask there would run before host
+/// timers and I/O and let a self-waking task starve them; a timeout the host
+/// clamps to a millisecond. A drive that finds nothing is normal.
 struct Hosted {
     target: Weak<Shared>,
-    scheduled: Cell<bool>,
 }
 
 // SAFETY: `Waker` requires the bounds, and this module is compiled only for
@@ -287,7 +314,8 @@ impl Wake for Hosted {
     }
 
     fn wake_by_ref(self: &Arc<Self>) {
-        if self.scheduled.replace(true) {
+        if IN_DRIVE.with(Cell::get) {
+            WOKEN.with(|w| w.set(true));
             return;
         }
         self.schedule(!IMMEDIATE_WAKES.with(Cell::get));
@@ -331,7 +359,7 @@ unsafe extern "C-unwind" fn drive(user_data: *mut c_void) {
     let hosted = unsafe { Arc::from_raw(user_data as *const Hosted) };
     // A runtime entered on this thread, such as a `block_on` suspended
     // through JSPI, owns it until it returns; the drive is rescheduled at
-    // its exit, with the wake still pending so it coalesces meanwhile.
+    // its exit.
     let again = hosted.clone();
     if !crate::runtime::jspi::defer_after_runtime_exit(move || again.schedule(false)) {
         hosted.run();
@@ -340,8 +368,6 @@ unsafe extern "C-unwind" fn drive(user_data: *mut c_void) {
 
 impl Hosted {
     fn run(self: Arc<Self>) {
-        // Cleared first: a busy drive re-wakes for the next batch.
-        self.scheduled.set(false);
         let Some(target) = self.target.upgrade() else {
             return;
         };
@@ -349,7 +375,6 @@ impl Hosted {
         // task panic under `UnhandledPanic::ShutdownRuntime`); it would
         // unwind into the host's JavaScript. Abort as an uncaught panic on
         // `main` would.
-        let _immediate = ImmediateWakes::enter();
         if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| target.drive())).is_err() {
             std::process::abort();
         }
@@ -357,8 +382,5 @@ impl Hosted {
 }
 
 pub(super) fn hosted_waker(target: Weak<Shared>) -> Waker {
-    Waker::from(Arc::new(Hosted {
-        target,
-        scheduled: Cell::new(false),
-    }))
+    Waker::from(Arc::new(Hosted { target }))
 }
