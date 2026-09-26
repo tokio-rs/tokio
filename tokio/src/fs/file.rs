@@ -9,7 +9,7 @@ use crate::sync::Mutex;
 
 use std::cmp;
 use std::fmt;
-use std::fs::{Metadata, Permissions};
+use std::fs::{FileTimes, Metadata, Permissions};
 use std::future::Future;
 use std::io::{self, Seek, SeekFrom};
 use std::path::Path;
@@ -564,6 +564,33 @@ impl File {
     pub async fn set_permissions(&self, perm: Permissions) -> io::Result<()> {
         let std = self.std.clone();
         asyncify(move || std.set_permissions(perm)).await
+    }
+
+    /// Changes the timestamps on the underlying file.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the user lacks permission to change
+    /// timestamps on the underlying file. It may also return an error in other
+    /// os-specific unspecified cases.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::open("foo.txt").await?;
+    /// let times = std::fs::FileTimes::new()
+    ///     .set_accessed(std::time::SystemTime::now())
+    ///     .set_modified(std::time::SystemTime::now());
+    /// file.set_times(times).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn set_times(&self, times: FileTimes) -> io::Result<()> {
+        let std = self.std.clone();
+        asyncify(move || std.set_times(times)).await
     }
 
     /// Set the maximum buffer size for the underlying [`AsyncRead`] / [`AsyncWrite`] operation.
