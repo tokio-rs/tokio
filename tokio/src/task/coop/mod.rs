@@ -122,7 +122,7 @@ impl Budget {
     }
 
     fn has_remaining(self) -> bool {
-        self.0.map_or(true, |budget| budget > 0)
+        self.0.is_none_or(|budget| budget > 0)
     }
 }
 

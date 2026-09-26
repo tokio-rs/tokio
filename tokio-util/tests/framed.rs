@@ -80,8 +80,7 @@ struct DontReadIntoThis;
 
 impl Read for DontReadIntoThis {
     fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
-        Err(io::Error::new(
-            io::ErrorKind::Other,
+        Err(io::Error::other(
             "Read into something you weren't supposed to.",
         ))
     }

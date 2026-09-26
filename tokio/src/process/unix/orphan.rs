@@ -195,7 +195,7 @@ pub(crate) mod test {
                 if self.return_err {
                     Ok(Some(ExitStatus::from_raw(0)))
                 } else {
-                    Err(io::Error::new(io::ErrorKind::Other, "mock err"))
+                    Err(io::Error::other("mock err"))
                 }
             } else {
                 Ok(None)

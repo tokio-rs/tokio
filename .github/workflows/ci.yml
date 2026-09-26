@@ -30,7 +30,7 @@ env:
   # - tokio-util/Cargo.toml
   # - tokio-test/Cargo.toml
   # - tokio-stream/Cargo.toml
-  rust_min: '1.71'
+  rust_min: '1.85'
   # This excludes unstable features like io_uring,
   # which require '--cfg tokio_unstable'.
   TOKIO_STABLE_FEATURES: "full,test-util"
@@ -252,7 +252,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: 1.82
+            toolchain: 1.85
 
       - name: Install Valgrind
         uses: taiki-e/install-action@valgrind
