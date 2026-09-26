@@ -89,47 +89,20 @@ where
     type Output = io::Result<u64>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        #[cfg(any(
-            feature = "fs",
-            feature = "io-std",
-            feature = "net",
-            feature = "process",
-            feature = "rt",
-            feature = "signal",
-            feature = "sync",
-            feature = "time",
-        ))]
-        // Keep track of task budget
-        let coop = ready!(crate::task::coop::poll_proceed(cx));
         loop {
+            // Charge each iteration, including when the I/O is always ready.
+            let coop = ready!(crate::util::coop::poll_proceed(cx));
             let me = &mut *self;
             let buffer = match Pin::new(&mut *me.reader).poll_fill_buf(cx) {
                 Poll::Ready(Ok(buffer)) => {
-                    #[cfg(any(
-                        feature = "fs",
-                        feature = "io-std",
-                        feature = "net",
-                        feature = "process",
-                        feature = "rt",
-                        feature = "signal",
-                        feature = "sync",
-                        feature = "time",
-                    ))]
                     coop.made_progress();
                     buffer
                 }
-                Poll::Ready(Err(err)) if err.kind() == io::ErrorKind::Interrupted => continue,
+                Poll::Ready(Err(err)) if err.kind() == io::ErrorKind::Interrupted => {
+                    coop.made_progress();
+                    continue;
+                }
                 Poll::Ready(Err(err)) => {
-                    #[cfg(any(
-                        feature = "fs",
-                        feature = "io-std",
-                        feature = "net",
-                        feature = "process",
-                        feature = "rt",
-                        feature = "signal",
-                        feature = "sync",
-                        feature = "time",
-                    ))]
                     coop.made_progress();
                     return Poll::Ready(Err(err));
                 }
