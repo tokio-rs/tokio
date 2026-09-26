@@ -427,8 +427,12 @@ async fn use_future_in_if_condition_biased() {
 #[maybe_tokio_test]
 async fn many_branches() {
     let num = tokio::select! {
+        #[cfg(any())]
+        _ = async { 0 } => unreachable!(),
         x = async { 1 } => x,
         x = async { 1 } => x,
+        #[cfg(any())]
+        _ = async { 0 } => unreachable!(),
         x = async { 1 } => x,
         x = async { 1 } => x,
         x = async { 1 } => x,
@@ -491,6 +495,8 @@ async fn many_branches() {
         x = async { 1 } => x,
         x = async { 1 } => x,
         x = async { 1 } => x,
+        #[cfg(any())]
+        _ = async { 0 } => unreachable!(),
     };
 
     assert_eq!(1, num);
@@ -627,6 +633,344 @@ async fn mut_ref_patterns() {
             assert_eq!(*foo, "2");
         },
     };
+
+    tokio::select! {
+        #[cfg(all())]
+        Some(ref mut foo) = async { Some("1".to_string()) } => {
+            assert_eq!(*foo, "1");
+            *foo = "2".to_string();
+            assert_eq!(*foo, "2");
+        },
+    };
+}
+
+#[maybe_tokio_test]
+async fn cfg_disabled_branch_forms_do_not_resolve() {
+    let non_terminal = tokio::select! {
+        // Block handler, condition, trailing comma.
+        #[cfg(any())]
+        missing::Pattern(binding) = missing::future::<missing::Type>(missing_variable),
+            if missing::precondition() => { missing::handler(binding) },
+
+        // Block handler, trailing comma.
+        #[cfg(any())]
+        missing::Pattern(binding) = missing::future::<missing::Type>(missing_variable) => {
+            missing::handler(binding)
+        },
+
+        // Block handler, condition, no trailing comma.
+        #[cfg(any())]
+        missing::Pattern(binding) = missing::future::<missing::Type>(missing_variable),
+            if missing::precondition() => { missing::handler(binding) }
+
+        // Block handler, no trailing comma.
+        #[cfg(any())]
+        missing::Pattern(binding) = missing::future::<missing::Type>(missing_variable) => {
+            missing::handler(binding)
+        }
+
+        // Expression handler, condition, trailing comma.
+        #[cfg(any())]
+        missing::Pattern(binding) = missing::future::<missing::Type>(missing_variable),
+            if missing::precondition() => missing::handler(binding),
+
+        // Expression handler, trailing comma.
+        #[cfg(any())]
+        missing::Pattern(binding) = missing::future::<missing::Type>(missing_variable) =>
+            missing::handler(binding),
+
+        else => 1usize,
+    };
+
+    let expression_condition_terminal = tokio::select! {
+        value = async { 2usize } => value,
+        #[cfg(any())]
+        missing::Pattern(binding) = missing::future::<missing::Type>(missing_variable),
+            if missing::precondition() => missing::handler(binding)
+    };
+
+    let expression_terminal = tokio::select! {
+        value = async { 3usize } => value,
+        #[cfg(any())]
+        missing::Pattern(binding) = missing::future::<missing::Type>(missing_variable) =>
+            missing::handler(binding)
+    };
+
+    assert_eq!(
+        [
+            non_terminal,
+            expression_condition_terminal,
+            expression_terminal,
+        ],
+        [1, 2, 3]
+    );
+}
+
+#[maybe_tokio_test]
+async fn cfg_branches_before_between_and_after_enabled_branches() {
+    let value = tokio::select! {
+        biased;
+
+        #[cfg(any())]
+        _ = async { 0usize } => 0,
+        _ = std::future::pending::<usize>(), if false => 1,
+        #[cfg(any())]
+        _ = async { 0usize } => 0,
+        value = async { 2usize } => value,
+        #[cfg(any())]
+        _ = async { 0usize } => 0,
+    };
+
+    assert_eq!(value, 2);
+}
+
+#[maybe_tokio_test]
+async fn cfg_compound_predicates_and_survivor_orders() {
+    let included = tokio::select! {
+        #[cfg(all(all(), not(any())))]
+        value = async { String::from("included") } => value,
+        _ = std::future::pending::<String>() => unreachable!(),
+    };
+
+    let excluded = tokio::select! {
+        value = async { String::from("ordinary") } => value,
+        #[cfg(any(any(), not(all())))]
+        _ = async { String::from("excluded") } => unreachable!(),
+    };
+
+    assert_eq!(included, "included");
+    assert_eq!(excluded, "ordinary");
+}
+
+#[maybe_tokio_test]
+async fn cfg_true_branch_preserves_precondition_semantics() {
+    use std::cell::Cell;
+
+    let constructions = Cell::new(0);
+    let value = tokio::select! {
+        #[cfg(all())]
+        _ = {
+            constructions.set(constructions.get() + 1);
+            std::future::pending::<()>()
+        }, if false => 0,
+        else => 1,
+    };
+
+    assert_eq!(value, 1);
+    assert_eq!(constructions.get(), 1);
+}
+
+#[maybe_tokio_test]
+async fn cfg_all_disabled_uses_else() {
+    let unbiased = tokio::select! {
+        #[cfg(any())]
+        missing::Pattern(value) = missing::future::<missing::Type>(missing_variable),
+            if missing::precondition() => missing::handler(value),
+        else => 11usize,
+    };
+
+    let biased = tokio::select! {
+        biased;
+
+        #[cfg(any())]
+        missing::Pattern(value) = missing::future::<missing::Type>(missing_variable),
+            if missing::precondition() => missing::handler(value),
+        else => 12usize,
+    };
+
+    assert_eq!(unbiased, 11);
+    assert_eq!(biased, 12);
+}
+
+#[cfg(panic = "unwind")]
+#[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
+#[maybe_tokio_test]
+async fn cfg_all_disabled_without_else_panics() {
+    use futures::FutureExt;
+
+    let panic = std::panic::AssertUnwindSafe(async {
+        tokio::select! {
+            #[cfg(any())]
+            missing::Pattern(value) = missing::future::<missing::Type>(missing_variable),
+                if missing::precondition() => missing::handler(value),
+        }
+    })
+    .catch_unwind()
+    .await
+    .expect_err("select! should panic when cfg excludes every branch");
+
+    let message = panic
+        .downcast_ref::<&str>()
+        .copied()
+        .or_else(|| panic.downcast_ref::<String>().map(String::as_str));
+    assert_eq!(
+        message,
+        Some("all branches are disabled and there is no else branch")
+    );
+}
+
+#[maybe_tokio_test]
+async fn cfg_biased_first_branch_disabled() {
+    let value = tokio::select! {
+        biased;
+
+        #[cfg(any())]
+        _ = async { 0usize } => 0,
+        value = async { 1usize } => value,
+        _ = async { 2usize } => 2,
+    };
+
+    assert_eq!(value, 1);
+}
+
+#[maybe_tokio_test]
+async fn cfg_preserves_all_branch_grammar_forms() {
+    let block_condition_comma = tokio::select! {
+        #[cfg(all())]
+        value = async { 1usize }, if true => { value },
+        _ = std::future::pending::<usize>() => unreachable!(),
+    };
+
+    let block_comma = tokio::select! {
+        #[cfg(all())]
+        value = async { 2usize } => { value },
+        _ = std::future::pending::<usize>() => unreachable!(),
+    };
+
+    let block_condition_no_comma = tokio::select! {
+        #[cfg(all())]
+        value = async { 3usize }, if true => { value }
+        _ = std::future::pending::<usize>() => unreachable!(),
+    };
+
+    let block_no_comma = tokio::select! {
+        #[cfg(all())]
+        value = async { 4usize } => { value }
+        _ = std::future::pending::<usize>() => unreachable!(),
+    };
+
+    let expression_condition_terminal = tokio::select! {
+        #[cfg(all())]
+        value = async { 5usize }, if true => value
+    };
+
+    let expression_terminal = tokio::select! {
+        #[cfg(all())]
+        value = async { 6usize } => value
+    };
+
+    let expression_condition_comma = tokio::select! {
+        #[cfg(all())]
+        value = async { 7usize }, if true => match value {
+            7 => value,
+            _ => unreachable!(),
+        },
+        _ = std::future::pending::<usize>() => unreachable!(),
+    };
+
+    let expression_comma = tokio::select! {
+        #[cfg(all())]
+        value = async { 8usize } => match value {
+            8 => value,
+            _ => unreachable!(),
+        },
+        _ = std::future::pending::<usize>() => unreachable!(),
+    };
+
+    assert_eq!(
+        [
+            block_condition_comma,
+            block_comma,
+            block_condition_no_comma,
+            block_no_comma,
+            expression_condition_terminal,
+            expression_terminal,
+            expression_condition_comma,
+            expression_comma,
+        ],
+        [1, 2, 3, 4, 5, 6, 7, 8]
+    );
+}
+
+#[maybe_tokio_test]
+async fn cfg_nested_selects() {
+    let value = tokio::select! {
+        #[cfg(all())]
+        outer = async { 2usize } => tokio::select! {
+            #[cfg(any())]
+            _ = async { 0usize } => 0,
+            #[cfg(all())]
+            inner = async { 3usize } => outer + inner,
+        },
+    };
+
+    assert_eq!(value, 5);
+}
+
+#[test]
+fn cfg_disabled_branch_has_no_future_or_output_storage() {
+    let baseline = async {
+        tokio::select! {
+            value = std::future::pending::<usize>() => value,
+        }
+    };
+
+    let with_disabled = async {
+        tokio::select! {
+            #[cfg(any())]
+            value = async { [0u8; 4096] } => value.len(),
+            value = std::future::pending::<usize>() => value,
+        }
+    };
+
+    assert_eq!(
+        std::mem::size_of_val(&with_disabled),
+        std::mem::size_of_val(&baseline)
+    );
+}
+
+#[maybe_tokio_test]
+async fn cfg_heavy_branch_list() {
+    let value = tokio::select! {
+        biased;
+
+        #[cfg(any())]
+        _ = async { 0usize } => 0,
+        #[cfg(any())]
+        _ = async { 1usize } => 1,
+        #[cfg(any())]
+        _ = async { 2usize } => 2,
+        #[cfg(any())]
+        _ = async { 3usize } => 3,
+        #[cfg(any())]
+        _ = async { 4usize } => 4,
+        #[cfg(any())]
+        _ = async { 5usize } => 5,
+        #[cfg(any())]
+        _ = async { 6usize } => 6,
+        #[cfg(any())]
+        _ = async { 7usize } => 7,
+        #[cfg(any())]
+        _ = async { 8usize } => 8,
+        #[cfg(any())]
+        _ = async { 9usize } => 9,
+        #[cfg(any())]
+        _ = async { 10usize } => 10,
+        #[cfg(any())]
+        _ = async { 11usize } => 11,
+        #[cfg(any())]
+        _ = async { 12usize } => 12,
+        #[cfg(any())]
+        _ = async { 13usize } => 13,
+        #[cfg(any())]
+        _ = async { 14usize } => 14,
+        #[cfg(any())]
+        _ = async { 15usize } => 15,
+        #[cfg(all())]
+        value = async { 16usize } => value,
+    };
+
+    assert_eq!(value, 16);
 }
 
 #[cfg(tokio_unstable)]
@@ -649,6 +993,23 @@ mod unstable {
         let rt2_values = rt2.block_on(async { (select_0_to_9().await, select_0_to_9().await) });
 
         assert_eq!(rt1_values, rt2_values);
+    }
+
+    #[test]
+    fn cfg_disabled_branches_do_not_change_randomized_selection() {
+        let seed = b"cfg-disabled branches do not affect branch count";
+        let plain = tokio::runtime::Builder::new_current_thread()
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap()
+            .block_on(async { collect_plain_sequence().await });
+        let with_disabled = tokio::runtime::Builder::new_current_thread()
+            .rng_seed(RngSeed::from_bytes(seed))
+            .build()
+            .unwrap()
+            .block_on(async { collect_cfg_sequence().await });
+
+        assert_eq!(plain, with_disabled);
     }
 
     #[test]
@@ -708,6 +1069,36 @@ mod unstable {
             x = async { 9 } => x,
         )
     }
+
+    async fn collect_plain_sequence() -> Vec<u8> {
+        let mut values = Vec::with_capacity(256);
+        for _ in 0..256 {
+            values.push(tokio::select! {
+                value = async { 0u8 } => value,
+                value = async { 1u8 } => value,
+                value = async { 2u8 } => value,
+            });
+        }
+        values
+    }
+
+    async fn collect_cfg_sequence() -> Vec<u8> {
+        let mut values = Vec::with_capacity(256);
+        for _ in 0..256 {
+            values.push(tokio::select! {
+                #[cfg(any())]
+                _ = async { 10u8 } => 10,
+                value = async { 0u8 } => value,
+                #[cfg(any())]
+                _ = async { 11u8 } => 11,
+                value = async { 1u8 } => value,
+                value = async { 2u8 } => value,
+                #[cfg(any())]
+                _ = async { 12u8 } => 12,
+            });
+        }
+        values
+    }
 }
 
 #[tokio::test]
@@ -725,12 +1116,22 @@ async fn select_into_future() {
     tokio::select! {
         () = NotAFuture => {},
     }
+
+    tokio::select! {
+        #[cfg(all())]
+        () = NotAFuture => {},
+    }
 }
 
 // regression test for https://github.com/tokio-rs/tokio/issues/6721
 #[tokio::test]
 async fn temporary_lifetime_extension() {
     tokio::select! {
+        () = &mut std::future::ready(()) => {},
+    }
+
+    tokio::select! {
+        #[cfg(all())]
         () = &mut std::future::ready(()) => {},
     }
 }

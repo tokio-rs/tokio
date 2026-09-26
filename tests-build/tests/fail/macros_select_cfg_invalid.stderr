@@ -1,0 +1,77 @@
+error: no rules expected `cfg_attr`
+ --> tests/fail/macros_select_cfg_invalid.rs:5:11
+  |
+5 |         #[cfg_attr(all(), allow(unused))]
+  |           ^^^^^^^^ no rules expected this token in macro call
+  |
+note: while trying to match `cfg`
+ --> $WORKSPACE/tokio/src/macros/select.rs
+  |
+  |     (#[cfg($($meta:tt)*)] $p:pat = $($t:tt)* ) => {
+  |        ^^^
+
+error: no rules expected `allow`
+  --> tests/fail/macros_select_cfg_invalid.rs:12:11
+   |
+12 |         #[allow(unused)]
+   |           ^^^^^ no rules expected this token in macro call
+   |
+note: while trying to match `cfg`
+  --> $WORKSPACE/tokio/src/macros/select.rs
+   |
+   |     (#[cfg($($meta:tt)*)] $p:pat = $($t:tt)* ) => {
+   |        ^^^
+
+error: no rules expected `#`
+  --> tests/fail/macros_select_cfg_invalid.rs:20:9
+   |
+20 |         #[cfg(all())]
+   |         ^ no rules expected this token in macro call
+   |
+note: while trying to match meta-variable `$p:pat`
+  --> $WORKSPACE/tokio/src/macros/select.rs
+   |
+   |     (#[cfg($($meta:tt)*)] $p:pat = $($t:tt)* ) => {
+   |                           ^^^^^^
+
+error: expected identifier, found keyword `else`
+  --> tests/fail/macros_select_cfg_invalid.rs:28:9
+   |
+28 |         else => (),
+   |         ^^^^ expected identifier, found keyword
+
+error: no rules expected `=>`
+  --> tests/fail/macros_select_cfg_invalid.rs:28:14
+   |
+28 |         else => (),
+   |              ^^ no rules expected this token in macro call
+   |
+note: while trying to match `=`
+  --> $WORKSPACE/tokio/src/macros/select.rs
+   |
+   |     (#[cfg($($meta:tt)*)] $p:pat = $($t:tt)* ) => {
+   |                                  ^
+
+error: no rules expected `;`
+  --> tests/fail/macros_select_cfg_invalid.rs:35:15
+   |
+35 |         biased;
+   |               ^ no rules expected this token in macro call
+   |
+note: while trying to match `=`
+  --> $WORKSPACE/tokio/src/macros/select.rs
+   |
+   |     (#[cfg($($meta:tt)*)] $p:pat = $($t:tt)* ) => {
+   |                                  ^
+
+error: no rules expected `!`
+  --> tests/fail/macros_select_cfg_invalid.rs:42:10
+   |
+42 |         #![cfg(all())]
+   |          ^ no rules expected this token in macro call
+   |
+note: while trying to match `[`
+  --> $WORKSPACE/tokio/src/macros/select.rs
+   |
+   |     (#[cfg($($meta:tt)*)] $p:pat = $($t:tt)* ) => {
+   |       ^
