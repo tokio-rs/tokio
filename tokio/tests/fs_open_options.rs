@@ -1,5 +1,17 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // WASI does not support all fs operations
+#![cfg(all(
+    any(
+        feature = "full",
+        all(
+            target_os = "emscripten",
+            feature = "fs",
+            feature = "macros",
+            feature = "rt",
+            feature = "io-util"
+        )
+    ),
+    not(target_os = "wasi")
+))] // WASI does not support all fs operations
 
 use std::io::Write;
 use tempfile::NamedTempFile;
@@ -58,7 +70,7 @@ async fn open_options_mode() {
     let mode = format!("{:?}", OpenOptions::new().mode(0o644));
     // TESTING HACK: use Debug output to check the stored data
     assert!(
-        mode.contains("mode: 420 ") || mode.contains("mode: 0o000644 "),
+        mode.contains("mode: 420") || mode.contains("mode: 0o000644"),
         "mode is: {mode}"
     );
 }
@@ -69,7 +81,7 @@ async fn open_options_custom_flags_linux() {
     // TESTING HACK: use Debug output to check the stored data
     assert!(
         format!("{:?}", OpenOptions::new().custom_flags(libc::O_TRUNC))
-            .contains("custom_flags: 512,")
+            .contains("custom_flags: 512")
     );
 }
 

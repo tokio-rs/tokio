@@ -37,12 +37,12 @@ cfg_io_util! {
     /// ```
     /// use tokio::io::{self, AsyncReadExt};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut buffer = [0; 3];
-    ///     io::repeat(0b101).read_exact(&mut buffer).await.unwrap();
-    ///     assert_eq!(buffer, [0b101, 0b101, 0b101]);
-    /// }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut buffer = [0; 3];
+    /// io::repeat(0b101).read_exact(&mut buffer).await.unwrap();
+    /// assert_eq!(buffer, [0b101, 0b101, 0b101]);
+    /// # }
     /// ```
     pub fn repeat(byte: u8) -> Repeat {
         Repeat { byte }
@@ -56,7 +56,7 @@ impl AsyncRead for Repeat {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         ready!(poll_proceed_and_make_progress(cx));
         buf.put_bytes(self.byte, buf.remaining());
         Poll::Ready(Ok(()))

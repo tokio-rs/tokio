@@ -1,4 +1,4 @@
-use crate::runtime::BOX_FUTURE_THRESHOLD;
+use crate::runtime::AutoBox;
 use crate::task::JoinHandle;
 use crate::util::trace::SpawnMeta;
 
@@ -6,16 +6,19 @@ use std::future::Future;
 
 cfg_rt! {
     /// Spawns a new asynchronous task, returning a
-    /// [`JoinHandle`](JoinHandle) for it.
+    /// [`JoinHandle`] for it.
     ///
     /// The provided future will start running in the background immediately
     /// when `spawn` is called, even if you don't await the returned
-    /// `JoinHandle`.
+    /// [`JoinHandle`].
     ///
     /// Spawning a task enables the task to execute concurrently to other tasks. The
     /// spawned task may execute on the current thread, or it may be sent to a
     /// different thread to be executed. The specifics depend on the current
-    /// [`Runtime`](crate::runtime::Runtime) configuration.
+    /// [`Runtime`](crate::runtime::Runtime) configuration. In a
+    /// [running runtime][running-runtime], the task will start immediately in the
+    /// background. On a blocked runtime, the user must drive the runtime forward (for
+    /// example, by calling [`Runtime::block_on`](crate::runtime::Runtime::block_on)).
     ///
     /// It is guaranteed that spawn will not synchronously poll the task being spawned.
     /// This means that calling spawn while holding a lock does not pose a risk of
@@ -29,12 +32,16 @@ cfg_rt! {
     /// the Tokio runtime are always inside its context, but you can also enter the context
     /// using the [`Runtime::enter`](crate::runtime::Runtime::enter()) method.
     ///
+    /// [running-runtime]: ../runtime/index.html#driving-the-runtime
+    ///
     /// # Examples
     ///
     /// In this example, a server is started and `spawn` is used to start a new task
     /// that processes each received connection.
     ///
     /// ```no_run
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::net::{TcpListener, TcpStream};
     ///
     /// use std::io;
@@ -57,6 +64,7 @@ cfg_rt! {
     ///         });
     ///     }
     /// }
+    /// # }
     /// ```
     ///
     /// To run multiple tasks in parallel and receive their results, join
@@ -112,18 +120,18 @@ cfg_rt! {
     /// # drop(rc);
     /// }
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     tokio::spawn(async {
-    ///         // Force the `Rc` to stay in a scope with no `.await`
-    ///         {
-    ///             let rc = Rc::new(());
-    ///             use_rc(rc.clone());
-    ///         }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// tokio::spawn(async {
+    ///     // Force the `Rc` to stay in a scope with no `.await`
+    ///     {
+    ///         let rc = Rc::new(());
+    ///         use_rc(rc.clone());
+    ///     }
     ///
-    ///         task::yield_now().await;
-    ///     }).await.unwrap();
-    /// }
+    ///     task::yield_now().await;
+    /// }).await.unwrap();
+    /// # }
     /// ```
     ///
     /// This will **not** work:
@@ -169,7 +177,7 @@ cfg_rt! {
         F::Output: Send + 'static,
     {
         let fut_size = std::mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
+        if AutoBox::<F>::SHOULD_BOX {
             spawn_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
             spawn_inner(future, SpawnMeta::new_unnamed(fut_size))
@@ -186,13 +194,14 @@ cfg_rt! {
 
         #[cfg(all(
             tokio_unstable,
-            tokio_taskdump,
+            feature = "taskdump",
             feature = "rt",
             target_os = "linux",
             any(
                 target_arch = "aarch64",
                 target_arch = "x86",
-                target_arch = "x86_64"
+                target_arch = "x86_64",
+                target_arch = "s390x"
             )
         ))]
         let future = task::trace::Trace::root(future);

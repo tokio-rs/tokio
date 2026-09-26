@@ -1,5 +1,5 @@
 #![cfg_attr(
-    not(all(feature = "rt", feature = "net", tokio_uring)),
+    not(all(feature = "rt", feature = "net", feature = "io-uring", tokio_unstable)),
     allow(dead_code)
 )]
 mod driver;

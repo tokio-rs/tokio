@@ -1,13 +1,14 @@
 #![cfg(feature = "full")]
 #![warn(rust_2018_idioms)]
 #![cfg(unix)]
-#![cfg(not(miri))] // No socket in miri.
+#![cfg(not(miri))] // No Unix domain sockets on miri.
 
 use std::io;
 #[cfg(target_os = "android")]
 use std::os::android::net::SocketAddrExt;
 #[cfg(target_os = "linux")]
 use std::os::linux::net::SocketAddrExt;
+use std::os::unix::net::SocketAddr;
 use std::task::Poll;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
@@ -28,6 +29,34 @@ async fn accept_read_write() -> std::io::Result<()> {
 
     let accept = listener.accept();
     let connect = UnixStream::connect(&sock_path);
+    let ((mut server, _), mut client) = try_join(accept, connect).await?;
+
+    // Write to the client.
+    client.write_all(b"hello").await?;
+    drop(client);
+
+    // Read from the server.
+    let mut buf = vec![];
+    server.read_to_end(&mut buf).await?;
+    assert_eq!(&buf, b"hello");
+    let len = server.read(&mut buf).await?;
+    assert_eq!(len, 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn accept_read_write_socketaddr() -> std::io::Result<()> {
+    let dir = tempfile::Builder::new()
+        .prefix("tokio-uds-tests")
+        .tempdir()
+        .unwrap();
+    let sock_path = dir.path().join("connect.sock");
+    let addr = SocketAddr::from_pathname(&sock_path)?.into();
+
+    let listener = UnixListener::bind_addr(&addr)?;
+
+    let accept = listener.accept();
+    let connect = UnixStream::connect_addr(&addr);
     let ((mut server, _), mut client) = try_join(accept, connect).await?;
 
     // Write to the client.
@@ -81,6 +110,13 @@ async fn try_read_write() -> std::io::Result<()> {
 
     let (server, _) = listener.accept().await?;
     let mut written = msg.to_vec();
+
+    // An accepted socket starts out assumed readable; a read that finds
+    // nothing clears that.
+    assert_eq!(
+        server.try_read(&mut [0; 1]).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
 
     // Track the server receiving data
     let mut readable = task::spawn(server.readable());
@@ -242,7 +278,10 @@ macro_rules! assert_not_writable_by_polling {
 async fn poll_read_ready() {
     let (mut client, mut server) = create_pair().await;
 
-    // Initial state - not readable.
+    // Initial state - an accepted socket is assumed readable until a read
+    // finds nothing.
+    assert_readable_by_polling!(server);
+    read_until_pending(&mut server);
     assert_not_readable_by_polling!(server);
 
     // There is data in the buffer - readable.
@@ -318,6 +357,13 @@ async fn try_read_buf() -> std::io::Result<()> {
 
     let (server, _) = listener.accept().await?;
     let mut written = msg.to_vec();
+
+    // An accepted socket starts out assumed readable; a read that finds
+    // nothing clears that.
+    assert_eq!(
+        server.try_read(&mut [0; 1]).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
 
     // Track the server receiving data
     let mut readable = task::spawn(server.readable());
@@ -443,4 +489,32 @@ async fn abstract_socket_name() {
 
     // `as_abstract_name` removes leading zero bytes
     assert_eq!(abstract_path_name, b"aaa");
+}
+
+// Both ends of a fresh pair are writable without a driver event, but not
+// readable until the peer writes.
+#[tokio::test(flavor = "current_thread")]
+async fn pair_starts_writable() -> io::Result<()> {
+    let (a, mut b) = UnixStream::pair()?;
+
+    // Nothing has polled the driver since `pair()`.
+    let mut writable = task::spawn(a.writable());
+    assert_ready_ok!(writable.poll());
+    assert_eq!(a.try_write(b"hi")?, 2);
+    let mut write = task::spawn(b.write_all(b"yo"));
+    assert_ready_ok!(write.poll());
+    drop(write);
+
+    let (c, _d) = UnixStream::pair()?;
+    let mut readable = task::spawn(c.readable());
+    assert_pending!(readable.poll());
+    assert_eq!(
+        c.try_read(&mut [0u8; 1]).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+
+    // The peer's bytes still arrive through the normal event path.
+    a.readable().await?;
+    assert_eq!(a.try_read(&mut [0u8; 8])?, 2);
+    Ok(())
 }

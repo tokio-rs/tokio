@@ -5,11 +5,12 @@ use crate::runtime::task::{Notified, Task, TaskHarnessScheduleHooks};
 use crate::runtime::{
     blocking, driver,
     task::{self, JoinHandle, SpawnLocation},
-    TaskHooks, TaskMeta,
+    TaskHooks, TaskMeta, TimerFlavor,
 };
 use crate::util::RngSeedGenerator;
 
 use std::fmt;
+use std::num::NonZeroU64;
 
 mod metrics;
 
@@ -17,8 +18,14 @@ cfg_taskdump! {
     mod taskdump;
 }
 
+#[cfg(all(tokio_unstable, feature = "time"))]
+use crate::loom::sync::atomic::{AtomicBool, Ordering::SeqCst};
+
 /// Handle to the multi thread scheduler
 pub(crate) struct Handle {
+    /// The name of the runtime
+    pub(super) name: Option<String>,
+
     /// Task spawner
     pub(super) shared: worker::Shared,
 
@@ -33,6 +40,14 @@ pub(crate) struct Handle {
 
     /// User-supplied hooks to invoke for things
     pub(crate) task_hooks: TaskHooks,
+
+    #[cfg_attr(not(feature = "time"), allow(dead_code))]
+    /// Timer flavor used by the runtime
+    pub(crate) timer_flavor: TimerFlavor,
+
+    #[cfg(all(tokio_unstable, feature = "time"))]
+    /// Indicates that the runtime is shutting down.
+    pub(crate) is_shutdown: AtomicBool,
 }
 
 impl Handle {
@@ -50,8 +65,16 @@ impl Handle {
         Self::bind_new_task(me, future, id, spawned_at)
     }
 
+    #[cfg(all(tokio_unstable, feature = "time"))]
+    pub(crate) fn is_shutdown(&self) -> bool {
+        self.is_shutdown
+            .load(crate::loom::sync::atomic::Ordering::SeqCst)
+    }
+
     pub(crate) fn shutdown(&self) {
         self.close();
+        #[cfg(all(tokio_unstable, feature = "time"))]
+        self.is_shutdown.store(true, SeqCst);
     }
 
     #[track_caller]
@@ -70,6 +93,8 @@ impl Handle {
         me.task_hooks.spawn(&TaskMeta {
             id,
             spawned_at,
+            #[cfg(all(tokio_unstable, feature = "schedule-latency"))]
+            schedule_latency: None,
             _phantom: Default::default(),
         });
 
@@ -99,13 +124,13 @@ impl task::Schedule for Arc<Handle> {
     }
 }
 
-cfg_unstable! {
-    use std::num::NonZeroU64;
+impl Handle {
+    pub(crate) fn owned_id(&self) -> NonZeroU64 {
+        self.shared.owned.id
+    }
 
-    impl Handle {
-        pub(crate) fn owned_id(&self) -> NonZeroU64 {
-            self.shared.owned.id
-        }
+    pub(crate) fn name(&self) -> Option<&str> {
+        self.name.as_deref()
     }
 }
 

@@ -10,15 +10,17 @@ use std::fmt::Debug;
 
 /// Timing wheel implementation.
 ///
-/// This type provides the hashed timing wheel implementation that backs `Timer`
-/// and `DelayQueue`.
+/// This type provides the hashed timing wheel implementation that backs
+/// [`DelayQueue`].
 ///
 /// The structure is generic over `T: Stack`. This allows handling timeout data
 /// being stored on the heap or in a slab. In order to support the latter case,
 /// the slab must be passed into each function allowing the implementation to
 /// lookup timer entries.
 ///
-/// See `Timer` documentation for some implementation notes.
+/// See `Driver` documentation for some implementation notes.
+///
+/// [`DelayQueue`]: crate::time::DelayQueue
 #[derive(Debug)]
 pub(crate) struct Wheel<T> {
     /// The number of milliseconds elapsed since the wheel started.
@@ -109,8 +111,7 @@ where
         debug_assert!({
             self.levels[level]
                 .next_expiration(self.elapsed)
-                .map(|e| e.deadline >= self.elapsed)
-                .unwrap_or(true)
+                .is_none_or(|e| e.deadline >= self.elapsed)
         });
 
         Ok(())
@@ -139,9 +140,9 @@ where
     }
 
     /// Next key that will expire
-    pub(crate) fn peek(&self) -> Option<T::Owned> {
+    pub(crate) fn peek(&self, store: &T::Store) -> Option<T::Owned> {
         self.next_expiration()
-            .and_then(|expiration| self.peek_entry(&expiration))
+            .and_then(|expiration| self.peek_entry(&expiration, store))
     }
 
     /// Advances the timer up to the instant represented by `now`.
@@ -249,8 +250,8 @@ where
         self.levels[expiration.level].pop_entry_slot(expiration.slot, store)
     }
 
-    fn peek_entry(&self, expiration: &Expiration) -> Option<T::Owned> {
-        self.levels[expiration.level].peek_entry_slot(expiration.slot)
+    fn peek_entry(&self, expiration: &Expiration, store: &T::Store) -> Option<T::Owned> {
+        self.levels[expiration.level].peek_entry_slot(expiration.slot, store)
     }
 
     fn level_for(&self, when: u64) -> usize {

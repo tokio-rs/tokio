@@ -59,7 +59,10 @@ pub async fn connect(
     let socket = UdpSocket::bind(&bind_addr).await?;
     socket.connect(addr).await?;
 
-    tokio::try_join!(send(stdin, &socket), recv(stdout, &socket))?;
+    tokio::select! {
+        r = send(stdin, &socket) => r?,
+        r = recv(stdout, &socket) => r?,
+    }
 
     Ok(())
 }
@@ -85,7 +88,7 @@ async fn recv(
         let n = reader.recv(&mut buf[..]).await?;
 
         if n > 0 {
-            stdout.send(Bytes::from(buf)).await?;
+            stdout.send(Bytes::copy_from_slice(&buf[..n])).await?;
         }
     }
 }

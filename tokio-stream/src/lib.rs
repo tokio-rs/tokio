@@ -34,14 +34,14 @@
 //! ```rust
 //! use tokio_stream::{self as stream, StreamExt};
 //!
-//! #[tokio::main]
-//! async fn main() {
-//!     let mut stream = stream::iter(vec![0, 1, 2]);
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() {
+//! let mut stream = stream::iter(vec![0, 1, 2]);
 //!
-//!     while let Some(value) = stream.next().await {
-//!         println!("Got {}", value);
-//!     }
+//! while let Some(value) = stream.next().await {
+//!     println!("Got {}", value);
 //! }
+//! # }
 //! ```
 //!
 //! # Returning a Stream from a function

@@ -7,10 +7,12 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 ///
 /// This uses `Arc::new_uninit_slice` and reads into the resulting uninitialized `Arc`.
 ///
+/// Interrupted reads are retried. Other errors are returned immediately.
+///
 /// # Example
 ///
 /// ```
-/// # #[tokio::main]
+/// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> std::io::Result<()> {
 /// use tokio_util::io::read_exact_arc;
 ///
@@ -32,7 +34,11 @@ pub async fn read_exact_arc<R: AsyncRead>(read: R, len: usize) -> io::Result<Arc
     // as we write through this reference.
     let mut buf = unsafe { &mut *(Arc::as_ptr(&arc) as *mut [MaybeUninit<u8>]) };
     while !buf.is_empty() {
-        if read.read_buf(&mut buf).await? == 0 {
+        let n = match read.read_buf(&mut buf).await {
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+            res => res?,
+        };
+        if n == 0 {
             return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "early eof"));
         }
     }

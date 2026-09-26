@@ -750,7 +750,7 @@ impl Command {
     where
         F: FnMut() -> io::Result<()> + Send + Sync + 'static,
     {
-        self.std.pre_exec(f);
+        unsafe { self.std.pre_exec(f) };
         self
     }
 
@@ -933,7 +933,7 @@ impl Command {
     #[inline]
     pub fn spawn_with(
         &mut self,
-        with: impl Fn(&mut StdCommand) -> io::Result<StdChild>,
+        with: impl FnOnce(&mut StdCommand) -> io::Result<StdChild>,
     ) -> io::Result<Child> {
         // On two lines to circumvent a mutable borrow check failure.
         let child = with(&mut self.std)?;
@@ -1135,7 +1135,7 @@ where
     type Output = Result<T, E>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         // Keep track of task budget
         let coop = ready!(crate::task::coop::poll_proceed(cx));
 

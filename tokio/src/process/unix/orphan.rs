@@ -195,7 +195,7 @@ pub(crate) mod test {
                 if self.return_err {
                     Ok(Some(ExitStatus::from_raw(0)))
                 } else {
-                    Err(io::Error::new(io::ErrorKind::Other, "mock err"))
+                    Err(io::Error::other("mock err"))
                 }
             } else {
                 Ok(None)
@@ -292,10 +292,10 @@ pub(crate) mod test {
         drop(signal_guard);
     }
 
-    #[cfg_attr(miri, ignore)] // Miri does not support epoll.
+    #[cfg_attr(miri, ignore)] // No `sigaction` on Miri
     #[test]
     fn does_not_register_signal_if_queue_empty() {
-        let (io_driver, io_handle) = IoDriver::new(1024).unwrap();
+        let (io_driver, io_handle) = IoDriver::new(1024, None).unwrap();
         let signal_driver = SignalDriver::new(io_driver, &io_handle).unwrap();
         let handle = signal_driver.handle();
 

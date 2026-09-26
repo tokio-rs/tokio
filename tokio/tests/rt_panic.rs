@@ -1,11 +1,16 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(target_os = "emscripten", feature = "rt", feature = "macros")
+))]
 #![cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
 #![cfg(panic = "unwind")]
 
 use futures::future;
 use std::error::Error;
-use tokio::runtime::{Builder, Handle, Runtime};
+#[cfg(feature = "rt-multi-thread")]
+use tokio::runtime::Builder;
+use tokio::runtime::{Handle, Runtime};
 
 mod support {
     pub mod panic;
@@ -47,6 +52,7 @@ fn into_panic_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+#[cfg(feature = "rt-multi-thread")]
 fn builder_worker_threads_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _ = Builder::new_multi_thread().worker_threads(0).build();
@@ -59,6 +65,7 @@ fn builder_worker_threads_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+#[cfg(feature = "rt-multi-thread")]
 fn builder_max_blocking_threads_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _ = Builder::new_multi_thread().max_blocking_threads(0).build();
@@ -71,9 +78,36 @@ fn builder_max_blocking_threads_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+#[cfg(feature = "rt-multi-thread")]
 fn builder_global_queue_interval_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
         let _ = Builder::new_multi_thread().global_queue_interval(0).build();
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "rt-multi-thread")]
+fn builder_event_interval_interval_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let _ = Builder::new_multi_thread().event_interval(0).build();
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "rt-multi-thread")]
+fn builder_name_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let _ = Builder::new_multi_thread().name(" ").build();
     });
 
     // The panic location should be in this file

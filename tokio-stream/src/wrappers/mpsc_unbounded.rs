@@ -1,4 +1,5 @@
 use crate::Stream;
+use futures_core::FusedStream;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -60,6 +61,26 @@ impl<T> Stream for UnboundedReceiverStream<T> {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.inner.poll_recv(cx)
+    }
+
+    /// Returns the bounds of the stream based on the underlying receiver.
+    ///
+    /// For open channels, it returns `(receiver.len(), None)`.
+    ///
+    /// For closed channels, it returns `(receiver.len(), receiver.len())`.
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.inner.is_closed() {
+            let len = self.inner.len();
+            (len, Some(len))
+        } else {
+            (self.inner.len(), None)
+        }
+    }
+}
+
+impl<T> FusedStream for UnboundedReceiverStream<T> {
+    fn is_terminated(&self) -> bool {
+        self.size_hint() == (0, Some(0))
     }
 }
 

@@ -44,6 +44,8 @@ cfg_io_util! {
     /// [`AsyncWrite`].
     ///
     /// ```no_run
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::io::{self, AsyncWriteExt};
     /// use tokio::fs::File;
     ///
@@ -61,6 +63,7 @@ cfg_io_util! {
     ///
     ///     Ok(())
     /// }
+    /// # }
     /// ```
     ///
     /// See [module][crate::io] documentation for more details.
@@ -100,14 +103,16 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// This method is cancellation safe in the sense that if it is used as
-        /// the event in a [`tokio::select!`](crate::select) statement and some
-        /// other branch completes first, then it is guaranteed that no data was
+        /// This method is cancel safe. If it is used as a branch in
+        /// [`tokio::select!`](crate::select) and another branch completes
+        /// first, then it is guaranteed that no data was
         /// written to this `AsyncWrite`.
         ///
         /// # Examples
         ///
         /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -120,6 +125,7 @@ cfg_io_util! {
         ///     file.flush().await?;
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         fn write<'a>(&'a mut self, src: &'a [u8]) -> Write<'a, Self>
         where
@@ -140,14 +146,16 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// This method is cancellation safe in the sense that if it is used as
-        /// the event in a [`tokio::select!`](crate::select) statement and some
-        /// other branch completes first, then it is guaranteed that no data was
+        /// This method is cancel safe. If it is used as a branch in
+        /// [`tokio::select!`](crate::select) and another branch completes
+        /// first, then it is guaranteed that no data was
         /// written to this `AsyncWrite`.
         ///
         /// # Examples
         ///
         /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         /// use std::io::IoSlice;
@@ -167,6 +175,7 @@ cfg_io_util! {
         ///
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         ///
         /// [`write`]: AsyncWriteExt::write
@@ -214,9 +223,9 @@ cfg_io_util! {
         ///
         /// # Cancel safety
         ///
-        /// This method is cancellation safe in the sense that if it is used as
-        /// the event in a [`tokio::select!`](crate::select) statement and some
-        /// other branch completes first, then it is guaranteed that no data was
+        /// This method is cancel safe. If it is used as a branch in
+        /// [`tokio::select!`](crate::select) and another branch completes
+        /// first, then it is guaranteed that no data was
         /// written to this `AsyncWrite`.
         ///
         /// # Examples
@@ -228,6 +237,8 @@ cfg_io_util! {
         /// [`Cursor`]: std::io::Cursor
         ///
         /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -250,6 +261,7 @@ cfg_io_util! {
         ///
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         fn write_buf<'a, B>(&'a mut self, src: &'a mut B) -> WriteBuf<'a, Self, B>
         where
@@ -274,16 +286,17 @@ cfg_io_util! {
         ///
         /// This method will continuously call [`write`] until
         /// [`buf.has_remaining()`](bytes::Buf::has_remaining) returns false. This method will not
-        /// return until the entire buffer has been successfully written or an error occurs. The
-        /// first error generated will be returned.
+        /// return until the entire buffer has been successfully written or an error occurs.
+        /// Errors of kind [`ErrorKind::Interrupted`] are ignored and the write is retried. The first
+        /// other error generated will be returned.
         ///
         /// The buffer is advanced after each chunk is successfully written. After failure,
         /// `src.chunk()` will return the chunk that failed to write.
         ///
         /// # Cancel safety
         ///
-        /// If `write_all_buf` is used as the event in a
-        /// [`tokio::select!`](crate::select) statement and some other branch
+        /// If `write_all_buf` is used as a branch in
+        /// [`tokio::select!`](crate::select) and another branch
         /// completes first, then the data in the provided buffer may have been
         /// partially written. However, it is guaranteed that the provided
         /// buffer has been [advanced] by the amount of bytes that have been
@@ -299,6 +312,8 @@ cfg_io_util! {
         /// [advanced]: bytes::Buf::advance
         ///
         /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -313,9 +328,11 @@ cfg_io_util! {
         ///     file.flush().await?;
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         ///
         /// [`write`]: AsyncWriteExt::write
+        /// [`ErrorKind::Interrupted`]: std::io::ErrorKind::Interrupted
         fn write_all_buf<'a, B>(&'a mut self, src: &'a mut B) -> WriteAllBuf<'a, Self, B>
         where
             Self: Sized + Unpin,
@@ -334,24 +351,28 @@ cfg_io_util! {
         ///
         /// This method will continuously call [`write`] until there is no more data
         /// to be written. This method will not return until the entire buffer
-        /// has been successfully written or such an error occurs. The first
-        /// error generated from this method will be returned.
+        /// has been successfully written or such an error occurs. Errors of kind
+        /// [`ErrorKind::Interrupted`] are ignored and the write is retried. The first
+        /// other error generated from this method will be returned.
         ///
         /// # Cancel safety
         ///
-        /// This method is not cancellation safe. If it is used as the event
-        /// in a [`tokio::select!`](crate::select) statement and some other
-        /// branch completes first, then the provided buffer may have been
+        /// This method is not cancel safe. If it is used as a branch in
+        /// [`tokio::select!`](crate::select) and another branch completes
+        /// first, then the provided buffer may have been
         /// partially written, but future calls to `write_all` will start over
         /// from the beginning of the buffer.
         ///
         /// # Errors
         ///
-        /// This function will return the first error that [`write`] returns.
+        /// This function will ignore errors of kind [`ErrorKind::Interrupted`] and
+        /// will otherwise return the first error that [`write`] returns.
         ///
         /// # Examples
         ///
         /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -363,9 +384,11 @@ cfg_io_util! {
         ///     file.flush().await?;
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         ///
         /// [`write`]: AsyncWriteExt::write
+        /// [`ErrorKind::Interrupted`]: std::io::ErrorKind::Interrupted
         fn write_all<'a>(&'a mut self, src: &'a [u8]) -> WriteAll<'a, Self>
         where
             Self: Unpin,
@@ -398,16 +421,16 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_u8(2).await?;
-            ///     writer.write_u8(5).await?;
+            /// writer.write_u8(2).await?;
+            /// writer.write_u8(5).await?;
             ///
-            ///     assert_eq!(writer, b"\x02\x05");
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, b"\x02\x05");
+            /// Ok(())
+            /// # }
             /// ```
             fn write_u8(&mut self, n: u8) -> WriteU8;
 
@@ -435,16 +458,16 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_i8(-2).await?;
-            ///     writer.write_i8(126).await?;
+            /// writer.write_i8(-2).await?;
+            /// writer.write_i8(126).await?;
             ///
-            ///     assert_eq!(writer, b"\xFE\x7E");
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, b"\xFE\x7E");
+            /// Ok(())
+            /// # }
             /// ```
             fn write_i8(&mut self, n: i8) -> WriteI8;
 
@@ -473,16 +496,16 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_u16(517).await?;
-            ///     writer.write_u16(768).await?;
+            /// writer.write_u16(517).await?;
+            /// writer.write_u16(768).await?;
             ///
-            ///     assert_eq!(writer, b"\x02\x05\x03\x00");
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, b"\x02\x05\x03\x00");
+            /// Ok(())
+            /// # }
             /// ```
             fn write_u16(&mut self, n: u16) -> WriteU16;
 
@@ -511,16 +534,16 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_i16(193).await?;
-            ///     writer.write_i16(-132).await?;
+            /// writer.write_i16(193).await?;
+            /// writer.write_i16(-132).await?;
             ///
-            ///     assert_eq!(writer, b"\x00\xc1\xff\x7c");
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, b"\x00\xc1\xff\x7c");
+            /// Ok(())
+            /// # }
             /// ```
             fn write_i16(&mut self, n: i16) -> WriteI16;
 
@@ -549,16 +572,16 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_u32(267).await?;
-            ///     writer.write_u32(1205419366).await?;
+            /// writer.write_u32(267).await?;
+            /// writer.write_u32(1205419366).await?;
             ///
-            ///     assert_eq!(writer, b"\x00\x00\x01\x0b\x47\xd9\x3d\x66");
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, b"\x00\x00\x01\x0b\x47\xd9\x3d\x66");
+            /// Ok(())
+            /// # }
             /// ```
             fn write_u32(&mut self, n: u32) -> WriteU32;
 
@@ -587,16 +610,16 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_i32(267).await?;
-            ///     writer.write_i32(1205419366).await?;
+            /// writer.write_i32(267).await?;
+            /// writer.write_i32(1205419366).await?;
             ///
-            ///     assert_eq!(writer, b"\x00\x00\x01\x0b\x47\xd9\x3d\x66");
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, b"\x00\x00\x01\x0b\x47\xd9\x3d\x66");
+            /// Ok(())
+            /// # }
             /// ```
             fn write_i32(&mut self, n: i32) -> WriteI32;
 
@@ -625,16 +648,16 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_u64(918733457491587).await?;
-            ///     writer.write_u64(143).await?;
+            /// writer.write_u64(918733457491587).await?;
+            /// writer.write_u64(143).await?;
             ///
-            ///     assert_eq!(writer, b"\x00\x03\x43\x95\x4d\x60\x86\x83\x00\x00\x00\x00\x00\x00\x00\x8f");
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, b"\x00\x03\x43\x95\x4d\x60\x86\x83\x00\x00\x00\x00\x00\x00\x00\x8f");
+            /// Ok(())
+            /// # }
             /// ```
             fn write_u64(&mut self, n: u64) -> WriteU64;
 
@@ -663,16 +686,16 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_i64(i64::MIN).await?;
-            ///     writer.write_i64(i64::MAX).await?;
+            /// writer.write_i64(i64::MIN).await?;
+            /// writer.write_i64(i64::MAX).await?;
             ///
-            ///     assert_eq!(writer, b"\x80\x00\x00\x00\x00\x00\x00\x00\x7f\xff\xff\xff\xff\xff\xff\xff");
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, b"\x80\x00\x00\x00\x00\x00\x00\x00\x7f\xff\xff\xff\xff\xff\xff\xff");
+            /// Ok(())
+            /// # }
             /// ```
             fn write_i64(&mut self, n: i64) -> WriteI64;
 
@@ -701,18 +724,18 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_u128(16947640962301618749969007319746179).await?;
+            /// writer.write_u128(16947640962301618749969007319746179).await?;
             ///
-            ///     assert_eq!(writer, vec![
-            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83,
-            ///         0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
-            ///     ]);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, vec![
+            ///     0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83,
+            ///     0x00, 0x03, 0x43, 0x95, 0x4d, 0x60, 0x86, 0x83
+            /// ]);
+            /// Ok(())
+            /// # }
             /// ```
             fn write_u128(&mut self, n: u128) -> WriteU128;
 
@@ -741,18 +764,18 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_i128(i128::MIN).await?;
+            /// writer.write_i128(i128::MIN).await?;
             ///
-            ///     assert_eq!(writer, vec![
-            ///         0x80, 0, 0, 0, 0, 0, 0, 0,
-            ///         0, 0, 0, 0, 0, 0, 0, 0
-            ///     ]);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, vec![
+            ///     0x80, 0, 0, 0, 0, 0, 0, 0,
+            ///     0, 0, 0, 0, 0, 0, 0, 0
+            /// ]);
+            /// Ok(())
+            /// # }
             /// ```
             fn write_i128(&mut self, n: i128) -> WriteI128;
 
@@ -781,15 +804,15 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_f32(f32::MIN).await?;
+            /// writer.write_f32(f32::MIN).await?;
             ///
-            ///     assert_eq!(writer, vec![0xff, 0x7f, 0xff, 0xff]);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, vec![0xff, 0x7f, 0xff, 0xff]);
+            /// Ok(())
+            /// # }
             /// ```
             fn write_f32(&mut self, n: f32) -> WriteF32;
 
@@ -818,17 +841,17 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_f64(f64::MIN).await?;
+            /// writer.write_f64(f64::MIN).await?;
             ///
-            ///     assert_eq!(writer, vec![
-            ///         0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-            ///     ]);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, vec![
+            ///     0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+            /// ]);
+            /// Ok(())
+            /// # }
             /// ```
             fn write_f64(&mut self, n: f64) -> WriteF64;
 
@@ -857,16 +880,16 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_u16_le(517).await?;
-            ///     writer.write_u16_le(768).await?;
+            /// writer.write_u16_le(517).await?;
+            /// writer.write_u16_le(768).await?;
             ///
-            ///     assert_eq!(writer, b"\x05\x02\x00\x03");
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, b"\x05\x02\x00\x03");
+            /// Ok(())
+            /// # }
             /// ```
             fn write_u16_le(&mut self, n: u16) -> WriteU16Le;
 
@@ -895,16 +918,16 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_i16_le(193).await?;
-            ///     writer.write_i16_le(-132).await?;
+            /// writer.write_i16_le(193).await?;
+            /// writer.write_i16_le(-132).await?;
             ///
-            ///     assert_eq!(writer, b"\xc1\x00\x7c\xff");
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, b"\xc1\x00\x7c\xff");
+            /// Ok(())
+            /// # }
             /// ```
             fn write_i16_le(&mut self, n: i16) -> WriteI16Le;
 
@@ -933,16 +956,16 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_u32_le(267).await?;
-            ///     writer.write_u32_le(1205419366).await?;
+            /// writer.write_u32_le(267).await?;
+            /// writer.write_u32_le(1205419366).await?;
             ///
-            ///     assert_eq!(writer, b"\x0b\x01\x00\x00\x66\x3d\xd9\x47");
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, b"\x0b\x01\x00\x00\x66\x3d\xd9\x47");
+            /// Ok(())
+            /// # }
             /// ```
             fn write_u32_le(&mut self, n: u32) -> WriteU32Le;
 
@@ -971,16 +994,16 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_i32_le(267).await?;
-            ///     writer.write_i32_le(1205419366).await?;
+            /// writer.write_i32_le(267).await?;
+            /// writer.write_i32_le(1205419366).await?;
             ///
-            ///     assert_eq!(writer, b"\x0b\x01\x00\x00\x66\x3d\xd9\x47");
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, b"\x0b\x01\x00\x00\x66\x3d\xd9\x47");
+            /// Ok(())
+            /// # }
             /// ```
             fn write_i32_le(&mut self, n: i32) -> WriteI32Le;
 
@@ -1009,16 +1032,16 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_u64_le(918733457491587).await?;
-            ///     writer.write_u64_le(143).await?;
+            /// writer.write_u64_le(918733457491587).await?;
+            /// writer.write_u64_le(143).await?;
             ///
-            ///     assert_eq!(writer, b"\x83\x86\x60\x4d\x95\x43\x03\x00\x8f\x00\x00\x00\x00\x00\x00\x00");
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, b"\x83\x86\x60\x4d\x95\x43\x03\x00\x8f\x00\x00\x00\x00\x00\x00\x00");
+            /// Ok(())
+            /// # }
             /// ```
             fn write_u64_le(&mut self, n: u64) -> WriteU64Le;
 
@@ -1047,16 +1070,16 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_i64_le(i64::MIN).await?;
-            ///     writer.write_i64_le(i64::MAX).await?;
+            /// writer.write_i64_le(i64::MIN).await?;
+            /// writer.write_i64_le(i64::MAX).await?;
             ///
-            ///     assert_eq!(writer, b"\x00\x00\x00\x00\x00\x00\x00\x80\xff\xff\xff\xff\xff\xff\xff\x7f");
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, b"\x00\x00\x00\x00\x00\x00\x00\x80\xff\xff\xff\xff\xff\xff\xff\x7f");
+            /// Ok(())
+            /// # }
             /// ```
             fn write_i64_le(&mut self, n: i64) -> WriteI64Le;
 
@@ -1085,18 +1108,18 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_u128_le(16947640962301618749969007319746179).await?;
+            /// writer.write_u128_le(16947640962301618749969007319746179).await?;
             ///
-            ///     assert_eq!(writer, vec![
-            ///         0x83, 0x86, 0x60, 0x4d, 0x95, 0x43, 0x03, 0x00,
-            ///         0x83, 0x86, 0x60, 0x4d, 0x95, 0x43, 0x03, 0x00,
-            ///     ]);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, vec![
+            ///     0x83, 0x86, 0x60, 0x4d, 0x95, 0x43, 0x03, 0x00,
+            ///     0x83, 0x86, 0x60, 0x4d, 0x95, 0x43, 0x03, 0x00,
+            /// ]);
+            /// Ok(())
+            /// # }
             /// ```
             fn write_u128_le(&mut self, n: u128) -> WriteU128Le;
 
@@ -1125,18 +1148,18 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_i128_le(i128::MIN).await?;
+            /// writer.write_i128_le(i128::MIN).await?;
             ///
-            ///     assert_eq!(writer, vec![
-            ///          0, 0, 0, 0, 0, 0, 0,
-            ///         0, 0, 0, 0, 0, 0, 0, 0, 0x80
-            ///     ]);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, vec![
+            ///     0, 0, 0, 0, 0, 0, 0,
+            ///     0, 0, 0, 0, 0, 0, 0, 0, 0x80
+            /// ]);
+            /// Ok(())
+            /// # }
             /// ```
             fn write_i128_le(&mut self, n: i128) -> WriteI128Le;
 
@@ -1165,15 +1188,15 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_f32_le(f32::MIN).await?;
+            /// writer.write_f32_le(f32::MIN).await?;
             ///
-            ///     assert_eq!(writer, vec![0xff, 0xff, 0x7f, 0xff]);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, vec![0xff, 0xff, 0x7f, 0xff]);
+            /// Ok(())
+            /// # }
             /// ```
             fn write_f32_le(&mut self, n: f32) -> WriteF32Le;
 
@@ -1202,17 +1225,17 @@ cfg_io_util! {
             /// ```rust
             /// use tokio::io::{self, AsyncWriteExt};
             ///
-            /// #[tokio::main]
-            /// async fn main() -> io::Result<()> {
-            ///     let mut writer = Vec::new();
+            /// # #[tokio::main(flavor = "current_thread")]
+            /// # async fn main() -> io::Result<()> {
+            /// let mut writer = Vec::new();
             ///
-            ///     writer.write_f64_le(f64::MIN).await?;
+            /// writer.write_f64_le(f64::MIN).await?;
             ///
-            ///     assert_eq!(writer, vec![
-            ///         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xef, 0xff
-            ///     ]);
-            ///     Ok(())
-            /// }
+            /// assert_eq!(writer, vec![
+            ///     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xef, 0xff
+            /// ]);
+            /// Ok(())
+            /// # }
             /// ```
             fn write_f64_le(&mut self, n: f64) -> WriteF64Le;
         }
@@ -1235,15 +1258,17 @@ cfg_io_util! {
         ///
         /// This method is cancel safe.
         ///
-        /// If `flush` is used as the event in a [`tokio::select!`](crate::select)
-        /// statement and some other branch completes first, then the data in the
-        /// buffered data in this `AsyncWrite` may have been partially flushed.
+        /// If `flush` is used as a branch in [`tokio::select!`](crate::select)
+        /// and another branch completes first, then the buffered data in this
+        /// `AsyncWrite` may have been partially flushed.
         /// However, it is guaranteed that the buffer is advanced by the amount of
         /// bytes that have been partially flushed.
         ///
         /// # Examples
         ///
         /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, BufWriter, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -1256,6 +1281,7 @@ cfg_io_util! {
         ///     buffer.flush().await?;
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         fn flush(&mut self) -> Flush<'_, Self>
         where
@@ -1273,8 +1299,8 @@ cfg_io_util! {
         /// async fn shutdown(&mut self) -> io::Result<()>;
         /// ```
         ///
-        /// Similar to [`flush`], all intermediately buffered is written to the
-        /// underlying stream. Once the operation completes, the caller should
+        /// Similar to [`flush`], all intermediately buffered content is written to
+        /// the underlying stream. Once the operation completes, the caller should
         /// no longer attempt to write to the stream. For example, the
         /// `TcpStream` implementation will issue a `shutdown(Write)` sys call.
         ///
@@ -1283,6 +1309,8 @@ cfg_io_util! {
         /// # Examples
         ///
         /// ```no_run
+        /// # #[cfg(not(target_family = "wasm"))]
+        /// # {
         /// use tokio::io::{self, BufWriter, AsyncWriteExt};
         /// use tokio::fs::File;
         ///
@@ -1295,6 +1323,7 @@ cfg_io_util! {
         ///     buffer.shutdown().await?;
         ///     Ok(())
         /// }
+        /// # }
         /// ```
         fn shutdown(&mut self) -> Shutdown<'_, Self>
         where

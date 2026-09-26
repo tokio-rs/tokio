@@ -163,9 +163,15 @@ impl<T> Block<T> {
         }
 
         // Get the value
-        let value = self.values[offset].with(|ptr| ptr::read(ptr));
+        //
+        // Safety:
+        //
+        // 1. The caller guarantees that there is no concurrent access to the slot.
+        // 2. The `UnsafeCell` always give us a valid pointer to the value.
+        let value = self.values[offset].with(|ptr| unsafe { ptr::read(ptr) });
 
-        Some(Read::Value(value.assume_init()))
+        // Safety: the ready bit is set, so the value has been initialized.
+        Some(Read::Value(unsafe { value.assume_init() }))
     }
 
     /// Returns true if *this* block has a value in the given slot.
@@ -197,7 +203,10 @@ impl<T> Block<T> {
         let slot_offset = offset(slot_index);
 
         self.values[slot_offset].with_mut(|ptr| {
-            ptr::write(ptr, MaybeUninit::new(value));
+            // Safety: the caller guarantees that there is no concurrent access to the slot
+            unsafe {
+                ptr::write(ptr, MaybeUninit::new(value));
+            }
         });
 
         // Release the value. After this point, the slot ref may no longer
@@ -209,11 +218,6 @@ impl<T> Block<T> {
     /// Signal to the receiver that the sender half of the list is closed.
     pub(crate) unsafe fn tx_close(&self) {
         self.header.ready_slots.fetch_or(TX_CLOSED, Release);
-    }
-
-    pub(crate) unsafe fn is_closed(&self) -> bool {
-        let ready_bits = self.header.ready_slots.load(Acquire);
-        is_tx_closed(ready_bits)
     }
 
     /// Resets the block to a blank state. This enables reusing blocks in the
@@ -246,7 +250,11 @@ impl<T> Block<T> {
         // tail_position is guaranteed to not access this block.
         self.header
             .observed_tail_position
-            .with_mut(|ptr| *ptr = tail_position);
+            // Safety:
+            //
+            // 1. The caller guarantees unique access to the block.
+            // 2. The `UnsafeCell` always gives us a valid pointer.
+            .with_mut(|ptr| unsafe { *ptr = tail_position });
 
         // Set the released bit, signalling to the receiver that it is safe to
         // free the block's memory as soon as all slots **prior** to
@@ -286,7 +294,7 @@ impl<T> Block<T> {
         let ret = NonNull::new(self.header.next.load(ordering));
 
         debug_assert!(unsafe {
-            ret.map_or(true, |block| {
+            ret.is_none_or(|block| {
                 block.as_ref().header.start_index == self.header.start_index.wrapping_add(BLOCK_CAP)
             })
         });
@@ -316,7 +324,9 @@ impl<T> Block<T> {
         success: Ordering,
         failure: Ordering,
     ) -> Result<(), NonNull<Block<T>>> {
-        block.as_mut().header.start_index = self.header.start_index.wrapping_add(BLOCK_CAP);
+        // Safety: caller guarantees that `block` is valid.
+        unsafe { block.as_mut() }.header.start_index =
+            self.header.start_index.wrapping_add(BLOCK_CAP);
 
         let next_ptr = self
             .header
@@ -428,8 +438,9 @@ impl<T> Values<T> {
         if_loom! {
             let p = _value.as_ptr() as *mut UnsafeCell<MaybeUninit<T>>;
             for i in 0..BLOCK_CAP {
-                p.add(i)
-                    .write(UnsafeCell::new(MaybeUninit::uninit()));
+                unsafe {
+                    p.add(i).write(UnsafeCell::new(MaybeUninit::uninit()));
+                }
             }
         }
     }

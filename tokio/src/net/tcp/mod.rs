@@ -2,7 +2,7 @@
 
 pub(crate) mod listener;
 
-cfg_not_wasi! {
+cfg_not_wasip1! {
     pub(crate) mod socket;
 }
 

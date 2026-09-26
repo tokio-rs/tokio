@@ -39,12 +39,12 @@ cfg_io_util! {
     /// ```
     /// use tokio::io::{self, AsyncReadExt};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
     ///     let mut buffer = String::new();
     ///     io::empty().read_to_string(&mut buffer).await.unwrap();
     ///     assert!(buffer.is_empty());
-    /// }
+    /// # }
     /// ```
     ///
     /// A convoluted way of getting the length of a buffer:
@@ -52,12 +52,12 @@ cfg_io_util! {
     /// ```
     /// use tokio::io::{self, AsyncWriteExt};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let buffer = vec![1, 2, 3, 5, 8];
-    ///     let num_bytes = io::empty().write(&buffer).await.unwrap();
-    ///     assert_eq!(num_bytes, 5);
-    /// }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let buffer = vec![1, 2, 3, 5, 8];
+    /// let num_bytes = io::empty().write(&buffer).await.unwrap();
+    /// assert_eq!(num_bytes, 5);
+    /// # }
     /// ```
     pub fn empty() -> Empty {
         Empty { _p: () }
@@ -71,7 +71,7 @@ impl AsyncRead for Empty {
         cx: &mut Context<'_>,
         _: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(()))
     }
@@ -80,7 +80,7 @@ impl AsyncRead for Empty {
 impl AsyncBufRead for Empty {
     #[inline]
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(&[]))
     }
@@ -96,21 +96,21 @@ impl AsyncWrite for Empty {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(buf.len()))
     }
 
     #[inline]
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(()))
     }
 
     #[inline]
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(()))
     }
@@ -126,7 +126,7 @@ impl AsyncWrite for Empty {
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<Result<usize, io::Error>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         ready!(poll_proceed_and_make_progress(cx));
         let num_bytes = bufs.iter().map(|b| b.len()).sum();
         Poll::Ready(Ok(num_bytes))
@@ -141,7 +141,7 @@ impl AsyncSeek for Empty {
 
     #[inline]
     fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(0))
     }

@@ -33,6 +33,12 @@ impl<S: Stream> ChunksTimeout<S> {
             cap: max_size,
         }
     }
+
+    /// Consumes the [`ChunksTimeout`] and then returns all buffered items.
+    pub fn into_remainder(mut self: Pin<&mut Self>) -> Vec<S::Item> {
+        let me = self.as_mut().project();
+        std::mem::take(me.items)
+    }
 }
 
 impl<S: Stream> Stream for ChunksTimeout<S> {

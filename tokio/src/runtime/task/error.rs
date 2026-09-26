@@ -46,6 +46,8 @@ impl JoinError {
     /// # Examples
     ///
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::panic;
     ///
     /// #[tokio::main]
@@ -56,6 +58,7 @@ impl JoinError {
     ///
     ///     assert!(err.is_panic());
     /// }
+    /// # }
     /// ```
     pub fn is_panic(&self) -> bool {
         matches!(&self.repr, Repr::Panic(_))
@@ -71,7 +74,7 @@ impl JoinError {
     ///
     /// # Examples
     ///
-    /// ```should_panic
+    /// ```should_panic,ignore-wasm
     /// use std::panic;
     ///
     /// #[tokio::main]
@@ -98,7 +101,7 @@ impl JoinError {
     ///
     /// # Examples
     ///
-    /// ```should_panic
+    /// ```should_panic,ignore-wasm
     /// use std::panic;
     ///
     /// #[tokio::main]
@@ -167,13 +170,10 @@ impl std::error::Error for JoinError {}
 
 impl From<JoinError> for io::Error {
     fn from(src: JoinError) -> io::Error {
-        io::Error::new(
-            io::ErrorKind::Other,
-            match src.repr {
-                Repr::Cancelled => "task was cancelled",
-                Repr::Panic(_) => "task panicked",
-            },
-        )
+        io::Error::other(match src.repr {
+            Repr::Cancelled => "task was cancelled",
+            Repr::Panic(_) => "task panicked",
+        })
     }
 }
 

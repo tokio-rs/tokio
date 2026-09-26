@@ -10,6 +10,13 @@ pub struct DropGuard {
 }
 
 impl DropGuard {
+    /// Returns a reference to the cancellation token wrapped by this guard.
+    pub fn token(&self) -> &CancellationToken {
+        self.inner
+            .as_ref()
+            .expect("`inner` can only be None in a destructor")
+    }
+
     /// Returns stored cancellation token and removes this drop guard instance
     /// (i.e. it will no longer cancel token). Other guards for this token
     /// are not affected.

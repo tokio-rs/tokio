@@ -178,10 +178,6 @@
 //! poll call will notice it when the poll finishes, and the task is cancelled
 //! at that point.
 
-// Some task infrastructure is here to support `JoinSet`, which is currently
-// unstable. This should be removed once `JoinSet` is stabilized.
-#![cfg_attr(not(tokio_unstable), allow(dead_code))]
-
 mod core;
 use self::core::Cell;
 use self::core::Header;
@@ -193,7 +189,6 @@ mod harness;
 use self::harness::Harness;
 
 mod id;
-#[cfg_attr(not(tokio_unstable), allow(unreachable_pub, unused_imports))]
 pub use id::{id, try_id, Id};
 
 #[cfg(feature = "rt")]
@@ -226,10 +221,13 @@ use crate::future::Future;
 use crate::util::linked_list;
 use crate::util::sharded_list;
 
+use crate::runtime::metrics::ScheduleLatencyInstant;
 use crate::runtime::TaskCallback;
 use std::marker::PhantomData;
 use std::panic::Location;
 use std::ptr::NonNull;
+#[cfg(tokio_unstable)]
+use std::time::Duration;
 use std::{fmt, mem};
 
 /// An owned handle to the task, tracked by ref count.
@@ -247,10 +245,13 @@ unsafe impl<S> Sync for Task<S> {}
 pub(crate) struct Notified<S: 'static>(Task<S>);
 
 impl<S> Notified<S> {
-    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-    #[inline]
-    pub(crate) fn task_meta<'task, 'meta>(&'task self) -> crate::runtime::TaskMeta<'meta> {
-        self.0.task_meta()
+    pub(crate) fn set_scheduled_at(&self, scheduled_at: ScheduleLatencyInstant) {
+        // SAFETY: There are no concurrent writes because there is only ever one `Notified`
+        // reference per task. There are no concurrent reads because this field is only read
+        // when polling the task, which can only happen after it's scheduled.
+        unsafe {
+            self.0.header().set_scheduled_at(scheduled_at);
+        }
     }
 }
 
@@ -270,8 +271,15 @@ pub(crate) struct LocalNotified<S: 'static> {
 impl<S> LocalNotified<S> {
     #[cfg(tokio_unstable)]
     #[inline]
-    pub(crate) fn task_meta<'task, 'meta>(&'task self) -> crate::runtime::TaskMeta<'meta> {
-        self.task.task_meta()
+    pub(crate) fn task_meta<'meta>(
+        &self,
+        schedule_latency: Option<Duration>,
+    ) -> crate::runtime::TaskMeta<'meta> {
+        self.task.task_meta(schedule_latency)
+    }
+
+    pub(crate) fn get_scheduled_at(&self) -> ScheduleLatencyInstant {
+        self.task.header().get_scheduled_at()
     }
 }
 
@@ -398,19 +406,17 @@ impl<S: 'static> Task<S> {
         }
     }
 
+    /// # Safety
+    ///
+    /// `ptr` must be a valid pointer to a [`Header`].
     unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
-        Task::new(RawTask::from_raw(ptr))
+        unsafe { Task::new(RawTask::from_raw(ptr)) }
     }
 
-    #[cfg(all(
-        tokio_unstable,
-        tokio_taskdump,
-        feature = "rt",
-        target_os = "linux",
-        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
-    ))]
-    pub(super) fn as_raw(&self) -> RawTask {
-        self.raw
+    cfg_taskdump! {
+        pub(super) fn as_raw(&self) -> RawTask {
+            self.raw
+        }
     }
 
     fn header(&self) -> &Header {
@@ -441,10 +447,15 @@ impl<S: 'static> Task<S> {
     // the compiler infers the lifetimes to be the same, and considers the task
     // to be borrowed for the lifetime of the returned `TaskMeta`.
     #[cfg(tokio_unstable)]
-    pub(crate) fn task_meta<'task, 'meta>(&'task self) -> crate::runtime::TaskMeta<'meta> {
+    pub(crate) fn task_meta<'meta>(
+        &self,
+        _schedule_latency: Option<Duration>,
+    ) -> crate::runtime::TaskMeta<'meta> {
         crate::runtime::TaskMeta {
             id: self.id(),
             spawned_at: self.spawned_at().into(),
+            #[cfg(all(tokio_unstable, feature = "schedule-latency"))]
+            schedule_latency: _schedule_latency,
             _phantom: PhantomData,
         }
     }
@@ -479,8 +490,11 @@ impl<S: 'static> Notified<S> {
 }
 
 impl<S: 'static> Notified<S> {
+    /// # Safety
+    ///
+    /// [`RawTask::ptr`] must be a valid pointer to a [`Header`].
     pub(crate) unsafe fn from_raw(ptr: RawTask) -> Notified<S> {
-        Notified(Task::new(ptr))
+        Notified(unsafe { Task::new(ptr) })
     }
 }
 
@@ -507,6 +521,15 @@ impl<S: Schedule> LocalNotified<S> {
         let raw = self.task.raw;
         mem::forget(self);
         raw.poll();
+    }
+
+    cfg_taskdump! {
+        /// Returns a `WakerRef` borrowing from this task.
+        ///
+        /// `WakerRef` derefs to `Waker` without bumping the task's refcount.
+        pub(crate) fn waker_ref(&self) -> waker::WakerRef<'_, S> {
+            waker::waker_ref::<S>(self.task.raw.header_ptr_ref())
+        }
     }
 }
 
@@ -597,11 +620,11 @@ unsafe impl<S> linked_list::Link for Task<S> {
     }
 
     unsafe fn from_raw(ptr: NonNull<Header>) -> Task<S> {
-        Task::from_raw(ptr)
+        unsafe { Task::from_raw(ptr) }
     }
 
     unsafe fn pointers(target: NonNull<Header>) -> NonNull<linked_list::Pointers<Header>> {
-        self::core::Trailer::addr_of_owned(Header::get_trailer(target))
+        unsafe { self::core::Trailer::addr_of_owned(Header::get_trailer(target)) }
     }
 }
 

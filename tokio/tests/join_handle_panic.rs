@@ -1,5 +1,8 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support panic recovery
+#![cfg(any(
+    all(feature = "full", not(target_os = "wasi")), // Wasi doesn't support panic recovery
+    all(target_os = "emscripten", feature = "rt", feature = "macros", feature = "time")
+))]
 #![cfg(panic = "unwind")]
 
 struct PanicsOnDrop;

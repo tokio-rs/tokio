@@ -1,3 +1,126 @@
+# 0.7.19 (July 21st, 2026)
+
+### Added
+
+- io: add `write_all_vectored` ([#7768], [#8159])
+- sync: add `DropGuard::token` for cancellation tokens ([#8226])
+- sync: implement `PartialEq` and `Eq` for `CancellationToken` ([#8110])
+- task: add `AbortOnDrop` ([#7855])
+- task: add `JoinMap::try_join_next` ([#8099])
+
+### Changed
+
+- codec: use `libc::memchr` for `LinesCodec` delimiter scan ([#8141])
+
+### Fixed
+
+- codec: fix `is_readable` when buffer is not empty ([#7912])
+- task: avoid replacing the `JoinQueue` waker in `try_join_next` ([#8279])
+- time: wake `DelayQueue` after resetting to expired ([#8274])
+
+### Documented
+
+- codec: document `UdpFramed` decoder errors ([#8248])
+
+[#7768]: https://github.com/tokio-rs/tokio/pull/7768
+[#7855]: https://github.com/tokio-rs/tokio/pull/7855
+[#7912]: https://github.com/tokio-rs/tokio/pull/7912
+[#8099]: https://github.com/tokio-rs/tokio/pull/8099
+[#8110]: https://github.com/tokio-rs/tokio/pull/8110
+[#8141]: https://github.com/tokio-rs/tokio/pull/8141
+[#8159]: https://github.com/tokio-rs/tokio/pull/8159
+[#8226]: https://github.com/tokio-rs/tokio/pull/8226
+[#8248]: https://github.com/tokio-rs/tokio/pull/8248
+[#8274]: https://github.com/tokio-rs/tokio/pull/8274
+[#8279]: https://github.com/tokio-rs/tokio/pull/8279
+
+# 0.7.18 (January 4th, 2026)
+
+### Added
+
+- io: add `tokio_util::io::simplex` ([#7565])
+
+### Changed
+
+- task: remove unnecessary trait bounds on the `Debug` implementation for `JoinQueue` and `AbortOnDropHandle` ([#7720])
+
+### Fixed
+
+- deps: bump `tokio` to `1.44.0` ([#7733])
+
+### Documented
+
+- io: document the default capacity of the `ReaderStream` ([#7147])
+- sync: fix a typo in the docs of `PollSender::is_closed` ([#7737])
+
+[#7147]: https://github.com/tokio-rs/tokio/pull/7147
+[#7565]: https://github.com/tokio-rs/tokio/pull/7565
+[#7720]: https://github.com/tokio-rs/tokio/pull/7720
+[#7733]: https://github.com/tokio-rs/tokio/pull/7733
+[#7737]: https://github.com/tokio-rs/tokio/pull/7737
+
+# 0.7.17 (November 2nd, 2025)
+
+The MSRV is increased to 1.71.
+
+### Added
+
+- codec: add `{FramedRead,FramedWrite}::into_parts()` ([#7566])
+- time: add `#[track_caller]` to `FutureExt::timeout` ([#7588])
+- task: add `tokio_util::task::JoinQueue` ([#7590])
+
+### Changed
+
+- codec: remove unnecessary trait bounds on all Framed constructors ([#7716])
+
+### Documented
+
+- time: clarify the cancellation safety of the `DelayQueue` ([#7564])
+- docs: fix some docs links ([#7654])
+- task: simplify the example of `TaskTracker` ([#7657])
+- task: clarify the behavior of several `spawn_local` methods ([#7669])
+
+[#7564]: https://github.com/tokio-rs/tokio/pull/7564
+[#7566]: https://github.com/tokio-rs/tokio/pull/7566
+[#7588]: https://github.com/tokio-rs/tokio/pull/7588
+[#7590]: https://github.com/tokio-rs/tokio/pull/7590
+[#7654]: https://github.com/tokio-rs/tokio/pull/7654
+[#7657]: https://github.com/tokio-rs/tokio/pull/7657
+[#7669]: https://github.com/tokio-rs/tokio/pull/7669
+[#7716]: https://github.com/tokio-rs/tokio/pull/7716
+
+# 0.7.16 (August 3rd, 2025)
+
+### Added
+
+- codec: add `FramedWrite::with_capacity` ([#7493])
+- future: add adapters of `CancellationToken` for `FutureExt` ([#7475])
+- sync: add `DropGuardRef` for `CancellationToken` ([#7407])
+- task: add `AbortOnDropHandle::detach` ([#7400])
+- task: stabilise `JoinMap` ([#7075])
+
+### Changed
+
+- codec: also apply capacity to read buffer in `Framed::with_capacity` ([#7500])
+- sync: make `CancellationToken::run_until_cancelled` biased towards the token ([#7462])
+- task: remove raw-entry feature from hashbrown dep ([#7252])
+
+### Documented
+
+- compat: add more documentation to `tokio_util::compat` ([#7279])
+- sync: improve docs of `tokio_util::sync::CancellationToken` ([#7408])
+
+[#7075]: https://github.com/tokio-rs/tokio/pull/7075
+[#7252]: https://github.com/tokio-rs/tokio/pull/7252
+[#7279]: https://github.com/tokio-rs/tokio/pull/7279
+[#7400]: https://github.com/tokio-rs/tokio/pull/7400
+[#7407]: https://github.com/tokio-rs/tokio/pull/7407
+[#7408]: https://github.com/tokio-rs/tokio/pull/7408
+[#7462]: https://github.com/tokio-rs/tokio/pull/7462
+[#7475]: https://github.com/tokio-rs/tokio/pull/7475
+[#7493]: https://github.com/tokio-rs/tokio/pull/7493
+[#7500]: https://github.com/tokio-rs/tokio/pull/7500
+
 # 0.7.15 (April 23rd, 2025)
 
 ### Fixed

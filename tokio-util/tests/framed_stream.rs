@@ -21,7 +21,7 @@ async fn return_none_after_error() {
     let mut io = FramedRead::new(
         Builder::new()
             .read(b"abcdef")
-            .read_error(io::Error::new(io::ErrorKind::Other, "Resource errored out"))
+            .read_error(io::Error::other("Resource errored out"))
             .read(b"more data")
             .build(),
         BytesCodec::new(),

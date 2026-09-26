@@ -1,4 +1,5 @@
 use crate::Stream;
+use futures_core::stream::FusedStream;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::time::{Instant, Interval};
@@ -54,6 +55,12 @@ impl Stream for IntervalStream {
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         (usize::MAX, None)
+    }
+}
+
+impl FusedStream for IntervalStream {
+    fn is_terminated(&self) -> bool {
+        false
     }
 }
 

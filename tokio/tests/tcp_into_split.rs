@@ -1,8 +1,7 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi doesn't support bind
-                                                                   // No `socket` on miri.
+#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support multithreading or peeking
 
-use std::io::{Error, ErrorKind, Result};
+use std::io::{Error, Result};
 use std::io::{Read, Write};
 use std::{net, thread};
 
@@ -96,10 +95,7 @@ async fn drop_write() -> Result<()> {
         let mut read_buf = [0u8; 32];
         let res = match stream.read(&mut read_buf) {
             Ok(0) => Ok(()),
-            Ok(len) => Err(Error::new(
-                ErrorKind::Other,
-                format!("Unexpected read: {len} bytes."),
-            )),
+            Ok(len) => Err(Error::other(format!("Unexpected read: {len} bytes."))),
             Err(err) => Err(err),
         };
 

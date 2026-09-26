@@ -58,14 +58,16 @@ pub async fn connect(
             //BytesMut into Bytes
             Ok(i) => future::ready(Some(i.freeze())),
             Err(e) => {
-                println!("failed to read from socket; error={e}");
+                eprintln!("failed to read from socket; error={e}");
                 future::ready(None)
             }
         })
         .map(Ok);
 
-    match future::join(sink.send_all(&mut stdin), stdout.send_all(&mut stream)).await {
-        (Err(e), _) | (_, Err(e)) => Err(e.into()),
-        _ => Ok(()),
+    tokio::select! {
+        r = sink.send_all(&mut stdin) => r?,
+        r = stdout.send_all(&mut stream) => r?,
     }
+
+    Ok(())
 }

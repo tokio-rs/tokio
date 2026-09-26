@@ -35,8 +35,14 @@ pub(crate) enum TryPopResult<T> {
     /// Successfully popped a value.
     Ok(T),
     /// The channel is empty.
+    ///
+    /// Note that `list.rs` only tracks the close state set by senders. If the
+    /// channel is closed by `Rx::close()`, then `TryPopResult::Empty` is still
+    /// returned, and the close state needs to be handled by `chan.rs`.
     Empty,
     /// The channel is empty and closed.
+    ///
+    /// Returned when the send half is closed (all senders dropped).
     Closed,
     /// The channel is not empty, but the first value is being written.
     Busy,
@@ -178,6 +184,13 @@ impl<T> Tx<T> {
         }
     }
 
+    /// # Safety
+    ///
+    /// Behavior is undefined if any of the following conditions are violated:
+    ///
+    /// - The `block` was created by [`Box::into_raw`].
+    /// - The `block` is not currently part of any linked list.
+    /// - The `block` is a valid pointer to a [`Block<T>`].
     pub(crate) unsafe fn reclaim_block(&self, mut block: NonNull<Block<T>>) {
         // The block has been removed from the linked list and ownership
         // is reclaimed.
@@ -186,24 +199,28 @@ impl<T> Tx<T> {
         // inserting it back at the end of the linked list.
         //
         // First, reset the data
-        block.as_mut().reclaim();
+        //
+        // Safety: caller guarantees the block is valid and not in any list.
+        unsafe {
+            block.as_mut().reclaim();
+        }
 
         let mut reused = false;
 
         // Attempt to insert the block at the end
         //
         // Walk at most three times
-        //
         let curr_ptr = self.block_tail.load(Acquire);
 
         // The pointer can never be null
         debug_assert!(!curr_ptr.is_null());
 
-        let mut curr = NonNull::new_unchecked(curr_ptr);
+        // Safety: curr_ptr is never null.
+        let mut curr = unsafe { NonNull::new_unchecked(curr_ptr) };
 
         // TODO: Unify this logic with Block::grow
         for _ in 0..3 {
-            match curr.as_ref().try_push(&mut block, AcqRel, Acquire) {
+            match unsafe { curr.as_ref().try_push(&mut block, AcqRel, Acquire) } {
                 Ok(()) => {
                     reused = true;
                     break;
@@ -215,16 +232,11 @@ impl<T> Tx<T> {
         }
 
         if !reused {
-            let _ = Box::from_raw(block.as_ptr());
-        }
-    }
-
-    pub(crate) fn is_closed(&self) -> bool {
-        let tail = self.block_tail.load(Acquire);
-
-        unsafe {
-            let tail_block = &*tail;
-            tail_block.is_closed()
+            // Safety:
+            //
+            // 1. Caller guarantees the block is valid and not in any list.
+            // 2. The block was created by `Box::into_raw`.
+            let _ = unsafe { Box::from_raw(block.as_ptr()) };
         }
     }
 }
@@ -250,11 +262,58 @@ impl<T> Rx<T> {
         self.len(tx) == 0
     }
 
+    // Guaranteed to return true if `slot_index` is the fake message sent on channel close.
+    // Guaranteed to return false if `slot_index` is a fully sent message.
+    //
+    // For messages that are partially sent, may return either true or false.
+    fn is_maybe_closed(&self, tx: &Tx<T>, slot_index: usize) -> bool {
+        let start_index = block::start_index(slot_index);
+
+        let tail = tx.block_tail.load(Acquire);
+        // SAFETY: Only the receiver frees blocks, so since we are the receiver, this will not be
+        // freed right now.
+        let tail_ref = unsafe { &*tail };
+        if tail_ref.is_at_index(start_index) {
+            return !tail_ref.has_value(slot_index);
+        }
+
+        // This method is optimized for checking whether the last value is present, so most of the
+        // time it is in `block_tail`. However, this isn't always the case since it's possible
+        // that the list was grown with an empty block, in which case `block_tail` points one block
+        // too far. To handle this case, we walk the list from the head.
+        let mut block_ptr = Some(self.head);
+
+        while let Some(block) = block_ptr {
+            // SAFETY: Only the receiver frees blocks, so since we are the receiver, this will not
+            // be freed right now.
+            let block_ref = unsafe { block.as_ref() };
+            if block_ref.is_at_index(start_index) {
+                return !block_ref.has_value(slot_index);
+            }
+            block_ptr = block_ref.load_next(Acquire);
+        }
+        true
+    }
+
     pub(crate) fn len(&self, tx: &Tx<T>) -> usize {
-        // When all the senders are dropped, there will be a last block in the tail position,
-        // but it will be closed
         let tail_position = tx.tail_position.load(Acquire);
-        tail_position - self.index - (tx.is_closed() as usize)
+        let mut len = tail_position.wrapping_sub(self.index);
+        debug_assert!(0 <= len as isize);
+        if len == 0 {
+            return 0;
+        }
+        // There are messages present in the queue. However, it's possible that the last message is
+        // a fake "closed" message that we do not wish to count. To avoid counting it, we do not
+        // count the last message if the ready bit is unset.
+        //
+        // Note that it is also possible for the ready bit to be unset on a normal message, but
+        // this happens only if that message is currently being sent *right now* in parallel on
+        // another thread. That is okay because it is optional to count messages that are currently
+        // being sent.
+        if self.is_maybe_closed(tx, tail_position.wrapping_sub(1)) {
+            len -= 1;
+        }
+        len
     }
 
     /// Pops the next value off the queue.
@@ -381,8 +440,8 @@ impl<T> Rx<T> {
         }
 
         while let Some(block) = cur {
-            cur = block.as_ref().load_next(Relaxed);
-            drop(Box::from_raw(block.as_ptr()));
+            cur = unsafe { block.as_ref() }.load_next(Relaxed);
+            drop(unsafe { Box::from_raw(block.as_ptr()) });
         }
     }
 }

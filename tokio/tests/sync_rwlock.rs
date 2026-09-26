@@ -1,12 +1,12 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::test as maybe_tokio_test;
 
 use std::task::Poll;
@@ -76,6 +76,18 @@ fn exhaust_reading() {
     drop(g2);
     assert!(t1.is_woken());
     let _g1 = assert_ready!(t1.poll());
+}
+
+#[test]
+#[should_panic(expected = "a RwLock may not be created with 0 readers")]
+fn zero_max_readers() {
+    RwLock::with_max_readers(100, 0);
+}
+
+#[test]
+#[should_panic(expected = "a RwLock may not be created with 0 readers")]
+fn zero_max_readers_const() {
+    RwLock::const_with_max_readers(100, 0);
 }
 
 // When there is an active exclusive owner, subsequent exclusive access should not be possible

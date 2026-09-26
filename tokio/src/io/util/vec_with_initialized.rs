@@ -5,7 +5,7 @@ use std::mem::MaybeUninit;
 ///
 /// # Safety
 ///
-/// The implementor must guarantee that the vector returned by the
+/// The implementer must guarantee that the vector returned by the
 /// `as_mut` and `as_mut` methods do not change from one call to
 /// another.
 pub(crate) unsafe trait VecU8: AsRef<Vec<u8>> + AsMut<Vec<u8>> {}

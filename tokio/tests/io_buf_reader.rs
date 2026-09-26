@@ -1,5 +1,13 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "macros",
+        feature = "io-util"
+    )
+))]
 
 // https://github.com/rust-lang/futures-rs/blob/1803948ff091b4eabf7f3bf39e16bbbdefca5cc8/futures/tests/io_buf_reader.rs
 
@@ -376,4 +384,44 @@ async fn test_fill_buf_wrapper() {
     assert_eq!(read.fill_buf().await.unwrap(), b"foo bar");
     read.consume(b"foo bar".len());
     assert_eq!(read.fill_buf().await.unwrap(), b"");
+}
+
+#[tokio::test]
+async fn one_byte_capacity_still_reads() {
+    let data: &[u8] = b"a\nb\nc\n";
+
+    let mut reader = BufReader::with_capacity(1, data);
+    let mut line = String::new();
+    assert_eq!(reader.read_line(&mut line).await.unwrap(), 2);
+    assert_eq!(line, "a\n");
+
+    let mut reader = BufReader::with_capacity(1, data);
+    let mut copied = Vec::new();
+    assert_eq!(
+        tokio::io::copy_buf(&mut reader, &mut copied).await.unwrap(),
+        6
+    );
+    assert_eq!(copied, data);
+}
+
+#[tokio::test]
+async fn one_byte_capacity_buf_stream_still_reads() {
+    use tokio::io::BufStream;
+
+    let mut stream = BufStream::with_capacity(1, 8, Cursor::new(b"a\nb\nc\n".to_vec()));
+    let mut line = String::new();
+    assert_eq!(stream.read_line(&mut line).await.unwrap(), 2);
+    assert_eq!(line, "a\n");
+}
+
+#[test]
+#[should_panic(expected = "capacity must be greater than zero")]
+fn zero_capacity_panics() {
+    BufReader::with_capacity(0, &b"data"[..]);
+}
+
+#[test]
+#[should_panic(expected = "capacity must be greater than zero")]
+fn zero_capacity_buf_stream_panics() {
+    tokio::io::BufStream::with_capacity(0, 8, Cursor::new(Vec::new()));
 }

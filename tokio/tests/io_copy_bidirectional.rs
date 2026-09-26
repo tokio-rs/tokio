@@ -1,8 +1,11 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support bind()
 
+use std::io::ErrorKind;
 use std::time::Duration;
-use tokio::io::{self, copy_bidirectional, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{
+    self, copy_bidirectional, copy_bidirectional_with_sizes, AsyncReadExt, AsyncWriteExt,
+};
 use tokio::net::TcpStream;
 use tokio::task::JoinHandle;
 
@@ -59,7 +62,6 @@ where
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` in miri.
 async fn test_basic_transfer() {
     symmetric(|_handle, mut a, mut b| async move {
         a.write_all(b"test").await.unwrap();
@@ -71,7 +73,6 @@ async fn test_basic_transfer() {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` in miri.
 async fn test_transfer_after_close() {
     symmetric(|handle, mut a, mut b| async move {
         AsyncWriteExt::shutdown(&mut a).await.unwrap();
@@ -91,7 +92,6 @@ async fn test_transfer_after_close() {
 }
 
 #[tokio::test]
-#[cfg_attr(miri, ignore)] // No `socket` in miri.
 async fn blocking_one_side_does_not_block_other() {
     symmetric(|handle, mut a, mut b| async move {
         block_write(&mut a).await;
@@ -116,7 +116,7 @@ async fn blocking_one_side_does_not_block_other() {
 #[tokio::test]
 async fn immediate_exit_on_write_error() {
     let payload = b"here, take this";
-    let error = || io::Error::new(io::ErrorKind::Other, "no thanks!");
+    let error = || io::Error::other("no thanks!");
 
     let mut a = tokio_test::io::Builder::new()
         .read(payload)
@@ -133,13 +133,31 @@ async fn immediate_exit_on_write_error() {
 
 #[tokio::test]
 async fn immediate_exit_on_read_error() {
-    let error = || io::Error::new(io::ErrorKind::Other, "got nothing!");
+    let error = || io::Error::other("got nothing!");
 
     let mut a = tokio_test::io::Builder::new().read_error(error()).build();
 
     let mut b = tokio_test::io::Builder::new().read_error(error()).build();
 
     assert!(copy_bidirectional(&mut a, &mut b).await.is_err());
+}
+
+#[test]
+#[should_panic(expected = "`a_to_b_buf_size` must be greater than 0")]
+fn copy_bidirectional_with_sizes_panics_on_zero_a_to_b_buffer() {
+    let mut a = tokio_test::io::Builder::new().build();
+    let mut b = tokio_test::io::Builder::new().build();
+
+    tokio_test::block_on(copy_bidirectional_with_sizes(&mut a, &mut b, 0, 1)).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "`b_to_a_buf_size` must be greater than 0")]
+fn copy_bidirectional_with_sizes_panics_on_zero_b_to_a_buffer() {
+    let mut a = tokio_test::io::Builder::new().build();
+    let mut b = tokio_test::io::Builder::new().build();
+
+    tokio_test::block_on(copy_bidirectional_with_sizes(&mut a, &mut b, 1, 0)).unwrap();
 }
 
 #[tokio::test]
@@ -164,5 +182,37 @@ async fn copy_bidirectional_is_cooperative() {
             }
         } => {},
         _ = tokio::task::yield_now() => {}
+    }
+}
+
+#[tokio::test]
+async fn retry_on_io_interrupted() {
+    for sized in [false, true] {
+        let mut a = tokio::io::join(
+            tokio_test::io::Builder::new()
+                .read_error(ErrorKind::Interrupted.into())
+                .read(b"ab")
+                .build(),
+            tokio_test::io::Builder::new()
+                .write_error(ErrorKind::Interrupted.into())
+                .write(b"cd")
+                .build(),
+        );
+        let mut b = tokio::io::join(
+            tokio_test::io::Builder::new()
+                .read_error(ErrorKind::Interrupted.into())
+                .read(b"cd")
+                .build(),
+            tokio_test::io::Builder::new()
+                .write_error(ErrorKind::Interrupted.into())
+                .write(b"ab")
+                .build(),
+        );
+        let result = if sized {
+            tokio::io::copy_bidirectional_with_sizes(&mut a, &mut b, 1, 1).await
+        } else {
+            tokio::io::copy_bidirectional(&mut a, &mut b).await
+        };
+        assert_eq!(result.unwrap(), (2, 2));
     }
 }

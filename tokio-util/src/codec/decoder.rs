@@ -47,7 +47,7 @@ pub trait Decoder {
     /// implementation of `decode_eof` to yield an `io::Error` when the decoder
     /// fails to consume all available data.
     ///
-    /// Note that implementors of this trait can simply indicate `type Error =
+    /// Note that implementers of this trait can simply indicate `type Error =
     /// io::Error` to use I/O errors as this type.
     ///
     /// [`FramedRead`]: crate::codec::FramedRead
@@ -148,7 +148,7 @@ pub trait Decoder {
                 if buf.is_empty() {
                     Ok(None)
                 } else {
-                    Err(io::Error::new(io::ErrorKind::Other, "bytes remaining on stream").into())
+                    Err(io::Error::other("bytes remaining on stream").into())
                 }
             }
         }

@@ -1,8 +1,17 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "macros",
+        feature = "io-util"
+    )
+))]
 
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio_test::assert_ok;
+use tokio_test::io::Builder;
 
 use bytes::BytesMut;
 use std::cmp;
@@ -48,4 +57,15 @@ async fn write_all() {
     assert_ok!(wr.write_all(b"hello world").await);
     assert_eq!(wr.buf, b"hello world"[..]);
     assert_eq!(wr.cnt, 3);
+}
+
+#[tokio::test]
+async fn write_all_retries_interrupted() {
+    let mut mock = Builder::new()
+        .write(b"he")
+        .write_error(io::Error::from(io::ErrorKind::Interrupted))
+        .write(b"llo")
+        .build();
+
+    mock.write_all(b"hello").await.unwrap();
 }

@@ -9,7 +9,8 @@ use std::{
 pub(super) unsafe fn try_transmute<Src, Target: 'static>(x: Src) -> Result<Target, Src> {
     if nonstatic_typeid::<Src>() == TypeId::of::<Target>() {
         let x = ManuallyDrop::new(x);
-        Ok(mem::transmute_copy::<Src, Target>(&x))
+        // SAFETY: we have checked that the types are the same.
+        Ok(unsafe { mem::transmute_copy::<Src, Target>(&x) })
     } else {
         Err(x)
     }

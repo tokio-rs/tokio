@@ -1,6 +1,12 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi"), not(miri)))] // Wasi doesn't support bind
-                                                                   // No `socket` on miri.
+// WASIp1 doesn't support bind
+#![cfg(all(
+    feature = "net",
+    feature = "macros",
+    feature = "rt",
+    feature = "io-util",
+    not(all(target_os = "wasi", target_env = "p1")),
+))]
 
 use std::time::Duration;
 use tokio::net::TcpSocket;
@@ -43,6 +49,7 @@ async fn basic_usage_v6() {
 }
 
 #[tokio::test]
+#[cfg_attr(miri, ignore = "Miri doesn't support binding before connecting")]
 async fn bind_before_connect() {
     // Create server
     let any_addr = assert_ok!("127.0.0.1:0".parse());
@@ -61,7 +68,9 @@ async fn bind_before_connect() {
     let _ = assert_ok!(srv.accept().await);
 }
 
+#[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support `SO_LINGER`")]
 #[tokio::test]
+#[cfg_attr(miri, ignore = "Miri doesn't support `SO_LINGER`")]
 async fn basic_linger() {
     // Create server
     let addr = assert_ok!("127.0.0.1:0".parse());
@@ -70,6 +79,156 @@ async fn basic_linger() {
 
     assert!(srv.linger().unwrap().is_none());
 
-    srv.set_linger(Some(Duration::new(0, 0))).unwrap();
+    srv.set_zero_linger().unwrap();
     assert_eq!(srv.linger().unwrap(), Some(Duration::new(0, 0)));
 }
+
+/// Macro to create a simple test to set and get a socket option.
+macro_rules! test {
+    // Test using the `arg`ument as expected return value.
+    ($( #[ $attr: meta ] )* $get_fn: ident, $set_fn: ident ( $arg: expr ) ) => {
+        test!($( #[$attr] )* $get_fn, $set_fn($arg), $arg);
+    };
+    ($( #[ $attr: meta ] )* $get_fn: ident, $set_fn: ident ( $arg: expr ), $expected: expr ) => {
+        #[test]
+        $( #[$attr] )*
+        fn $get_fn() {
+            test!(__ new_v4, $get_fn, $set_fn($arg), $expected);
+            #[cfg(not(target_os = "vita"))]
+            test!(__ new_v6, $get_fn, $set_fn($arg), $expected);
+        }
+    };
+    // Only test using a IPv4 socket.
+    (IPv4 $get_fn: ident, $set_fn: ident ( $arg: expr ) ) => {
+        #[test]
+        fn $get_fn() {
+            test!(__ new_v4, $get_fn, $set_fn($arg), $arg);
+        }
+    };
+    // Only test using a IPv6 socket.
+    (IPv6 $get_fn: ident, $set_fn: ident ( $arg: expr ) ) => {
+        #[test]
+        fn $get_fn() {
+            test!(__ new_v6, $get_fn, $set_fn($arg), $arg);
+        }
+    };
+
+    // Internal to this macro.
+    (__ $constructor: ident, $get_fn: ident, $set_fn: ident ( $arg: expr ), $expected: expr ) => {
+        let socket = TcpSocket::$constructor().expect("failed to create `TcpSocket`");
+
+        let initial = socket.$get_fn().expect("failed to get initial value");
+        let arg = $arg;
+        assert_ne!(initial, arg, "initial value and argument are the same");
+
+        socket.$set_fn(arg).expect("failed to set option");
+        let got = socket.$get_fn().expect("failed to get value");
+        let expected = $expected;
+        assert_eq!(got, expected, "set and get values differ");
+    };
+}
+
+const SET_BUF_SIZE: u32 = 4096;
+// Linux doubles the buffer size for kernel usage, and exposes that when
+// retrieving the buffer size.
+
+#[cfg(not(any(target_os = "android", target_os = "linux")))]
+const GET_BUF_SIZE: u32 = SET_BUF_SIZE;
+
+#[cfg(any(target_os = "android", target_os = "linux"))]
+const GET_BUF_SIZE: u32 = 2 * SET_BUF_SIZE;
+
+test!(
+    #[cfg_attr(
+        miri,
+        ignore = "Miri doesn't support setting the keepalive socket option"
+    )]
+    keepalive,
+    set_keepalive(true)
+);
+
+test!(
+    #[cfg_attr(
+        miri,
+        ignore = "Miri doesn't support reading the reuseaddr socket option"
+    )]
+    reuseaddr,
+    set_reuseaddr(true)
+);
+
+#[cfg(all(
+    unix,
+    not(target_os = "solaris"),
+    not(target_os = "illumos"),
+    not(target_os = "cygwin"),
+))]
+test!(
+    #[cfg_attr(
+        miri,
+        ignore = "Miri doesn't support setting the reuseport socket option"
+    )]
+    reuseport,
+    set_reuseport(true)
+);
+
+test!(
+    #[cfg_attr(
+        miri,
+        ignore = "Miri doesn't support setting the send buffer size socket option"
+    )]
+    send_buffer_size,
+    set_send_buffer_size(SET_BUF_SIZE),
+    GET_BUF_SIZE
+);
+
+test!(
+    #[cfg_attr(
+        miri,
+        ignore = "Miri doesn't support setting the receive buffer size socket option"
+    )]
+    recv_buffer_size,
+    set_recv_buffer_size(SET_BUF_SIZE),
+    GET_BUF_SIZE
+);
+
+test!(
+    #[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support `SO_LINGER`")]
+    #[cfg_attr(miri, ignore = "Miri doesn't support `SO_LINGER`")]
+    #[expect(deprecated, reason = "set_linger is deprecated")]
+    linger,
+    set_linger(Some(Duration::from_secs(10)))
+);
+
+test!(
+    #[cfg_attr(miri, ignore = "Miri only supports `TCP_NODELAY` on connected sockets")]
+    nodelay,
+    set_nodelay(true)
+);
+
+#[cfg(any(
+    target_os = "android",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "fuchsia",
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "cygwin",
+))]
+#[cfg(not(miri))] // Miri doesn't support TClass.
+test!(
+    IPv6 tclass_v6,
+    set_tclass_v6(96)
+);
+
+#[cfg(not(any(
+    target_os = "fuchsia",
+    target_os = "redox",
+    target_os = "solaris",
+    target_os = "illumos",
+    target_os = "haiku",
+    target_os = "wasi",
+    miri // Miri doesn't support TOS.
+)))]
+test!(IPv4 tos_v4, set_tos_v4(96));

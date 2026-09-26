@@ -219,10 +219,34 @@ fn size_hint_without_upper() {
 
     map.insert("a", pin_box(stream::iter(vec![1])));
     map.insert("b", pin_box(stream::iter(vec![1, 2])));
-    map.insert("c", pin_box(pending()));
+    map.insert("c", pin_box(futures::stream::poll_fn(|_| Poll::Pending)));
 
     let size_hint = map.size_hint();
     assert_eq!(size_hint, (3, None));
+}
+
+#[test]
+fn size_hint_overflow() {
+    struct Monster;
+
+    impl Stream for Monster {
+        type Item = ();
+
+        fn poll_next(self: Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<Option<()>> {
+            panic!()
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            (usize::MAX, Some(usize::MAX))
+        }
+    }
+
+    let mut map = StreamMap::new();
+
+    map.insert("a", Monster);
+    map.insert("b", Monster);
+
+    assert_eq!(map.size_hint(), (usize::MAX, None));
 }
 
 #[test]
@@ -406,6 +430,27 @@ async fn poll_next_many_enough() {
 }
 
 #[tokio::test]
+async fn poll_next_many_does_not_exceed_limit() {
+    let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
+
+    stream_map.insert(0, Box::pin(iter([0usize].into_iter())) as UsizeStream);
+    stream_map.insert(1, Box::pin(iter([1usize].into_iter())) as UsizeStream);
+
+    let mut buffer = vec![];
+    let n = poll_fn(|cx| stream_map.poll_next_many(cx, &mut buffer, 1)).await;
+
+    assert_eq!(n, 1);
+    assert_eq!(buffer.len(), 1);
+
+    let n = poll_fn(|cx| stream_map.poll_next_many(cx, &mut buffer, 1)).await;
+
+    assert_eq!(n, 1);
+    assert_eq!(buffer.len(), 2);
+    assert!(buffer.contains(&(0, 0)));
+    assert!(buffer.contains(&(1, 1)));
+}
+
+#[tokio::test]
 async fn poll_next_many_correctly_loops_around() {
     for _ in 0..10 {
         let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
@@ -514,6 +559,27 @@ async fn next_many_enough() {
     let n = poll_fn(|cx| pin!(stream_map.next_many(&mut buffer, 2)).poll(cx)).await;
 
     assert_eq!(n, 2);
+    assert_eq!(buffer.len(), 2);
+    assert!(buffer.contains(&(0, 0)));
+    assert!(buffer.contains(&(1, 1)));
+}
+
+#[tokio::test]
+async fn next_many_does_not_exceed_limit() {
+    let mut stream_map: StreamMap<usize, UsizeStream> = StreamMap::new();
+
+    stream_map.insert(0, Box::pin(iter([0usize].into_iter())) as UsizeStream);
+    stream_map.insert(1, Box::pin(iter([1usize].into_iter())) as UsizeStream);
+
+    let mut buffer = vec![];
+    let n = poll_fn(|cx| pin!(stream_map.next_many(&mut buffer, 1)).poll(cx)).await;
+
+    assert_eq!(n, 1);
+    assert_eq!(buffer.len(), 1);
+
+    let n = poll_fn(|cx| pin!(stream_map.next_many(&mut buffer, 1)).poll(cx)).await;
+
+    assert_eq!(n, 1);
     assert_eq!(buffer.len(), 2);
     assert!(buffer.contains(&(0, 0)));
     assert!(buffer.contains(&(1, 1)));

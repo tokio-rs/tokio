@@ -57,15 +57,15 @@ use tokio::io::{
 ///    let hash = blake3::hash(&data);
 ///
 ///    Ok(hash)
-///}
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), std::io::Error> {
-///     // Example: In-memory data.
-///     let data = b"Hello, world!"; // A byte slice.
-///     let reader = Cursor::new(data); // Create an in-memory AsyncRead.
-///     hash_contents(reader).await
 /// }
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() -> Result<(), std::io::Error> {
+/// // Example: In-memory data.
+/// let data = b"Hello, world!"; // A byte slice.
+/// let reader = Cursor::new(data); // Create an in-memory AsyncRead.
+/// hash_contents(reader).await
+/// # }
 /// ```
 ///
 /// When the data doesn't fit into memory, the hashing library will usually
@@ -88,7 +88,7 @@ use tokio::io::{
 /// /// and hashes the data incrementally.
 /// async fn hash_stream(mut reader: impl AsyncRead + Unpin, mut hasher: Hasher) -> Result<(), std::io::Error> {
 ///    // Create a buffer to read data into, sized for performance.
-///    let mut data = vec![0; 64 * 1024];
+///    let mut data = vec![0; 16 * 1024];
 ///    loop {
 ///        // Read data from the reader into the buffer.
 ///        let len = reader.read(&mut data).await?;
@@ -102,16 +102,16 @@ use tokio::io::{
 ///    let hash = hasher.finalize();
 ///
 ///    Ok(hash)
-///}
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), std::io::Error> {
-///     // Example: In-memory data.
-///     let data = b"Hello, world!"; // A byte slice.
-///     let reader = Cursor::new(data); // Create an in-memory AsyncRead.
-///     let hasher = Hasher;
-///     hash_stream(reader, hasher).await
 /// }
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() -> Result<(), std::io::Error> {
+/// // Example: In-memory data.
+/// let data = b"Hello, world!"; // A byte slice.
+/// let reader = Cursor::new(data); // Create an in-memory AsyncRead.
+/// let hasher = Hasher;
+/// hash_stream(reader, hasher).await
+/// # }
 /// ```
 ///
 ///
@@ -218,6 +218,8 @@ use tokio::io::{
 /// thread pool, preventing it from interfering with the async tasks.
 ///
 /// ```rust
+/// # #[cfg(not(target_family = "wasm"))]
+/// # {
 /// use tokio::task::spawn_blocking;
 /// use tokio_util::io::SyncIoBridge;
 /// use tokio::io::AsyncRead;
@@ -255,6 +257,7 @@ use tokio::io::{
 ///
 ///     Ok(())
 /// }
+/// # }
 /// ```
 ///
 #[derive(Debug)]

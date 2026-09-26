@@ -26,10 +26,11 @@
 //! ```
 
 use std::future::Future;
+use std::mem;
 use std::ops;
 use std::pin::Pin;
 use std::sync::{Arc, Condvar, Mutex};
-use std::task::{Context, Poll, Wake, Waker};
+use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 use tokio_stream::Stream;
 
@@ -68,6 +69,9 @@ struct ThreadWaker {
 const IDLE: usize = 0;
 const WAKE: usize = 1;
 const SLEEP: usize = 2;
+
+/// Default maximum number of poll iterations in [`Spawn::poll_until_idle`].
+const POLL_UNTIL_IDLE_MAX_ITERATIONS: usize = 150;
 
 impl<T> Spawn<T> {
     /// Consumes `self` returning the inner value
@@ -122,6 +126,43 @@ impl<T: Future> Spawn<T> {
         let fut = self.future.as_mut();
         self.task.enter(|cx| fut.poll(cx))
     }
+
+    /// Polls the future until it is idle.
+    ///
+    /// A future is considered idle when it either completes, or returns
+    /// [`Poll::Pending`] without a pending wake notification.
+    ///
+    /// Unlike [`poll`](Self::poll), this method keeps polling while the future
+    /// returns [`Poll::Pending`] but has received a wake notification, advancing
+    /// the future as far as possible without waiting for external events.
+    ///
+    /// Polling is bounded to avoid infinite loops when a future wakes without
+    /// making progress.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the iteration limit is exceeded.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use tokio_test::task;
+    ///
+    /// let mut task = task::spawn(async { 42 });
+    ///
+    /// assert!(task.poll_until_idle().is_ready());
+    /// ```
+    pub fn poll_until_idle(&mut self) -> Poll<T::Output> {
+        for _ in 0..POLL_UNTIL_IDLE_MAX_ITERATIONS {
+            let result = self.poll();
+            if result.is_ready() || !self.is_woken() {
+                return result;
+            }
+        }
+        panic!(
+            "poll_until_idle exceeded {POLL_UNTIL_IDLE_MAX_ITERATIONS} iterations; future may be waking without making progress"
+        );
+    }
 }
 
 impl<T: Stream> Spawn<T> {
@@ -170,7 +211,7 @@ impl MockTask {
         F: FnOnce(&mut Context<'_>) -> R,
     {
         self.waker.clear();
-        let waker = self.clone().into_waker();
+        let waker = self.waker();
         let mut cx = Context::from_waker(&waker);
 
         f(&mut cx)
@@ -189,8 +230,11 @@ impl MockTask {
         Arc::strong_count(&self.waker)
     }
 
-    fn into_waker(self) -> Waker {
-        self.waker.into()
+    fn waker(&self) -> Waker {
+        unsafe {
+            let raw = to_raw(self.waker.clone());
+            Waker::from_raw(raw)
+        }
     }
 }
 
@@ -222,14 +266,8 @@ impl ThreadWaker {
             _ => unreachable!(),
         }
     }
-}
 
-impl Wake for ThreadWaker {
-    fn wake(self: Arc<Self>) {
-        self.wake_by_ref();
-    }
-
-    fn wake_by_ref(self: &Arc<Self>) {
+    fn wake(&self) {
         // First, try transitioning from IDLE -> NOTIFY, this does not require a lock.
         let mut state = self.state.lock().unwrap();
         let prev = *state;
@@ -248,4 +286,40 @@ impl Wake for ThreadWaker {
         assert_eq!(prev, SLEEP);
         self.condvar.notify_one();
     }
+}
+
+static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop_waker);
+
+unsafe fn to_raw(waker: Arc<ThreadWaker>) -> RawWaker {
+    RawWaker::new(Arc::into_raw(waker) as *const (), &VTABLE)
+}
+
+unsafe fn from_raw(raw: *const ()) -> Arc<ThreadWaker> {
+    Arc::from_raw(raw as *const ThreadWaker)
+}
+
+unsafe fn clone(raw: *const ()) -> RawWaker {
+    let waker = from_raw(raw);
+
+    // Increment the ref count
+    mem::forget(waker.clone());
+
+    to_raw(waker)
+}
+
+unsafe fn wake(raw: *const ()) {
+    let waker = from_raw(raw);
+    waker.wake();
+}
+
+unsafe fn wake_by_ref(raw: *const ()) {
+    let waker = from_raw(raw);
+    waker.wake();
+
+    // We don't actually own a reference to the unparker
+    mem::forget(waker);
+}
+
+unsafe fn drop_waker(raw: *const ()) {
+    let _ = from_raw(raw);
 }

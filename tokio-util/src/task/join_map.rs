@@ -4,7 +4,7 @@ use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
 use std::fmt;
 use std::future::Future;
-use std::hash::{BuildHasher, Hash, Hasher};
+use std::hash::{BuildHasher, Hash};
 use std::marker::PhantomData;
 use tokio::runtime::Handle;
 use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
@@ -29,10 +29,6 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 ///
 /// When the `JoinMap` is dropped, all tasks in the `JoinMap` are immediately aborted.
 ///
-/// **Note**: This type depends on Tokio's [unstable API][unstable]. See [the
-/// documentation on unstable features][unstable] for details on how to enable
-/// Tokio's unstable features.
-///
 /// # Examples
 ///
 /// Spawn multiple tasks and wait for them:
@@ -40,28 +36,28 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 /// ```
 /// use tokio_util::task::JoinMap;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut map = JoinMap::new();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let mut map = JoinMap::new();
 ///
-///     for i in 0..10 {
-///         // Spawn a task on the `JoinMap` with `i` as its key.
-///         map.spawn(i, async move { /* ... */ });
-///     }
-///
-///     let mut seen = [false; 10];
-///
-///     // When a task completes, `join_next` returns the task's key along
-///     // with its output.
-///     while let Some((key, res)) = map.join_next().await {
-///         seen[key] = true;
-///         assert!(res.is_ok(), "task {} completed successfully!", key);
-///     }
-///
-///     for i in 0..10 {
-///         assert!(seen[i]);
-///     }
+/// for i in 0..10 {
+///     // Spawn a task on the `JoinMap` with `i` as its key.
+///     map.spawn(i, async move { /* ... */ });
 /// }
+///
+/// let mut seen = [false; 10];
+///
+/// // When a task completes, `join_next` returns the task's key along
+/// // with its output.
+/// while let Some((key, res)) = map.join_next().await {
+///     seen[key] = true;
+///     assert!(res.is_ok(), "task {} completed successfully!", key);
+/// }
+///
+/// for i in 0..10 {
+///     assert!(seen[i]);
+/// }
+/// # }
 /// ```
 ///
 /// Cancel tasks based on their keys:
@@ -69,38 +65,36 @@ use tokio::task::{AbortHandle, Id, JoinError, JoinSet, LocalSet};
 /// ```
 /// use tokio_util::task::JoinMap;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut map = JoinMap::new();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let mut map = JoinMap::new();
 ///
-///     map.spawn("hello world", async move { /* ... */ });
-///     map.spawn("goodbye world", async move { /* ... */});
+/// map.spawn("hello world", std::future::ready(1));
+/// map.spawn("goodbye world", std::future::pending());
 ///
-///     // Look up the "goodbye world" task in the map and abort it.
-///     let aborted = map.abort("goodbye world");
+/// // Look up the "goodbye world" task in the map and abort it.
+/// let aborted = map.abort("goodbye world");
 ///
-///     // `JoinMap::abort` returns `true` if a task existed for the
-///     // provided key.
-///     assert!(aborted);
+/// // `JoinMap::abort` returns `true` if a task existed for the
+/// // provided key.
+/// assert!(aborted);
 ///
-///     while let Some((key, res)) = map.join_next().await {
-///         if key == "goodbye world" {
-///             // The aborted task should complete with a cancelled `JoinError`.
-///             assert!(res.unwrap_err().is_cancelled());
-///         } else {
-///             // Other tasks should complete normally.
-///             assert!(res.is_ok());
-///         }
+/// while let Some((key, res)) = map.join_next().await {
+///     if key == "goodbye world" {
+///         // The aborted task should complete with a cancelled `JoinError`.
+///         assert!(res.unwrap_err().is_cancelled());
+///     } else {
+///         // Other tasks should complete normally.
+///         assert_eq!(res.unwrap(), 1);
 ///     }
 /// }
+/// # }
 /// ```
 ///
 /// [`JoinSet`]: tokio::task::JoinSet
-/// [unstable]: tokio#unstable-features
 /// [abort]: fn@Self::abort
 /// [abort_matching]: fn@Self::abort_matching
 /// [contains]: fn@Self::contains_key
-#[cfg_attr(docsrs, doc(cfg(all(feature = "rt", tokio_unstable))))]
 pub struct JoinMap<K, V, S = RandomState> {
     /// A map of the [`AbortHandle`]s of the tasks spawned on this `JoinMap`,
     /// indexed by their keys.
@@ -192,7 +186,7 @@ impl<K, V, S> JoinMap<K, V, S> {
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_util::task::JoinMap;
     /// use std::collections::hash_map::RandomState;
@@ -351,8 +345,8 @@ where
         self.insert(key, task);
     }
 
-    /// Spawn the provided task on the current [`LocalSet`] and store it in this
-    /// `JoinMap` with the provided key.
+    /// Spawn the provided task on the current [`LocalSet`] or [`LocalRuntime`]
+    /// and store it in this `JoinMap` with the provided key.
     ///
     /// If a task previously existed in the `JoinMap` for this key, that task
     /// will be cancelled and replaced with the new one. The previous task will
@@ -361,9 +355,10 @@ where
     ///
     /// # Panics
     ///
-    /// This method panics if it is called outside of a `LocalSet`.
+    /// This method panics if it is called outside of a `LocalSet` or `LocalRuntime`.
     ///
     /// [`LocalSet`]: tokio::task::LocalSet
+    /// [`LocalRuntime`]: tokio::runtime::LocalRuntime
     /// [`join_next`]: Self::join_next
     #[track_caller]
     pub fn spawn_local<F>(&mut self, key: K, task: F)
@@ -397,13 +392,13 @@ where
 
     fn insert(&mut self, mut key: K, mut abort: AbortHandle) {
         let hash_builder = self.hashes_by_task.hasher();
-        let hash = hash_one(hash_builder, &key);
+        let hash = hash_builder.hash_one(&key);
         let id = abort.id();
 
         // Insert the new key into the map of tasks by keys.
         let entry =
             self.tasks_by_key
-                .entry(hash, |(k, _)| *k == key, |(k, _)| hash_one(hash_builder, k));
+                .entry(hash, |(k, _)| *k == key, |(k, _)| hash_builder.hash_one(k));
         match entry {
             Entry::Occupied(occ) => {
                 // There was a previous task spawned with the same key! Cancel
@@ -451,12 +446,12 @@ where
     ///  * `Some((key, Ok(value)))` if one of the tasks in this `JoinMap` has
     ///    completed. The `value` is the return value of that ask, and `key` is
     ///    the key associated with the task.
-    ///  * `Some((key, Err(err))` if one of the tasks in this `JoinMap` has
+    ///  * `Some((key, Err(err)))` if one of the tasks in this `JoinMap` has
     ///    panicked or been aborted. `key` is the key associated  with the task
     ///    that panicked or was aborted.
     ///  * `None` if the `JoinMap` is empty.
     ///
-    /// [`tokio::select!`]: tokio::select
+    /// [`tokio::select!`]: https://docs.rs/tokio/latest/tokio/macro.select.html
     pub async fn join_next(&mut self) -> Option<(K, Result<V, JoinError>)> {
         loop {
             let (res, id) = match self.tasks.join_next_with_id().await {
@@ -466,6 +461,60 @@ where
                     (Err(e), id)
                 }
                 None => return None,
+            };
+            if let Some(key) = self.remove_by_id(id) {
+                break Some((key, res));
+            }
+        }
+    }
+
+    /// Tries to join one of the tasks in the map that has completed and
+    /// returns its output, along with the key corresponding to that task.
+    ///
+    /// Returns `None` if there are no completed tasks, or if the map is empty.
+    ///
+    /// # Returns
+    ///
+    /// This function returns:
+    ///
+    ///  * `Some((key, Ok(value)))` if one of the tasks in this `JoinMap` has
+    ///    completed. The `value` is the return value of that task, and `key`
+    ///    is the key associated with the task.
+    ///  * `Some((key, Err(err)))` if one of the tasks in this `JoinMap` has
+    ///    panicked or been aborted. `key` is the key associated with the task
+    ///    that panicked or was aborted.
+    ///  * `None` if there are no completed tasks ready to be joined, or the
+    ///    `JoinMap` is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio_util::task::JoinMap;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut map = JoinMap::new();
+    /// map.spawn("answer", async { 42 });
+    ///
+    /// let (key, res) = loop {
+    ///     if let Some(joined) = map.try_join_next() {
+    ///         break joined;
+    ///     }
+    ///     tokio::task::yield_now().await;
+    /// };
+    ///
+    /// assert_eq!(key, "answer");
+    /// assert_eq!(res.unwrap(), 42);
+    /// # }
+    /// ```
+    pub fn try_join_next(&mut self) -> Option<(K, Result<V, JoinError>)> {
+        loop {
+            let (res, id) = match self.tasks.try_join_next_with_id()? {
+                Ok((id, output)) => (Ok(output), id),
+                Err(e) => {
+                    let id = e.id();
+                    (Err(e), id)
+                }
             };
             if let Some(key) = self.remove_by_id(id) {
                 break Some((key, res));
@@ -501,12 +550,12 @@ where
     /// ```
     /// use tokio_util::task::JoinMap;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut map = JoinMap::new();
     ///
-    /// map.spawn("hello world", async move { /* ... */ });
-    /// map.spawn("goodbye world", async move { /* ... */});
+    /// map.spawn("hello world", std::future::ready(1));
+    /// map.spawn("goodbye world", std::future::pending());
     ///
     /// // Look up the "goodbye world" task in the map and abort it.
     /// map.abort("goodbye world");
@@ -517,7 +566,7 @@ where
     ///         assert!(res.unwrap_err().is_cancelled());
     ///     } else {
     ///         // Other tasks should complete normally.
-    ///         assert!(res.is_ok());
+    ///         assert_eq!(res.unwrap(), 1);
     ///     }
     /// }
     /// # }
@@ -527,7 +576,7 @@ where
     /// ```
     /// use tokio_util::task::JoinMap;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut map = JoinMap::new();
     ///
@@ -541,9 +590,9 @@ where
     /// assert!(!map.abort("goodbye universe"));
     /// # }
     /// ```
-    pub fn abort<Q: ?Sized>(&mut self, key: &Q) -> bool
+    pub fn abort<Q>(&mut self, key: &Q) -> bool
     where
-        Q: Hash + Eq,
+        Q: ?Sized + Hash + Eq,
         K: Borrow<Q>,
     {
         match self.get_by_key(key) {
@@ -638,9 +687,9 @@ where
     /// call to [`join_next`], this method will still return `true`.
     ///
     /// [`join_next`]: fn@Self::join_next
-    pub fn contains_key<Q: ?Sized>(&self, key: &Q) -> bool
+    pub fn contains_key<Q>(&self, key: &Q) -> bool
     where
-        Q: Hash + Eq,
+        Q: ?Sized + Hash + Eq,
         K: Borrow<Q>,
     {
         self.get_by_key(key).is_some()
@@ -679,9 +728,9 @@ where
     /// ```
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
-        let hash_builder = self.hashes_by_task.hasher();
-        self.tasks_by_key
-            .reserve(additional, |(k, _)| hash_one(hash_builder, k));
+        self.tasks_by_key.reserve(additional, |(k, _)| {
+            self.hashes_by_task.hasher().hash_one(k)
+        });
         self.hashes_by_task.reserve(additional);
     }
 
@@ -692,7 +741,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_util::task::JoinMap;
     ///
@@ -707,9 +756,8 @@ where
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.hashes_by_task.shrink_to_fit();
-        let hash_builder = self.hashes_by_task.hasher();
         self.tasks_by_key
-            .shrink_to_fit(|(k, _)| hash_one(hash_builder, k));
+            .shrink_to_fit(|(k, _)| self.hashes_by_task.hasher().hash_one(k));
     }
 
     /// Shrinks the capacity of the map with a lower limit. It will drop
@@ -721,7 +769,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_util::task::JoinMap;
     ///
@@ -738,19 +786,18 @@ where
     #[inline]
     pub fn shrink_to(&mut self, min_capacity: usize) {
         self.hashes_by_task.shrink_to(min_capacity);
-        let hash_builder = self.hashes_by_task.hasher();
-        self.tasks_by_key
-            .shrink_to(min_capacity, |(k, _)| hash_one(hash_builder, k))
+        self.tasks_by_key.shrink_to(min_capacity, |(k, _)| {
+            self.hashes_by_task.hasher().hash_one(k)
+        })
     }
 
     /// Look up a task in the map by its key, returning the key and abort handle.
-    fn get_by_key<'map, Q: ?Sized>(&'map self, key: &Q) -> Option<&'map (K, AbortHandle)>
+    fn get_by_key<'map, Q>(&'map self, key: &Q) -> Option<&'map (K, AbortHandle)>
     where
-        Q: Hash + Eq,
+        Q: ?Sized + Hash + Eq,
         K: Borrow<Q>,
     {
-        let hash_builder = self.hashes_by_task.hasher();
-        let hash = hash_one(hash_builder, key);
+        let hash = self.hashes_by_task.hasher().hash_one(key);
         self.tasks_by_key.find(hash, |(k, _)| k.borrow() == key)
     }
 
@@ -767,20 +814,8 @@ where
             Ok(entry) => entry.remove().0,
             _ => return None,
         };
-        self.hashes_by_task.remove(&id);
         Some(key)
     }
-}
-
-/// Returns the hash for a given key.
-#[inline]
-fn hash_one<S: BuildHasher, Q: ?Sized>(hash_builder: &S, key: &Q) -> u64
-where
-    Q: Hash,
-{
-    let mut hasher = hash_builder.build_hasher();
-    key.hash(&mut hasher);
-    hasher.finish()
 }
 
 impl<K, V, S> JoinMap<K, V, S>

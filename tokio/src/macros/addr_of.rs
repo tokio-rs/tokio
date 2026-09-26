@@ -11,11 +11,16 @@ macro_rules! generate_addr_of_methods {
     )*}
     ) => {
         impl<$($gen)*> $struct_name {$(
+            #[doc = "# Safety"]
+            #[doc = ""]
+            #[doc = "The `me` pointer must be valid."]
             $(#[$attrs])*
             $vis unsafe fn $fn_name(me: ::core::ptr::NonNull<Self>) -> ::core::ptr::NonNull<$field_type> {
                 let me = me.as_ptr();
-                let field = ::std::ptr::addr_of_mut!((*me) $(.$field_name)+ );
-                ::core::ptr::NonNull::new_unchecked(field)
+                // safety: the caller guarantees that `me` is valid
+                let field = unsafe { ::std::ptr::addr_of_mut!((*me) $(.$field_name)+ ) };
+                // safety: the field pointer is never null
+                unsafe { ::core::ptr::NonNull::new_unchecked(field) }
             }
         )*}
     };

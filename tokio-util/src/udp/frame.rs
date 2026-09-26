@@ -22,6 +22,12 @@ use std::{
 /// handle encoding and decoding of messages frames. Note that the incoming and
 /// outgoing frame types may be distinct.
 ///
+/// A single datagram may decode into multiple frames. `UdpFramed` will keep
+/// calling [`Decoder::decode_eof`] with the current datagram until it returns
+/// `Ok(None)`. If a decoder wants to discard a malformed datagram and continue
+/// receiving later datagrams, it should consume or clear the remaining bytes
+/// from the buffer before returning `Err`.
+///
 /// This function returns a *single* object that is both [`Stream`] and [`Sink`];
 /// grouping this into a single object is often useful for layering things which
 /// require both read and write access to the underlying object.
@@ -156,11 +162,7 @@ where
         let res = if wrote_all {
             Ok(())
         } else {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
-                "failed to write entire datagram to socket",
-            )
-            .into())
+            Err(io::Error::other("failed to write entire datagram to socket").into())
         };
 
         Poll::Ready(res)

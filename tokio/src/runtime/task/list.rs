@@ -9,8 +9,8 @@
 use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::task::{JoinHandle, LocalNotified, Notified, Schedule, SpawnLocation, Task};
-use crate::util::linked_list::{Link, LinkedList};
-use crate::util::sharded_list;
+use crate::util::linked_list::LinkedList;
+use crate::util::sharded_list::ShardedList;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use std::marker::PhantomData;
@@ -56,12 +56,10 @@ cfg_not_has_atomic_u64! {
 }
 
 pub(crate) struct OwnedTasks<S: 'static> {
-    list: List<S>,
+    list: ShardedList<Task<S>>,
     pub(crate) id: NonZeroU64,
     closed: AtomicBool,
 }
-
-type List<S> = sharded_list::ShardedList<Task<S>, <Task<S> as Link>::Target>;
 
 pub(crate) struct LocalOwnedTasks<S: 'static> {
     inner: UnsafeCell<OwnedTasksInner<S>>,
@@ -70,15 +68,15 @@ pub(crate) struct LocalOwnedTasks<S: 'static> {
 }
 
 struct OwnedTasksInner<S: 'static> {
-    list: LinkedList<Task<S>, <Task<S> as Link>::Target>,
+    list: LinkedList<Task<S>>,
     closed: bool,
 }
 
 impl<S: 'static> OwnedTasks<S> {
     pub(crate) fn new(num_cores: usize) -> Self {
-        let shard_size = Self::gen_shared_list_size(num_cores);
+        let sharded_size = Self::gen_sharded_list_size(num_cores);
         Self {
-            list: List::new(shard_size),
+            list: ShardedList::new(sharded_size),
             closed: AtomicBool::new(false),
             id: get_next_id(),
         }
@@ -106,6 +104,7 @@ impl<S: 'static> OwnedTasks<S> {
     /// Bind a task that isn't safe to transfer across thread boundaries.
     ///
     /// # Safety
+    ///
     /// Only use this in `LocalRuntime` where the task cannot move
     pub(crate) unsafe fn bind_local<T>(
         &self,
@@ -192,9 +191,11 @@ impl<S: 'static> OwnedTasks<S> {
         self.list.len()
     }
 
-    cfg_64bit_metrics! {
-        pub(crate) fn spawned_tasks_count(&self) -> u64 {
-            self.list.added()
+    cfg_unstable_metrics! {
+        cfg_64bit_metrics! {
+            pub(crate) fn spawned_tasks_count(&self) -> u64 {
+                self.list.added()
+            }
         }
     }
 
@@ -223,11 +224,11 @@ impl<S: 'static> OwnedTasks<S> {
     /// nodes in the intrusive linked list will diminish. Furthermore,
     /// the construction time of the sharded list will also increase with a higher number of shards.
     ///
-    /// Due to the above reasons, we set a maximum value for the shared list size,
-    /// denoted as `MAX_SHARED_LIST_SIZE`.
-    fn gen_shared_list_size(num_cores: usize) -> usize {
-        const MAX_SHARED_LIST_SIZE: usize = 1 << 16;
-        usize::min(MAX_SHARED_LIST_SIZE, num_cores.next_power_of_two() * 4)
+    /// Due to the above reasons, we set a maximum value for the sharded list size,
+    /// denoted as `MAX_SHARDED_LIST_SIZE`.
+    fn gen_sharded_list_size(num_cores: usize) -> usize {
+        const MAX_SHARDED_LIST_SIZE: usize = 1 << 16;
+        usize::min(MAX_SHARDED_LIST_SIZE, num_cores.next_power_of_two() * 4)
     }
 }
 

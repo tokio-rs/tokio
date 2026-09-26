@@ -1,4 +1,4 @@
-use crate::time::{sleep_until, Duration, Instant, Sleep};
+use crate::time::{safe_delay, sleep_until, Duration, Instant, Sleep};
 use crate::util::trace;
 
 use std::future::{poll_fn, Future};
@@ -26,16 +26,16 @@ use std::task::{ready, Context, Poll};
 /// ```
 /// use tokio::time::{self, Duration};
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut interval = time::interval(Duration::from_millis(10));
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let mut interval = time::interval(Duration::from_millis(10));
 ///
-///     interval.tick().await; // ticks immediately
-///     interval.tick().await; // ticks after 10ms
-///     interval.tick().await; // ticks after 10ms
+/// interval.tick().await; // ticks immediately
+/// interval.tick().await; // ticks after 10ms
+/// interval.tick().await; // ticks after 10ms
 ///
-///     // approximately 20ms have elapsed.
-/// }
+/// // approximately 20ms have elapsed.
+/// # }
 /// ```
 ///
 /// A simple example using `interval` to execute a task every two seconds.
@@ -57,14 +57,14 @@ use std::task::{ready, Context, Poll};
 ///     time::sleep(time::Duration::from_secs(1)).await
 /// }
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut interval = time::interval(time::Duration::from_secs(2));
-///     for _i in 0..5 {
-///         interval.tick().await;
-///         task_that_takes_a_second().await;
-///     }
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let mut interval = time::interval(time::Duration::from_secs(2));
+/// for _i in 0..5 {
+///     interval.tick().await;
+///     task_that_takes_a_second().await;
 /// }
+/// # }
 /// ```
 ///
 /// [`sleep`]: crate::time::sleep()
@@ -92,17 +92,17 @@ pub fn interval(period: Duration) -> Interval {
 /// ```
 /// use tokio::time::{interval_at, Duration, Instant};
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let start = Instant::now() + Duration::from_millis(50);
-///     let mut interval = interval_at(start, Duration::from_millis(10));
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let start = Instant::now() + Duration::from_millis(50);
+/// let mut interval = interval_at(start, Duration::from_millis(10));
 ///
-///     interval.tick().await; // ticks after 50ms
-///     interval.tick().await; // ticks after 10ms
-///     interval.tick().await; // ticks after 10ms
+/// interval.tick().await; // ticks after 50ms
+/// interval.tick().await; // ticks after 10ms
+/// interval.tick().await; // ticks after 10ms
 ///
-///     // approximately 70ms have elapsed.
-/// }
+/// // approximately 70ms have elapsed.
+/// # }
 /// ```
 #[track_caller]
 pub fn interval_at(start: Instant, period: Duration) -> Interval {
@@ -131,15 +131,9 @@ fn internal_interval_at(
         )
     };
 
-    #[cfg(all(tokio_unstable, feature = "tracing"))]
-    let delay = resource_span.in_scope(|| Box::pin(sleep_until(start)));
-
-    #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-    let delay = Box::pin(sleep_until(start));
-
     Interval {
-        delay,
-        period,
+        delay: Box::pin(sleep_until(start)),
+        period: safe_delay(period),
         missed_tick_behavior: MissedTickBehavior::default(),
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         resource_span,
@@ -155,16 +149,16 @@ fn internal_interval_at(
 /// use tokio::time::{self, Duration};
 /// # async fn task_that_takes_one_to_three_millis() {}
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     // ticks every 2 milliseconds
-///     let mut interval = time::interval(Duration::from_millis(2));
-///     for _ in 0..5 {
-///         interval.tick().await;
-///         // if this takes more than 2 milliseconds, a tick will be delayed
-///         task_that_takes_one_to_three_millis().await;
-///     }
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// // ticks every 2 milliseconds
+/// let mut interval = time::interval(Duration::from_millis(2));
+/// for _ in 0..5 {
+///     interval.tick().await;
+///     // if this takes more than 2 milliseconds, a tick will be delayed
+///     task_that_takes_one_to_three_millis().await;
 /// }
+/// # }
 /// ```
 ///
 /// Generally, a tick is missed if too much time is spent without calling
@@ -343,21 +337,21 @@ impl MissedTickBehavior {
             Self::Burst => timeout + period,
             Self::Delay => now + period,
             Self::Skip => {
-                now + period
-                    - Duration::from_nanos(
-                        ((now - timeout).as_nanos() % period.as_nanos())
-                            .try_into()
-                            // This operation is practically guaranteed not to
-                            // fail, as in order for it to fail, `period` would
-                            // have to be longer than `now - timeout`, and both
-                            // would have to be longer than 584 years.
-                            //
-                            // If it did fail, there's not a good way to pass
-                            // the error along to the user, so we just panic.
-                            .expect(
-                                "too much time has elapsed since the interval was supposed to tick",
-                            ),
-                    )
+                let offset = Duration::from_nanos(
+                    ((now - timeout).as_nanos() % period.as_nanos())
+                        .try_into()
+                        // This operation is practically guaranteed not to
+                        // fail, as in order for it to fail, `period` would
+                        // have to be longer than `now - timeout`, and both
+                        // would have to be longer than 584 years.
+                        //
+                        // If it did fail, there's not a good way to pass
+                        // the error along to the user, so we just panic.
+                        .expect(
+                            "too much time has elapsed since the interval was supposed to tick",
+                        ),
+                );
+                now + (period - offset)
             }
         }
     }
@@ -408,8 +402,9 @@ impl Interval {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancellation safe. If `tick` is used as the branch in a `tokio::select!` and
-    /// another branch completes first, then no tick has been consumed.
+    /// This method is cancel safe. If `tick` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch completes first,
+    /// then no tick has been consumed.
     ///
     /// # Examples
     ///
@@ -418,17 +413,17 @@ impl Interval {
     ///
     /// use std::time::Duration;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut interval = time::interval(Duration::from_millis(10));
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut interval = time::interval(Duration::from_millis(10));
     ///
-    ///     interval.tick().await;
-    ///     // approximately 0ms have elapsed. The first tick completes immediately.
-    ///     interval.tick().await;
-    ///     interval.tick().await;
+    /// interval.tick().await;
+    /// // approximately 0ms have elapsed. The first tick completes immediately.
+    /// interval.tick().await;
+    /// interval.tick().await;
     ///
-    ///     // approximately 20ms have elapsed.
-    /// }
+    /// // approximately 20ms have elapsed.
+    /// # }
     /// ```
     pub async fn tick(&mut self) -> Instant {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -479,15 +474,13 @@ impl Interval {
             self.missed_tick_behavior
                 .next_timeout(timeout, now, self.period)
         } else {
-            timeout
-                .checked_add(self.period)
-                .unwrap_or_else(Instant::far_future)
+            timeout + self.period
         };
 
         // When we arrive here, the internal delay returned `Poll::Ready`.
         // Reset the delay but do not register it. It should be registered with
         // the next call to [`poll_tick`].
-        self.delay.as_mut().reset_without_reregister(next);
+        self.delay.as_mut().reset_without_timer(next);
 
         // Return the time when we were scheduled to tick
         Poll::Ready(timeout)
@@ -506,20 +499,20 @@ impl Interval {
     ///
     /// use std::time::Duration;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut interval = time::interval(Duration::from_millis(100));
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut interval = time::interval(Duration::from_millis(100));
     ///
-    ///     interval.tick().await;
+    /// interval.tick().await;
     ///
-    ///     time::sleep(Duration::from_millis(50)).await;
-    ///     interval.reset();
+    /// time::sleep(Duration::from_millis(50)).await;
+    /// interval.reset();
     ///
-    ///     interval.tick().await;
-    ///     interval.tick().await;
+    /// interval.tick().await;
+    /// interval.tick().await;
     ///
-    ///     // approximately 250ms have elapsed.
-    /// }
+    /// // approximately 250ms have elapsed.
+    /// # }
     /// ```
     pub fn reset(&mut self) {
         self.delay.as_mut().reset(Instant::now() + self.period);
@@ -538,20 +531,20 @@ impl Interval {
     ///
     /// use std::time::Duration;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut interval = time::interval(Duration::from_millis(100));
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut interval = time::interval(Duration::from_millis(100));
     ///
-    ///     interval.tick().await;
+    /// interval.tick().await;
     ///
-    ///     time::sleep(Duration::from_millis(50)).await;
-    ///     interval.reset_immediately();
+    /// time::sleep(Duration::from_millis(50)).await;
+    /// interval.reset_immediately();
     ///
-    ///     interval.tick().await;
-    ///     interval.tick().await;
+    /// interval.tick().await;
+    /// interval.tick().await;
     ///
-    ///     // approximately 150ms have elapsed.
-    /// }
+    /// // approximately 150ms have elapsed.
+    /// # }
     /// ```
     pub fn reset_immediately(&mut self) {
         self.delay.as_mut().reset(Instant::now());
@@ -570,24 +563,25 @@ impl Interval {
     ///
     /// use std::time::Duration;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut interval = time::interval(Duration::from_millis(100));
-    ///     interval.tick().await;
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut interval = time::interval(Duration::from_millis(100));
+    /// interval.tick().await;
     ///
-    ///     time::sleep(Duration::from_millis(50)).await;
+    /// time::sleep(Duration::from_millis(50)).await;
     ///
-    ///     let after = Duration::from_millis(20);
-    ///     interval.reset_after(after);
+    /// let after = Duration::from_millis(20);
+    /// interval.reset_after(after);
     ///
-    ///     interval.tick().await;
-    ///     interval.tick().await;
+    /// interval.tick().await;
+    /// interval.tick().await;
     ///
-    ///     // approximately 170ms have elapsed.
-    /// }
+    /// // approximately 170ms have elapsed.
+    /// # }
     /// ```
     pub fn reset_after(&mut self, after: Duration) {
-        self.delay.as_mut().reset(Instant::now() + after);
+        let deadline = Instant::now() + safe_delay(after);
+        self.delay.as_mut().reset(deadline);
     }
 
     /// Resets the interval to a [`crate::time::Instant`] deadline.
@@ -606,21 +600,21 @@ impl Interval {
     ///
     /// use std::time::Duration;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let mut interval = time::interval(Duration::from_millis(100));
-    ///     interval.tick().await;
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let mut interval = time::interval(Duration::from_millis(100));
+    /// interval.tick().await;
     ///
-    ///     time::sleep(Duration::from_millis(50)).await;
+    /// time::sleep(Duration::from_millis(50)).await;
     ///
-    ///     let deadline = Instant::now() + Duration::from_millis(30);
-    ///     interval.reset_at(deadline);
+    /// let deadline = Instant::now() + Duration::from_millis(30);
+    /// interval.reset_at(deadline);
     ///
-    ///     interval.tick().await;
-    ///     interval.tick().await;
+    /// interval.tick().await;
+    /// interval.tick().await;
     ///
-    ///     // approximately 180ms have elapsed.
-    /// }
+    /// // approximately 180ms have elapsed.
+    /// # }
     /// ```
     pub fn reset_at(&mut self, deadline: Instant) {
         self.delay.as_mut().reset(deadline);

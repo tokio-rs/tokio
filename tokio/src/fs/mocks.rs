@@ -2,6 +2,8 @@
 use mockall::mock;
 
 use crate::sync::oneshot;
+#[cfg(all(test, unix))]
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::{
     cell::RefCell,
     collections::VecDeque,
@@ -36,6 +38,10 @@ mock! {
         pub fn try_clone(&self) -> io::Result<Self>;
     }
     #[cfg(windows)]
+    impl From<std::os::windows::io::OwnedHandle> for File {
+        fn from(handle: std::os::windows::io::OwnedHandle) -> Self;
+    }
+    #[cfg(windows)]
     impl std::os::windows::io::AsRawHandle for File {
         fn as_raw_handle(&self) -> std::os::windows::io::RawHandle;
     }
@@ -56,6 +62,13 @@ mock! {
 
 impl Read for MockFile {
     fn read(&mut self, dst: &mut [u8]) -> io::Result<usize> {
+        // Placate Miri.  Tokio will call this method with an uninitialized
+        // buffer, which is ok because std::io::Read::read implementations don't usually read
+        // from their input buffers.  But Mockall 0.12-0.13 will try to Debug::fmt the
+        // buffer, even if there is no failure, triggering an uninitialized data access alert from
+        // Miri.  Initialize the data here just to prevent those Miri alerts.
+        // This can be removed after upgrading to Mockall 0.14.
+        dst.fill(0);
         self.inner_read(dst)
     }
 }
@@ -86,6 +99,23 @@ impl Write for &'_ MockFile {
 
     fn flush(&mut self) -> io::Result<()> {
         self.inner_flush()
+    }
+}
+
+#[cfg(all(test, unix))]
+impl From<MockFile> for OwnedFd {
+    #[inline]
+    fn from(file: MockFile) -> OwnedFd {
+        unsafe { OwnedFd::from_raw_fd(file.as_raw_fd()) }
+    }
+}
+
+#[cfg(all(test, unix))]
+impl From<OwnedFd> for MockFile {
+    #[inline]
+    fn from(file: OwnedFd) -> MockFile {
+        use std::os::fd::IntoRawFd;
+        unsafe { MockFile::from_raw_fd(IntoRawFd::into_raw_fd(file)) }
     }
 }
 

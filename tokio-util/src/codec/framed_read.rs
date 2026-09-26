@@ -11,6 +11,8 @@ use std::fmt;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use super::FramedParts;
+
 pin_project! {
     /// A [`Stream`] of messages decoded from an [`AsyncRead`].
     ///
@@ -34,11 +36,7 @@ pin_project! {
 
 // ===== impl FramedRead =====
 
-impl<T, D> FramedRead<T, D>
-where
-    T: AsyncRead,
-    D: Decoder,
-{
+impl<T, D> FramedRead<T, D> {
     /// Creates a new `FramedRead` with the given `decoder`.
     pub fn new(inner: T, decoder: D) -> FramedRead<T, D> {
         FramedRead {
@@ -66,9 +64,7 @@ where
             },
         }
     }
-}
 
-impl<T, D> FramedRead<T, D> {
     /// Returns a reference to the underlying I/O stream wrapped by
     /// `FramedRead`.
     ///
@@ -152,6 +148,18 @@ impl<T, D> FramedRead<T, D> {
     /// Returns a mutable reference to the read buffer.
     pub fn read_buffer_mut(&mut self) -> &mut BytesMut {
         &mut self.inner.state.buffer
+    }
+
+    /// Consumes the `FramedRead`, returning its underlying I/O stream, the buffer
+    /// with unprocessed data, and the codec.
+    pub fn into_parts(self) -> FramedParts<T, D> {
+        FramedParts {
+            io: self.inner.inner,
+            codec: self.inner.codec,
+            read_buf: self.inner.state.buffer,
+            write_buf: BytesMut::new(),
+            _priv: (),
+        }
     }
 }
 

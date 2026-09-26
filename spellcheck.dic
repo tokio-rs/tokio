@@ -1,4 +1,4 @@
-306
+331
 &
 +
 <
@@ -64,6 +64,7 @@ codec
 codecs
 combinator
 combinators
+condvar
 config
 Config
 connectionless
@@ -75,6 +76,7 @@ CQE
 cqe's
 customizable
 Customizable
+Cygwin
 datagram
 Datagram
 datagrams
@@ -87,6 +89,7 @@ decrementing
 demangled
 dequeued
 dereferenced
+derefs
 deregister
 deregistered
 deregistering
@@ -103,6 +106,8 @@ dns
 DNS
 DoS
 dwOpenMode
+Emscripten
+Emscripten's
 endian
 enqueue
 enqueued
@@ -136,7 +141,9 @@ hashmaps
 HashMaps
 hashsets
 HdrHistogram
+ICMP
 ie
+iff
 Illumos
 impl
 implementers
@@ -162,6 +169,7 @@ Lauck
 libc
 lifecycle
 lifo
+LLVM
 lookups
 macOS
 MacOS
@@ -184,15 +192,20 @@ mut
 mutex
 Mutex
 Nagle
+namespace
+NetBSD
 nonblocking
 nondecreasing
 noop
 ntasks
+NTO
+NUMA
 ok
 oneshot
+opcode
+OpenBSD
 ORed
 os
-overweighing
 parker
 parsers
 peekable
@@ -202,10 +215,13 @@ plaintext
 poller
 POSIX
 proxied
+pthreads
 qos
 RAII
+RCU
 reallocations
 recv's
+Redox
 refactors
 refcount
 refcounting
@@ -217,6 +233,7 @@ reregistering
 resize
 resized
 RMW
+RNG
 runtime
 runtime's
 runtimes
@@ -232,9 +249,11 @@ signalling
 SmallCrush
 Solaris
 spawner
+spawners
 Splitter
 spmc
 spsc
+SQE
 src
 stabilised
 startup
@@ -271,6 +290,7 @@ tokio's
 Tokio's
 tuple
 Tuple
+tvOS
 tx
 udp
 UDP
@@ -298,10 +318,15 @@ vec
 versa
 versioned
 versioning
+visionOS
 vtable
 waker
 wakers
 Wakers
 wakeup
 wakeups
+WASI
+Wasm
+watchOS
 workstealing
+ZST

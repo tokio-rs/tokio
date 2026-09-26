@@ -1,8 +1,7 @@
 use crate::runtime::context;
 
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::future::poll_fn;
+use std::task::{ready, Poll};
 
 /// Yields execution back to the Tokio runtime.
 ///
@@ -37,28 +36,25 @@ use std::task::{ready, Context, Poll};
 /// [`tokio::select!`]: macro@crate::select
 #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
 pub async fn yield_now() {
-    /// Yield implementation
-    struct YieldNow {
-        yielded: bool,
-    }
+    let mut yielded = false;
+    poll_fn(|cx| {
+        ready!(crate::trace::trace_leaf());
 
-    impl Future for YieldNow {
-        type Output = ();
-
-        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-            ready!(crate::trace::trace_leaf(cx));
-
-            if self.yielded {
-                return Poll::Ready(());
-            }
-
-            self.yielded = true;
-
-            context::defer(cx.waker());
-
-            Poll::Pending
+        if yielded {
+            return Poll::Ready(());
         }
-    }
 
-    YieldNow { yielded: false }.await;
+        yielded = true;
+
+        // Don't wake the task immediately, as that would push it right back
+        // onto the run queue and it could be polled again before other tasks
+        // or the IO/timer driver get a chance to run. Instead, hand the waker
+        // to the scheduler, which wakes deferred tasks only after it has run
+        // out of ready tasks and polled the driver. When polled from outside
+        // a Tokio runtime, the waker is woken immediately.
+        context::defer(cx.waker());
+
+        Poll::Pending
+    })
+    .await
 }

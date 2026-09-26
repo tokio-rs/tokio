@@ -35,12 +35,9 @@ impl Handle {
 
         let owned = &self.shared.owned;
         let mut local = self.shared.steal_all();
-        let synced = &self.shared.synced;
         let injection = &self.shared.inject;
 
-        // safety: `trace_multi_thread` is invoked with the same `synced` that `injection`
-        // was created with.
-        let traces = unsafe { trace_multi_thread(owned, &mut local, synced, injection) }
+        let traces = trace_multi_thread(owned, &mut local, injection)
             .into_iter()
             .map(|(id, trace)| dump::Task::new(id, trace))
             .collect();

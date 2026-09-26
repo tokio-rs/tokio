@@ -72,7 +72,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     /// struct Foo(u32);
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let lock = RwLock::new(Foo(1));
     ///
@@ -130,7 +130,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     /// struct Foo(u32);
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let lock = RwLock::new(Foo(1));
     ///
@@ -205,7 +205,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     /// struct Foo(u32);
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let lock = RwLock::new(Foo(1));
     ///
@@ -274,7 +274,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     /// struct Foo(u32);
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let lock = RwLock::new(Foo(1));
     ///
@@ -352,7 +352,7 @@ impl<'a, T: ?Sized> RwLockWriteGuard<'a, T> {
     /// # use tokio::sync::RwLock;
     /// # use std::sync::Arc;
     /// #
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let lock = Arc::new(RwLock::new(1));
     ///

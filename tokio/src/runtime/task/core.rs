@@ -9,9 +9,19 @@
 //! Make sure to consult the relevant safety section of each function before
 //! use.
 
+// It doesn't make sense to enforce `unsafe_op_in_unsafe_fn` for this module because
+//
+// * This module is doing the low-level task management that requires tons of unsafe
+//   operations.
+// * Excessive `unsafe {}` blocks hurt readability significantly.
+// TODO: replace with `#[expect(unsafe_op_in_unsafe_fn)]` after bumpping
+// the MSRV to 1.81.0.
+#![allow(unsafe_op_in_unsafe_fn)]
+
 use crate::future::Future;
 use crate::loom::cell::UnsafeCell;
 use crate::runtime::context;
+use crate::runtime::metrics::ScheduleLatencyInstant;
 use crate::runtime::task::raw::{self, Vtable};
 use crate::runtime::task::state::State;
 use crate::runtime::task::{Id, Schedule, TaskHarnessScheduleHooks};
@@ -182,6 +192,9 @@ pub(crate) struct Header {
     /// The tracing ID for this instrumented task.
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) tracing_id: Option<tracing::Id>,
+
+    /// The last time this task was scheduled. Used to measure schedule latency.
+    pub(super) scheduled_at: UnsafeCell<ScheduleLatencyInstant>,
 }
 
 unsafe impl Send for Header {}
@@ -195,6 +208,7 @@ pub(super) struct Trailer {
     /// Consumer task waiting on completion of this task.
     pub(super) waker: UnsafeCell<Option<Waker>>,
     /// Optional hooks needed in the harness.
+    #[cfg_attr(not(tokio_unstable), allow(dead_code))] //TODO: remove when hooks are stabilized
     pub(super) hooks: TaskHarnessScheduleHooks,
 }
 
@@ -237,6 +251,7 @@ impl<T: Future, S: Schedule> Cell<T, S> {
                 owner_id: UnsafeCell::new(None),
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 tracing_id,
+                scheduled_at: UnsafeCell::new(ScheduleLatencyInstant::new(None)),
             }
         }
 
@@ -523,6 +538,23 @@ impl Header {
     #[cfg(all(tokio_unstable, feature = "tracing"))]
     pub(super) unsafe fn get_tracing_id(me: &NonNull<Header>) -> Option<&tracing::Id> {
         me.as_ref().tracing_id.as_ref()
+    }
+
+    /// Updates the last time this task was scheduled. Used to calculate
+    /// the time elapsed between task scheduling and polling.
+    ///
+    /// # Safety
+    ///
+    /// The caller must guarantee exclusive access to this field.
+    pub(super) unsafe fn set_scheduled_at(&self, scheduled_at: ScheduleLatencyInstant) {
+        self.scheduled_at.with_mut(|ptr| *ptr = scheduled_at);
+    }
+
+    /// Gets the last time this task was scheduled.
+    pub(super) fn get_scheduled_at(&self) -> ScheduleLatencyInstant {
+        // Safety: If there are concurrent writes, then that write has violated
+        // the safety requirements on `set_scheduled_at`.
+        unsafe { self.scheduled_at.with(|ptr| *ptr) }
     }
 }
 

@@ -1,3 +1,60 @@
+# 0.1.19 (July 22nd, 2026)
+
+### Added
+
+- stream: implement `FromStream` for standard collections ([#7954], [#7966])
+- stream: implement `FusedStream` for various stream adaptors ([#7854], [#8090], [#8096])
+- stream: implement `Peekable::size_hint` ([#8109])
+- task: add `JoinSetStream` wrapper for `JoinSet` ([#8189])
+
+### Changed
+
+- stream: bump minimum required `tokio` version to `1.38.0` ([#7887])
+- stream: use cooperative budgeting in `tokio_stream::iter` ([#8218])
+- stream: update coop handling for `empty` and `once` ([#8227])
+
+### Fixed
+
+- stream: fix overflow in `StreamMap::size_hint` ([#8216])
+- stream: honor `StreamMap::next_many` limit ([#8215])
+- stream: stop polling underlying stream once `map_while` yields `None` ([#8233])
+
+[#7854]: https://github.com/tokio-rs/tokio/pull/7854
+[#7887]: https://github.com/tokio-rs/tokio/pull/7887
+[#7954]: https://github.com/tokio-rs/tokio/pull/7954
+[#7966]: https://github.com/tokio-rs/tokio/pull/7966
+[#8090]: https://github.com/tokio-rs/tokio/pull/8090
+[#8096]: https://github.com/tokio-rs/tokio/pull/8096
+[#8109]: https://github.com/tokio-rs/tokio/pull/8109
+[#8189]: https://github.com/tokio-rs/tokio/pull/8189
+[#8215]: https://github.com/tokio-rs/tokio/pull/8215
+[#8216]: https://github.com/tokio-rs/tokio/pull/8216
+[#8218]: https://github.com/tokio-rs/tokio/pull/8218
+[#8227]: https://github.com/tokio-rs/tokio/pull/8227
+[#8233]: https://github.com/tokio-rs/tokio/pull/8233
+
+# 0.1.18 (January 4th, 2026)
+
+### Added
+
+- stream: add `ChunksTimeout::into_remainder` ([#7715])
+- stream: add examples to wrapper types ([#7024])
+- sync: implement `Stream::size_hint` for `ReceiverStream` and `UnboundedReceiverStream` ([#7492])
+
+### Fixed
+
+- stream: work around the rustc bug in `StreamExt::collect` ([#7754])
+
+### Documented
+
+- stream: improve the docs of `TcpListenerStream` ([#7578])
+
+[#7024]: https://github.com/tokio-rs/tokio/pull/7024
+[#7492]: https://github.com/tokio-rs/tokio/pull/7492
+[#7578]: https://github.com/tokio-rs/tokio/pull/7578
+[#7715]: https://github.com/tokio-rs/tokio/pull/7715
+[#7754]: https://github.com/tokio-rs/tokio/pull/7754
+
 # 0.1.17 (December 6th, 2024)
 
 - deps: fix dev-dependency on tokio-test ([#6931], [#7019])

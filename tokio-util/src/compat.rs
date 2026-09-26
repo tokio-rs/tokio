@@ -34,6 +34,8 @@
 //! stream via [`compat()`].
 //!
 //! ```no_run
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::net::{TcpListener, TcpStream};
 //! use tokio::io::AsyncWriteExt;
 //! use tokio_util::compat::TokioAsyncReadCompatExt;
@@ -58,6 +60,7 @@
 //!
 //!     Ok(())
 //! }
+//! # }
 //! ```
 //!
 //! ## Example 2: Futures -> Tokio (`AsyncRead`)
@@ -66,6 +69,8 @@
 //! adapt it to be used with [`tokio::io::AsyncReadExt::read_to_end`]
 //!
 //! ```
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use futures::io::Cursor;
 //! use tokio_util::compat::FuturesAsyncReadCompatExt;
 //! use tokio::io::AsyncReadExt;
@@ -82,6 +87,7 @@
 //!     // Run the future inside a Tokio runtime
 //!     tokio::runtime::Runtime::new().unwrap().block_on(future);
 //! }
+//! # }
 //! ```
 //!
 //! ## Common Use Cases

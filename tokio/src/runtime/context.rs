@@ -66,10 +66,15 @@ struct Context {
 
     #[cfg(all(
         tokio_unstable,
-        tokio_taskdump,
+        feature = "taskdump",
         feature = "rt",
         target_os = "linux",
-        any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
+        any(
+            target_arch = "aarch64",
+            target_arch = "x86",
+            target_arch = "x86_64",
+            target_arch = "s390x"
+        )
     ))]
     trace: trace::Context,
 }
@@ -107,13 +112,14 @@ tokio_thread_local! {
 
             #[cfg(all(
                 tokio_unstable,
-                tokio_taskdump,
+                feature = "taskdump",
                 feature = "rt",
                 target_os = "linux",
                 any(
                     target_arch = "aarch64",
                     target_arch = "x86",
-                    target_arch = "x86_64"
+                    target_arch = "x86_64",
+                    target_arch = "s390x"
                 )
             ))]
             trace: trace::Context::new(),
@@ -121,7 +127,7 @@ tokio_thread_local! {
     }
 }
 
-#[cfg(any(feature = "macros", all(feature = "sync", feature = "rt")))]
+#[cfg(any(feature = "macros", feature = "rt"))]
 pub(crate) fn thread_rng_n(n: u32) -> u32 {
     CONTEXT.with(|ctx| {
         let mut rng = ctx.rng.get().unwrap_or_else(FastRand::new);
@@ -152,11 +158,15 @@ cfg_rt! {
     }
 
     pub(crate) fn set_current_task_id(id: Option<Id>) -> Option<Id> {
-        CONTEXT.try_with(|ctx| ctx.current_task_id.replace(id)).unwrap_or(None)
+        CONTEXT.try_with(|ctx| ctx.current_task_id.replace(id)).unwrap_or_default()
     }
 
     pub(crate) fn current_task_id() -> Option<Id> {
-        CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or(None)
+        CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or_default()
+    }
+
+    pub(crate) fn worker_index() -> Option<usize> {
+        with_scheduler(|ctx| ctx.and_then(|c| c.worker_index()))
     }
 
     #[track_caller]

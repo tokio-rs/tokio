@@ -32,15 +32,26 @@
 //! This broadcast channel implementation handles this case by setting a hard
 //! upper bound on the number of values the channel may retain at any given
 //! time. This upper bound is passed to the [`channel`] function as an argument.
+//! The provided capacity is rounded **up** to the next power of two; that
+//! rounded size is the number of messages the ring buffer can hold, and is what
+//! lag detection is based on. For example, `channel(3)` allocates a buffer of
+//! length 4, so a receiver only lags once it falls more than 4 messages behind
+//! the sender.
 //!
 //! If a value is sent when the channel is at capacity, the oldest value
-//! currently held by the channel is released. This frees up space for the new
-//! value. Any receiver that has not yet seen the released value will return
-//! [`RecvError::Lagged`] the next time [`recv`] is called.
+//! currently held by the channel is overwritten. This frees up space for the
+//! new value. Any receiver that has not yet seen the overwritten value will
+//! return [`RecvError::Lagged`] the next time [`recv`] (or
+//! [`try_recv`](Receiver::try_recv)) is called. The error carries the number of
+//! messages that were dropped before the receiver's cursor and are therefore
+//! no longer available.
 //!
-//! Once [`RecvError::Lagged`] is returned, the lagging receiver's position is
-//! updated to the oldest value contained by the channel. The next call to
-//! [`recv`] will return this value.
+//! Returning [`RecvError::Lagged`] does **not** close or disconnect the
+//! receiver. The lagging receiver's internal cursor is advanced to the oldest
+//! value still retained by the channel. The **next** successful call to
+//! [`recv`] / [`try_recv`](Receiver::try_recv) returns that oldest retained
+//! value (unless further sends overwrite it again before the receiver reads
+//! it). Subsequent receives then continue in send order from there.
 //!
 //! This behavior enables a receiver to detect when it has lagged so far behind
 //! that data has been dropped. The caller may decide how to respond to this:
@@ -73,47 +84,50 @@
 //! ```
 //! use tokio::sync::broadcast;
 //!
-//! #[tokio::main]
-//! async fn main() {
-//!     let (tx, mut rx1) = broadcast::channel(16);
-//!     let mut rx2 = tx.subscribe();
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() {
+//! let (tx, mut rx1) = broadcast::channel(16);
+//! let mut rx2 = tx.subscribe();
 //!
-//!     tokio::spawn(async move {
-//!         assert_eq!(rx1.recv().await.unwrap(), 10);
-//!         assert_eq!(rx1.recv().await.unwrap(), 20);
-//!     });
+//! tokio::spawn(async move {
+//!     assert_eq!(rx1.recv().await.unwrap(), 10);
+//!     assert_eq!(rx1.recv().await.unwrap(), 20);
+//! });
 //!
-//!     tokio::spawn(async move {
-//!         assert_eq!(rx2.recv().await.unwrap(), 10);
-//!         assert_eq!(rx2.recv().await.unwrap(), 20);
-//!     });
+//! tokio::spawn(async move {
+//!     assert_eq!(rx2.recv().await.unwrap(), 10);
+//!     assert_eq!(rx2.recv().await.unwrap(), 20);
+//! });
 //!
-//!     tx.send(10).unwrap();
-//!     tx.send(20).unwrap();
-//! }
+//! tx.send(10).unwrap();
+//! tx.send(20).unwrap();
+//! # }
 //! ```
 //!
 //! Handling lag
 //!
 //! ```
 //! use tokio::sync::broadcast;
+//! use tokio::sync::broadcast::error::RecvError;
 //!
-//! #[tokio::main]
-//! async fn main() {
-//!     let (tx, mut rx) = broadcast::channel(2);
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() {
+//! // Capacity 2 → ring buffer of length 2.
+//! let (tx, mut rx) = broadcast::channel(2);
 //!
-//!     tx.send(10).unwrap();
-//!     tx.send(20).unwrap();
-//!     tx.send(30).unwrap();
+//! tx.send(10).unwrap();
+//! tx.send(20).unwrap();
+//! // Overwrites 10; receiver has not read it yet.
+//! tx.send(30).unwrap();
 //!
-//!     // The receiver lagged behind
-//!     assert!(rx.recv().await.is_err());
+//! // One message (10) was dropped; cursor moves to the oldest retained value (20).
+//! assert!(matches!(rx.recv().await, Err(RecvError::Lagged(1))));
 //!
-//!     // At this point, we can abort or continue with lost messages
-//!
-//!     assert_eq!(20, rx.recv().await.unwrap());
-//!     assert_eq!(30, rx.recv().await.unwrap());
-//! }
+//! // At this point, we can abort or continue with lost messages.
+//! // Continuing resumes from the oldest retained message.
+//! assert_eq!(20, rx.recv().await.unwrap());
+//! assert_eq!(30, rx.recv().await.unwrap());
+//! # }
 //! ```
 
 use crate::loom::cell::UnsafeCell;
@@ -128,7 +142,7 @@ use std::future::Future;
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release, SeqCst};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::task::{ready, Context, Poll, Waker};
 
 /// Sending-half of the [`broadcast`] channel.
@@ -141,24 +155,24 @@ use std::task::{ready, Context, Poll, Waker};
 /// ```
 /// use tokio::sync::broadcast;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let (tx, mut rx1) = broadcast::channel(16);
-///     let mut rx2 = tx.subscribe();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let (tx, mut rx1) = broadcast::channel(16);
+/// let mut rx2 = tx.subscribe();
 ///
-///     tokio::spawn(async move {
-///         assert_eq!(rx1.recv().await.unwrap(), 10);
-///         assert_eq!(rx1.recv().await.unwrap(), 20);
-///     });
+/// tokio::spawn(async move {
+///     assert_eq!(rx1.recv().await.unwrap(), 10);
+///     assert_eq!(rx1.recv().await.unwrap(), 20);
+/// });
 ///
-///     tokio::spawn(async move {
-///         assert_eq!(rx2.recv().await.unwrap(), 10);
-///         assert_eq!(rx2.recv().await.unwrap(), 20);
-///     });
+/// tokio::spawn(async move {
+///     assert_eq!(rx2.recv().await.unwrap(), 10);
+///     assert_eq!(rx2.recv().await.unwrap(), 20);
+/// });
 ///
-///     tx.send(10).unwrap();
-///     tx.send(20).unwrap();
-/// }
+/// tx.send(10).unwrap();
+/// tx.send(20).unwrap();
+/// # }
 /// ```
 ///
 /// [`broadcast`]: crate::sync::broadcast
@@ -183,18 +197,18 @@ pub struct Sender<T> {
 /// ```
 /// use tokio::sync::broadcast::channel;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let (tx, _rx) = channel::<i32>(15);
-///     let tx_weak = tx.downgrade();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let (tx, _rx) = channel::<i32>(15);
+/// let tx_weak = tx.downgrade();
 ///
-///     // Upgrading will succeed because `tx` still exists.
-///     assert!(tx_weak.upgrade().is_some());
+/// // Upgrading will succeed because `tx` still exists.
+/// assert!(tx_weak.upgrade().is_some());
 ///
-///     // If we drop `tx`, then it will fail.
-///     drop(tx);
-///     assert!(tx_weak.clone().upgrade().is_none());
-/// }
+/// // If we drop `tx`, then it will fail.
+/// drop(tx);
+/// assert!(tx_weak.clone().upgrade().is_none());
+/// # }
 /// ```
 pub struct WeakSender<T> {
     shared: Arc<Shared<T>>,
@@ -215,24 +229,24 @@ pub struct WeakSender<T> {
 /// ```
 /// use tokio::sync::broadcast;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let (tx, mut rx1) = broadcast::channel(16);
-///     let mut rx2 = tx.subscribe();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let (tx, mut rx1) = broadcast::channel(16);
+/// let mut rx2 = tx.subscribe();
 ///
-///     tokio::spawn(async move {
-///         assert_eq!(rx1.recv().await.unwrap(), 10);
-///         assert_eq!(rx1.recv().await.unwrap(), 20);
-///     });
+/// tokio::spawn(async move {
+///     assert_eq!(rx1.recv().await.unwrap(), 10);
+///     assert_eq!(rx1.recv().await.unwrap(), 20);
+/// });
 ///
-///     tokio::spawn(async move {
-///         assert_eq!(rx2.recv().await.unwrap(), 10);
-///         assert_eq!(rx2.recv().await.unwrap(), 20);
-///     });
+/// tokio::spawn(async move {
+///     assert_eq!(rx2.recv().await.unwrap(), 10);
+///     assert_eq!(rx2.recv().await.unwrap(), 20);
+/// });
 ///
-///     tx.send(10).unwrap();
-///     tx.send(20).unwrap();
-/// }
+/// tx.send(10).unwrap();
+/// tx.send(20).unwrap();
+/// # }
 /// ```
 ///
 /// [`broadcast`]: crate::sync::broadcast
@@ -278,10 +292,18 @@ pub mod error {
         /// be sent.
         Closed,
 
-        /// The receiver lagged too far behind. Attempting to receive again will
-        /// return the oldest message still retained by the channel.
+        /// The receiver lagged too far behind: one or more messages were
+        /// overwritten in the ring buffer before this receiver could read them.
         ///
-        /// Includes the number of skipped messages.
+        /// The receiver remains subscribed. Its internal cursor has been advanced
+        /// to the oldest message still retained by the channel; the next
+        /// successful [`recv`] call returns that message (unless further sends
+        /// overwrite it first).
+        ///
+        /// The `u64` is the number of messages that were skipped (dropped before
+        /// the receiver's previous cursor position).
+        ///
+        /// [`recv`]: crate::sync::broadcast::Receiver::recv
         Lagged(u64),
     }
 
@@ -312,11 +334,18 @@ pub mod error {
         /// be sent.
         Closed,
 
-        /// The receiver lagged too far behind and has been forcibly disconnected.
-        /// Attempting to receive again will return the oldest message still
-        /// retained by the channel.
+        /// The receiver lagged too far behind: one or more messages were
+        /// overwritten in the ring buffer before this receiver could read them.
         ///
-        /// Includes the number of skipped messages.
+        /// The receiver remains subscribed. Its internal cursor has been advanced
+        /// to the oldest message still retained by the channel; the next
+        /// successful [`try_recv`] call returns that message (unless further sends
+        /// overwrite it first).
+        ///
+        /// The `u64` is the number of messages that were skipped (dropped before
+        /// the receiver's previous cursor position).
+        ///
+        /// [`try_recv`]: crate::sync::broadcast::Receiver::try_recv
         Lagged(u64),
     }
 
@@ -370,7 +399,7 @@ struct Tail {
     closed: bool,
 
     /// Receivers waiting for a value.
-    waiters: LinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
+    waiters: LinkedList<Waiter>,
 }
 
 /// Slot in the buffer.
@@ -379,16 +408,15 @@ struct Slot<T> {
     ///
     /// When this goes to zero, the value is released.
     ///
-    /// An atomic is used as it is mutated concurrently with the slot read lock
-    /// acquired.
-    rem: AtomicUsize,
+    /// Access is protected by the slot mutex.
+    rem: usize,
 
     /// Uniquely identifies the `send` stored in the slot.
     pos: u64,
 
     /// The value being broadcast.
     ///
-    /// The value is set by `send` when the write lock is held. When a reader
+    /// The value is set by `send` while the slot mutex is held. When a reader
     /// drops, `rem` is decremented. When it hits zero, the value is dropped.
     val: Option<T>,
 }
@@ -453,7 +481,10 @@ const MAX_RECEIVERS: usize = usize::MAX >> 2;
 /// Create a bounded, multi-producer, multi-consumer channel where each sent
 /// value is broadcasted to all active receivers.
 ///
-/// **Note:** The actual capacity may be greater than the provided `capacity`.
+/// **Note:** The provided `capacity` is rounded **up** to the next power of
+/// two. That rounded size is the number of messages the internal ring buffer
+/// can retain, and is what [lag detection](self#lagging) uses. For example,
+/// `channel(3)` behaves as if the capacity were 4.
 ///
 /// All data sent on [`Sender`] will become available on every active
 /// [`Receiver`] in the same order as it was sent.
@@ -478,32 +509,32 @@ const MAX_RECEIVERS: usize = usize::MAX >> 2;
 /// ```
 /// use tokio::sync::broadcast;
 ///
-/// #[tokio::main]
-/// async fn main() {
-///     let (tx, mut rx1) = broadcast::channel(16);
-///     let mut rx2 = tx.subscribe();
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// let (tx, mut rx1) = broadcast::channel(16);
+/// let mut rx2 = tx.subscribe();
 ///
-///     tokio::spawn(async move {
-///         assert_eq!(rx1.recv().await.unwrap(), 10);
-///         assert_eq!(rx1.recv().await.unwrap(), 20);
-///     });
+/// tokio::spawn(async move {
+///     assert_eq!(rx1.recv().await.unwrap(), 10);
+///     assert_eq!(rx1.recv().await.unwrap(), 20);
+/// });
 ///
-///     tokio::spawn(async move {
-///         assert_eq!(rx2.recv().await.unwrap(), 10);
-///         assert_eq!(rx2.recv().await.unwrap(), 20);
-///     });
+/// tokio::spawn(async move {
+///     assert_eq!(rx2.recv().await.unwrap(), 10);
+///     assert_eq!(rx2.recv().await.unwrap(), 20);
+/// });
 ///
-///     tx.send(10).unwrap();
-///     tx.send(20).unwrap();
-/// }
+/// tx.send(10).unwrap();
+/// tx.send(20).unwrap();
+/// # }
 /// ```
 ///
 /// # Panics
 ///
-/// This will panic if `capacity` is equal to `0`.
+/// This will panic if `capacity` is equal to `0` or exceeds `usize::MAX / 2`.
 ///
 /// This pre-allocates space for `capacity` messages. Allocation failure may result in a panic or
-/// [an allocation failure](std::alloc::handle_alloc_error).
+/// [an allocation error](std::alloc::handle_alloc_error).
 #[track_caller]
 pub fn channel<T: Clone>(capacity: usize) -> (Sender<T>, Receiver<T>) {
     // SAFETY: In the line below we are creating one extra receiver, so there will be 1 in total.
@@ -550,23 +581,21 @@ impl<T> Sender<T> {
         // Round to a power of two
         capacity = capacity.next_power_of_two();
 
-        let mut buffer = Vec::with_capacity(capacity);
-
-        for i in 0..capacity {
-            buffer.push(Mutex::new(Slot {
-                rem: AtomicUsize::new(0),
+        let buffer = (0..capacity).map(|i| {
+            Mutex::new(Slot {
+                rem: 0,
                 pos: (i as u64).wrapping_sub(capacity as u64),
                 val: None,
-            }));
-        }
+            })
+        });
 
         let shared = Arc::new(Shared {
-            buffer: buffer.into_boxed_slice(),
+            buffer: buffer.collect(),
             mask: capacity - 1,
             tail: Mutex::new(Tail {
                 pos: 0,
                 rx_cnt: receiver_count,
-                closed: false,
+                closed: receiver_count == 0,
                 waiters: LinkedList::new(),
             }),
             num_tx: AtomicUsize::new(1),
@@ -609,24 +638,24 @@ impl<T> Sender<T> {
     /// ```
     /// use tokio::sync::broadcast;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx1) = broadcast::channel(16);
-    ///     let mut rx2 = tx.subscribe();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx1) = broadcast::channel(16);
+    /// let mut rx2 = tx.subscribe();
     ///
-    ///     tokio::spawn(async move {
-    ///         assert_eq!(rx1.recv().await.unwrap(), 10);
-    ///         assert_eq!(rx1.recv().await.unwrap(), 20);
-    ///     });
+    /// tokio::spawn(async move {
+    ///     assert_eq!(rx1.recv().await.unwrap(), 10);
+    ///     assert_eq!(rx1.recv().await.unwrap(), 20);
+    /// });
     ///
-    ///     tokio::spawn(async move {
-    ///         assert_eq!(rx2.recv().await.unwrap(), 10);
-    ///         assert_eq!(rx2.recv().await.unwrap(), 20);
-    ///     });
+    /// tokio::spawn(async move {
+    ///     assert_eq!(rx2.recv().await.unwrap(), 10);
+    ///     assert_eq!(rx2.recv().await.unwrap(), 20);
+    /// });
     ///
-    ///     tx.send(10).unwrap();
-    ///     tx.send(20).unwrap();
-    /// }
+    /// tx.send(10).unwrap();
+    /// tx.send(20).unwrap();
+    /// # }
     /// ```
     pub fn send(&self, value: T) -> Result<usize, SendError<T>> {
         let mut tail = self.shared.tail.lock();
@@ -650,7 +679,7 @@ impl<T> Sender<T> {
         slot.pos = pos;
 
         // Set remaining receivers
-        slot.rem.with_mut(|v| *v = rem);
+        slot.rem = rem;
 
         // Write the value
         slot.val = Some(value);
@@ -674,20 +703,20 @@ impl<T> Sender<T> {
     /// ```
     /// use tokio::sync::broadcast;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, _rx) = broadcast::channel(16);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, _rx) = broadcast::channel(16);
     ///
-    ///     // Will not be seen
-    ///     tx.send(10).unwrap();
+    /// // Will not be seen
+    /// tx.send(10).unwrap();
     ///
-    ///     let mut rx = tx.subscribe();
+    /// let mut rx = tx.subscribe();
     ///
-    ///     tx.send(20).unwrap();
+    /// tx.send(20).unwrap();
     ///
-    ///     let value = rx.recv().await.unwrap();
-    ///     assert_eq!(20, value);
-    /// }
+    /// let value = rx.recv().await.unwrap();
+    /// assert_eq!(20, value);
+    /// # }
     /// ```
     pub fn subscribe(&self) -> Receiver<T> {
         let shared = self.shared.clone();
@@ -722,26 +751,26 @@ impl<T> Sender<T> {
     /// ```
     /// use tokio::sync::broadcast;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx1) = broadcast::channel(16);
-    ///     let mut rx2 = tx.subscribe();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx1) = broadcast::channel(16);
+    /// let mut rx2 = tx.subscribe();
     ///
-    ///     tx.send(10).unwrap();
-    ///     tx.send(20).unwrap();
-    ///     tx.send(30).unwrap();
+    /// tx.send(10).unwrap();
+    /// tx.send(20).unwrap();
+    /// tx.send(30).unwrap();
     ///
-    ///     assert_eq!(tx.len(), 3);
+    /// assert_eq!(tx.len(), 3);
     ///
-    ///     rx1.recv().await.unwrap();
+    /// rx1.recv().await.unwrap();
     ///
-    ///     // The len is still 3 since rx2 hasn't seen the first value yet.
-    ///     assert_eq!(tx.len(), 3);
+    /// // The len is still 3 since rx2 hasn't seen the first value yet.
+    /// assert_eq!(tx.len(), 3);
     ///
-    ///     rx2.recv().await.unwrap();
+    /// rx2.recv().await.unwrap();
     ///
-    ///     assert_eq!(tx.len(), 2);
-    /// }
+    /// assert_eq!(tx.len(), 2);
+    /// # }
     /// ```
     pub fn len(&self) -> usize {
         let tail = self.shared.tail.lock();
@@ -752,7 +781,7 @@ impl<T> Sender<T> {
         while low < high {
             let mid = low + (high - low) / 2;
             let idx = base_idx.wrapping_add(mid) & self.shared.mask;
-            if self.shared.buffer[idx].lock().rem.load(SeqCst) == 0 {
+            if self.shared.buffer[idx].lock().rem == 0 {
                 low = mid + 1;
             } else {
                 high = mid;
@@ -769,32 +798,32 @@ impl<T> Sender<T> {
     /// ```
     /// use tokio::sync::broadcast;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx1) = broadcast::channel(16);
-    ///     let mut rx2 = tx.subscribe();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx1) = broadcast::channel(16);
+    /// let mut rx2 = tx.subscribe();
     ///
-    ///     assert!(tx.is_empty());
+    /// assert!(tx.is_empty());
     ///
-    ///     tx.send(10).unwrap();
+    /// tx.send(10).unwrap();
     ///
-    ///     assert!(!tx.is_empty());
+    /// assert!(!tx.is_empty());
     ///
-    ///     rx1.recv().await.unwrap();
+    /// rx1.recv().await.unwrap();
     ///
-    ///     // The queue is still not empty since rx2 hasn't seen the value.
-    ///     assert!(!tx.is_empty());
+    /// // The queue is still not empty since rx2 hasn't seen the value.
+    /// assert!(!tx.is_empty());
     ///
-    ///     rx2.recv().await.unwrap();
+    /// rx2.recv().await.unwrap();
     ///
-    ///     assert!(tx.is_empty());
-    /// }
+    /// assert!(tx.is_empty());
+    /// # }
     /// ```
     pub fn is_empty(&self) -> bool {
         let tail = self.shared.tail.lock();
 
         let idx = (tail.pos.wrapping_sub(1) & self.shared.mask as u64) as usize;
-        self.shared.buffer[idx].lock().rem.load(SeqCst) == 0
+        self.shared.buffer[idx].lock().rem == 0
     }
 
     /// Returns the number of active receivers.
@@ -820,18 +849,18 @@ impl<T> Sender<T> {
     /// ```
     /// use tokio::sync::broadcast;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, _rx1) = broadcast::channel(16);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, _rx1) = broadcast::channel(16);
     ///
-    ///     assert_eq!(1, tx.receiver_count());
+    /// assert_eq!(1, tx.receiver_count());
     ///
-    ///     let mut _rx2 = tx.subscribe();
+    /// let mut _rx2 = tx.subscribe();
     ///
-    ///     assert_eq!(2, tx.receiver_count());
+    /// assert_eq!(2, tx.receiver_count());
     ///
-    ///     tx.send(10).unwrap();
-    /// }
+    /// tx.send(10).unwrap();
+    /// # }
     /// ```
     pub fn receiver_count(&self) -> usize {
         let tail = self.shared.tail.lock();
@@ -845,17 +874,17 @@ impl<T> Sender<T> {
     /// ```
     /// use tokio::sync::broadcast;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, _rx) = broadcast::channel::<()>(16);
-    ///     let tx2 = tx.clone();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, _rx) = broadcast::channel::<()>(16);
+    /// let tx2 = tx.clone();
     ///
-    ///     assert!(tx.same_channel(&tx2));
+    /// assert!(tx.same_channel(&tx2));
     ///
-    ///     let (tx3, _rx3) = broadcast::channel::<()>(16);
+    /// let (tx3, _rx3) = broadcast::channel::<()>(16);
     ///
-    ///     assert!(!tx3.same_channel(&tx2));
-    /// }
+    /// assert!(!tx3.same_channel(&tx2));
+    /// # }
     /// ```
     pub fn same_channel(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.shared, &other.shared)
@@ -870,21 +899,21 @@ impl<T> Sender<T> {
     /// use futures::FutureExt;
     /// use tokio::sync::broadcast;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx1) = broadcast::channel::<u32>(16);
-    ///     let mut rx2 = tx.subscribe();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx1) = broadcast::channel::<u32>(16);
+    /// let mut rx2 = tx.subscribe();
     ///
-    ///     let _ = tx.send(10);
+    /// let _ = tx.send(10);
     ///
-    ///     assert_eq!(rx1.recv().await.unwrap(), 10);
-    ///     drop(rx1);
-    ///     assert!(tx.closed().now_or_never().is_none());
+    /// assert_eq!(rx1.recv().await.unwrap(), 10);
+    /// drop(rx1);
+    /// assert!(tx.closed().now_or_never().is_none());
     ///
-    ///     assert_eq!(rx2.recv().await.unwrap(), 10);
-    ///     drop(rx2);
-    ///     assert!(tx.closed().now_or_never().is_some());
-    /// }
+    /// assert_eq!(rx2.recv().await.unwrap(), 10);
+    /// drop(rx2);
+    /// assert!(tx.closed().now_or_never().is_some());
+    /// # }
     /// ```
     pub async fn closed(&self) {
         loop {
@@ -945,7 +974,7 @@ fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
 /// and gates the access to it on the `Shared.tail` mutex. It also empties
 /// the list on drop.
 struct WaitersList<'a, T> {
-    list: GuardedLinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
+    list: GuardedLinkedList<Waiter>,
     is_empty: bool,
     shared: &'a Shared<T>,
 }
@@ -963,7 +992,7 @@ impl<'a, T> Drop for WaitersList<'a, T> {
 
 impl<'a, T> WaitersList<'a, T> {
     fn new(
-        unguarded_list: LinkedList<Waiter, <Waiter as linked_list::Link>::Target>,
+        unguarded_list: LinkedList<Waiter>,
         guard: Pin<&'a Waiter>,
         shared: &'a Shared<T>,
     ) -> Self {
@@ -1132,12 +1161,16 @@ impl<T> Receiver<T> {
     /// Returns the number of messages that were sent into the channel and that
     /// this [`Receiver`] has yet to receive.
     ///
-    /// If the returned value from `len` is larger than the next largest power of 2
-    /// of the capacity of the channel any call to [`recv`] will return an
-    /// `Err(RecvError::Lagged)` and any call to [`try_recv`] will return an
-    /// `Err(TryRecvError::Lagged)`, e.g. if the capacity of the channel is 10,
-    /// [`recv`] will start to return `Err(RecvError::Lagged)` once `len` returns
-    /// values larger than 16.
+    /// This count includes messages that have already been overwritten in the
+    /// ring buffer and are no longer readable. If `len` is **greater than** the
+    /// channel's effective capacity (the provided capacity rounded up to the
+    /// next power of two), the next call to [`recv`] returns
+    /// `Err(RecvError::Lagged)` and the next call to [`try_recv`] returns
+    /// `Err(TryRecvError::Lagged)`. For example, with `channel(10)` the buffer
+    /// length is 16, so lagging begins once `len` is larger than 16.
+    ///
+    /// After a successful receive (including after handling `Lagged` and then
+    /// reading retained messages), `len` decreases accordingly.
     ///
     /// [`Receiver`]: crate::sync::broadcast::Receiver
     /// [`recv`]: crate::sync::broadcast::Receiver::recv
@@ -1148,19 +1181,19 @@ impl<T> Receiver<T> {
     /// ```
     /// use tokio::sync::broadcast;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx1) = broadcast::channel(16);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx1) = broadcast::channel(16);
     ///
-    ///     tx.send(10).unwrap();
-    ///     tx.send(20).unwrap();
+    /// tx.send(10).unwrap();
+    /// tx.send(20).unwrap();
     ///
-    ///     assert_eq!(rx1.len(), 2);
-    ///     assert_eq!(rx1.recv().await.unwrap(), 10);
-    ///     assert_eq!(rx1.len(), 1);
-    ///     assert_eq!(rx1.recv().await.unwrap(), 20);
-    ///     assert_eq!(rx1.len(), 0);
-    /// }
+    /// assert_eq!(rx1.len(), 2);
+    /// assert_eq!(rx1.recv().await.unwrap(), 10);
+    /// assert_eq!(rx1.len(), 1);
+    /// assert_eq!(rx1.recv().await.unwrap(), 20);
+    /// assert_eq!(rx1.len(), 0);
+    /// # }
     /// ```
     pub fn len(&self) -> usize {
         let next_send_pos = self.shared.tail.lock().pos;
@@ -1170,27 +1203,27 @@ impl<T> Receiver<T> {
     /// Returns true if there aren't any messages in the channel that the [`Receiver`]
     /// has yet to receive.
     ///
-    /// [`Receiver]: create::sync::broadcast::Receiver
+    /// [`Receiver`]: crate::sync::broadcast::Receiver
     ///
     /// # Examples
     ///
     /// ```
     /// use tokio::sync::broadcast;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx1) = broadcast::channel(16);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx1) = broadcast::channel(16);
     ///
-    ///     assert!(rx1.is_empty());
+    /// assert!(rx1.is_empty());
     ///
-    ///     tx.send(10).unwrap();
-    ///     tx.send(20).unwrap();
+    /// tx.send(10).unwrap();
+    /// tx.send(20).unwrap();
     ///
-    ///     assert!(!rx1.is_empty());
-    ///     assert_eq!(rx1.recv().await.unwrap(), 10);
-    ///     assert_eq!(rx1.recv().await.unwrap(), 20);
-    ///     assert!(rx1.is_empty());
-    /// }
+    /// assert!(!rx1.is_empty());
+    /// assert_eq!(rx1.recv().await.unwrap(), 10);
+    /// assert_eq!(rx1.recv().await.unwrap(), 20);
+    /// assert!(rx1.is_empty());
+    /// # }
     /// ```
     pub fn is_empty(&self) -> bool {
         self.len() == 0
@@ -1203,17 +1236,17 @@ impl<T> Receiver<T> {
     /// ```
     /// use tokio::sync::broadcast;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = broadcast::channel::<()>(16);
-    ///     let rx2 = tx.subscribe();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = broadcast::channel::<()>(16);
+    /// let rx2 = tx.subscribe();
     ///
-    ///     assert!(rx.same_channel(&rx2));
+    /// assert!(rx.same_channel(&rx2));
     ///
-    ///     let (_tx3, rx3) = broadcast::channel::<()>(16);
+    /// let (_tx3, rx3) = broadcast::channel::<()>(16);
     ///
-    ///     assert!(!rx3.same_channel(&rx2));
-    /// }
+    /// assert!(!rx3.same_channel(&rx2));
+    /// # }
     /// ```
     pub fn same_channel(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.shared, &other.shared)
@@ -1348,15 +1381,15 @@ impl<T> Receiver<T> {
     /// ```
     /// use tokio::sync::broadcast;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = broadcast::channel::<()>(10);
-    ///     assert!(!rx.is_closed());
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = broadcast::channel::<()>(10);
+    /// assert!(!rx.is_closed());
     ///
-    ///     drop(tx);
+    /// drop(tx);
     ///
-    ///     assert!(rx.is_closed());
-    /// }
+    /// assert!(rx.is_closed());
+    /// # }
     /// ```
     pub fn is_closed(&self) -> bool {
         // Channel is closed when there are no strong senders left active
@@ -1376,17 +1409,17 @@ impl<T: Clone> Receiver<T> {
     /// ```
     /// use tokio::sync::broadcast;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///   let (tx, mut rx) = broadcast::channel(2);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = broadcast::channel(2);
     ///
-    ///   tx.send(1).unwrap();
-    ///   let mut rx2 = rx.resubscribe();
-    ///   tx.send(2).unwrap();
+    /// tx.send(1).unwrap();
+    /// let mut rx2 = rx.resubscribe();
+    /// tx.send(2).unwrap();
     ///
-    ///   assert_eq!(rx2.recv().await.unwrap(), 2);
-    ///   assert_eq!(rx.recv().await.unwrap(), 1);
-    /// }
+    /// assert_eq!(rx2.recv().await.unwrap(), 2);
+    /// assert_eq!(rx.recv().await.unwrap(), 1);
+    /// # }
     /// ```
     pub fn resubscribe(&self) -> Self {
         let shared = self.shared.clone();
@@ -1401,16 +1434,18 @@ impl<T: Clone> Receiver<T> {
     /// dropped, indicating that no further values can be sent on the channel.
     ///
     /// If the [`Receiver`] handle falls behind, once the channel is full, newly
-    /// sent values will overwrite old values. At this point, a call to [`recv`]
-    /// will return with `Err(RecvError::Lagged)` and the [`Receiver`]'s
-    /// internal cursor is updated to point to the oldest value still held by
-    /// the channel. A subsequent call to [`recv`] will return this value
-    /// **unless** it has been since overwritten.
+    /// sent values overwrite old values in the ring buffer. The next call to
+    /// [`recv`] then returns `Err(RecvError::Lagged(n))`, where `n` is the
+    /// number of overwritten messages the receiver missed. The receiver stays
+    /// subscribed; its internal cursor is advanced to the oldest value still
+    /// held by the channel. A subsequent call to [`recv`] returns that value,
+    /// unless further sends overwrite it before the receiver reads it. See
+    /// [lagging](self#lagging) for details.
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If `recv` is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// This method is cancel safe. If `recv` is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch
     /// completes first, it is guaranteed that no messages were received on this
     /// channel.
     ///
@@ -1422,47 +1457,47 @@ impl<T: Clone> Receiver<T> {
     /// ```
     /// use tokio::sync::broadcast;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx1) = broadcast::channel(16);
-    ///     let mut rx2 = tx.subscribe();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx1) = broadcast::channel(16);
+    /// let mut rx2 = tx.subscribe();
     ///
-    ///     tokio::spawn(async move {
-    ///         assert_eq!(rx1.recv().await.unwrap(), 10);
-    ///         assert_eq!(rx1.recv().await.unwrap(), 20);
-    ///     });
+    /// tokio::spawn(async move {
+    ///     assert_eq!(rx1.recv().await.unwrap(), 10);
+    ///     assert_eq!(rx1.recv().await.unwrap(), 20);
+    /// });
     ///
-    ///     tokio::spawn(async move {
-    ///         assert_eq!(rx2.recv().await.unwrap(), 10);
-    ///         assert_eq!(rx2.recv().await.unwrap(), 20);
-    ///     });
+    /// tokio::spawn(async move {
+    ///     assert_eq!(rx2.recv().await.unwrap(), 10);
+    ///     assert_eq!(rx2.recv().await.unwrap(), 20);
+    /// });
     ///
-    ///     tx.send(10).unwrap();
-    ///     tx.send(20).unwrap();
-    /// }
+    /// tx.send(10).unwrap();
+    /// tx.send(20).unwrap();
+    /// # }
     /// ```
     ///
     /// Handling lag
     ///
     /// ```
     /// use tokio::sync::broadcast;
+    /// use tokio::sync::broadcast::error::RecvError;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = broadcast::channel(2);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = broadcast::channel(2);
     ///
-    ///     tx.send(10).unwrap();
-    ///     tx.send(20).unwrap();
-    ///     tx.send(30).unwrap();
+    /// tx.send(10).unwrap();
+    /// tx.send(20).unwrap();
+    /// tx.send(30).unwrap();
     ///
-    ///     // The receiver lagged behind
-    ///     assert!(rx.recv().await.is_err());
+    /// // One message was overwritten before this receiver could read it.
+    /// assert!(matches!(rx.recv().await, Err(RecvError::Lagged(1))));
     ///
-    ///     // At this point, we can abort or continue with lost messages
-    ///
-    ///     assert_eq!(20, rx.recv().await.unwrap());
-    ///     assert_eq!(30, rx.recv().await.unwrap());
-    /// }
+    /// // Resume from the oldest retained message, or abort the task instead.
+    /// assert_eq!(20, rx.recv().await.unwrap());
+    /// assert_eq!(30, rx.recv().await.unwrap());
+    /// # }
     /// ```
     pub async fn recv(&mut self) -> Result<T, RecvError> {
         cooperative(Recv::new(self)).await
@@ -1480,12 +1515,14 @@ impl<T: Clone> Receiver<T> {
     /// dropped, indicating that no further values can be sent on the channel.
     ///
     /// If the [`Receiver`] handle falls behind, once the channel is full, newly
-    /// sent values will overwrite old values. At this point, a call to [`recv`]
-    /// will return with `Err(TryRecvError::Lagged)` and the [`Receiver`]'s
-    /// internal cursor is updated to point to the oldest value still held by
-    /// the channel. A subsequent call to [`try_recv`] will return this value
-    /// **unless** it has been since overwritten. If there are no values to
-    /// receive, `Err(TryRecvError::Empty)` is returned.
+    /// sent values overwrite old values in the ring buffer. The next call to
+    /// [`try_recv`] then returns `Err(TryRecvError::Lagged(n))`, where `n` is
+    /// the number of overwritten messages the receiver missed. The receiver
+    /// stays subscribed; its internal cursor is advanced to the oldest value
+    /// still held by the channel. A subsequent call to [`try_recv`] returns
+    /// that value, unless further sends overwrite it before the receiver reads
+    /// it. If there are no values to receive, `Err(TryRecvError::Empty)` is
+    /// returned. See [lagging](self#lagging) for details.
     ///
     /// [`recv`]: crate::sync::broadcast::Receiver::recv
     /// [`try_recv`]: crate::sync::broadcast::Receiver::try_recv
@@ -1496,17 +1533,17 @@ impl<T: Clone> Receiver<T> {
     /// ```
     /// use tokio::sync::broadcast;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, mut rx) = broadcast::channel(16);
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, mut rx) = broadcast::channel(16);
     ///
-    ///     assert!(rx.try_recv().is_err());
+    /// assert!(rx.try_recv().is_err());
     ///
-    ///     tx.send(10).unwrap();
+    /// tx.send(10).unwrap();
     ///
-    ///     let value = rx.try_recv().unwrap();
-    ///     assert_eq!(10, value);
-    /// }
+    /// let value = rx.try_recv().unwrap();
+    /// assert_eq!(10, value);
+    /// # }
     /// ```
     pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
         let guard = self.recv_ref(None)?;
@@ -1522,6 +1559,8 @@ impl<T: Clone> Receiver<T> {
     ///
     /// # Examples
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use std::thread;
     /// use tokio::sync::broadcast;
     ///
@@ -1536,6 +1575,7 @@ impl<T: Clone> Receiver<T> {
     ///     let _ = tx.send(10);
     ///     sync_code.join().unwrap();
     /// }
+    /// # }
     /// ```
     pub fn blocking_recv(&mut self) -> Result<T, RecvError> {
         crate::future::block_on(self.recv())
@@ -1604,7 +1644,7 @@ where
     type Output = Result<T, RecvError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
 
         let (receiver, waiter) = self.project();
 
@@ -1675,7 +1715,7 @@ unsafe impl linked_list::Link for Waiter {
     }
 
     unsafe fn pointers(target: NonNull<Waiter>) -> NonNull<linked_list::Pointers<Waiter>> {
-        Waiter::addr_of_pointers(target)
+        unsafe { Waiter::addr_of_pointers(target) }
     }
 }
 
@@ -1709,7 +1749,8 @@ impl<'a, T> RecvGuard<'a, T> {
 impl<'a, T> Drop for RecvGuard<'a, T> {
     fn drop(&mut self) {
         // Decrement the remaining counter
-        if 1 == self.slot.rem.fetch_sub(1, SeqCst) {
+        self.slot.rem -= 1;
+        if self.slot.rem == 0 {
             self.slot.val = None;
         }
     }

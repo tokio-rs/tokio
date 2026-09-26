@@ -20,7 +20,7 @@ pub(super) struct Synced {
     is_shutdown: bool,
 
     // List of all registrations tracked by the set
-    registrations: LinkedList<Arc<ScheduledIo>, ScheduledIo>,
+    registrations: LinkedList<Arc<ScheduledIo>>,
 
     // Registrations that are pending drop. When a `Registration` is dropped, it
     // stores its `ScheduledIo` in this list. The I/O driver is responsible for
@@ -55,8 +55,7 @@ impl RegistrationSet {
 
     pub(super) fn allocate(&self, synced: &mut Synced) -> io::Result<Arc<ScheduledIo>> {
         if synced.is_shutdown {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(io::Error::other(
                 crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR,
             ));
         }
@@ -119,7 +118,8 @@ impl RegistrationSet {
         let io = unsafe { NonNull::new_unchecked(Arc::as_ptr(io).cast_mut()) };
 
         super::EXPOSE_IO.unexpose_provenance(io.as_ptr());
-        let _ = synced.registrations.remove(io);
+        // SAFETY: the caller guarantees that `io` is part of this list.
+        let _ = unsafe { synced.registrations.remove(io) };
     }
 }
 
@@ -141,6 +141,8 @@ unsafe impl linked_list::Link for Arc<ScheduledIo> {
     unsafe fn pointers(
         target: NonNull<Self::Target>,
     ) -> NonNull<linked_list::Pointers<ScheduledIo>> {
-        NonNull::new_unchecked(target.as_ref().linked_list_pointers.get())
+        // safety: `target.as_ref().linked_list_pointers` is a `UnsafeCell` that
+        // always returns a non-null pointer.
+        unsafe { NonNull::new_unchecked(target.as_ref().linked_list_pointers.get()) }
     }
 }

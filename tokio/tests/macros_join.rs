@@ -2,13 +2,13 @@
 #![allow(clippy::disallowed_names)]
 use std::sync::Arc;
 
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 #[cfg(target_pointer_width = "64")]
 use wasm_bindgen_test::wasm_bindgen_test as test;
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::test as maybe_tokio_test;
 
 use tokio::sync::{oneshot, Semaphore};
@@ -233,4 +233,24 @@ async fn join_into_future() {
     }
 
     tokio::join!(NotAFuture);
+}
+
+// Regression test for: https://github.com/tokio-rs/tokio/issues/7637
+// We want to make sure that the `const COUNT: u32` declaration
+// inside the macro body doesn't leak to the caller to cause compiler failures
+// or variable shadowing.
+#[tokio::test]
+async fn caller_names_const_count() {
+    let (tx, rx) = oneshot::channel::<u32>();
+
+    const COUNT: u32 = 2;
+
+    let mut join = task::spawn(async { tokio::join!(async { tx.send(COUNT).unwrap() }) });
+    assert_ready!(join.poll());
+
+    let res = rx.await.unwrap();
+
+    // This passing demonstrates that the const in the macro is
+    // not shadowing the caller-specified COUNT value
+    assert_eq!(2, res);
 }

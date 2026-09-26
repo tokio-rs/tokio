@@ -70,7 +70,8 @@
 //! ```
 //! use tokio::task;
 //!
-//! # #[tokio::main] async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let join = task::spawn(async {
 //!     // ...
 //!     "hello world!"
@@ -90,6 +91,8 @@
 //! example:
 //!
 //! ```
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::task;
 //!
 //! # #[tokio::main] async fn main() {
@@ -99,6 +102,7 @@
 //!
 //! // The returned result indicates that the task failed.
 //! assert!(join.await.is_err());
+//! # }
 //! # }
 //! ```
 //!
@@ -176,7 +180,7 @@
 //! #### `spawn_blocking`
 //!
 //! The `task::spawn_blocking` function is similar to the `task::spawn` function
-//! discussed in the previous section, but rather than spawning an
+//! discussed in the previous section, but rather than spawning a
 //! _non-blocking_ future on the Tokio runtime, it instead spawns a
 //! _blocking_ function on a dedicated thread pool for blocking tasks. For
 //! example:
@@ -221,6 +225,8 @@
 //! For example:
 //!
 //! ```
+//! # #[cfg(not(target_family = "wasm"))]
+//! # {
 //! use tokio::task;
 //!
 //! # async fn docs() {
@@ -230,6 +236,7 @@
 //! });
 //!
 //! assert_eq!(result, "blocking completed");
+//! # }
 //! # }
 //! ```
 //!
@@ -245,7 +252,8 @@
 //! ```rust
 //! use tokio::task;
 //!
-//! # #[tokio::main] async fn main() {
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() {
 //! async {
 //!     task::spawn(async {
 //!         // ...

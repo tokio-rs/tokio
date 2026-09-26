@@ -124,8 +124,39 @@ cfg_test_util! {
     /// other timer-backed primitives can cause the runtime to advance the
     /// current time when awaited.
     ///
+    /// # Preventing auto-advance
+    ///
+    /// In some testing scenarios, you may want to keep the clock paused without
+    /// auto-advancing, even while waiting for I/O or other asynchronous operations.
+    /// This can be achieved by using [`spawn_blocking`] to wrap your I/O operations.
+    ///
+    /// When a blocking task is running, the clock's auto-advance is temporarily
+    /// inhibited. This allows you to wait for I/O to complete while keeping the
+    /// paused clock stationary:
+    ///
+    /// ```ignore
+    /// use tokio::time::{Duration, Instant};
+    /// use tokio::task;
+    ///
+    /// #[tokio::test(start_paused = true)]
+    /// async fn test_with_io() {
+    ///     let start = Instant::now();
+    ///
+    ///     // The clock will NOT auto-advance while this blocking task runs
+    ///     let result = task::spawn_blocking(|| {
+    ///         // Perform I/O operations here
+    ///         std::thread::sleep(std::time::Duration::from_millis(10));
+    ///         42
+    ///     }).await.unwrap();
+    ///
+    ///     // Time has not advanced
+    ///     assert_eq!(start.elapsed(), Duration::ZERO);
+    /// }
+    /// ```
+    ///
     /// [`Sleep`]: crate::time::Sleep
     /// [`advance`]: crate::time::advance
+    /// [`spawn_blocking`]: crate::task::spawn_blocking
     #[track_caller]
     pub fn pause() {
         with_clock(|maybe_clock| {
@@ -182,6 +213,37 @@ cfg_test_util! {
     /// if the runtime has not yet touched the timer driver after the call to
     /// `advance`. However if they don't, the runtime will poll the task again
     /// shortly.
+    ///
+    /// # When to use `sleep` instead
+    ///
+    /// **Important:** `advance` is designed for testing scenarios where you want to
+    /// instantly jump forward in time. However, it has limitations that make it
+    /// unsuitable for certain use cases:
+    ///
+    /// - **Forcing timeouts:** If you want to reliably trigger a timeout, prefer
+    ///   using [`sleep`] with auto-advance rather than `advance`. The `advance`
+    ///   function jumps time forward but doesn't guarantee that all timers will be
+    ///   processed before your code continues.
+    ///
+    /// - **Simulating freezes:** If you're trying to simulate a scenario where the
+    ///   program freezes and then resumes, the batch behavior of `advance` may not
+    ///   produce the expected results. All timers that expire during the advance
+    ///   complete simultaneously.
+    ///
+    /// For most testing scenarios where you want to wait for a duration to pass
+    /// and have all timers fire in order, use [`sleep`] instead:
+    ///
+    /// ```ignore
+    /// use tokio::time::{self, Duration};
+    ///
+    /// #[tokio::test(start_paused = true)]
+    /// async fn test_timeout_reliable() {
+    ///     // Use sleep with auto-advance for reliable timeout testing
+    ///     time::sleep(Duration::from_secs(5)).await;
+    ///     // All timers that were scheduled to fire within 5 seconds
+    ///     // have now been processed in order
+    /// }
+    /// ```
     ///
     /// # Panics
     ///

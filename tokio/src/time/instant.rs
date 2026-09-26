@@ -54,14 +54,6 @@ impl Instant {
         Instant { std }
     }
 
-    pub(crate) fn far_future() -> Instant {
-        // Roughly 30 years from now.
-        // API does not provide a way to obtain max `Instant`
-        // or convert specific date in the future to instant.
-        // 1000 years overflows on macOS, 100 years overflows on FreeBSD.
-        Self::now() + Duration::from_secs(86400 * 365 * 30)
-    }
-
     /// Convert the value into a `std::time::Instant`.
     pub fn into_std(self) -> std::time::Instant {
         self.std
@@ -81,14 +73,14 @@ impl Instant {
     /// ```
     /// use tokio::time::{Duration, Instant, sleep};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let now = Instant::now();
-    ///     sleep(Duration::new(1, 0)).await;
-    ///     let new_now = Instant::now();
-    ///     println!("{:?}", new_now.checked_duration_since(now));
-    ///     println!("{:?}", now.checked_duration_since(new_now)); // None
-    /// }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let now = Instant::now();
+    /// sleep(Duration::new(1, 0)).await;
+    /// let new_now = Instant::now();
+    /// println!("{:?}", new_now.checked_duration_since(now));
+    /// println!("{:?}", now.checked_duration_since(new_now)); // None
+    /// # }
     /// ```
     pub fn checked_duration_since(&self, earlier: Instant) -> Option<Duration> {
         self.std.checked_duration_since(earlier.std)
@@ -102,13 +94,13 @@ impl Instant {
     /// ```
     /// use tokio::time::{Duration, Instant, sleep};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let now = Instant::now();
-    ///     sleep(Duration::new(1, 0)).await;
-    ///     let new_now = Instant::now();
-    ///     println!("{:?}", new_now.saturating_duration_since(now));
-    ///     println!("{:?}", now.saturating_duration_since(new_now)); // 0ns
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let now = Instant::now();
+    /// sleep(Duration::new(1, 0)).await;
+    /// let new_now = Instant::now();
+    /// println!("{:?}", new_now.saturating_duration_since(now));
+    /// println!("{:?}", now.saturating_duration_since(new_now)); // 0ns
     /// }
     /// ```
     pub fn saturating_duration_since(&self, earlier: Instant) -> Duration {
@@ -123,13 +115,13 @@ impl Instant {
     /// ```
     /// use tokio::time::{Duration, Instant, sleep};
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let instant = Instant::now();
-    ///     let three_secs = Duration::from_secs(3);
-    ///     sleep(three_secs).await;
-    ///     assert!(instant.elapsed() >= three_secs);
-    /// }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let instant = Instant::now();
+    /// let three_secs = Duration::from_secs(3);
+    /// sleep(three_secs).await;
+    /// assert!(instant.elapsed() >= three_secs);
+    /// # }
     /// ```
     pub fn elapsed(&self) -> Duration {
         Instant::now().saturating_duration_since(*self)

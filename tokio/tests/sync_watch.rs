@@ -2,7 +2,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use tokio::sync::watch;
@@ -449,4 +449,70 @@ async fn sender_closed_is_cooperative() {
         } => {},
         _ = tokio::task::yield_now() => {},
     }
+}
+
+#[tokio::test]
+async fn changed_succeeds_on_closed_channel_with_unseen_value() {
+    let (tx, mut rx) = watch::channel("A");
+    tx.send("B").unwrap();
+
+    drop(tx);
+
+    rx.changed()
+        .await
+        .expect("should not return error as long as the current value is not seen");
+}
+
+#[tokio::test]
+async fn changed_errors_on_closed_channel_with_seen_value() {
+    let (tx, mut rx) = watch::channel("A");
+    drop(tx);
+
+    rx.changed()
+        .await
+        .expect_err("should return error if the tx is closed and the current value is seen");
+}
+
+#[test]
+fn has_changed_errors_on_closed_channel_with_unseen_value() {
+    let (tx, rx) = watch::channel("A");
+    tx.send("B").unwrap();
+
+    drop(tx);
+
+    rx.has_changed()
+        .expect_err("`has_changed` returns an error if and only if channel is closed. Even if the current value is not seen.");
+}
+
+#[test]
+fn has_changed_errors_on_closed_channel_with_seen_value() {
+    let (tx, rx) = watch::channel("A");
+    drop(tx);
+
+    rx.has_changed()
+        .expect_err("`has_changed` returns an error if and only if channel is closed.");
+}
+
+#[test]
+fn receiver_is_closed_after_all_senders_are_dropped() {
+    let (tx, rx) = watch::channel("A");
+    let tx2 = tx.clone();
+    assert!(!rx.is_closed());
+
+    drop(tx);
+    assert!(!rx.is_closed());
+
+    drop(tx2);
+    assert!(rx.is_closed());
+}
+
+#[tokio::test]
+async fn wait_for_errors_on_closed_channel_true_predicate() {
+    let (tx, mut rx) = watch::channel("A");
+    tx.send("B").unwrap();
+    drop(tx);
+
+    rx.wait_for(|_| true).await.expect(
+        "`wait_for` call does not return error even if channel is closed when predicate is true for last value.",
+    );
 }

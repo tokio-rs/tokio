@@ -4,6 +4,7 @@ use core::fmt;
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -36,6 +37,32 @@ impl<St, Fut, F> Then<St, Fut, F> {
             future: None,
             f,
         }
+    }
+
+    /// Returns a reference to the inner stream.
+    pub fn get_ref(&self) -> &St {
+        &self.stream
+    }
+
+    /// Returns a mutable reference to the inner stream.
+    ///
+    /// Mutating the inner stream may confuse this combinator.
+    pub fn get_mut(&mut self) -> &mut St {
+        &mut self.stream
+    }
+
+    /// Returns a pinned mutable reference to the inner stream.
+    ///
+    /// Mutating the inner stream may confuse this combinator.
+    pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut St> {
+        self.project().stream
+    }
+
+    /// Consumes this combinator and returns the inner stream.
+    ///
+    /// This may discard intermediate combinator state.
+    pub fn into_inner(self) -> St {
+        self.stream
     }
 }
 
@@ -79,5 +106,16 @@ where
         let upper = upper.and_then(|upper| upper.checked_add(future_len));
 
         (lower, upper)
+    }
+}
+
+impl<St, F, Fut> FusedStream for Then<St, Fut, F>
+where
+    St: FusedStream,
+    Fut: Future,
+    F: FnMut(St::Item) -> Fut,
+{
+    fn is_terminated(&self) -> bool {
+        self.future.is_none() && self.stream.is_terminated()
     }
 }

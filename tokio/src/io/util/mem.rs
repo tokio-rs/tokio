@@ -100,6 +100,11 @@ pub struct SimplexStream {
 ///
 /// The `max_buf_size` argument is the maximum amount of bytes that can be
 /// written to a side before the write returns `Poll::Pending`.
+///
+/// # Panics
+///
+/// This function panics if `max_buf_size` is 0.
+#[track_caller]
 #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
 pub fn duplex(max_buf_size: usize) -> (DuplexStream, DuplexStream) {
     let one = Arc::new(Mutex::new(SimplexStream::new_unsplit(max_buf_size)));
@@ -185,7 +190,7 @@ impl Drop for DuplexStream {
 /// Creates unidirectional buffer that acts like in memory pipe.
 ///
 /// The `max_buf_size` argument is the maximum amount of bytes that can be
-/// written to a buffer before the it returns `Poll::Pending`.
+/// written to a buffer before it returns `Poll::Pending`.
 ///
 /// # Unify reader and writer
 ///
@@ -207,6 +212,11 @@ impl Drop for DuplexStream {
 /// # Ok(())
 /// # }
 /// ```
+///
+/// # Panics
+///
+/// This function panics if `max_buf_size` is 0.
+#[track_caller]
 #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
 pub fn simplex(max_buf_size: usize) -> (ReadHalf<SimplexStream>, WriteHalf<SimplexStream>) {
     split(SimplexStream::new_unsplit(max_buf_size))
@@ -217,9 +227,15 @@ impl SimplexStream {
     /// version with separate reader and writer you can use [`simplex`] function.
     ///
     /// The `max_buf_size` argument is the maximum amount of bytes that can be
-    /// written to a buffer before the it returns `Poll::Pending`.
+    /// written to a buffer before it returns `Poll::Pending`.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if `max_buf_size` is 0.
+    #[track_caller]
     #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
     pub fn new_unsplit(max_buf_size: usize) -> SimplexStream {
+        assert!(max_buf_size > 0, "`max_buf_size` must be greater than 0");
         SimplexStream {
             buffer: BytesMut::new(),
             is_closed: false,
@@ -250,6 +266,10 @@ impl SimplexStream {
         cx: &mut task::Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
+        if buf.remaining() == 0 {
+            return Poll::Ready(Ok(()));
+        }
+
         if self.buffer.has_remaining() {
             let max = self.buffer.remaining().min(buf.remaining());
             buf.put_slice(&self.buffer[..max]);
@@ -278,6 +298,10 @@ impl SimplexStream {
         if self.is_closed {
             return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
         }
+        if buf.is_empty() {
+            return Poll::Ready(Ok(0));
+        }
+
         let avail = self.max_buf_size - self.buffer.len();
         if avail == 0 {
             self.write_waker = Some(cx.waker().clone());
@@ -300,6 +324,10 @@ impl SimplexStream {
         if self.is_closed {
             return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
         }
+        if bufs.iter().all(|buf| buf.is_empty()) {
+            return Poll::Ready(Ok(0));
+        }
+
         let avail = self.max_buf_size - self.buffer.len();
         if avail == 0 {
             self.write_waker = Some(cx.waker().clone());
@@ -331,7 +359,7 @@ impl AsyncRead for SimplexStream {
             cx: &mut task::Context<'_>,
             buf: &mut ReadBuf<'_>,
         ) -> Poll<std::io::Result<()>> {
-            ready!(crate::trace::trace_leaf(cx));
+            ready!(crate::trace::trace_leaf());
             let coop = ready!(crate::task::coop::poll_proceed(cx));
 
             let ret = self.poll_read_internal(cx, buf);
@@ -348,7 +376,7 @@ impl AsyncRead for SimplexStream {
             cx: &mut task::Context<'_>,
             buf: &mut ReadBuf<'_>,
         ) -> Poll<std::io::Result<()>> {
-            ready!(crate::trace::trace_leaf(cx));
+            ready!(crate::trace::trace_leaf());
             self.poll_read_internal(cx, buf)
         }
     }
@@ -361,7 +389,7 @@ impl AsyncWrite for SimplexStream {
             cx: &mut task::Context<'_>,
             buf: &[u8],
         ) -> Poll<std::io::Result<usize>> {
-            ready!(crate::trace::trace_leaf(cx));
+            ready!(crate::trace::trace_leaf());
             let coop = ready!(crate::task::coop::poll_proceed(cx));
 
             let ret = self.poll_write_internal(cx, buf);
@@ -378,7 +406,7 @@ impl AsyncWrite for SimplexStream {
             cx: &mut task::Context<'_>,
             buf: &[u8],
         ) -> Poll<std::io::Result<usize>> {
-            ready!(crate::trace::trace_leaf(cx));
+            ready!(crate::trace::trace_leaf());
             self.poll_write_internal(cx, buf)
         }
     }
@@ -389,7 +417,7 @@ impl AsyncWrite for SimplexStream {
             cx: &mut task::Context<'_>,
             bufs: &[std::io::IoSlice<'_>],
         ) -> Poll<Result<usize, std::io::Error>> {
-            ready!(crate::trace::trace_leaf(cx));
+            ready!(crate::trace::trace_leaf());
             let coop = ready!(crate::task::coop::poll_proceed(cx));
 
             let ret = self.poll_write_vectored_internal(cx, bufs);
@@ -406,7 +434,7 @@ impl AsyncWrite for SimplexStream {
             cx: &mut task::Context<'_>,
             bufs: &[std::io::IoSlice<'_>],
         ) -> Poll<Result<usize, std::io::Error>> {
-            ready!(crate::trace::trace_leaf(cx));
+            ready!(crate::trace::trace_leaf());
             self.poll_write_vectored_internal(cx, bufs)
         }
     }

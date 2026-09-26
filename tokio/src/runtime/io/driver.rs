@@ -2,10 +2,10 @@
 cfg_signal_internal_and_unix! {
     mod signal;
 }
-cfg_tokio_uring! {
+cfg_io_uring! {
     mod uring;
     use uring::UringContext;
-    use crate::loom::sync::atomic::AtomicUsize;
+    use crate::sync::OnceCell;
 }
 
 use crate::io::interest::Interest;
@@ -29,6 +29,10 @@ pub(crate) struct Driver {
     /// Reuse the `mio::Events` value across calls to poll.
     events: mio::Events,
 
+    /// Buffer for polls that do not wait, if
+    /// `Builder::max_io_events_per_busy_tick` is set.
+    events_busy: Option<mio::Events>,
+
     /// The system event queue.
     poll: mio::Poll,
 }
@@ -51,16 +55,28 @@ pub(crate) struct Handle {
 
     pub(crate) metrics: IoDriverMetrics,
 
-    #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    ))]
     pub(crate) uring_context: Mutex<UringContext>,
 
-    #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
-    pub(crate) uring_state: AtomicUsize,
+    #[cfg(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    ))]
+    pub(crate) uring_probe: OnceCell<Option<io_uring::Probe>>,
 }
 
 #[derive(Debug)]
 pub(crate) struct ReadyEvent {
-    pub(super) tick: u8,
+    pub(super) tick: u16,
     pub(crate) ready: Ready,
     pub(super) is_shutdown: bool,
 }
@@ -85,7 +101,7 @@ pub(super) enum Direction {
 
 pub(super) enum Tick {
     Set,
-    Clear(u8),
+    Clear(u16),
 }
 
 const TOKEN_WAKEUP: mio::Token = mio::Token(0);
@@ -102,7 +118,7 @@ fn _assert_kinds() {
 impl Driver {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
-    pub(crate) fn new(nevents: usize) -> io::Result<(Driver, Handle)> {
+    pub(crate) fn new(nevents: usize, nevents_busy: Option<usize>) -> io::Result<(Driver, Handle)> {
         let poll = mio::Poll::new()?;
         #[cfg(not(target_os = "wasi"))]
         let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
@@ -111,6 +127,7 @@ impl Driver {
         let driver = Driver {
             signal_ready: false,
             events: mio::Events::with_capacity(nevents),
+            events_busy: nevents_busy.map(mio::Events::with_capacity),
             poll,
         };
 
@@ -123,10 +140,22 @@ impl Driver {
             #[cfg(not(target_os = "wasi"))]
             waker,
             metrics: IoDriverMetrics::default(),
-            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux",
+            ))]
             uring_context: Mutex::new(UringContext::new()),
-            #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
-            uring_state: AtomicUsize::new(0),
+            #[cfg(all(
+                tokio_unstable,
+                feature = "io-uring",
+                feature = "rt",
+                feature = "fs",
+                target_os = "linux",
+            ))]
+            uring_probe: OnceCell::new(),
         };
 
         Ok((driver, handle))
@@ -157,7 +186,12 @@ impl Driver {
 
         handle.release_pending_registrations();
 
-        let events = &mut self.events;
+        // A poll that does not wait takes the busy batch. Events it leaves
+        // behind stay queued in the kernel, so the next poll returns them.
+        let events = match (&mut self.events_busy, max_wait) {
+            (Some(busy), Some(wait)) if wait.is_zero() => busy,
+            _ => &mut self.events,
+        };
 
         // Block waiting for an event to happen, peeling out how many events
         // happened.
@@ -198,11 +232,29 @@ impl Driver {
             }
         }
 
-        #[cfg(all(tokio_uring, feature = "rt", feature = "fs", target_os = "linux",))]
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
         {
             let mut guard = handle.get_uring().lock();
             let ctx = &mut *guard;
             ctx.dispatch_completions();
+
+            // There might be some cases where the CQ overflows, so we need to flush
+            // the remaining buffered CQEs.
+            while ctx
+                .uring
+                .as_mut()
+                .is_some_and(|uring| uring.submission().cq_overflow())
+            {
+                ctx.submit()
+                    .expect("failed to flush io_uring completion queue overflow");
+                ctx.dispatch_completions();
+            }
         }
 
         handle.metrics.incr_ready_count_by(ready_count);
@@ -266,7 +318,8 @@ impl Handle {
         source: &mut impl Source,
     ) -> io::Result<()> {
         // Deregister the source with the OS poller **first**
-        self.registry.deregister(source)?;
+        // Cleanup ALWAYS happens
+        let os_result = self.registry.deregister(source);
 
         if self
             .registrations
@@ -277,7 +330,7 @@ impl Handle {
 
         self.metrics.dec_fd_count();
 
-        Ok(())
+        os_result // Return error after cleanup
     }
 
     fn release_pending_registrations(&self) {
@@ -299,5 +352,36 @@ impl Direction {
             Direction::Read => Ready::READABLE | Ready::READ_CLOSED,
             Direction::Write => Ready::WRITABLE | Ready::WRITE_CLOSED,
         }
+    }
+}
+
+#[cfg(all(test, unix, feature = "net", not(loom), not(miri)))]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn busy_turn_takes_busy_batch() {
+        let (mut driver, handle) = Driver::new(16, Some(2)).unwrap();
+        let mut sources = Vec::new();
+        for _ in 0..5 {
+            let (mut rx, mut tx) = mio::net::UnixStream::pair().unwrap();
+            tx.write_all(b"x").unwrap();
+            let reg = handle.add_source(&mut rx, Interest::READABLE).unwrap();
+            sources.push((rx, tx, reg));
+        }
+
+        // A poll that does not wait takes the busy batch.
+        driver.turn(&handle, Some(Duration::ZERO));
+        assert_eq!(driver.events_busy.as_ref().unwrap().iter().count(), 2);
+
+        // The rest stays queued for the next poll, which takes the main batch.
+        driver.turn(&handle, Some(Duration::from_millis(100)));
+        assert_eq!(driver.events.iter().count(), 3);
+
+        for (mut rx, _tx, reg) in sources {
+            handle.deregister_source(&reg, &mut rx).unwrap();
+        }
+        handle.release_pending_registrations();
     }
 }

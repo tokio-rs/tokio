@@ -1,12 +1,11 @@
 //! Runs `!Send` futures on the current thread.
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::{Arc, Mutex};
-#[cfg(tokio_unstable)]
 use crate::runtime;
 use crate::runtime::task::{
     self, JoinHandle, LocalOwnedTasks, SpawnLocation, Task, TaskHarnessScheduleHooks,
 };
-use crate::runtime::{context, ThreadId, BOX_FUTURE_THRESHOLD};
+use crate::runtime::{context, AutoBox, ThreadId};
 use crate::sync::AtomicWaker;
 use crate::util::trace::SpawnMeta;
 use crate::util::RcCell;
@@ -64,24 +63,24 @@ cfg_rt! {
     /// use std::rc::Rc;
     /// use tokio::task;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let nonsend_data = Rc::new("my nonsend data...");
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let nonsend_data = Rc::new("my nonsend data...");
     ///
-    ///     // Construct a local task set that can run `!Send` futures.
-    ///     let local = task::LocalSet::new();
+    /// // Construct a local task set that can run `!Send` futures.
+    /// let local = task::LocalSet::new();
     ///
-    ///     // Run the local task set.
-    ///     local.run_until(async move {
-    ///         let nonsend_data = nonsend_data.clone();
-    ///         // `spawn_local` ensures that the future is spawned on the local
-    ///         // task set.
-    ///         task::spawn_local(async move {
-    ///             println!("{}", nonsend_data);
-    ///             // ...
-    ///         }).await.unwrap();
-    ///     }).await;
-    /// }
+    /// // Run the local task set.
+    /// local.run_until(async move {
+    ///     let nonsend_data = nonsend_data.clone();
+    ///     // `spawn_local` ensures that the future is spawned on the local
+    ///     // task set.
+    ///     task::spawn_local(async move {
+    ///         println!("{}", nonsend_data);
+    ///         // ...
+    ///     }).await.unwrap();
+    /// }).await;
+    /// # }
     /// ```
     /// **Note:** The `run_until` method can only be used in `#[tokio::main]`,
     /// `#[tokio::test]` or directly inside a call to [`Runtime::block_on`]. It
@@ -98,26 +97,26 @@ cfg_rt! {
     /// use tokio::{task, time};
     /// use std::rc::Rc;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let nonsend_data = Rc::new("world");
-    ///     let local = task::LocalSet::new();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let nonsend_data = Rc::new("world");
+    /// let local = task::LocalSet::new();
     ///
-    ///     let nonsend_data2 = nonsend_data.clone();
-    ///     local.spawn_local(async move {
-    ///         // ...
-    ///         println!("hello {}", nonsend_data2)
-    ///     });
-    ///
-    ///     local.spawn_local(async move {
-    ///         time::sleep(time::Duration::from_millis(100)).await;
-    ///         println!("goodbye {}", nonsend_data)
-    ///     });
-    ///
+    /// let nonsend_data2 = nonsend_data.clone();
+    /// local.spawn_local(async move {
     ///     // ...
+    ///     println!("hello {}", nonsend_data2)
+    /// });
     ///
-    ///     local.await;
-    /// }
+    /// local.spawn_local(async move {
+    ///     time::sleep(time::Duration::from_millis(100)).await;
+    ///     println!("goodbye {}", nonsend_data)
+    /// });
+    ///
+    /// // ...
+    ///
+    /// local.await;
+    /// # }
     /// ```
     /// **Note:** Awaiting a `LocalSet` can only be done inside
     /// `#[tokio::main]`, `#[tokio::test]` or directly inside a call to
@@ -133,6 +132,8 @@ cfg_rt! {
     ///
     /// The following example puts the `LocalSet` inside a new thread.
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Builder;
     /// use tokio::sync::{mpsc, oneshot};
     /// use tokio::task::LocalSet;
@@ -212,6 +213,7 @@ cfg_rt! {
     ///     let eleven = response.await.unwrap();
     ///     assert_eq!(eleven, 11);
     /// }
+    /// # }
     /// ```
     ///
     /// [`Send`]: trait@std::marker::Send
@@ -326,6 +328,13 @@ impl<'a> Drop for LocalDataEnterGuard<'a> {
 cfg_rt! {
     /// Spawns a `!Send` future on the current [`LocalSet`] or [`LocalRuntime`].
     ///
+    /// This is possible when either using one of these types explicitly, or by
+    /// opting to use the `"local"` runtime flavor in `tokio::main`:
+    ///
+    /// ```ignore
+    /// #[tokio::main(flavor = "local")]
+    /// ```
+    ///
     /// The spawned future will run on the same thread that called `spawn_local`.
     ///
     /// The provided future will start running in the background immediately
@@ -334,7 +343,7 @@ cfg_rt! {
     ///
     /// # Panics
     ///
-    /// This function panics if called outside of a [`LocalSet`].
+    /// This function panics if called outside of a [`LocalSet`] or [`LocalRuntime`].
     ///
     /// Note that if [`tokio::spawn`] is used from within a `LocalSet`, the
     /// resulting new task will _not_ be inside the `LocalSet`, so you must use
@@ -342,25 +351,40 @@ cfg_rt! {
     ///
     /// # Examples
     ///
+    /// With `LocalSet`:
+    ///
     /// ```rust
     /// use std::rc::Rc;
     /// use tokio::task;
     ///
-    /// #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let nonsend_data = Rc::new("my nonsend data...");
+    ///
+    /// let local = task::LocalSet::new();
+    ///
+    /// // Run the local task set.
+    /// local.run_until(async move {
+    ///     let nonsend_data = nonsend_data.clone();
+    ///     task::spawn_local(async move {
+    ///         println!("{}", nonsend_data);
+    ///         // ...
+    ///     }).await.unwrap();
+    /// }).await;
+    /// # }
+    /// ```
+    /// With local runtime flavor.
+    ///
+    /// ```rust
+    /// #[tokio::main(flavor = "local")]
     /// async fn main() {
-    ///     let nonsend_data = Rc::new("my nonsend data...");
+    ///     let join = tokio::task::spawn_local(async {
+    ///         println!("my nonsend data...")
+    ///     });
     ///
-    ///     let local = task::LocalSet::new();
+    ///    join.await.unwrap()
+    ///  }
     ///
-    ///     // Run the local task set.
-    ///     local.run_until(async move {
-    ///         let nonsend_data = nonsend_data.clone();
-    ///         task::spawn_local(async move {
-    ///             println!("{}", nonsend_data);
-    ///             // ...
-    ///         }).await.unwrap();
-    ///     }).await;
-    /// }
     /// ```
     ///
     /// [`LocalSet`]: struct@crate::task::LocalSet
@@ -373,7 +397,7 @@ cfg_rt! {
         F::Output: 'static,
     {
         let fut_size = std::mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
+        if AutoBox::<F>::SHOULD_BOX {
             spawn_local_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
             spawn_local_inner(future, SpawnMeta::new_unnamed(fut_size))
@@ -400,13 +424,14 @@ cfg_rt! {
 
                 #[cfg(all(
                     tokio_unstable,
-                    tokio_taskdump,
+                    feature = "taskdump",
                     feature = "rt",
                     target_os = "linux",
                     any(
                         target_arch = "aarch64",
                         target_arch = "x86",
-                        target_arch = "x86_64"
+                        target_arch = "x86_64",
+                        target_arch = "s390x"
                     )
                 ))]
                 let future = task::trace::Trace::root(future);
@@ -417,7 +442,7 @@ cfg_rt! {
                 unsafe { handle.spawn_local(task, id, meta.spawned_at) }
             } else {
                 match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
-                    None => panic!("`spawn_local` called from outside of a `task::LocalSet` or LocalRuntime"),
+                    None => panic!("`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"),
                     Some(cx) => cx.spawn(future.take().unwrap(), meta)
                 }
             })
@@ -427,7 +452,7 @@ cfg_rt! {
             Ok(None) => panic!("Local tasks can only be spawned on a LocalRuntime from the thread the runtime was created on"),
             Ok(Some(join_handle)) => join_handle,
             Err(_) => match CURRENT.with(|LocalData { ctx, .. }| ctx.get()) {
-                None => panic!("`spawn_local` called from outside of a `task::LocalSet` or LocalRuntime"),
+                None => panic!("`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"),
                 Some(cx) => cx.spawn(future.unwrap(), meta)
             }
         }
@@ -535,31 +560,31 @@ impl LocalSet {
     /// ```rust
     /// use tokio::task;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let local = task::LocalSet::new();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let local = task::LocalSet::new();
     ///
-    ///     // Spawn a future on the local set. This future will be run when
-    ///     // we call `run_until` to drive the task set.
-    ///     local.spawn_local(async {
-    ///        // ...
-    ///     });
+    /// // Spawn a future on the local set. This future will be run when
+    /// // we call `run_until` to drive the task set.
+    /// local.spawn_local(async {
+    ///     // ...
+    /// });
     ///
-    ///     // Run the local task set.
-    ///     local.run_until(async move {
-    ///         // ...
-    ///     }).await;
+    /// // Run the local task set.
+    /// local.run_until(async move {
+    ///     // ...
+    /// }).await;
     ///
-    ///     // When `run` finishes, we can spawn _more_ futures, which will
-    ///     // run in subsequent calls to `run_until`.
-    ///     local.spawn_local(async {
-    ///        // ...
-    ///     });
+    /// // When `run` finishes, we can spawn _more_ futures, which will
+    /// // run in subsequent calls to `run_until`.
+    /// local.spawn_local(async {
+    ///     // ...
+    /// });
     ///
-    ///     local.run_until(async move {
-    ///         // ...
-    ///     }).await;
-    /// }
+    /// local.run_until(async move {
+    ///     // ...
+    /// }).await;
+    /// # }
     /// ```
     /// [`spawn_local`]: fn@spawn_local
     #[track_caller]
@@ -569,7 +594,7 @@ impl LocalSet {
         F::Output: 'static,
     {
         let fut_size = mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
+        if AutoBox::<F>::SHOULD_BOX {
             self.spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
             self.spawn_named(future, SpawnMeta::new_unnamed(fut_size))
@@ -600,7 +625,7 @@ impl LocalSet {
     /// issued from a local task, the [`spawn_blocking`] API may be used instead.
     ///
     /// For example, this will panic:
-    /// ```should_panic
+    /// ```should_panic,ignore-wasm
     /// use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
@@ -618,6 +643,8 @@ impl LocalSet {
     /// ```
     /// This, however, will not panic:
     /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
     /// use tokio::runtime::Runtime;
     /// use tokio::task;
     ///
@@ -632,6 +659,7 @@ impl LocalSet {
     ///     });
     ///     join.await.unwrap();
     /// })
+    /// # }
     /// ```
     ///
     /// [`spawn_local`]: fn@spawn_local
@@ -667,15 +695,15 @@ impl LocalSet {
     /// ```rust
     /// use tokio::task;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     task::LocalSet::new().run_until(async {
-    ///         task::spawn_local(async move {
-    ///             // ...
-    ///         }).await.unwrap();
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// task::LocalSet::new().run_until(async {
+    ///     task::spawn_local(async move {
     ///         // ...
-    ///     }).await;
-    /// }
+    ///     }).await.unwrap();
+    ///     // ...
+    /// }).await;
+    /// # }
     /// ```
     ///
     /// [`spawn_local`]: fn@spawn_local
@@ -811,6 +839,25 @@ impl LocalSet {
             Err(_access_error) => (f.take().unwrap())(),
         }
     }
+
+    /// Returns the [`Id`] of the current [`LocalSet`] runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use tokio::task;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let local_set = task::LocalSet::new();
+    /// println!("Local set id: {}", local_set.id());
+    /// # }
+    /// ```
+    ///
+    /// [`Id`]: struct@crate::runtime::Id
+    pub fn id(&self) -> runtime::Id {
+        runtime::Id::new(self.context.shared.local_state.owned.id)
+    }
 }
 
 cfg_unstable! {
@@ -855,7 +902,7 @@ cfg_unstable! {
         /// ```should_panic
         /// use tokio::runtime::UnhandledPanic;
         ///
-        /// # #[tokio::main]
+        /// # #[tokio::main(flavor = "current_thread")]
         /// # async fn main() {
         /// tokio::task::LocalSet::new()
         ///     .unhandled_panic(UnhandledPanic::ShutdownRuntime)
@@ -880,30 +927,6 @@ cfg_unstable! {
                 .expect("Unhandled Panic behavior modified after starting LocalSet")
                 .unhandled_panic = behavior;
             self
-        }
-
-        /// Returns the [`Id`] of the current `LocalSet` runtime.
-        ///
-        /// # Examples
-        ///
-        /// ```rust
-        /// use tokio::task;
-        ///
-        /// #[tokio::main]
-        /// async fn main() {
-        ///     let local_set = task::LocalSet::new();
-        ///     println!("Local set id: {}", local_set.id());
-        /// }
-        /// ```
-        ///
-        /// **Note**: This is an [unstable API][unstable]. The public API of this type
-        /// may break in 1.x releases. See [the documentation on unstable
-        /// features][unstable] for details.
-        ///
-        /// [unstable]: crate#unstable-features
-        /// [`Id`]: struct@crate::runtime::Id
-        pub fn id(&self) -> runtime::Id {
-            self.context.shared.local_state.owned.id.into()
         }
     }
 }
@@ -1159,28 +1182,43 @@ impl task::Schedule for Arc<Shared> {
 }
 
 impl LocalState {
+    /// # Safety
+    ///
+    /// This method must only be called from the thread who
+    /// has the same [`ThreadId`] as [`Self::owner`].
     unsafe fn task_pop_front(&self) -> Option<task::Notified<Arc<Shared>>> {
         // The caller ensures it is called from the same thread that owns
         // the LocalSet.
         self.assert_called_from_owner_thread();
 
-        self.local_queue.with_mut(|ptr| (*ptr).pop_front())
+        self.local_queue
+            .with_mut(|ptr| unsafe { (*ptr).pop_front() })
     }
 
+    /// # Safety
+    ///
+    /// This method must only be called from the thread who
+    /// has the same [`ThreadId`] as [`Self::owner`].
     unsafe fn task_push_back(&self, task: task::Notified<Arc<Shared>>) {
         // The caller ensures it is called from the same thread that owns
         // the LocalSet.
         self.assert_called_from_owner_thread();
 
-        self.local_queue.with_mut(|ptr| (*ptr).push_back(task));
+        self.local_queue
+            .with_mut(|ptr| unsafe { (*ptr).push_back(task) });
     }
 
+    /// # Safety
+    ///
+    /// This method must only be called from the thread who
+    /// has the same [`ThreadId`] as [`Self::owner`].
     unsafe fn take_local_queue(&self) -> VecDeque<task::Notified<Arc<Shared>>> {
         // The caller ensures it is called from the same thread that owns
         // the LocalSet.
         self.assert_called_from_owner_thread();
 
-        self.local_queue.with_mut(|ptr| std::mem::take(&mut (*ptr)))
+        self.local_queue
+            .with_mut(|ptr| std::mem::take(unsafe { &mut (*ptr) }))
     }
 
     unsafe fn task_remove(&self, task: &Task<Arc<Shared>>) -> Option<Task<Arc<Shared>>> {
@@ -1228,9 +1266,7 @@ impl LocalState {
             // if we couldn't get the thread ID because we're dropping the local
             // data, skip the assertion --- the `Drop` impl is not going to be
             // called from another thread, because `LocalSet` is `!Send`
-            context::thread_id()
-                .map(|id| id == self.owner)
-                .unwrap_or(true),
+            context::thread_id().map_or(true, |id| id == self.owner),
             "`LocalSet`'s local run queue must not be accessed by another thread!"
         );
     }
@@ -1240,7 +1276,7 @@ impl LocalState {
 // ensure they are on the same thread that owns the `LocalSet`.
 unsafe impl Send for LocalState {}
 
-#[cfg(all(test, not(loom)))]
+#[cfg(all(test, not(loom), not(target_os = "emscripten")))]
 mod tests {
     use super::*;
 

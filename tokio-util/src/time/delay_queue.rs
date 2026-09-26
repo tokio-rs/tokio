@@ -40,7 +40,7 @@ use std::task::{self, ready, Poll, Waker};
 /// # `Stream` implementation
 ///
 /// Items are retrieved from the queue via [`DelayQueue::poll_expired`]. If no delays have
-/// expired, no items are returned. In this case, `Poll::Pending` is returned and the
+/// expired, no items are returned. In this case, [`Poll::Pending`] is returned and the
 /// current task is registered to be notified once the next item's delay has
 /// expired.
 ///
@@ -66,9 +66,13 @@ use std::task::{self, ready, Poll, Waker};
 /// Capacity can be checked using [`capacity`] and allocated preemptively by using
 /// the [`reserve`] method.
 ///
+/// # Cancellation safety
+///
+/// [`DelayQueue`]'s implementation of [`StreamExt::next`] is cancellation safe.
+///
 /// # Usage
 ///
-/// Using `DelayQueue` to manage cache entries.
+/// Using [`DelayQueue`] to manage cache entries.
 ///
 /// ```rust,no_run
 /// use tokio_util::time::{DelayQueue, delay_queue};
@@ -118,7 +122,8 @@ use std::task::{self, ready, Poll, Waker};
 /// [`insert`]: method@Self::insert
 /// [`insert_at`]: method@Self::insert_at
 /// [`Key`]: struct@Key
-/// [`Stream`]: https://docs.rs/futures/0.1/futures/stream/trait.Stream.html
+/// [`Stream`]: https://docs.rs/futures/0.3.31/futures/stream/trait.Stream.html
+/// [`StreamExt::next`]: https://docs.rs/tokio-stream/0.1.17/tokio_stream/trait.StreamExt.html#method.next
 /// [`poll_expired`]: method@Self::poll_expired
 /// [`Stream::poll_expired`]: method@Self::poll_expired
 /// [`DelayQueue`]: struct@DelayQueue
@@ -456,7 +461,7 @@ impl<T> DelayQueue<T> {
     /// # use tokio_util::time::DelayQueue;
     /// # use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::with_capacity(10);
     ///
@@ -512,7 +517,7 @@ impl<T> DelayQueue<T> {
     /// use tokio::time::{Duration, Instant};
     /// use tokio_util::time::DelayQueue;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert_at(
@@ -575,12 +580,7 @@ impl<T> DelayQueue<T> {
     /// current task for wakeup if the value is not yet available, and returning
     /// `None` if the queue is exhausted.
     pub fn poll_expired(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Expired<T>>> {
-        if !self
-            .waker
-            .as_ref()
-            .map(|w| w.will_wake(cx.waker()))
-            .unwrap_or(false)
-        {
+        if !self.waker.as_ref().is_some_and(|w| w.will_wake(cx.waker())) {
             self.waker = Some(cx.waker().clone());
         }
 
@@ -632,7 +632,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
@@ -687,7 +687,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     ///
@@ -738,7 +738,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
@@ -836,7 +836,7 @@ impl<T> DelayQueue<T> {
     /// use tokio::time::{Duration, Instant};
     /// use tokio_util::time::DelayQueue;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
@@ -859,11 +859,19 @@ impl<T> DelayQueue<T> {
         self.slab[*key].expired = false;
 
         self.insert_idx(when, *key);
+        let inserted_expired = self.slab[*key].expired;
 
         let next_deadline = self.next_deadline();
-        if let (Some(ref mut delay), Some(deadline)) = (&mut self.delay, next_deadline) {
-            // This should awaken us if necessary (ie, if already expired)
-            delay.as_mut().reset(deadline);
+        match (next_deadline, &mut self.delay) {
+            (None, _) => self.delay = None,
+            (Some(deadline), Some(delay)) => delay.as_mut().reset(deadline),
+            (Some(deadline), None) => self.delay = Some(Box::pin(sleep_until(deadline))),
+        }
+
+        if inserted_expired {
+            if let Some(waker) = self.waker.take() {
+                waker.wake();
+            }
         }
     }
 
@@ -893,7 +901,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::with_capacity(10);
     ///
@@ -926,7 +934,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     ///
@@ -943,7 +951,7 @@ impl<T> DelayQueue<T> {
     pub fn peek(&self) -> Option<Key> {
         use self::wheel::Stack;
 
-        self.expired.peek().or_else(|| self.wheel.peek())
+        self.expired.peek().or_else(|| self.wheel.peek(&self.slab))
     }
 
     /// Returns the next time to poll as determined by the wheel.
@@ -978,7 +986,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// let key = delay_queue.insert("foo", Duration::from_secs(5));
@@ -1009,7 +1017,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     ///
@@ -1023,10 +1031,18 @@ impl<T> DelayQueue<T> {
     /// # }
     /// ```
     pub fn clear(&mut self) {
+        let had_entries = !self.slab.is_empty();
+
         self.slab.clear();
         self.expired = Stack::default();
         self.wheel = Wheel::new();
         self.delay = None;
+
+        if had_entries {
+            if let Some(waker) = self.waker.take() {
+                waker.wake();
+            }
+        }
     }
 
     /// Returns the number of elements the queue can hold without reallocating.
@@ -1051,7 +1067,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue: DelayQueue<i32> = DelayQueue::with_capacity(10);
     /// assert_eq!(delay_queue.len(), 0);
@@ -1086,7 +1102,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     ///
@@ -1116,7 +1132,7 @@ impl<T> DelayQueue<T> {
     /// use tokio_util::time::DelayQueue;
     /// use std::time::Duration;
     ///
-    /// # #[tokio::main]
+    /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// let mut delay_queue = DelayQueue::new();
     /// assert!(delay_queue.is_empty());
@@ -1242,6 +1258,27 @@ impl<T> wheel::Stack for Stack<T> {
 
     fn peek(&self) -> Option<Self::Owned> {
         self.head
+    }
+
+    fn peek_earliest(&self, store: &Self::Store) -> Option<Self::Owned> {
+        let head = self.head?;
+        let mut earliest = (head, store[head].when);
+        let mut curr = store[head].next;
+
+        while let Some(key) = curr {
+            let data = &store[key];
+
+            // The comparison is strict so that the first entry seen wins a tie,
+            // which agrees with `pop` when every entry in the slot shares a
+            // deadline.
+            if data.when < earliest.1 {
+                earliest = (key, data.when);
+            }
+
+            curr = data.next;
+        }
+
+        Some(earliest.0)
     }
 
     #[track_caller]

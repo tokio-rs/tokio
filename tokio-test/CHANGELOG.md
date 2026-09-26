@@ -1,3 +1,36 @@
+# 0.4.6 (September 25th, 2026)
+
+### Added
+
+- test: add `Spawn::poll_until_idle` ([#8213])
+
+### Fixed
+
+- test: fix race in `Mock::poll_write` ([#7882])
+- test: fix `semicolon_in_expressions_from_macros` lint ([#8317])
+
+[#7882]: https://github.com/tokio-rs/tokio/pull/7882
+[#8213]: https://github.com/tokio-rs/tokio/pull/8213
+[#8317]: https://github.com/tokio-rs/tokio/pull/8317
+
+# 0.4.5 (January 4th, 2026)
+
+### Added
+
+- test: add `io::Builder::name` for better panic messages ([#7212])
+
+### Fixed
+
+- test: make `Spawn` forward `size_hint` ([#6607])
+
+### Changed
+
+- test: remove unused `async-stream` and `bytes` dependencies ([#7214])
+
+[#6607]: https://github.com/tokio-rs/tokio/pull/6607
+[#7212]: https://github.com/tokio-rs/tokio/pull/7212
+[#7214]: https://github.com/tokio-rs/tokio/pull/7214
+
 # 0.4.4 (March 14, 2024)
 
 - task: mark `Spawn` as `#[must_use]` ([#6371])

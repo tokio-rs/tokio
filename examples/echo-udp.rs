@@ -9,6 +9,28 @@
 //!     cargo run --example connect-udp 127.0.0.1:8080
 //!
 //! Each line you type in to the `connect-udp` terminal should be echo'd back to you!
+//!
+//! # Binding to all interfaces
+//!
+//! By default this example binds to `127.0.0.1` so it is only reachable
+//! from the local machine.
+//!
+//! To listen on all interfaces instead:
+//!
+//! ```sh
+//! cargo run --example echo-udp -- 0.0.0.0:8080
+//! ```
+//!
+//! Binding to `0.0.0.0` exposes the server on all network interfaces.
+//! Only do this in trusted network environments.
+//!
+//! On multi-homed systems, a UDP socket bound to a wildcard address
+//! (`0.0.0.0` or `::`) cannot always send replies from the same local IP
+//! that received the packet. Replies may therefore originate from a
+//! different address than the client targeted. See [this Cloudflare blog
+//! post][udp-blog] for more details.
+//!
+//! [udp-blog]: https://blog.cloudflare.com/everything-you-ever-wanted-to-know-about-udp-sockets-but-were-afraid-to-ask-part-1
 
 #![warn(rust_2018_idioms)]
 

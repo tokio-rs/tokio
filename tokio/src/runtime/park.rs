@@ -2,7 +2,6 @@
 
 use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Condvar, Mutex};
-use crate::util::{waker, Wake};
 
 use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
@@ -227,7 +226,7 @@ use crate::loom::thread::AccessError;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::rc::Rc;
-use std::task::Waker;
+use std::task::{RawWaker, RawWakerVTable, Waker};
 
 /// Blocks the current thread using a condition variable.
 #[derive(Debug)]
@@ -293,17 +292,67 @@ impl CachedParkThread {
 
 impl UnparkThread {
     pub(crate) fn into_waker(self) -> Waker {
-        waker(self.inner)
+        unsafe {
+            let raw = unparker_to_raw_waker(self.inner);
+            Waker::from_raw(raw)
+        }
     }
 }
 
-impl Wake for Inner {
-    fn wake(arc_self: Arc<Self>) {
-        arc_self.unpark();
+impl Inner {
+    #[allow(clippy::wrong_self_convention)]
+    fn into_raw(this: Arc<Inner>) -> *const () {
+        Arc::into_raw(this) as *const ()
     }
 
-    fn wake_by_ref(arc_self: &Arc<Self>) {
-        arc_self.unpark();
+    /// # Safety
+    ///
+    /// The pointer must have been created by [`Self::into_raw`].
+    unsafe fn from_raw(ptr: *const ()) -> Arc<Inner> {
+        unsafe { Arc::from_raw(ptr as *const Inner) }
+    }
+}
+
+// TODO: Is this really an unsafe function?
+unsafe fn unparker_to_raw_waker(unparker: Arc<Inner>) -> RawWaker {
+    RawWaker::new(
+        Inner::into_raw(unparker),
+        &RawWakerVTable::new(clone, wake, wake_by_ref, drop_waker),
+    )
+}
+
+/// # Safety
+///
+/// The pointer must have been created by [`Inner::into_raw`].
+unsafe fn clone(raw: *const ()) -> RawWaker {
+    unsafe {
+        Arc::increment_strong_count(raw as *const Inner);
+    }
+    unsafe { unparker_to_raw_waker(Inner::from_raw(raw)) }
+}
+
+/// # Safety
+///
+/// The pointer must have been created by [`Inner::into_raw`].
+unsafe fn drop_waker(raw: *const ()) {
+    drop(unsafe { Inner::from_raw(raw) });
+}
+
+/// # Safety
+///
+/// The pointer must have been created by [`Inner::into_raw`].
+unsafe fn wake(raw: *const ()) {
+    let unparker = unsafe { Inner::from_raw(raw) };
+    unparker.unpark();
+}
+
+/// # Safety
+///
+/// The pointer must have been created by [`Inner::into_raw`].
+unsafe fn wake_by_ref(raw: *const ()) {
+    let raw = raw as *const Inner;
+    unsafe {
+        (*raw).unpark();
     }
 }
 

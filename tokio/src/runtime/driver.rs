@@ -40,15 +40,19 @@ pub(crate) struct Cfg {
     pub(crate) enable_pause_time: bool,
     pub(crate) start_paused: bool,
     pub(crate) nevents: usize,
+    pub(crate) nevents_busy: Option<usize>,
+    pub(crate) timer_flavor: crate::runtime::TimerFlavor,
 }
 
 impl Driver {
     pub(crate) fn new(cfg: Cfg) -> io::Result<(Self, Handle)> {
-        let (io_stack, io_handle, signal_handle) = create_io_stack(cfg.enable_io, cfg.nevents)?;
+        let (io_stack, io_handle, signal_handle) =
+            create_io_stack(cfg.enable_io, cfg.nevents, cfg.nevents_busy)?;
 
         let clock = create_clock(cfg.enable_pause_time, cfg.start_paused);
 
-        let (time_driver, time_handle) = create_time_driver(cfg.enable_time, io_stack, &clock);
+        let (time_driver, time_handle) =
+            create_time_driver(cfg.enable_time, cfg.timer_flavor, io_stack, &clock);
 
         Ok((
             Self { inner: time_driver },
@@ -98,7 +102,7 @@ impl Handle {
         pub(crate) fn signal(&self) -> &crate::runtime::signal::Handle {
             self.signal
                 .as_ref()
-                .expect("there is no signal driver running, must be called from the context of Tokio runtime")
+                .expect("A Tokio 1.x context was found, but IO is disabled. Call `enable_io` on the runtime builder to enable IO.")
         }
     }
 
@@ -113,8 +117,21 @@ impl Handle {
                 .expect("A Tokio 1.x context was found, but timers are disabled. Call `enable_time` on the runtime builder to enable timers.")
         }
 
+        #[cfg(tokio_unstable)]
+        pub(crate) fn with_time<F, R>(&self, f: F) -> R
+        where
+            F: FnOnce(Option<&crate::runtime::time::Handle>) -> R,
+        {
+            f(self.time.as_ref())
+        }
+
         pub(crate) fn clock(&self) -> &Clock {
             &self.clock
+        }
+
+        #[cfg(test)]
+        pub(crate) fn now(&self) -> u64 {
+           self.time().time_source().deadline_to_tick(self.clock.now())
         }
     }
 }
@@ -136,12 +153,12 @@ cfg_io_driver! {
         Disabled(UnparkThread),
     }
 
-    fn create_io_stack(enabled: bool, nevents: usize) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
+    fn create_io_stack(enabled: bool, nevents: usize, nevents_busy: Option<usize>) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
         #[cfg(loom)]
         assert!(!enabled);
 
         let ret = if enabled {
-            let (io_driver, io_handle) = crate::runtime::io::Driver::new(nevents)?;
+            let (io_driver, io_handle) = crate::runtime::io::Driver::new(nevents, nevents_busy)?;
 
             let (signal_driver, signal_handle) = create_signal_driver(io_driver, &io_handle)?;
             let process_driver = create_process_driver(signal_driver);
@@ -202,7 +219,7 @@ cfg_not_io_driver! {
     #[derive(Debug)]
     pub(crate) struct IoStack(ParkThread);
 
-    fn create_io_stack(_enabled: bool, _nevents: usize) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
+    fn create_io_stack(_enabled: bool, _nevents: usize, _nevents_busy: Option<usize>) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
         let park_thread = ParkThread::new();
         let unpark_thread = park_thread.unpark();
         Ok((IoStack(park_thread), unpark_thread, Default::default()))
@@ -241,7 +258,7 @@ cfg_signal_internal_and_unix! {
     }
 }
 
-cfg_not_signal_internal! {
+cfg_not_signal_internal_and_unix! {
     pub(crate) type SignalHandle = ();
 
     cfg_io_driver! {
@@ -281,6 +298,7 @@ cfg_time! {
         Enabled {
             driver: crate::runtime::time::Driver,
         },
+        EnabledAlt(IoStack),
         Disabled(IoStack),
     }
 
@@ -293,13 +311,21 @@ cfg_time! {
 
     fn create_time_driver(
         enable: bool,
+        timer_flavor: crate::runtime::TimerFlavor,
         io_stack: IoStack,
         clock: &Clock,
     ) -> (TimeDriver, TimeHandle) {
         if enable {
-            let (driver, handle) = crate::runtime::time::Driver::new(io_stack, clock);
-
-            (TimeDriver::Enabled { driver }, Some(handle))
+            match timer_flavor {
+                crate::runtime::TimerFlavor::Traditional => {
+                    let (driver, handle) = crate::runtime::time::Driver::new(io_stack, clock);
+                    (TimeDriver::Enabled { driver }, Some(handle))
+                }
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                crate::runtime::TimerFlavor::Alternative => {
+                    (TimeDriver::EnabledAlt(io_stack), Some(crate::runtime::time::Driver::new_alt(clock)))
+                }
+            }
         } else {
             (TimeDriver::Disabled(io_stack), None)
         }
@@ -309,6 +335,7 @@ cfg_time! {
         pub(crate) fn park(&mut self, handle: &Handle) {
             match self {
                 TimeDriver::Enabled { driver, .. } => driver.park(handle),
+                TimeDriver::EnabledAlt(v) => v.park(handle),
                 TimeDriver::Disabled(v) => v.park(handle),
             }
         }
@@ -316,6 +343,7 @@ cfg_time! {
         pub(crate) fn park_timeout(&mut self, handle: &Handle, duration: Duration) {
             match self {
                 TimeDriver::Enabled { driver } => driver.park_timeout(handle, duration),
+                TimeDriver::EnabledAlt(v) => v.park_timeout(handle, duration),
                 TimeDriver::Disabled(v) => v.park_timeout(handle, duration),
             }
         }
@@ -323,6 +351,7 @@ cfg_time! {
         pub(crate) fn shutdown(&mut self, handle: &Handle) {
             match self {
                 TimeDriver::Enabled { driver } => driver.shutdown(handle),
+                TimeDriver::EnabledAlt(v) => v.shutdown(handle),
                 TimeDriver::Disabled(v) => v.shutdown(handle),
             }
         }
@@ -341,6 +370,7 @@ cfg_not_time! {
 
     fn create_time_driver(
         _enable: bool,
+        _timer_flavor: crate::runtime::TimerFlavor,
         io_stack: IoStack,
         _clock: &Clock,
     ) -> (TimeDriver, TimeHandle) {
@@ -348,6 +378,6 @@ cfg_not_time! {
     }
 }
 
-cfg_tokio_uring! {
+cfg_io_uring! {
     pub(crate) mod op;
 }

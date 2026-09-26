@@ -1,5 +1,17 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // WASI does not support all fs operations
+#![cfg(all(
+    any(
+        feature = "full",
+        all(
+            target_os = "emscripten",
+            feature = "fs",
+            feature = "macros",
+            feature = "rt",
+            feature = "io-util"
+        )
+    ),
+    not(target_os = "wasi")
+))] // WASI does not support all fs operations
 
 use futures::future::FutureExt;
 use std::io::prelude::*;
@@ -124,6 +136,10 @@ async fn coop() {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "emscripten libc does not implement dup()/try_clone()"
+)]
 async fn write_to_clone() {
     let tempfile = tempfile();
 
@@ -219,6 +235,14 @@ async fn set_max_buf_size_write() {
 
     // A single write operation writes a maximum of 1 byte.
     assert_eq!(file.write(HELLO).await.unwrap(), 1);
+}
+
+#[tokio::test]
+#[should_panic(expected = "`max_buf_size` must be greater than 0")]
+async fn set_max_buf_size_panics_on_zero() {
+    let tempfile = tempfile();
+    let mut file = File::open(tempfile.path()).await.unwrap();
+    file.set_max_buf_size(0);
 }
 
 #[tokio::test]

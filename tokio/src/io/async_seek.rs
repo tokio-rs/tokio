@@ -87,9 +87,11 @@ where
 }
 
 impl<T: AsRef<[u8]> + Unpin> AsyncSeek for io::Cursor<T> {
+    #[inline]
     fn start_seek(mut self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
         io::Seek::seek(&mut *self, pos).map(drop)
     }
+    #[inline]
     fn poll_complete(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<u64>> {
         Poll::Ready(Ok(self.get_mut().position()))
     }

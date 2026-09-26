@@ -3,6 +3,7 @@ use crate::Stream;
 use core::fmt;
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -30,6 +31,32 @@ impl<St, F> FilterMap<St, F> {
     pub(super) fn new(stream: St, f: F) -> Self {
         Self { stream, f }
     }
+
+    /// Returns a reference to the inner stream.
+    pub fn get_ref(&self) -> &St {
+        &self.stream
+    }
+
+    /// Returns a mutable reference to the inner stream.
+    ///
+    /// Mutating the inner stream may confuse this combinator.
+    pub fn get_mut(&mut self) -> &mut St {
+        &mut self.stream
+    }
+
+    /// Returns a pinned mutable reference to the inner stream.
+    ///
+    /// Mutating the inner stream may confuse this combinator.
+    pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut St> {
+        self.project().stream
+    }
+
+    /// Consumes this combinator and returns the inner stream.
+    ///
+    /// This may discard intermediate combinator state.
+    pub fn into_inner(self) -> St {
+        self.stream
+    }
 }
 
 impl<St, F, T> Stream for FilterMap<St, F>
@@ -54,5 +81,15 @@ where
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         (0, self.stream.size_hint().1) // can't know a lower bound, due to the predicate
+    }
+}
+
+impl<St, F, T> FusedStream for FilterMap<St, F>
+where
+    St: FusedStream,
+    F: FnMut(St::Item) -> Option<T>,
+{
+    fn is_terminated(&self) -> bool {
+        self.stream.is_terminated()
     }
 }

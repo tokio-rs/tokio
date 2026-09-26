@@ -243,7 +243,7 @@ impl HistogramBuilder {
     }
 
     pub(crate) fn legacy_mut(&mut self, f: impl Fn(&mut LegacyBuilder)) {
-        let legacy = self.legacy.get_or_insert_with(|| LegacyBuilder::default());
+        let legacy = self.legacy.get_or_insert_with(LegacyBuilder::default);
         f(legacy);
     }
 

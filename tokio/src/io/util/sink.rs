@@ -37,13 +37,13 @@ cfg_io_util! {
     /// ```
     /// use tokio::io::{self, AsyncWriteExt};
     ///
-    /// #[tokio::main]
-    /// async fn main() -> io::Result<()> {
-    ///     let buffer = vec![1, 2, 3, 5, 8];
-    ///     let num_bytes = io::sink().write(&buffer).await?;
-    ///     assert_eq!(num_bytes, 5);
-    ///     Ok(())
-    /// }
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> io::Result<()> {
+    /// let buffer = vec![1, 2, 3, 5, 8];
+    /// let num_bytes = io::sink().write(&buffer).await?;
+    /// assert_eq!(num_bytes, 5);
+    /// Ok(())
+    /// # }
     /// ```
     pub fn sink() -> Sink {
         Sink { _p: () }
@@ -57,21 +57,21 @@ impl AsyncWrite for Sink {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(buf.len()))
     }
 
     #[inline]
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(()))
     }
 
     #[inline]
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        ready!(crate::trace::trace_leaf(cx));
+        ready!(crate::trace::trace_leaf());
         ready!(poll_proceed_and_make_progress(cx));
         Poll::Ready(Ok(()))
     }

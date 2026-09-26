@@ -3,6 +3,7 @@ use crate::Stream;
 use core::fmt;
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -32,6 +33,32 @@ impl<St, F> SkipWhile<St, F> {
             stream,
             predicate: Some(predicate),
         }
+    }
+
+    /// Returns a reference to the inner stream.
+    pub fn get_ref(&self) -> &St {
+        &self.stream
+    }
+
+    /// Returns a mutable reference to the inner stream.
+    ///
+    /// Mutating the inner stream may confuse this combinator.
+    pub fn get_mut(&mut self) -> &mut St {
+        &mut self.stream
+    }
+
+    /// Returns a pinned mutable reference to the inner stream.
+    ///
+    /// Mutating the inner stream may confuse this combinator.
+    pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut St> {
+        self.project().stream
+    }
+
+    /// Consumes this combinator and returns the inner stream.
+    ///
+    /// This may discard intermediate combinator state.
+    pub fn into_inner(self) -> St {
+        self.stream
     }
 }
 
@@ -69,5 +96,15 @@ where
         }
 
         (lower, upper)
+    }
+}
+
+impl<St, F> FusedStream for SkipWhile<St, F>
+where
+    St: FusedStream,
+    F: FnMut(&St::Item) -> bool,
+{
+    fn is_terminated(&self) -> bool {
+        self.stream.is_terminated()
     }
 }

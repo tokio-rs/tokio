@@ -69,6 +69,15 @@ impl UnixStream {
     /// This function will create a new Unix socket and connect to the path
     /// specified, associating the returned stream with the default event loop's
     /// handle.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
     pub async fn connect<P>(path: P) -> io::Result<UnixStream>
     where
         P: AsRef<Path>,
@@ -86,7 +95,26 @@ impl UnixStream {
         #[cfg(not(any(target_os = "linux", target_os = "android")))]
         let addr = StdSocketAddr::from_pathname(path)?;
 
-        let stream = mio::net::UnixStream::connect_addr(&addr)?;
+        let addr = SocketAddr::from(addr);
+        UnixStream::connect_addr(&addr).await
+    }
+
+    /// Connects to the socket named by `socket_addr`.
+    ///
+    /// This function will create a new Unix socket and connect to the address
+    /// specified, associating the returned stream with the default event
+    /// loop's handle.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if it is not called from within a runtime with
+    /// IO enabled.
+    ///
+    /// The runtime is usually set implicitly when this function is called
+    /// from a future driven by a tokio runtime, otherwise runtime can be set
+    /// explicitly with [`Runtime::enter`](crate::runtime::Runtime::enter) function.
+    pub async fn connect_addr(socket_addr: &SocketAddr) -> io::Result<UnixStream> {
+        let stream = mio::net::UnixStream::connect_addr(&socket_addr.0)?;
         let stream = UnixStream::new(stream)?;
 
         poll_fn(|cx| stream.io.registration().poll_write_ready(cx)).await?;
@@ -848,7 +876,7 @@ impl UnixStream {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn Error>> {
-    /// #   if cfg!(miri) { return Ok(()); } // No `socket` in miri.
+    /// #   if cfg!(miri) { return Ok(()); } // No Unix domain sockets in miri.
     ///     let dir = tempfile::tempdir().unwrap();
     ///     let bind_path = dir.path().join("bind_path");
     ///
@@ -886,8 +914,22 @@ impl UnixStream {
         let (a, b) = mio::net::UnixStream::pair()?;
         let a = UnixStream::new(a)?;
         let b = UnixStream::new(b)?;
+        // A fresh pair has empty buffers: writable now, readable only once
+        // the peer writes.
+        a.io.registration().assume_ready(Ready::WRITABLE);
+        b.io.registration().assume_ready(Ready::WRITABLE);
 
         Ok((a, b))
+    }
+
+    /// See `TcpStream::new_accepted`.
+    pub(crate) fn new_accepted(stream: mio::net::UnixStream) -> io::Result<UnixStream> {
+        let stream = UnixStream::new(stream)?;
+        stream
+            .io
+            .registration()
+            .assume_ready(Ready::READABLE | Ready::WRITABLE);
+        Ok(stream)
     }
 
     pub(crate) fn new(stream: mio::net::UnixStream) -> io::Result<UnixStream> {
@@ -974,7 +1016,7 @@ impl UnixStream {
     /// Unlike [`split`], the owned halves can be moved to separate tasks, however
     /// this comes at the cost of a heap allocation.
     ///
-    /// **Note:** Dropping the write half will shut down the write half of the
+    /// **Note:** Dropping the write half will only shut down the write half of the
     /// stream. This is equivalent to calling [`shutdown()`] on the `UnixStream`.
     ///
     /// [`split`]: Self::split()
@@ -1072,7 +1114,13 @@ impl UnixStream {
 
 impl fmt::Debug for UnixStream {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.io.fmt(f)
+        (*self.io).fmt(f)
+    }
+}
+
+impl AsRef<Self> for UnixStream {
+    fn as_ref(&self) -> &Self {
+        self
     }
 }
 

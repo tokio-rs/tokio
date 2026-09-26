@@ -170,8 +170,7 @@ impl UnixSocket {
     /// [`new_datagram`]: `UnixSocket::new_datagram`
     pub fn listen(self, backlog: u32) -> io::Result<UnixListener> {
         if self.ty() == socket2::Type::DGRAM {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(io::Error::other(
                 "listen cannot be called on a datagram socket",
             ));
         }
@@ -200,8 +199,7 @@ impl UnixSocket {
     /// [`new_datagram`]: `UnixSocket::new_datagram`
     pub async fn connect(self, path: impl AsRef<Path>) -> io::Result<UnixStream> {
         if self.ty() == socket2::Type::DGRAM {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(io::Error::other(
                 "connect cannot be called on a datagram socket",
             ));
         }
@@ -229,8 +227,7 @@ impl UnixSocket {
     /// [`new_stream`]: `UnixSocket::new_stream`
     pub fn datagram(self) -> io::Result<UnixDatagram> {
         if self.ty() == socket2::Type::STREAM {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(io::Error::other(
                 "datagram cannot be called on a stream socket",
             ));
         }
@@ -259,7 +256,9 @@ impl AsFd for UnixSocket {
 
 impl FromRawFd for UnixSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> UnixSocket {
-        let inner = socket2::Socket::from_raw_fd(fd);
+        // Safety: exactly the same safety requirements as the
+        // `FromRawFd::from_raw_fd` trait method.
+        let inner = unsafe { socket2::Socket::from_raw_fd(fd) };
         UnixSocket { inner }
     }
 }

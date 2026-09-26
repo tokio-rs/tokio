@@ -34,6 +34,33 @@ impl<T: Stream> Peekable<T> {
             self.peek.as_ref()
         }
     }
+
+    /// Peek at the next item in the stream as a mutable reference.
+    pub async fn peek_mut(&mut self) -> Option<&mut T::Item>
+    where
+        T: Unpin,
+    {
+        if let Some(ref mut it) = self.peek {
+            Some(it)
+        } else {
+            self.peek = self.next().await;
+            self.peek.as_mut()
+        }
+    }
+
+    /// Poll to peek at the next item in the stream as a mutable reference.
+    pub fn poll_peek(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<&mut T::Item>> {
+        let mut this = self.project();
+
+        if this.peek.is_none() {
+            match this.stream.as_mut().poll_next(cx) {
+                Poll::Ready(item) => *this.peek = item,
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+
+        Poll::Ready(this.peek.as_mut())
+    }
 }
 
 impl<T: Stream> Stream for Peekable<T> {
@@ -46,5 +73,13 @@ impl<T: Stream> Stream for Peekable<T> {
         } else {
             this.stream.poll_next(cx)
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let peek_len = if self.peek.is_some() { 1 } else { 0 };
+        let (lo, hi) = self.stream.size_hint();
+        let lo = lo.saturating_add(peek_len);
+        let hi = hi.and_then(|x| x.checked_add(peek_len));
+        (lo, hi)
     }
 }

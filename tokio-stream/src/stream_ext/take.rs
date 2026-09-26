@@ -4,6 +4,7 @@ use core::cmp;
 use core::fmt;
 use core::pin::Pin;
 use core::task::{Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -30,6 +31,32 @@ where
 impl<St> Take<St> {
     pub(super) fn new(stream: St, remaining: usize) -> Self {
         Self { stream, remaining }
+    }
+
+    /// Returns a reference to the inner stream.
+    pub fn get_ref(&self) -> &St {
+        &self.stream
+    }
+
+    /// Returns a mutable reference to the inner stream.
+    ///
+    /// Mutating the inner stream may confuse this combinator.
+    pub fn get_mut(&mut self) -> &mut St {
+        &mut self.stream
+    }
+
+    /// Returns a pinned mutable reference to the inner stream.
+    ///
+    /// Mutating the inner stream may confuse this combinator.
+    pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut St> {
+        self.project().stream
+    }
+
+    /// Consumes this combinator and returns the inner stream.
+    ///
+    /// This may discard intermediate combinator state.
+    pub fn into_inner(self) -> St {
+        self.stream
     }
 }
 
@@ -72,5 +99,14 @@ where
         };
 
         (lower, upper)
+    }
+}
+
+impl<St> FusedStream for Take<St>
+where
+    St: Stream,
+{
+    fn is_terminated(&self) -> bool {
+        self.remaining == 0
     }
 }

@@ -6,7 +6,7 @@ use tempfile::tempdir;
 use tokio::fs;
 
 #[tokio::test]
-async fn symlink_file_windows() {
+async fn symlink_dir_windows() {
     const FILE_NAME: &str = "abc.txt";
 
     let temp_dir = tempdir().unwrap();
