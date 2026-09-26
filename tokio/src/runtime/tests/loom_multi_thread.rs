@@ -77,6 +77,37 @@ impl<T> AtomicOneshot<T> {
 mod group_a {
     use super::*;
 
+    #[cfg(tokio_unstable)]
+    #[test]
+    fn llc_remote_schedule_races_shutdown() {
+        loom::model(|| {
+            let mut builder = runtime::Builder::new_multi_thread();
+            builder
+                .worker_threads(1)
+                .event_interval(2)
+                .llc_aware(runtime::LlcAwareConfig::new(1, |_| Some(0)));
+            let pool = builder.build().unwrap();
+            let handle = pool.handle().clone();
+
+            let submit = loom::thread::spawn(move || {
+                let task = task::Builder::new()
+                    .llc_partition(0)
+                    .spawn_on(track(async {}), &handle)
+                    .unwrap();
+                drop(task);
+            });
+
+            drop(pool);
+            submit.join().unwrap();
+        });
+    }
+
+    #[cfg(tokio_unstable)]
+    #[test]
+    fn llc_two_partition_queue_races() {
+        crate::runtime::scheduler::multi_thread::model_two_partition_queue_races();
+    }
+
     #[test]
     fn racy_shutdown() {
         loom::model(|| {

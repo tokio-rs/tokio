@@ -319,10 +319,30 @@ cfg_rt! {
 
     pub use crate::runtime::task::{Id, id, try_id};
 
-    cfg_trace! {
-        mod builder;
-        pub use builder::Builder;
-    }
+    #[cfg(all(
+        tokio_unstable,
+        any(feature = "tracing", feature = "rt-multi-thread")
+    ))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(
+            tokio_unstable,
+            any(feature = "tracing", feature = "rt-multi-thread")
+        )))
+    )]
+    mod builder;
+    #[cfg(all(
+        tokio_unstable,
+        any(feature = "tracing", feature = "rt-multi-thread")
+    ))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(
+            tokio_unstable,
+            any(feature = "tracing", feature = "rt-multi-thread")
+        )))
+    )]
+    pub use builder::Builder;
 
     /// Task-related futures.
     pub mod futures {

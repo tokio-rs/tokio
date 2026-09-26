@@ -1,4 +1,6 @@
 #![allow(unreachable_pub)]
+#[cfg(feature = "rt-multi-thread")]
+use crate::runtime::{LlcTaskOptions, LlcTaskPlacement};
 use crate::{
     runtime::{AutoBox, Handle},
     task::{JoinHandle, LocalSet},
@@ -14,10 +16,12 @@ use std::{future::Future, io, mem};
 ///
 /// Methods can be chained in order to configure it.
 ///
-/// Currently, there is only one configuration option:
+/// The following configuration options are available:
 ///
 /// - [`name`], which specifies an associated name for
 ///   the task
+/// - [`llc_partition`], which selects a last-level-cache partition
+/// - [`global_queue`], which bypasses LLC-aware placement
 ///
 /// There are three types of task that can be spawned from a Builder:
 /// - [`spawn_local`] for executing not [`Send`] futures
@@ -55,13 +59,20 @@ use std::{future::Future, io, mem};
 /// ```
 /// [unstable]: crate#unstable-features
 /// [`name`]: Builder::name
+/// [`llc_partition`]: Builder::llc_partition
+/// [`global_queue`]: Builder::global_queue
 /// [`spawn_local`]: Builder::spawn_local
 /// [`spawn`]: Builder::spawn
 /// [`spawn_blocking`]: Builder::spawn_blocking
 #[derive(Default, Debug)]
-#[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tracing"))))]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(all(tokio_unstable, any(feature = "tracing", feature = "rt-multi-thread"))))
+)]
 pub struct Builder<'a> {
     name: Option<&'a str>,
+    #[cfg(feature = "rt-multi-thread")]
+    llc: LlcTaskOptions,
 }
 
 impl<'a> Builder<'a> {
@@ -72,7 +83,67 @@ impl<'a> Builder<'a> {
 
     /// Assigns a name to the task which will be spawned.
     pub fn name(&self, name: &'a str) -> Self {
-        Self { name: Some(name) }
+        Self {
+            name: Some(name),
+            #[cfg(feature = "rt-multi-thread")]
+            llc: self.llc,
+        }
+    }
+
+    /// Assigns the task to an LLC partition when it enters a shared scheduler
+    /// queue.
+    ///
+    /// Tasks spawned from a runtime worker continue to use that worker's
+    /// private queue when possible. The partition hint takes effect whenever
+    /// the task must be scheduled through a shared queue. An out-of-range
+    /// partition falls back to the global queue. The hint has no effect when
+    /// LLC-aware scheduling is disabled.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> std::io::Result<()> {
+    /// let task = tokio::task::Builder::new()
+    ///     .llc_partition(0)
+    ///     .spawn(async {})?;
+    /// task.await.unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "rt-multi-thread")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
+    pub fn llc_partition(mut self, partition: usize) -> Self {
+        self.llc.placement = Some(LlcTaskPlacement::Partition(partition));
+        self
+    }
+
+    /// Routes the task through the global queue instead of an LLC queue.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn example() -> std::io::Result<()> {
+    /// let task = tokio::task::Builder::new()
+    ///     .global_queue()
+    ///     .spawn(async {})?;
+    /// task.await.unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "rt-multi-thread")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "rt-multi-thread")))]
+    pub fn global_queue(mut self) -> Self {
+        self.llc.placement = Some(LlcTaskPlacement::Global);
+        self
+    }
+
+    #[track_caller]
+    fn spawn_meta(&self, original_size: usize) -> SpawnMeta<'a> {
+        let meta = SpawnMeta::new(self.name, original_size);
+        #[cfg(feature = "rt-multi-thread")]
+        return meta.with_llc_options(self.llc);
+        #[cfg(not(feature = "rt-multi-thread"))]
+        meta
     }
 
     /// Spawns a task with this builder's settings on the current runtime.
@@ -90,10 +161,11 @@ impl<'a> Builder<'a> {
         Fut::Output: Send + 'static,
     {
         let fut_size = mem::size_of::<Fut>();
+        let meta = self.spawn_meta(fut_size);
         Ok(if AutoBox::<Fut>::SHOULD_BOX {
-            super::spawn::spawn_inner(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            super::spawn::spawn_inner(Box::pin(future), meta)
         } else {
-            super::spawn::spawn_inner(future, SpawnMeta::new(self.name, fut_size))
+            super::spawn::spawn_inner(future, meta)
         })
     }
 
@@ -111,10 +183,11 @@ impl<'a> Builder<'a> {
         Fut::Output: Send + 'static,
     {
         let fut_size = mem::size_of::<Fut>();
+        let meta = self.spawn_meta(fut_size);
         Ok(if AutoBox::<Fut>::SHOULD_BOX {
-            handle.spawn_named(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            handle.spawn_named(Box::pin(future), meta)
         } else {
-            handle.spawn_named(future, SpawnMeta::new(self.name, fut_size))
+            handle.spawn_named(future, meta)
         })
     }
 
@@ -142,10 +215,11 @@ impl<'a> Builder<'a> {
         Fut::Output: 'static,
     {
         let fut_size = mem::size_of::<Fut>();
+        let meta = self.spawn_meta(fut_size);
         Ok(if AutoBox::<Fut>::SHOULD_BOX {
-            super::local::spawn_local_inner(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            super::local::spawn_local_inner(Box::pin(future), meta)
         } else {
-            super::local::spawn_local_inner(future, SpawnMeta::new(self.name, fut_size))
+            super::local::spawn_local_inner(future, meta)
         })
     }
 
@@ -167,10 +241,11 @@ impl<'a> Builder<'a> {
         Fut::Output: 'static,
     {
         let fut_size = mem::size_of::<Fut>();
+        let meta = self.spawn_meta(fut_size);
         Ok(if AutoBox::<Fut>::SHOULD_BOX {
-            local_set.spawn_named(Box::pin(future), SpawnMeta::new(self.name, fut_size))
+            local_set.spawn_named(Box::pin(future), meta)
         } else {
-            local_set.spawn_named(future, SpawnMeta::new(self.name, fut_size))
+            local_set.spawn_named(future, meta)
         })
     }
 
@@ -213,18 +288,19 @@ impl<'a> Builder<'a> {
     {
         use crate::runtime::Mandatory;
         let fn_size = mem::size_of::<Function>();
+        let meta = self.spawn_meta(fn_size);
         let (join_handle, spawn_result) = if AutoBox::<Function>::SHOULD_BOX {
             handle.inner.blocking_spawner().spawn_blocking_inner(
                 Box::new(function),
                 Mandatory::NonMandatory,
-                SpawnMeta::new(self.name, fn_size),
+                meta,
                 handle,
             )
         } else {
             handle.inner.blocking_spawner().spawn_blocking_inner(
                 function,
                 Mandatory::NonMandatory,
-                SpawnMeta::new(self.name, fn_size),
+                meta,
                 handle,
             )
         };

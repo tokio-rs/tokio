@@ -1,4 +1,4 @@
-331
+336
 &
 +
 <
@@ -71,6 +71,7 @@ connectionless
 coroutines
 cpu
 cpus
+CPUs
 cqe
 CQE
 cqe's
@@ -169,6 +170,8 @@ Lauck
 libc
 lifecycle
 lifo
+LLC
+LLCs
 LLVM
 lookups
 macOS
@@ -275,6 +278,7 @@ symlinks
 sys
 syscall
 syscalls
+sysfs
 tcp
 TCP
 TestU01
@@ -312,6 +316,7 @@ unsynchronized
 untrusted
 uring
 usecases
+userspace
 Valgrind
 Varghese
 vec

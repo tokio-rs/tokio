@@ -36,8 +36,13 @@ impl Handle {
         let owned = &self.shared.owned;
         let mut local = self.shared.steal_all();
         let injection = &self.shared.inject;
+        let mut llc_tasks = Vec::new();
+        #[cfg(tokio_unstable)]
+        if let Some(queues) = &self.shared.llc {
+            queues.drain_into(&mut llc_tasks);
+        }
 
-        let traces = trace_multi_thread(owned, &mut local, injection)
+        let traces = trace_multi_thread(owned, &mut local, injection, llc_tasks)
             .into_iter()
             .map(|(id, trace)| dump::Task::new(id, trace))
             .collect();

@@ -6,6 +6,10 @@ use crate::runtime::{Callback, TaskCallback};
 use crate::util::RngSeedGenerator;
 
 pub(crate) struct Config {
+    /// Configuration for LLC-aware scheduling on the multi-thread runtime.
+    #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+    pub(crate) llc_aware: Option<crate::runtime::LlcAwareConfig>,
+
     /// How many ticks before pulling a task from the global/remote queue?
     pub(crate) global_queue_interval: Option<u32>,
 

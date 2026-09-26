@@ -397,7 +397,13 @@ impl Handle {
         let future = super::task::trace::Trace::root(future);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", meta, id.as_u64());
-        self.inner.spawn(future, id, meta.spawned_at)
+        self.inner.spawn(
+            future,
+            id,
+            meta.spawned_at,
+            #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+            meta.llc,
+        )
     }
 
     #[track_caller]

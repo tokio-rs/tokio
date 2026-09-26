@@ -56,6 +56,11 @@
 //! the inject queue indefinitely. This would be a ref-count cycle and a memory
 //! leak.
 
+#[cfg(tokio_unstable)]
+use super::llc::{LlcQueues, NO_PARTITION};
+
+#[cfg(tokio_unstable)]
+use crate::loom::sync::atomic::AtomicUsize;
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
 use crate::runtime::scheduler::multi_thread::{
@@ -71,8 +76,13 @@ use crate::task::coop;
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
+#[cfg(tokio_unstable)]
+use crate::runtime::{LlcTaskHint, LlcTaskPlacement};
+
 use std::cell::RefCell;
 use std::ops::ControlFlow;
+#[cfg(tokio_unstable)]
+use std::sync::atomic::Ordering::{Acquire, Release};
 use std::task::Waker;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -164,6 +174,14 @@ struct Core {
 
     /// Fast random number generator.
     rand: FastRand,
+
+    /// LLC partition observed at the most recent topology refresh.
+    #[cfg(tokio_unstable)]
+    llc_partition: Option<usize>,
+
+    /// Scheduler tick at which the LLC partition was last refreshed.
+    #[cfg(tokio_unstable)]
+    llc_refresh_tick: u32,
 }
 
 /// State shared across all workers
@@ -176,6 +194,10 @@ pub(crate) struct Shared {
     ///  1. Submit work to the scheduler while **not** currently on a worker thread.
     ///  2. Submit work to the scheduler when a worker run queue is saturated
     pub(super) inject: InjectQueue<Arc<Handle>>,
+
+    /// Shared queues for work which has an LLC affinity.
+    #[cfg(tokio_unstable)]
+    llc: Option<LlcQueues>,
 
     /// Coordinates idle workers
     idle: Idle,
@@ -241,6 +263,10 @@ struct Remote {
 
     /// Unparks the associated worker thread
     unpark: Unparker,
+
+    /// The worker's last observed LLC partition.
+    #[cfg(tokio_unstable)]
+    llc_partition: AtomicUsize,
 }
 
 /// Thread-local context
@@ -261,6 +287,25 @@ pub(crate) struct Launch(Vec<Arc<Worker>>);
 
 /// A notified task handle
 type Notified = task::Notified<Arc<Handle>>;
+
+struct LocalOverflow<'a> {
+    handle: &'a Handle,
+    #[cfg(tokio_unstable)]
+    partition: Option<usize>,
+}
+
+impl<'a> LocalOverflow<'a> {
+    fn new(
+        handle: &'a Handle,
+        #[cfg_attr(not(tokio_unstable), allow(unused))] core: &Core,
+    ) -> Self {
+        Self {
+            handle,
+            #[cfg(tokio_unstable)]
+            partition: core.llc_partition,
+        }
+    }
+}
 
 /// Value picked out of thin-air. Running the LIFO slot a handful of times
 /// seems sufficient to benefit from locality. More than 3 times probably is
@@ -308,9 +353,18 @@ pub(super) fn create(
             global_queue_interval: stats.tuned_global_queue_interval(&config),
             stats,
             rand: FastRand::from_seed(config.seed_generator.next_seed()),
+            #[cfg(tokio_unstable)]
+            llc_partition: None,
+            #[cfg(tokio_unstable)]
+            llc_refresh_tick: 0,
         }));
 
-        remotes.push(Remote { steal, unpark });
+        remotes.push(Remote {
+            steal,
+            unpark,
+            #[cfg(tokio_unstable)]
+            llc_partition: AtomicUsize::new(NO_PARTITION),
+        });
         worker_metrics.push(metrics);
     }
 
@@ -324,6 +378,11 @@ pub(super) fn create(
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
             inject: InjectQueue::new(),
+            #[cfg(tokio_unstable)]
+            llc: config
+                .llc_aware
+                .as_ref()
+                .map(|config| LlcQueues::new(config.partition_count, size)),
             idle,
             owned: OwnedTasks::new(size),
             synced: Mutex::new(Synced {
@@ -479,8 +538,9 @@ fn maybe_move_runtime() -> Result<(bool, bool), &'static str> {
         // run this core. Except for the task in the lifo_slot, all tasks can be
         // stolen, so we move the task out of the lifo_slot to the run_queue.
         if let Some(task) = core.lifo_slot.take() {
+            let overflow = LocalOverflow::new(&cx.worker.handle, &core);
             core.run_queue
-                .push_back_or_overflow(task, &*cx.worker.handle, &mut core.stats);
+                .push_back_or_overflow(task, &overflow, &mut core.stats);
         }
 
         // We are taking the core from the context and sending it to another
@@ -572,6 +632,9 @@ impl Context {
         // a task that had the LIFO slot disabled.
         self.reset_lifo_enabled(&mut core);
 
+        #[cfg(tokio_unstable)]
+        core.refresh_llc_partition(&self.worker, true);
+
         // Start as "processing" tasks as polling tasks from the local queue
         // will be one of the first things we do.
         core.stats.start_processing_scheduled_tasks();
@@ -588,6 +651,9 @@ impl Context {
 
             // Run maintenance, if needed
             core = self.maintenance(core);
+
+            #[cfg(tokio_unstable)]
+            core.refresh_llc_partition(&self.worker, false);
 
             // First, check work available to the current worker.
             if let Some(task) = core.next_task(&self.worker) {
@@ -617,6 +683,8 @@ impl Context {
                 } else {
                     self.park(core)
                 };
+                #[cfg(tokio_unstable)]
+                core.refresh_llc_partition(&self.worker, true);
                 core.stats.start_processing_scheduled_tasks();
             }
         }
@@ -645,6 +713,11 @@ impl Context {
     /// running the task completes, it is returned. Otherwise, the worker will need
     /// to stop processing.
     fn run_task(&self, task: Notified, mut core: Box<Core>) -> ControlFlow<(), Box<Core>> {
+        #[cfg(tokio_unstable)]
+        if let Some(partition) = core.llc_partition {
+            task.set_last_llc_partition(partition);
+        }
+
         let task = self.worker.handle.shared.owned.assert_owner(task);
 
         // Make sure the worker is not in the **searching** state. This enables
@@ -738,11 +811,9 @@ impl Context {
 
                     // Not enough budget left to run the LIFO task, push it to
                     // the back of the queue and return.
-                    core.run_queue.push_back_or_overflow(
-                        task,
-                        &*self.worker.handle,
-                        &mut core.stats,
-                    );
+                    let overflow = LocalOverflow::new(&self.worker.handle, &core);
+                    core.run_queue
+                        .push_back_or_overflow(task, &overflow, &mut core.stats);
                     // If we hit this point, the LIFO slot should be enabled.
                     // There is no need to reset it.
                     debug_assert!(core.lifo_enabled);
@@ -763,6 +834,11 @@ impl Context {
                 if lifo_polls >= MAX_LIFO_POLLS_PER_TICK {
                     core.lifo_enabled = false;
                     super::counters::inc_lifo_capped();
+                }
+
+                #[cfg(tokio_unstable)]
+                if let Some(partition) = core.llc_partition {
+                    task.set_last_llc_partition(partition);
                 }
 
                 let task = self.worker.handle.shared.owned.assert_owner(task);
@@ -1092,15 +1168,48 @@ impl Core {
             // Update the global queue interval, if needed
             self.tune_global_queue_interval(worker);
 
+            #[cfg(tokio_unstable)]
+            if self.llc_partition.is_some() && worker.handle.shared.llc.is_some() {
+                // Alternate which shared queue wins the periodic fairness
+                // check so neither a saturated global queue nor a saturated
+                // LLC queue can starve the other.
+                let round = self.tick / self.global_queue_interval;
+                let task = if round % 2 == 0 {
+                    worker
+                        .handle
+                        .next_remote_task()
+                        .or_else(|| self.next_llc_task(worker))
+                } else {
+                    self.next_llc_task(worker)
+                        .or_else(|| worker.handle.next_remote_task())
+                };
+                return task.or_else(|| self.next_local_task());
+            }
+
             worker
                 .handle
                 .next_remote_task()
                 .or_else(|| self.next_local_task())
+                .or_else(|| {
+                    #[cfg(tokio_unstable)]
+                    {
+                        self.next_llc_task(worker)
+                    }
+                    #[cfg(not(tokio_unstable))]
+                    {
+                        None
+                    }
+                })
         } else {
             let maybe_task = self.next_local_task();
 
             if maybe_task.is_some() {
                 return maybe_task;
+            }
+
+            #[cfg(tokio_unstable)]
+            if let Some(task) = self.next_llc_task(worker) {
+                return Some(task);
             }
 
             if worker.inject().is_empty() {
@@ -1159,6 +1268,32 @@ impl Core {
         self.lifo_slot.take().or_else(|| self.run_queue.pop())
     }
 
+    #[cfg(tokio_unstable)]
+    fn next_llc_task(&mut self, worker: &Worker) -> Option<Notified> {
+        let partition = self.llc_partition?;
+        let queues = worker.handle.shared.llc.as_ref()?;
+        if queues.is_empty(partition) {
+            return None;
+        }
+
+        let cap = usize::min(
+            self.run_queue.remaining_slots(),
+            self.run_queue.max_capacity() / 2,
+        );
+        let n = usize::max(
+            1,
+            usize::min(
+                queues.len(partition) / queues.worker_count(partition).max(1) + 1,
+                cap,
+            ),
+        );
+        queues.pop_n(partition, n, |mut tasks| {
+            let task = tasks.next();
+            self.run_queue.push_back(tasks);
+            task
+        })
+    }
+
     /// Function responsible for stealing tasks from another worker
     ///
     /// Note: Only if less than half the workers are searching for tasks to steal
@@ -1172,6 +1307,133 @@ impl Core {
         let num = worker.handle.shared.remotes.len();
         // Start from a random worker
         let start = self.rand.fastrand_n(num as u32) as usize;
+
+        #[cfg(tokio_unstable)]
+        if let Some(partition) = self.llc_partition {
+            let config = worker
+                .handle
+                .shared
+                .config
+                .llc_aware
+                .as_ref()
+                .expect("LLC queues exist without configuration");
+            let numa_node = config.numa_node(partition);
+            let queues = worker
+                .handle
+                .shared
+                .llc
+                .as_ref()
+                .expect("LLC config exists without queues");
+
+            // Prefer workers which were most recently observed on this LLC.
+            if let Some(task) = queues.find_worker(partition, start, |index| {
+                if index == worker.index
+                    || worker.handle.shared.remotes[index]
+                        .llc_partition
+                        .load(Acquire)
+                        != partition
+                {
+                    return None;
+                }
+                worker.handle.shared.remotes[index]
+                    .steal
+                    .steal_into(&mut self.run_queue, &mut self.stats)
+            }) {
+                return Some(task);
+            }
+
+            if let Some(task) = worker.handle.pop_llc_task(partition) {
+                return Some(task);
+            }
+
+            // Unaffiliated work is preferable to a cross-LLC migration.
+            if let Some(task) = worker.handle.next_remote_task() {
+                return Some(task);
+            }
+
+            let partition_start = self.rand.fastrand_n(queues.partition_count() as u32) as usize;
+
+            // Cross an LLC boundary, but remain on the same NUMA node. Shared
+            // queues come first because taking unowned work does not disturb a
+            // peer's cache-warm private queue.
+            if let Some(task) = queues.pop_other_where(
+                partition,
+                partition_start,
+                config.cross_llc_scan_limit,
+                |candidate| config.numa_node(candidate) == numa_node,
+            ) {
+                return Some(task);
+            }
+
+            let mut probes = 0;
+            for offset in 0..num {
+                let index = (start + offset) % num;
+                let candidate = worker.handle.shared.worker_llc_partition(index);
+                if index == worker.index || candidate == Some(partition) {
+                    continue;
+                }
+                let Some(candidate) = candidate else {
+                    continue;
+                };
+                if config.numa_node(candidate) != numa_node {
+                    continue;
+                }
+                if probes == config.cross_llc_scan_limit {
+                    break;
+                }
+                probes += 1;
+
+                if let Some(task) = worker.handle.shared.remotes[index]
+                    .steal
+                    .steal_into_with_limit(
+                        &mut self.run_queue,
+                        &mut self.stats,
+                        config.cross_llc_steal_batch,
+                    )
+                {
+                    return Some(task);
+                }
+            }
+
+            // Crossing a NUMA boundary is the final rung and gets its own,
+            // smaller probe budget.
+            if let Some(task) = queues.pop_other_where(
+                partition,
+                partition_start,
+                config.cross_numa_scan_limit,
+                |candidate| config.numa_node(candidate) != numa_node,
+            ) {
+                return Some(task);
+            }
+
+            let mut probes = 0;
+            for offset in 0..num {
+                let index = (start + offset) % num;
+                let candidate = worker.handle.shared.worker_llc_partition(index);
+                if index == worker.index
+                    || candidate.is_some_and(|candidate| config.numa_node(candidate) == numa_node)
+                {
+                    continue;
+                }
+                if probes == config.cross_numa_scan_limit {
+                    break;
+                }
+                probes += 1;
+
+                if let Some(task) = worker.handle.shared.remotes[index]
+                    .steal
+                    .steal_into_with_limit(
+                        &mut self.run_queue,
+                        &mut self.stats,
+                        config.cross_numa_steal_batch,
+                    )
+                {
+                    return Some(task);
+                }
+            }
+
+            return None;
+        }
 
         for i in 0..num {
             let i = (start + i) % num;
@@ -1192,6 +1454,53 @@ impl Core {
 
         // Fallback on checking the global queue
         worker.handle.next_remote_task()
+    }
+
+    #[cfg(tokio_unstable)]
+    fn refresh_llc_partition(&mut self, worker: &Worker, force: bool) {
+        let Some(config) = &worker.handle.shared.config.llc_aware else {
+            return;
+        };
+
+        if !force && self.tick.wrapping_sub(self.llc_refresh_tick) < config.refresh_interval {
+            return;
+        }
+        self.llc_refresh_tick = self.tick;
+
+        let next = config.current_partition(Some(worker.index));
+        if next == self.llc_partition {
+            return;
+        }
+
+        let previous = self.llc_partition;
+        let queues = worker
+            .handle
+            .shared
+            .llc
+            .as_ref()
+            .expect("LLC config exists without queues");
+        queues.update_worker(worker.index, previous, next);
+        if let Some(previous) = previous {
+            // The local queue contains tasks whose working sets were last used
+            // on the old LLC. Leave them there for a worker which is still in
+            // that partition rather than dragging the cache footprint along
+            // with this migrated worker.
+            if let Some(task) = self.lifo_slot.take() {
+                worker.handle.push_task_with_affinity(task, Some(previous));
+            }
+            while let Some(task) = self.run_queue.pop() {
+                worker.handle.push_task_with_affinity(task, Some(previous));
+            }
+        }
+
+        self.llc_partition = next;
+        worker.handle.shared.remotes[worker.index]
+            .llc_partition
+            .store(next.unwrap_or(NO_PARTITION), Release);
+
+        if previous.is_some() {
+            worker.handle.notify_parked_for_partition(previous);
+        }
     }
 
     fn transition_to_searching(&mut self, worker: &Worker) -> bool {
@@ -1349,6 +1658,14 @@ impl Worker {
     }
 }
 
+#[cfg(tokio_unstable)]
+impl Shared {
+    pub(super) fn worker_llc_partition(&self, worker: usize) -> Option<usize> {
+        let partition = self.remotes[worker].llc_partition.load(Acquire);
+        (partition != NO_PARTITION).then_some(partition)
+    }
+}
+
 impl Handle {
     pub(super) fn schedule_task(&self, task: Notified, is_yield: bool) {
         if self.shared.schedule_latency_start.is_some() {
@@ -1370,8 +1687,8 @@ impl Handle {
             }
 
             // Otherwise, use the inject queue.
-            self.push_remote_task(task);
-            self.notify_parked_remote();
+            let partition = self.push_remote_task(task);
+            self.notify_parked_for_partition(partition);
         });
     }
 
@@ -1383,7 +1700,25 @@ impl Handle {
     }
 
     fn schedule_local(&self, core: &mut Core, task: Notified, is_yield: bool) {
+        #[cfg(tokio_unstable)]
+        if self.shared.llc.is_some() {
+            let placement = task.llc_options().placement;
+            let use_shared_queue = match placement {
+                Some(LlcTaskPlacement::Global) => true,
+                Some(LlcTaskPlacement::Partition(partition)) => {
+                    core.llc_partition != Some(partition)
+                }
+                Some(LlcTaskPlacement::Inherit) | None => false,
+            };
+            if use_shared_queue {
+                let partition = self.push_remote_task(task);
+                self.notify_parked_for_partition(partition);
+                return;
+            }
+        }
+
         core.stats.inc_local_schedule_count();
+        let overflow = LocalOverflow::new(self, core);
 
         // Spawning from the worker thread. If scheduling a "yield" then the
         // task must always be pushed to the back of the queue, enabling other
@@ -1391,7 +1726,7 @@ impl Handle {
         // flexibility and the task may go to the front of the queue.
         let should_notify = if is_yield || !core.lifo_enabled {
             core.run_queue
-                .push_back_or_overflow(task, self, &mut core.stats);
+                .push_back_or_overflow(task, &overflow, &mut core.stats);
             true
         } else {
             // Push to the LIFO slot
@@ -1400,7 +1735,7 @@ impl Handle {
 
             if let Some(prev) = prev {
                 core.run_queue
-                    .push_back_or_overflow(prev, self, &mut core.stats);
+                    .push_back_or_overflow(prev, &overflow, &mut core.stats);
             }
 
             core.lifo_slot = Some(task);
@@ -1412,6 +1747,9 @@ impl Handle {
         // scheduling is from a resource driver. As notifications often come in
         // batches, the notification is delayed until the park is complete.
         if should_notify && core.park.is_some() {
+            #[cfg(tokio_unstable)]
+            self.notify_parked_for_partition(core.llc_partition);
+            #[cfg(not(tokio_unstable))]
             self.notify_parked_local();
         }
     }
@@ -1420,10 +1758,66 @@ impl Handle {
         self.shared.inject.pop()
     }
 
-    fn push_remote_task(&self, task: Notified) {
+    fn push_remote_task(&self, task: Notified) -> Option<usize> {
         self.shared.scheduler_metrics.inc_remote_schedule_count();
 
+        #[cfg(tokio_unstable)]
+        return self.push_task_with_affinity(task, None);
+
+        #[cfg(not(tokio_unstable))]
+        {
+            self.shared.inject.push(task);
+            None
+        }
+    }
+
+    #[cfg(tokio_unstable)]
+    fn push_task_with_affinity(
+        &self,
+        task: Notified,
+        inherited_partition: Option<usize>,
+    ) -> Option<usize> {
+        if let (Some(config), Some(queues)) = (&self.shared.config.llc_aware, &self.shared.llc) {
+            let task_options = task.llc_options();
+            let mut hint = if let Some(callback) = &config.task_hint {
+                callback(&task.task_meta())
+            } else {
+                LlcTaskHint::default()
+            };
+            if let Some(placement) = task_options.placement {
+                hint.placement = placement;
+            }
+            let partition = match hint.placement {
+                LlcTaskPlacement::Inherit => task
+                    .last_llc_partition()
+                    .or(inherited_partition)
+                    .or_else(|| config.current_partition(None)),
+                LlcTaskPlacement::Global => None,
+                LlcTaskPlacement::Partition(partition) => {
+                    (partition < config.partition_count).then_some(partition)
+                }
+            };
+
+            if let Some(partition) = partition {
+                // When no worker is currently associated with the requested
+                // LLC, putting the task in that partition would guarantee a
+                // later cross-LLC dequeue. Keep it immediately visible in the
+                // global queue instead. This is especially important when a
+                // pool has fewer workers than the machine has LLCs.
+                if queues.worker_count(partition) > 0 {
+                    queues.push(partition, task);
+                    return Some(partition);
+                }
+            }
+        }
+
         self.shared.inject.push(task);
+        None
+    }
+
+    #[cfg(tokio_unstable)]
+    fn pop_llc_task(&self, partition: usize) -> Option<Notified> {
+        self.shared.llc.as_ref()?.pop(partition)
     }
 
     #[cfg(all(tokio_unstable, feature = "time"))]
@@ -1448,7 +1842,12 @@ impl Handle {
     }
 
     pub(super) fn close(&self) {
-        if self.shared.inject.close() {
+        let was_open = self.shared.inject.close();
+        #[cfg(tokio_unstable)]
+        if let Some(queues) = &self.shared.llc {
+            queues.close();
+        }
+        if was_open {
             self.notify_all();
         }
     }
@@ -1474,6 +1873,23 @@ impl Handle {
         }
     }
 
+    #[cfg_attr(not(tokio_unstable), allow(unused_variables))]
+    fn notify_parked_for_partition(&self, partition: Option<usize>) {
+        #[cfg(tokio_unstable)]
+        if let Some(partition) = partition {
+            if let Some(index) = self
+                .shared
+                .idle
+                .worker_to_notify_for_partition(&self.shared, partition)
+            {
+                self.shared.remotes[index].unpark.unpark(&self.driver);
+                return;
+            }
+        }
+
+        self.notify_parked_remote();
+    }
+
     pub(super) fn notify_all(&self) {
         for remote in &self.shared.remotes[..] {
             remote.unpark.unpark(&self.driver);
@@ -1490,6 +1906,16 @@ impl Handle {
 
         if !self.shared.inject.is_empty() {
             self.notify_parked_local();
+        } else {
+            #[cfg(tokio_unstable)]
+            if self
+                .shared
+                .llc
+                .as_ref()
+                .is_some_and(|queues| !queues.all_empty())
+            {
+                self.notify_parked_local();
+            }
         }
     }
 
@@ -1528,6 +1954,15 @@ impl Handle {
         while let Some(task) = self.next_remote_task() {
             drop(task);
         }
+
+        #[cfg(tokio_unstable)]
+        if let Some(queues) = &self.shared.llc {
+            for partition in 0..queues.partition_count() {
+                while let Some(task) = queues.pop(partition) {
+                    drop(task);
+                }
+            }
+        }
     }
 
     fn ptr_eq(&self, other: &Handle) -> bool {
@@ -1535,16 +1970,44 @@ impl Handle {
     }
 }
 
-impl Overflow<Arc<Handle>> for Handle {
+impl Overflow<Arc<Handle>> for LocalOverflow<'_> {
     fn push(&self, task: task::Notified<Arc<Handle>>) {
-        self.push_remote_task(task);
+        self.handle
+            .shared
+            .scheduler_metrics
+            .inc_remote_schedule_count();
+        #[cfg(tokio_unstable)]
+        self.handle.push_task_with_affinity(task, self.partition);
+        #[cfg(not(tokio_unstable))]
+        self.handle.shared.inject.push(task);
     }
 
     fn push_batch<I>(&self, iter: I)
     where
         I: Iterator<Item = task::Notified<Arc<Handle>>>,
     {
-        self.shared.inject.push_batch(iter);
+        #[cfg(tokio_unstable)]
+        if let Some(config) = &self.handle.shared.config.llc_aware {
+            // A task with global or cross-partition placement is routed away
+            // before it can enter the local queue. Without an enqueue
+            // callback, every task reaching local overflow can therefore
+            // inherit the worker's current partition as one FIFO batch.
+            if config.task_hint.is_none() {
+                if let (Some(partition), Some(queues)) = (self.partition, &self.handle.shared.llc) {
+                    if queues.worker_count(partition) > 0 {
+                        queues.push_batch(partition, iter);
+                        return;
+                    }
+                }
+            }
+
+            for task in iter {
+                self.handle.push_task_with_affinity(task, self.partition);
+            }
+            return;
+        }
+
+        self.handle.shared.inject.push_batch(iter);
     }
 }
 

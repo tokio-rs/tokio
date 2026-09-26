@@ -12,9 +12,8 @@ cfg_fs! {
     pub(crate) use pool::spawn_mandatory_blocking;
 }
 
-cfg_trace! {
-    pub(crate) use pool::Mandatory;
-}
+#[cfg(all(tokio_unstable, any(feature = "tracing", feature = "rt-multi-thread")))]
+pub(crate) use pool::Mandatory;
 
 mod schedule;
 mod shutdown;

@@ -14,20 +14,39 @@ cfg_rt! {
         /// This is wrapped in a type that may be empty when `tokio_unstable` is
         /// not enabled.
         pub(crate) spawned_at: crate::runtime::task::SpawnLocation,
+        /// LLC placement override from `task::Builder`.
+        #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+        pub(crate) llc: crate::runtime::LlcTaskOptions,
         _pd: PhantomData<&'a ()>,
     }
 
     impl<'a> SpawnMeta<'a> {
         /// Create new spawn meta with a name and original size (before possible auto-boxing)
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        #[cfg(all(
+            tokio_unstable,
+            any(feature = "tracing", feature = "rt-multi-thread")
+        ))]
         #[track_caller]
         pub(crate) fn new(name: Option<&'a str>, original_size: usize) -> Self {
+            #[cfg(not(feature = "tracing"))]
+            let _ = (name, original_size);
+
             Self {
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
                 name,
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
                 original_size,
                 spawned_at: crate::runtime::task::SpawnLocation::capture(),
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                llc: crate::runtime::LlcTaskOptions::default(),
                 _pd: PhantomData,
             }
+        }
+
+        #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+        pub(crate) fn with_llc_options(mut self, llc: crate::runtime::LlcTaskOptions) -> Self {
+            self.llc = llc;
+            self
         }
 
         /// Create a new unnamed spawn meta with the original size (before possible auto-boxing)
@@ -42,6 +61,8 @@ cfg_rt! {
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
                 original_size,
                 spawned_at: crate::runtime::task::SpawnLocation::capture(),
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                llc: crate::runtime::LlcTaskOptions::default(),
                 _pd: PhantomData,
             }
         }

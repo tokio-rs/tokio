@@ -12,6 +12,11 @@ pub(crate) use overflow::Overflow;
 mod idle;
 use self::idle::Idle;
 
+#[cfg(tokio_unstable)]
+mod llc;
+#[cfg(all(test, loom, tokio_unstable))]
+pub(crate) use llc::model_two_partition_queue_races;
+
 mod stats;
 pub(crate) use stats::Stats;
 
