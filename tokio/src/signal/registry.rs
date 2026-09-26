@@ -82,14 +82,13 @@ impl<S: Storage> Registry<S> {
     ///
     /// Returns `true` if an event was delivered to at least one listener.
     fn broadcast(&self) -> bool {
-        #[allow(clippy::unnecessary_fold, reason = "must not return early")]
         self.storage
             .iter()
             // Any signal of this kind arrived since we checked last?
             .filter(|event_info| event_info.pending.swap(false, Ordering::SeqCst))
             // Ignore errors if there are no listeners
             .map(|event_info| event_info.tx.send(()).is_ok())
-            .fold(false, |acc, x| acc || x)
+            .fold(false, |acc, x| acc | x)
     }
 }
 
