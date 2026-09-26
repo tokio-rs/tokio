@@ -33,6 +33,20 @@ impl AtomicUsize {
         // safety: we have mutable access
         f(unsafe { (*self.inner.get()).get_mut() })
     }
+
+    // TODO(MSRV 1.95): When bumping MSRV, switch to `try_update`.
+    pub(crate) fn fetch_update<F>(
+        &self,
+        set_order: std::sync::atomic::Ordering,
+        fetch_order: std::sync::atomic::Ordering,
+        f: F,
+    ) -> Result<usize, usize>
+    where
+        F: FnMut(usize) -> Option<usize>,
+    {
+        #[allow(deprecated)]
+        ops::Deref::deref(self).fetch_update(set_order, fetch_order, f)
+    }
 }
 
 impl ops::Deref for AtomicUsize {
