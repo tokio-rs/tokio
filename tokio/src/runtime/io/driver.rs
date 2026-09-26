@@ -15,10 +15,10 @@ use crate::runtime::driver;
 use crate::runtime::io::registration_set;
 use crate::runtime::io::{IoDriverMetrics, RegistrationSet, ScheduledIo};
 
+use crate::loom::sync::Arc;
 use mio::event::Source;
 use std::fmt;
 use std::io;
-use std::sync::Arc;
 use std::time::Duration;
 
 /// I/O driver, backed by Mio.
@@ -94,7 +94,7 @@ cfg_net_unix!(
 );
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
-pub(super) enum Direction {
+pub(crate) enum Direction {
     Read,
     Write,
 }
@@ -217,16 +217,12 @@ impl Driver {
                 self.signal_ready = true;
             } else {
                 let ready = Ready::from_mio(event);
-                let ptr = super::EXPOSE_IO.from_exposed_addr(token.0);
 
                 // Safety: we ensure that the pointers used as tokens are not freed
                 // until they are both deregistered from mio **and** we know the I/O
                 // driver is not concurrently polling. The I/O driver holds ownership of
                 // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
-                let io: &ScheduledIo = unsafe { &*ptr };
-
-                io.set_readiness(Tick::Set, |curr| curr | ready);
-                io.wake(ready);
+                unsafe { dispatch_event(token, ready) };
 
                 ready_count += 1;
             }
@@ -311,6 +307,17 @@ impl Handle {
         Ok(scheduled_io)
     }
 
+    fn deregister_inner(&self, registration: &Arc<ScheduledIo>) {
+        if self
+            .registrations
+            .deregister(&mut self.synced.lock(), registration)
+        {
+            self.unpark();
+        }
+
+        self.metrics.dec_fd_count();
+    }
+
     /// Deregisters an I/O resource from the reactor.
     pub(super) fn deregister_source(
         &self,
@@ -321,14 +328,7 @@ impl Handle {
         // Cleanup ALWAYS happens
         let os_result = self.registry.deregister(source);
 
-        if self
-            .registrations
-            .deregister(&mut self.synced.lock(), registration)
-        {
-            self.unpark();
-        }
-
-        self.metrics.dec_fd_count();
+        self.deregister_inner(registration);
 
         os_result // Return error after cleanup
     }
@@ -338,6 +338,20 @@ impl Handle {
             self.registrations.release(&mut self.synced.lock());
         }
     }
+}
+
+/// Delivers an event that the poller has already returned.
+///
+/// # Safety
+///
+/// `token` must refer to a registered `ScheduledIo` that remains alive through
+/// this call. Pending registrations are released only before the next poll.
+pub(crate) unsafe fn dispatch_event(token: mio::Token, ready: Ready) {
+    let ptr = super::EXPOSE_IO.from_exposed_addr(token.0);
+    // Safety: the caller guarantees that the registration remains alive.
+    let io: &ScheduledIo = unsafe { &*ptr };
+    io.set_readiness(Tick::Set, |curr| curr | ready);
+    io.wake(ready);
 }
 
 impl fmt::Debug for Handle {

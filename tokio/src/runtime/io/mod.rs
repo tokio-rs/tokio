@@ -3,17 +3,21 @@
     allow(dead_code)
 )]
 mod driver;
-use driver::{Direction, Tick};
-pub(crate) use driver::{Driver, Handle, ReadyEvent};
+#[cfg(all(test, loom))]
+pub(crate) use driver::dispatch_event;
+use driver::Tick;
+pub(crate) use driver::{Direction, Driver, Handle, ReadyEvent};
 
 mod registration;
 pub(crate) use registration::Registration;
 
 mod registration_set;
-use registration_set::RegistrationSet;
+pub(crate) use registration_set::RegistrationSet;
+#[cfg(all(test, loom))]
+pub(crate) use registration_set::Synced;
 
 mod scheduled_io;
-use scheduled_io::ScheduledIo;
+pub(crate) use scheduled_io::ScheduledIo;
 
 mod metrics;
 use metrics::IoDriverMetrics;

@@ -4,9 +4,9 @@ use crate::io::interest::Interest;
 use crate::runtime::io::{Direction, Handle, ReadyEvent, ScheduledIo};
 use crate::runtime::scheduler;
 
+use crate::loom::sync::Arc;
 use mio::event::Source;
 use std::io;
-use std::sync::Arc;
 use std::task::{ready, Context, Poll};
 
 cfg_io_driver! {
