@@ -383,7 +383,11 @@ impl Sleep {
     /// Resets the `Sleep` instance to a new deadline.
     ///
     /// Unlike [`reset`][Self::reset], this __removes__ the internal timer.
-    pub(super) fn reset_without_timer(self: Pin<&mut Self>, deadline: Instant) {
+    ///
+    /// # Safety
+    ///
+    /// The internal timer must be elapsed.
+    pub(super) unsafe fn reset_without_timer(self: Pin<&mut Self>, deadline: Instant) {
         let mut this = self.project();
         *this.deadline = deadline;
         this.timer.set(None);
