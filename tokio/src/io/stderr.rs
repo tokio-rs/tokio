@@ -84,7 +84,7 @@ cfg_io_std! {
         // SAFETY: The `Read` implementation of `std` does not read from the
         // buffer it is borrowing and correctly reports the length of the data
         // written into the buffer.
-        let blocking = unsafe { Blocking::new(std) };
+        let blocking = unsafe { Blocking::new_mandatory(std) };
         Stderr {
             std: SplitByUtf8BoundaryIfWindows::new(blocking),
         }

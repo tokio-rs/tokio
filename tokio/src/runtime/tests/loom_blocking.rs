@@ -75,6 +75,46 @@ fn spawn_mandatory_blocking_should_run_even_when_shutting_down_from_other_thread
 }
 
 #[test]
+fn mandatory_blocking_io_write_should_always_run() {
+    use crate::io::blocking::Blocking;
+    use crate::io::AsyncWriteExt;
+    use crate::runtime::tests::loom_oneshot;
+    use std::io;
+
+    struct Writer(Option<loom_oneshot::Sender<()>>);
+
+    impl io::Write for Writer {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            if let Some(tx) = self.0.take() {
+                tx.send(());
+            }
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    loom::model(|| {
+        let rt = runtime::Builder::new_current_thread().build().unwrap();
+
+        let (tx, rx) = loom_oneshot::channel();
+        let _enter = rt.enter();
+        runtime::spawn_blocking(|| {});
+
+        // SAFETY: `Writer` does not implement `Read`.
+        let mut writer = unsafe { Blocking::new_mandatory(Writer(Some(tx))) };
+        loom::future::block_on(writer.write_all(b"hello")).unwrap();
+
+        drop(rt);
+
+        // This call will deadlock if the write doesn't run.
+        let () = rx.recv();
+    });
+}
+
+#[test]
 fn spawn_blocking_when_paused() {
     loom::model(|| {
         let rt = crate::runtime::Builder::new_current_thread()

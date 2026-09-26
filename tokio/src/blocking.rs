@@ -2,7 +2,7 @@ cfg_rt! {
     #[cfg(any(not(target_os = "emscripten"), target_feature = "atomics"))]
     pub(crate) use crate::runtime::spawn_blocking;
 
-    cfg_fs! {
+    cfg_io_blocking! {
         #[cfg(any(not(target_os = "emscripten"), target_feature = "atomics"))]
         #[allow(unused_imports)]
         pub(crate) use crate::runtime::spawn_mandatory_blocking;
@@ -35,8 +35,14 @@ cfg_rt! {
         crate::task::coop::cooperative(std::future::ready(Ok(f())))
     }
 
-    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics"), feature = "fs"))]
-    #[allow(dead_code)] // unit tests replace this with the `fs::mocks` version
+    #[cfg(all(
+        target_os = "emscripten",
+        not(target_feature = "atomics"),
+        any(feature = "fs", feature = "io-std"),
+    ))]
+    // `fs` unit tests use the `fs::mocks` version instead, so this is unused
+    // when `io-std` is disabled.
+    #[allow(dead_code)]
     pub(crate) fn spawn_mandatory_blocking<F, R>(f: F) -> Option<JoinHandle<R>>
     where
         F: FnOnce() -> R + Send + 'static,
@@ -61,7 +67,7 @@ cfg_not_rt! {
         panic!("requires the `rt` Tokio feature flag")
     }
 
-    cfg_fs! {
+    cfg_io_blocking! {
         pub(crate) fn spawn_mandatory_blocking<F, R>(_f: F) -> Option<JoinHandle<R>>
         where
             F: FnOnce() -> R + Send + 'static,
