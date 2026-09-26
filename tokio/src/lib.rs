@@ -472,10 +472,47 @@
 //! ### Emscripten support
 //!
 //! The `wasm32-unknown-emscripten` target supports the single-threaded runtime
-//! with the `rt`, `time`, `sync`, `macros`, `fs`, `io-util`, `io-std`, and
-//! `test-util` features. The `rt-multi-thread` feature is additionally
-//! supported when building with Emscripten pthreads (`-pthread`). The `net`,
-//! `process`, and `signal` features are not supported.
+//! with the `rt`, `time`, `sync`, `macros`, `fs`, `io-util`, `io-std`,
+//! `test-util`, and `net` features. The `rt-multi-thread` feature is
+//! additionally supported when building with Emscripten pthreads (`-pthread`).
+//! The `process` and `signal` features are not supported.
+//!
+//! Emscripten's filesystem is synchronous, so `tokio::fs` and `io-std` run
+//! their operations inline on the calling thread rather than on the blocking
+//! pool, in pthreads builds too.
+//!
+//! When the build links WebAssembly JavaScript Promise Integration (JSPI), a
+//! wait that would block suspends on the host event loop rather than blocking.
+//! This requires Emscripten 6.0.10 or later. Without JSPI, such a wait panics.
+//!
+//! Suspension requires the current export to have been wrapped with
+//! `WebAssembly.promising`. A wait from any other activation throws
+//! `WebAssembly.SuspendError`. That is a foreign exception rather than a Rust
+//! panic, so it can't be caught by `catch_unwind`.
+//!
+//! `net` uses the standard `mio` epoll reactor over Emscripten's sockets. The
+//! I/O driver's wait is a blocking `epoll_wait`, which needs either JSPI
+//! (suspending on the host event loop) or pthreads with `-sPROXY_TO_PTHREAD`
+//! (blocking on a worker); a wait with no deadline then suspends until
+//! readiness rather than panicking. Built with `-sNODERAWSOCKETS` (real Node
+//! sockets), [`TcpStream`](crate::net::TcpStream),
+//! [`TcpListener`](crate::net::TcpListener), [`UdpSocket`](crate::net::UdpSocket),
+//! stream `AF_UNIX` sockets ([`UnixStream`](crate::net::UnixStream),
+//! [`UnixListener`](crate::net::UnixListener), [`UnixSocket`](crate::net::UnixSocket)),
+//! [`lookup_host`](crate::net::lookup_host), and
+//! [`AsyncFd`](crate::io::unix::AsyncFd) behave as on native. Node has no
+//! `socketpair(2)` (so `UnixStream::pair`), no datagram `AF_UNIX` (so
+//! `UnixDatagram`), and no `SO_PEERCRED` (so `peer_cred`).
+//!
+//! With `--cfg tokio_unstable`, `Builder::build_hosted_local_event_loop`
+//! builds a `LocalEventLoop` driven by the JavaScript host event loop
+//! itself, which needs neither JSPI nor pthreads: the runtime schedules its
+//! own drives on the host loop, for its reactor's readiness and its timer
+//! deadlines, and tasks run once control returns to the host. It keeps the
+//! Emscripten runtime alive while it has tasks, so `main` may return with
+//! work in flight. Its `block_on` runs a future only as far as ready work
+//! carries it and panics where it would have to wait, as a blocked wait
+//! does here without JSPI. Event loops are not available in pthreads builds.
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at
 // least 32 bits, which a lot of components in Tokio currently assumes.
@@ -501,11 +538,8 @@ compile_error! {
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
 
-#[cfg(all(
-    target_os = "emscripten",
-    any(feature = "net", feature = "process", feature = "signal")
-))]
-compile_error!("Features net,process,signal are not supported on wasm32-unknown-emscripten.");
+#[cfg(all(target_os = "emscripten", any(feature = "process", feature = "signal")))]
+compile_error!("Features process,signal are not supported on wasm32-unknown-emscripten.");
 
 #[cfg(all(
     target_os = "emscripten",

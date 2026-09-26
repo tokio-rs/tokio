@@ -36,6 +36,9 @@ cfg_not_wasip1! {
 pub use addr::ToSocketAddrs;
 
 cfg_net! {
+    #[cfg(target_os = "emscripten")]
+    pub(crate) mod emscripten_dns;
+
     mod lookup_host;
     pub use lookup_host::lookup_host;
 
@@ -53,6 +56,8 @@ cfg_net! {
 
 cfg_net_unix! {
     pub mod unix;
+    // Node has no datagram `AF_UNIX` sockets.
+    #[cfg(not(target_os = "emscripten"))]
     pub use unix::datagram::socket::UnixDatagram;
     pub use unix::listener::UnixListener;
     pub use unix::stream::UnixStream;

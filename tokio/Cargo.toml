@@ -199,5 +199,11 @@ allowed_external_types = [
   "tokio_macros::*",
 ]
 
+# `main` returns into the host event loop, which drives the spawned tasks.
+[[test]]
+name = "rt_emscripten_event_loop_main"
+path = "tests/rt_emscripten_event_loop_main.rs"
+harness = false
+
 [lints]
 workspace = true
