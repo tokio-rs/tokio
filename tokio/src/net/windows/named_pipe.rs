@@ -11,7 +11,9 @@ use std::ptr::null_mut;
 use std::task::{Context, Poll};
 
 use crate::io::{AsyncRead, AsyncWrite, Interest, PollEvented, ReadBuf, Ready};
-use crate::os::windows::io::{AsHandle, AsRawHandle, BorrowedHandle, FromRawHandle, RawHandle};
+use crate::os::windows::io::{
+    AsHandle, AsRawHandle, BorrowedHandle, FromRawHandle, IntoRawHandle, OwnedHandle, RawHandle,
+};
 
 cfg_io_util! {
     use bytes::BufMut;
@@ -2579,18 +2581,34 @@ impl ClientOptions {
             return Err(io::Error::last_os_error());
         }
 
+        // SAFETY: `h` is a valid handle returned by `CreateFileW` above, and
+        // ownership of it has not yet been transferred to anything else, so
+        // `handle` is the sole owner. If we return early below, `handle` is
+        // dropped and its destructor closes the underlying handle for us.
+        let handle = unsafe { OwnedHandle::from_raw_handle(h as _) };
+
         if matches!(self.pipe_mode, PipeMode::Message) {
             let mode = windows_sys::PIPE_READMODE_MESSAGE;
+            // SAFETY: `handle` wraps a valid, open handle that we own for the
+            // duration of this call.
             let result = unsafe {
-                windows_sys::SetNamedPipeHandleState(h, &mode, ptr::null_mut(), ptr::null_mut())
+                windows_sys::SetNamedPipeHandleState(
+                    handle.as_raw_handle() as _,
+                    &mode,
+                    ptr::null_mut(),
+                    ptr::null_mut(),
+                )
             };
 
             if result == 0 {
+                // `handle` is dropped here, closing the underlying handle.
                 return Err(io::Error::last_os_error());
             }
         }
 
-        unsafe { NamedPipeClient::from_raw_handle(h as _) }
+        // SAFETY: `handle` is a valid handle that we exclusively own, and we
+        // are transferring that ownership to the returned `NamedPipeClient`.
+        unsafe { NamedPipeClient::from_raw_handle(handle.into_raw_handle()) }
     }
 
     fn get_flags(&self) -> u32 {

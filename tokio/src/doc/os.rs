@@ -26,6 +26,12 @@ pub mod windows {
             unsafe fn from_raw_handle(handle: RawHandle) -> Self;
         }
 
+        /// See [`std::os::windows::io::IntoRawHandle`](https://doc.rust-lang.org/std/os/windows/io/trait.IntoRawHandle.html)
+        pub trait IntoRawHandle {
+            /// See [`std::os::windows::io::IntoRawHandle::into_raw_handle`](https://doc.rust-lang.org/std/os/windows/io/trait.IntoRawHandle.html#tymethod.into_raw_handle)
+            fn into_raw_handle(self) -> RawHandle;
+        }
+
         /// See [`std::os::windows::io::RawSocket`](https://doc.rust-lang.org/std/os/windows/io/type.RawSocket.html)
         pub type RawSocket = crate::doc::NotDefinedHere;
 
