@@ -1644,7 +1644,7 @@ where
     type Output = Result<T, RecvError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
 
         let (receiver, waiter) = self.project();
 
