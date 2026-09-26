@@ -52,11 +52,8 @@ impl Storage for OsStorage {
         self.get(id).map(|si| &si.event_info)
     }
 
-    fn for_each<'a, F>(&'a self, f: F)
-    where
-        F: FnMut(&'a EventInfo),
-    {
-        self.0.iter().map(|si| &si.event_info).for_each(f);
+    fn iter(&self) -> impl Iterator<Item = &EventInfo> {
+        self.0.iter().map(|si| &si.event_info)
     }
 }
 
