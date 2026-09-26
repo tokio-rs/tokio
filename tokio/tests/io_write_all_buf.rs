@@ -79,7 +79,7 @@ async fn write_buf_err() {
         ) -> Poll<io::Result<usize>> {
             self.cnt += 1;
             if self.cnt == 2 {
-                return Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, "whoops")));
+                return Poll::Ready(Err(io::Error::other("whoops")));
             }
             Poll::Ready(Ok(4))
         }
