@@ -186,6 +186,22 @@ cfg_rt! {
         CONTEXT.with(|c| c.scheduler.set(v, f))
     }
 
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    pub(crate) struct ClearSchedulerGuard(*const scheduler::Context);
+
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    impl Drop for ClearSchedulerGuard {
+        fn drop(&mut self) {
+            CONTEXT.with(|c| c.scheduler.inner.set(self.0));
+        }
+    }
+
+    /// Unsets the scheduler context until the guard drops, on unwind too.
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    pub(crate) fn clear_scheduler() -> ClearSchedulerGuard {
+        CONTEXT.with(|c| ClearSchedulerGuard(c.scheduler.inner.replace(std::ptr::null())))
+    }
+
     #[track_caller]
     pub(super) fn with_scheduler<R>(f: impl FnOnce(Option<&scheduler::Context>) -> R) -> R {
         let mut f = Some(f);

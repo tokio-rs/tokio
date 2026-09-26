@@ -1187,6 +1187,34 @@ impl Builder {
         }
     }
 
+    cfg_event_loop! {
+        /// Creates the configured runtime as a [`LocalEventLoop`]: a
+        /// [`LocalRuntime`] driven by a host event loop instead of by parking
+        /// a thread. The runtime wakes `waker` whenever it has work, and the
+        /// host calls [`LocalEventLoop::drive`] in response.
+        ///
+        /// # Panics
+        ///
+        /// This will panic if the runtime is configured with [`new_multi_thread()`].
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if OS resources required by the runtime cannot be
+        /// initialized.
+        ///
+        /// [`new_multi_thread()`]: Builder::new_multi_thread
+        /// [`LocalEventLoop`]: crate::runtime::LocalEventLoop
+        /// [`LocalEventLoop::drive`]: crate::runtime::LocalEventLoop::drive
+        pub fn build_local_event_loop(
+            &mut self,
+            options: LocalOptions,
+            waker: std::task::Waker,
+        ) -> io::Result<crate::runtime::LocalEventLoop> {
+            let runtime = self.build_local(options)?;
+            crate::runtime::LocalEventLoop::new(runtime, waker)
+        }
+    }
+
     fn get_cfg(&self) -> driver::Cfg {
         driver::Cfg {
             enable_pause_time: match self.kind {

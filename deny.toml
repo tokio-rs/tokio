@@ -19,3 +19,6 @@ wildcards = "deny"
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+# TEMPORARY: mio's wasm32-unknown-emscripten target (tokio-rs/mio#1969), and
+# its libc epoll bindings for emscripten (rust-lang/libc#5427, unreleased).
+allow-git = ["https://github.com/guybedford/mio", "https://github.com/rust-lang/libc"]
