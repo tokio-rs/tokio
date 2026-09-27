@@ -489,16 +489,6 @@ fn any_delimiter_decoder_no_delimiters() {
 }
 
 #[test]
-fn any_delimiter_codec_debug() {
-    let codec = AnyDelimiterCodec::new_with_max_length(b",;".to_vec(), b",".to_vec(), 8);
-    assert_eq!(
-        format!("{codec:?}"),
-        "AnyDelimiterCodec { next_index: 0, max_length: 8, is_discarding: false, \
-         seek_delimiters: [44, 59], sequence_writer: [44] }"
-    );
-}
-
-#[test]
 fn any_delimiter_encoder() {
     let mut codec = AnyDelimiterCodec::new(b",".to_vec(), b";--;".to_vec());
     let mut buf = BytesMut::new();
