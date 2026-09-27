@@ -400,8 +400,5 @@ cfg_fs! {
 }
 
 fn gone() -> io::Error {
-    io::Error::new(
-        io::ErrorKind::Other,
-        crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR,
-    )
+    io::Error::other(crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR)
 }
