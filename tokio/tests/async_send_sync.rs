@@ -163,6 +163,7 @@ cfg_not_wasi! {
         assert_value!(tokio::fs::DirBuilder: Send & Sync & Unpin);
         assert_value!(tokio::fs::DirEntry: Send & Sync & Unpin);
         assert_value!(tokio::fs::File: Send & Sync & Unpin);
+        assert_value!(tokio::fs::FileTimes: Send & Sync & Unpin);
         assert_value!(tokio::fs::OpenOptions: Send & Sync & Unpin);
         assert_value!(tokio::fs::ReadDir: Send & Sync & Unpin);
 
@@ -200,7 +201,7 @@ cfg_not_wasi! {
             tokio::fs::File::set_permissions(_, std::fs::Permissions): Send & Sync & !Unpin
         );
         async_assert_fn!(
-            tokio::fs::File::set_times(_, std::fs::FileTimes): Send & Sync & !Unpin
+            tokio::fs::File::set_times(_, tokio::fs::FileTimes): Send & Sync & !Unpin
         );
     }
 }

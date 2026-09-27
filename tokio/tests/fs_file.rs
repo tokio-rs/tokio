@@ -211,6 +211,7 @@ async fn empty_read() {
     assert_eq!(&buf[..n], HELLO);
 }
 
+#[cfg_attr(miri, ignore)]
 #[tokio::test]
 async fn set_times() {
     use std::time::{Duration, SystemTime};
@@ -222,7 +223,7 @@ async fn set_times() {
     // Whole seconds to avoid filesystem timestamp precision loss.
     let accessed = SystemTime::UNIX_EPOCH + Duration::from_secs(1_600_000_000);
     let modified = SystemTime::UNIX_EPOCH + Duration::from_secs(1_500_000_000);
-    let times = std::fs::FileTimes::new()
+    let times = tokio::fs::FileTimes::new()
         .set_accessed(accessed)
         .set_modified(modified);
 

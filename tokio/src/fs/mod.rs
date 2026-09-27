@@ -235,7 +235,7 @@ mod dir_builder;
 pub use self::dir_builder::DirBuilder;
 
 mod file;
-pub use self::file::File;
+pub use self::file::{File, FileTimes};
 
 mod hard_link;
 pub use self::hard_link::hard_link;
