@@ -914,8 +914,22 @@ impl UnixStream {
         let (a, b) = mio::net::UnixStream::pair()?;
         let a = UnixStream::new(a)?;
         let b = UnixStream::new(b)?;
+        // A fresh pair has empty buffers: writable now, readable only once
+        // the peer writes.
+        a.io.registration().assume_ready(Ready::WRITABLE);
+        b.io.registration().assume_ready(Ready::WRITABLE);
 
         Ok((a, b))
+    }
+
+    /// See `TcpStream::new_accepted`.
+    pub(crate) fn new_accepted(stream: mio::net::UnixStream) -> io::Result<UnixStream> {
+        let stream = UnixStream::new(stream)?;
+        stream
+            .io
+            .registration()
+            .assume_ready(Ready::READABLE | Ready::WRITABLE);
+        Ok(stream)
     }
 
     pub(crate) fn new(stream: mio::net::UnixStream) -> io::Result<UnixStream> {

@@ -376,7 +376,7 @@ rt_test! {
 
     #[test]
     #[should_panic(
-        expected = "Cannot start a runtime from within a runtime. This happens because a function (like `block_on`) attempted to block the current thread while the thread is being used to drive asynchronous tasks."
+        expected = "Cannot start a runtime from within a runtime. This happens because a function (like `block_on`) attempted to block the current thread while the thread is being used to drive asynchronous tasks. If you are in an async function, use `.await` on the future instead of blocking on it."
     )]
     fn nesting() {
         fn some_non_async_function() -> i32 {

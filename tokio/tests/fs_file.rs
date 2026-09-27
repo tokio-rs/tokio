@@ -111,10 +111,6 @@ async fn rewind_seek_position() {
 }
 
 #[tokio::test]
-#[cfg_attr(
-    target_os = "emscripten",
-    ignore = "inline-fs shim does not insert cooperative yield points"
-)]
 async fn coop() {
     let mut tempfile = tempfile();
     tempfile.write_all(HELLO).unwrap();
@@ -239,6 +235,14 @@ async fn set_max_buf_size_write() {
 
     // A single write operation writes a maximum of 1 byte.
     assert_eq!(file.write(HELLO).await.unwrap(), 1);
+}
+
+#[tokio::test]
+#[should_panic(expected = "`max_buf_size` must be greater than 0")]
+async fn set_max_buf_size_panics_on_zero() {
+    let tempfile = tempfile();
+    let mut file = File::open(tempfile.path()).await.unwrap();
+    file.set_max_buf_size(0);
 }
 
 #[tokio::test]

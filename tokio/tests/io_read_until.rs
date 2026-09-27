@@ -32,6 +32,20 @@ async fn read_until() {
 }
 
 #[tokio::test]
+async fn read_until_retries_interrupted() {
+    let mock = Builder::new()
+        .read_error(Error::from(ErrorKind::Interrupted))
+        .read(b"hello world")
+        .build();
+    let mut read = BufReader::new(mock);
+    let mut buf = vec![];
+
+    let n = read.read_until(b' ', &mut buf).await.unwrap();
+    assert_eq!(n, 6);
+    assert_eq!(buf, b"hello ");
+}
+
+#[tokio::test]
 async fn read_until_not_all_ready() {
     let mock = Builder::new()
         .read(b"Hello Wor")
@@ -66,7 +80,7 @@ async fn read_until_not_all_ready() {
 async fn read_until_fail() {
     let mock = Builder::new()
         .read(b"Hello \xffWor")
-        .read_error(Error::new(ErrorKind::Other, "The world has no end"))
+        .read_error(Error::other("The world has no end"))
         .build();
 
     let mut read = BufReader::new(mock);

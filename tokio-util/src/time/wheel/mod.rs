@@ -111,7 +111,7 @@ where
         debug_assert!({
             self.levels[level]
                 .next_expiration(self.elapsed)
-                .map_or(true, |e| e.deadline >= self.elapsed)
+                .is_none_or(|e| e.deadline >= self.elapsed)
         });
 
         Ok(())
@@ -148,23 +148,15 @@ where
     /// Advances the timer up to the instant represented by `now`.
     pub(crate) fn poll(&mut self, now: u64, store: &mut T::Store) -> Option<T::Owned> {
         loop {
-            let expiration = self.next_expiration().and_then(|expiration| {
-                if expiration.deadline > now {
-                    None
-                } else {
-                    Some(expiration)
-                }
-            });
-
-            match expiration {
-                Some(ref expiration) => {
-                    if let Some(item) = self.poll_expiration(expiration, store) {
+            match self.next_expiration() {
+                Some(expiration) if expiration.deadline <= now => {
+                    if let Some(item) = self.poll_expiration(&expiration, store) {
                         return Some(item);
                     }
 
                     self.set_elapsed(expiration.deadline);
                 }
-                None => {
+                _ => {
                     // in this case the poll did not indicate an expiration
                     // _and_ we were not able to find a next expiration in
                     // the current list of timers.  advance to the poll's

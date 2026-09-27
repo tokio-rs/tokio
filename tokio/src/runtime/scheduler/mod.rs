@@ -17,9 +17,6 @@ cfg_rt_multi_thread! {
     mod block_in_place;
     pub(crate) use block_in_place::block_in_place;
 
-    mod lock;
-    use lock::Lock;
-
     pub(crate) mod multi_thread;
     pub(crate) use multi_thread::MultiThread;
 }
@@ -281,7 +278,6 @@ cfg_rt! {
             match_flavor!(self, Context(context) => context.defer(waker));
         }
 
-        #[cfg(tokio_unstable)]
         pub(crate) fn worker_index(&self) -> Option<usize> {
             match self {
                 Context::CurrentThread(_) => Some(0),

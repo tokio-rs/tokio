@@ -23,6 +23,10 @@ pub(crate) use task::BlockingTask;
 
 use crate::runtime::Builder;
 
-pub(crate) fn create_blocking_pool(builder: &Builder, thread_cap: usize) -> BlockingPool {
-    BlockingPool::new(builder, thread_cap)
+pub(crate) fn create_blocking_pool(
+    builder: &Builder,
+    thread_cap: usize,
+    scheduler_threads: usize,
+) -> BlockingPool {
+    BlockingPool::new(builder, thread_cap, scheduler_threads)
 }

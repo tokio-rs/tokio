@@ -31,7 +31,7 @@ fn test_is_rt_shutdown_err() {
 
 #[test]
 fn test_is_not_rt_shutdown_err() {
-    let err = io::Error::new(io::ErrorKind::Other, "some other error");
+    let err = io::Error::other("some other error");
     assert!(!tokio::runtime::is_rt_shutdown_err(&err));
 
     let err = io::Error::new(io::ErrorKind::NotFound, "not found");
@@ -75,10 +75,10 @@ fn test_other_error_kinds_and_strings() {
 
     // String that contains the shutdown message but has a prefix/suffix
     let msg = "A Tokio 1.x context was found, but it is being shutdown. (extra info)";
-    let err = io::Error::new(io::ErrorKind::Other, msg);
+    let err = io::Error::other(msg);
     assert!(!tokio::runtime::is_rt_shutdown_err(&err));
 
     let msg = "Error: A Tokio 1.x context was found, but it is being shutdown.";
-    let err = io::Error::new(io::ErrorKind::Other, msg);
+    let err = io::Error::other(msg);
     assert!(!tokio::runtime::is_rt_shutdown_err(&err));
 }

@@ -70,6 +70,7 @@ impl<W: AsyncWrite> BufWriter<W> {
                     break;
                 }
                 Ok(n) => *me.written += n,
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
                 Err(e) => {
                     ret = Err(e);
                     break;

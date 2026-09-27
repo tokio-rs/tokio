@@ -1,3 +1,18 @@
+# 0.4.6 (September 25th, 2026)
+
+### Added
+
+- test: add `Spawn::poll_until_idle` ([#8213])
+
+### Fixed
+
+- test: fix race in `Mock::poll_write` ([#7882])
+- test: fix `semicolon_in_expressions_from_macros` lint ([#8317])
+
+[#7882]: https://github.com/tokio-rs/tokio/pull/7882
+[#8213]: https://github.com/tokio-rs/tokio/pull/8213
+[#8317]: https://github.com/tokio-rs/tokio/pull/8317
+
 # 0.4.5 (January 4th, 2026)
 
 ### Added

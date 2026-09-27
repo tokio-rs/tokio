@@ -81,6 +81,7 @@ jobs:
           mount -t sysfs sysfs /sys
           mkdir -p /tmp && mount -t tmpfs -o mode=1777 tmpfs /tmp
           for f in /bin/tests/*; do RUST_BACKTRACE=1 "$f" ; done
+          echo "ALL_TESTS_COMPLETED"
           EOF
           chmod +x initramfs/init
 
@@ -94,11 +95,14 @@ jobs:
           set -euo pipefail
 
           set +e
+          # 3 GiB guest (the runner has 16 GB): the initramfs holds ~760 MB of
+          # unstripped test binaries, and `open_many_files` in `fs_uring` had
+          # 200-340 MB of anon RSS when the 1 GiB guest OOM-killed it.
           qemu-system-x86_64 \
             -kernel linux-${{ env.KERNEL_VERSION }}/arch/x86/boot/bzImage \
             -initrd initramfs.cpio.gz \
             -append "console=ttyS0 rootfstype=ramfs panic=1" \
-            -nographic -no-reboot -m 1024 -action panic=exit-failure 2>&1 | tee qemu-output.log
+            -nographic -no-reboot -m 3072 -action panic=exit-failure 2>&1 | tee qemu-output.log
           qemu_status=${PIPESTATUS[0]} tee_status=${PIPESTATUS[1]}
           set -e
 
@@ -115,6 +119,14 @@ jobs:
           if grep -q "test result: FAILED" qemu-output.log; then
             echo "tests reported failures"
             exit 1
-          else
-            echo "all tests passed"
           fi
+
+          # A binary killed before it prints its summary (OOM, panic in init)
+          # never writes `test result: FAILED`, so also require the marker that
+          # init prints after the last binary.
+          if ! grep -q "ALL_TESTS_COMPLETED" qemu-output.log; then
+            echo "tests did not run to completion"
+            exit 1
+          fi
+
+          echo "all tests passed"

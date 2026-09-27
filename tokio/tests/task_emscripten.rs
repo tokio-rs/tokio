@@ -1,4 +1,9 @@
-#![cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+#![cfg(all(
+    target_os = "emscripten",
+    not(target_feature = "atomics"),
+    feature = "rt",
+    feature = "macros"
+))]
 
 /// There is no threadpool on a single-threaded JS worker: the public
 /// `spawn_blocking` is unsupported on non-pthread emscripten, as on the other

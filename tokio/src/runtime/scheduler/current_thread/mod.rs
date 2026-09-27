@@ -662,7 +662,7 @@ cfg_unstable_metrics! {
         }
 
         pub(crate) fn num_blocking_threads(&self) -> usize {
-            self.blocking_spawner.num_threads()
+            self.blocking_spawner.num_blocking_threads()
         }
 
         pub(crate) fn num_idle_blocking_threads(&self) -> usize {

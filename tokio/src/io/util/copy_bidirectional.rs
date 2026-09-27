@@ -64,9 +64,10 @@ where
 ///
 /// # Errors
 ///
-/// The future will immediately return an error if any IO operation on `a`
-/// or `b` returns an error. Some data read from either stream may be lost (not
-/// written to the other stream) in this case.
+/// Interrupted reads and writes are retried. The future will immediately
+/// return any other read or write error, or any flush or shutdown error. Some
+/// data read from either stream may be lost (not written to the other stream)
+/// in this case.
 ///
 /// # Return value
 ///
@@ -90,6 +91,10 @@ where
 ///
 /// This method is the same as the [`copy_bidirectional()`], except that it allows you to set the
 /// size of the internal buffers used when copying data.
+///
+/// # Panics
+///
+/// Panics if either buffer size is zero.
 #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
 pub async fn copy_bidirectional_with_sizes<A, B>(
     a: &mut A,
@@ -101,6 +106,15 @@ where
     A: AsyncRead + AsyncWrite + Unpin + ?Sized,
     B: AsyncRead + AsyncWrite + Unpin + ?Sized,
 {
+    assert!(
+        a_to_b_buf_size > 0,
+        "`a_to_b_buf_size` must be greater than 0"
+    );
+    assert!(
+        b_to_a_buf_size > 0,
+        "`b_to_a_buf_size` must be greater than 0"
+    );
+
     copy_bidirectional_impl(
         a,
         b,
