@@ -294,7 +294,7 @@ impl<T> Block<T> {
         let ret = NonNull::new(self.header.next.load(ordering));
 
         debug_assert!(unsafe {
-            ret.map_or(true, |block| {
+            ret.is_none_or(|block| {
                 block.as_ref().header.start_index == self.header.start_index.wrapping_add(BLOCK_CAP)
             })
         });
@@ -360,7 +360,7 @@ impl<T> Block<T> {
         // `start_index` is updated accordingly.
         let new_block = Block::new(self.header.start_index + BLOCK_CAP);
 
-        let mut new_block = unsafe { NonNull::new_unchecked(Box::into_raw(new_block)) };
+        let mut new_block = NonNull::from(Box::leak(new_block));
 
         // Attempt to store the block. The first compare-and-swap attempt is
         // "unrolled" due to minor differences in logic

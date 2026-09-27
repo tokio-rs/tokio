@@ -425,7 +425,7 @@ impl Handle {
                     Ok(when) => {
                         if lock
                             .next_wake
-                            .map_or(true, |next_wake| when < next_wake.get())
+                            .is_none_or(|next_wake| when < next_wake.get())
                         {
                             unpark.unpark();
                         }

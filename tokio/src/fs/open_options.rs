@@ -6,6 +6,7 @@ use std::path::Path;
 cfg_io_uring! {
     mod uring_open_options;
     pub(crate) use uring_open_options::UringOpenOptions;
+
 }
 
 #[cfg(test)]
@@ -531,18 +532,19 @@ impl OpenOptions {
                 target_os = "linux"
             ))]
             Kind::Uring(opts) => {
-                let handle = crate::runtime::Handle::current();
-                let driver_handle = handle.inner.driver().io();
-
-                if driver_handle
-                    .check_and_init(io_uring::opcode::OpenAt::CODE)
-                    .await?
-                {
-                    crate::io::uring::open::open(path, opts).await
-                } else {
-                    let opts = opts.clone().into();
-                    Self::std_open(&opts, path).await
+                if let Ok(handle) = crate::runtime::Handle::try_current() {
+                    if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
+                        if driver_handle
+                            .check_and_init(io_uring::opcode::OpenAt::CODE)
+                            .await?
+                        {
+                            return crate::io::uring::open::open(path, opts).await;
+                        }
+                    }
                 }
+
+                let opts = opts.clone().into();
+                Self::std_open(&opts, path).await
             }
         }
     }
