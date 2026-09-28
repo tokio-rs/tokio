@@ -256,7 +256,9 @@ impl UnixSocket {
         let is_bound = self.inner.local_addr()?.as_pathname().is_some();
         if is_bound {
             // Too late: socket file already created
-            return Err(io::Error::other("set_permissions cannot be called on a bound socket"));
+            return Err(io::Error::other(
+                "set_permissions cannot be called on a bound socket",
+            ));
         }
 
         // Safety: calling `fchmod` on an open fd is safe
