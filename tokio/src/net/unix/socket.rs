@@ -251,21 +251,22 @@ impl UnixSocket {
     /// This calls the `fchmod(2)` operating-system function.
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fn set_permissions(&self, perm: Permissions) -> io::Result<()> {
-        use std::fs::File;
-        use std::mem::ManuallyDrop;
+        use std::os::unix::fs::PermissionsExt;
 
         let is_bound = self.inner.local_addr()?.as_pathname().is_some();
-
-        // After binding, the file is a separate inode so `fchmod` would silently no-op
         if is_bound {
+            // Too late: socket file already created
             return Err(io::Error::other("set_permissions cannot be called on a bound socket"));
         }
 
-        // Safety: `self` keeps the descriptor open, and `file` neither escapes this
-        // function nor is dropped, so the descriptor is not closed.
-        let file = ManuallyDrop::new(unsafe { File::from_raw_fd(self.as_raw_fd()) });
+        // Safety: calling `fchmod` on an open fd is safe
+        let ret = unsafe { libc::fchmod(self.as_raw_fd(), perm.mode() as libc::mode_t) };
 
-        file.set_permissions(perm)
+        if ret == -1 {
+            return Err(io::Error::last_os_error());
+        }
+
+        Ok(())
     }
 }
 
