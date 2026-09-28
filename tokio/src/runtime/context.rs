@@ -165,7 +165,6 @@ cfg_rt! {
         CONTEXT.try_with(|ctx| ctx.current_task_id.get()).unwrap_or_default()
     }
 
-    #[cfg(tokio_unstable)]
     pub(crate) fn worker_index() -> Option<usize> {
         with_scheduler(|ctx| ctx.and_then(|c| c.worker_index()))
     }
@@ -185,6 +184,22 @@ cfg_rt! {
 
     pub(super) fn set_scheduler<R>(v: &scheduler::Context, f: impl FnOnce() -> R) -> R {
         CONTEXT.with(|c| c.scheduler.set(v, f))
+    }
+
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    pub(crate) struct ClearSchedulerGuard(*const scheduler::Context);
+
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    impl Drop for ClearSchedulerGuard {
+        fn drop(&mut self) {
+            CONTEXT.with(|c| c.scheduler.inner.set(self.0));
+        }
+    }
+
+    /// Unsets the scheduler context until the guard drops, on unwind too.
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    pub(crate) fn clear_scheduler() -> ClearSchedulerGuard {
+        CONTEXT.with(|c| ClearSchedulerGuard(c.scheduler.inner.replace(std::ptr::null())))
     }
 
     #[track_caller]

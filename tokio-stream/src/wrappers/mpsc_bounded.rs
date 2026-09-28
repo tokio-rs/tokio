@@ -1,4 +1,5 @@
 use crate::Stream;
+use futures_core::FusedStream;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc::Receiver;
@@ -85,6 +86,12 @@ impl<T> Stream for ReceiverStream<T> {
         } else {
             (self.inner.len(), None)
         }
+    }
+}
+
+impl<T> FusedStream for ReceiverStream<T> {
+    fn is_terminated(&self) -> bool {
+        self.size_hint() == (0, Some(0))
     }
 }
 

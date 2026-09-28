@@ -86,6 +86,9 @@ impl TcpStream {
         /// result in a successful connection, the error returned from the last
         /// connection attempt (the last address) is returned.
         ///
+        /// For example, on a host without IPv6 connectivity, the
+        /// `AddrNotAvailable` error of a later IPv6 attempt can hide an earlier
+        /// IPv4 failure such as connection refused.
         /// To configure the socket before connecting, you can use the [`TcpSocket`]
         /// type.
         ///
@@ -163,6 +166,18 @@ impl TcpStream {
     pub(crate) fn new(connected: mio::net::TcpStream) -> io::Result<TcpStream> {
         let io = PollEvented::new(connected)?;
         Ok(TcpStream { io })
+    }
+
+    /// A stream returned by `accept`: assumed readable and writable, so that
+    /// its first read and write try the socket instead of waiting for the
+    /// driver's first event (see `Registration::assume_ready`).
+    pub(crate) fn new_accepted(connected: mio::net::TcpStream) -> io::Result<TcpStream> {
+        let stream = TcpStream::new(connected)?;
+        stream
+            .io
+            .registration()
+            .assume_ready(Ready::READABLE | Ready::WRITABLE);
+        Ok(stream)
     }
 
     /// Creates new `TcpStream` from a `std::net::TcpStream`.

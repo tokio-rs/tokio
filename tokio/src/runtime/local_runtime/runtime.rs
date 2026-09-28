@@ -2,7 +2,7 @@
 
 use crate::runtime::blocking::BlockingPool;
 use crate::runtime::scheduler::CurrentThread;
-use crate::runtime::{context, Builder, EnterGuard, Handle, BOX_FUTURE_THRESHOLD};
+use crate::runtime::{context, AutoBox, Builder, EnterGuard, Handle};
 use crate::task::JoinHandle;
 
 use crate::util::trace::SpawnMeta;
@@ -158,7 +158,7 @@ impl LocalRuntime {
 
         // safety: spawn_local can only be called from `LocalRuntime`, which this is
         unsafe {
-            if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+            if AutoBox::<F>::SHOULD_BOX {
                 self.handle.spawn_local_named(Box::pin(future), meta)
             } else {
                 self.handle.spawn_local_named(future, meta)
@@ -225,7 +225,7 @@ impl LocalRuntime {
         let fut_size = mem::size_of::<F>();
         let meta = SpawnMeta::new_unnamed(fut_size);
 
-        if std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+        if AutoBox::<F>::SHOULD_BOX {
             self.block_on_inner(Box::pin(future), meta)
         } else {
             self.block_on_inner(future, meta)

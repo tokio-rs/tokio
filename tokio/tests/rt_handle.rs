@@ -1,5 +1,8 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(target_os = "emscripten", feature = "rt", feature = "macros")
+))]
 
 use std::sync::Arc;
 use tokio::runtime::Runtime;

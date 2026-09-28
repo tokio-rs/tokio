@@ -3,7 +3,7 @@ use tokio_test::*;
 
 const MAX_PERMITS: usize = crate::sync::Semaphore::MAX_PERMITS;
 
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 #[test]

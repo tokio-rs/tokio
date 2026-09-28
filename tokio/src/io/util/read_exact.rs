@@ -57,7 +57,11 @@ where
             // if our buffer is empty, then we need to read some data to continue.
             let rem = me.buf.remaining();
             if rem != 0 {
-                ready!(Pin::new(&mut *me.reader).poll_read(cx, me.buf))?;
+                match ready!(Pin::new(&mut *me.reader).poll_read(cx, me.buf)) {
+                    Ok(()) => {}
+                    Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                    Err(e) => return Err(e).into(),
+                }
                 if me.buf.remaining() == rem {
                     return Err(eof()).into();
                 }

@@ -173,8 +173,7 @@ impl UnixSocket {
     /// [`new_datagram`]: `UnixSocket::new_datagram`
     pub fn listen(self, backlog: u32) -> io::Result<UnixListener> {
         if self.ty() == socket2::Type::DGRAM {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(io::Error::other(
                 "listen cannot be called on a datagram socket",
             ));
         }
@@ -203,8 +202,7 @@ impl UnixSocket {
     /// [`new_datagram`]: `UnixSocket::new_datagram`
     pub async fn connect(self, path: impl AsRef<Path>) -> io::Result<UnixStream> {
         if self.ty() == socket2::Type::DGRAM {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(io::Error::other(
                 "connect cannot be called on a datagram socket",
             ));
         }
@@ -232,8 +230,7 @@ impl UnixSocket {
     /// [`new_stream`]: `UnixSocket::new_stream`
     pub fn datagram(self) -> io::Result<UnixDatagram> {
         if self.ty() == socket2::Type::STREAM {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(io::Error::other(
                 "datagram cannot be called on a stream socket",
             ));
         }
@@ -261,10 +258,7 @@ impl UnixSocket {
 
         // After binding, the file is a separate inode so `fchmod` would silently no-op
         if is_bound {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "set_permissions cannot be called on a bound socket",
-            ));
+            return Err(io::Error::other("set_permissions cannot be called on a bound socket"));
         }
 
         // Safety: `self` keeps the descriptor open, and `file` neither escapes this

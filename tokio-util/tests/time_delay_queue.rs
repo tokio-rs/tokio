@@ -903,6 +903,41 @@ async fn peek() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn peek_entries_sharing_a_wheel_slot() {
+    // Only the lowest level of the timer wheel has one deadline per slot. A
+    // level-one slot spans 64ms, so entries with different deadlines share it
+    // and are only ordered once the slot cascades down.
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let now = Instant::now();
+
+    // 64ms..=127ms all fall in the same level-one slot. Entries are pushed onto
+    // the front of a slot, so inserting the later deadline second puts it at the
+    // head.
+    let early = queue.insert_at("early", now + ms(100));
+    let late = queue.insert_at("late", now + ms(120));
+
+    assert_eq!(queue.peek(), Some(early));
+
+    sleep(ms(105)).await;
+
+    assert_eq!(queue.peek(), Some(early));
+
+    let entry = assert_ready_some!(poll!(queue));
+    assert_eq!(entry.key(), early);
+    assert_eq!(entry.get_ref(), &"early");
+
+    assert_eq!(queue.peek(), Some(late));
+
+    sleep(ms(20)).await;
+
+    let entry = assert_ready_some!(poll!(queue));
+    assert_eq!(entry.key(), late);
+
+    assert!(queue.peek().is_none());
+}
+
+#[tokio::test(start_paused = true)]
 async fn wake_after_remove_last() {
     let mut queue = task::spawn(DelayQueue::new());
     let key = queue.insert("foo", ms(1000));

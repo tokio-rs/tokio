@@ -1,5 +1,17 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // WASI does not support all fs operations
+#![cfg(all(
+    any(
+        feature = "full",
+        all(
+            target_os = "emscripten",
+            feature = "fs",
+            feature = "macros",
+            feature = "rt",
+            feature = "io-util"
+        )
+    ),
+    not(target_os = "wasi")
+))] // WASI does not support all fs operations
 
 use tempfile::tempdir;
 use tokio::fs;
