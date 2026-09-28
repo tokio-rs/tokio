@@ -7,6 +7,7 @@ use crate::io::blocking::{Buf, DEFAULT_MAX_BUF_SIZE};
 use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use crate::sync::Mutex;
 
+use super::file_times::FileTimes;
 use std::cmp;
 use std::fmt;
 use std::fs::{Metadata, Permissions};
@@ -16,7 +17,6 @@ use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{ready, Context, Poll};
-use std::time::SystemTime;
 
 #[cfg(test)]
 use super::mocks::JoinHandle;
@@ -591,7 +591,7 @@ impl File {
     /// ```
     pub async fn set_times(&self, times: FileTimes) -> io::Result<()> {
         let std = self.std.clone();
-        let std_times = std::fs::FileTimes::from(times);
+        let std_times = times.into_std();
         asyncify(move || std.set_times(std_times)).await
     }
 
@@ -632,73 +632,6 @@ impl File {
     /// Get the maximum buffer size for the underlying [`AsyncRead`] / [`AsyncWrite`] operation.
     pub fn max_buf_size(&self) -> usize {
         self.max_buf_size
-    }
-}
-
-/// Timestamps for a file.
-///
-/// This is a specialized version of [`std::fs::FileTimes`] for usage with
-/// [`File::set_times`]. Unlike the standard library version, the timestamps
-/// set here are kept so that future backends such as `io-uring` can read them
-/// without going through the standard library type.
-///
-/// # Examples
-///
-/// ```no_run
-/// use tokio::fs::FileTimes;
-///
-/// # async fn dox() -> std::io::Result<()> {
-/// let times = FileTimes::new()
-///     .set_accessed(std::time::SystemTime::now())
-///     .set_modified(std::time::SystemTime::now());
-/// # Ok(())
-/// # }
-/// ```
-#[derive(Debug, Clone, Default)]
-pub struct FileTimes {
-    accessed: Option<SystemTime>,
-    modified: Option<SystemTime>,
-}
-
-impl FileTimes {
-    /// Creates a new empty [`FileTimes`].
-    ///
-    /// Unset timestamps are left unchanged.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Sets the last access time.
-    pub fn set_accessed(mut self, t: SystemTime) -> Self {
-        self.accessed = Some(t);
-        self
-    }
-
-    /// Sets the last modification time.
-    pub fn set_modified(mut self, t: SystemTime) -> Self {
-        self.modified = Some(t);
-        self
-    }
-
-    pub(crate) fn accessed(&self) -> Option<SystemTime> {
-        self.accessed
-    }
-
-    pub(crate) fn modified(&self) -> Option<SystemTime> {
-        self.modified
-    }
-}
-
-impl From<FileTimes> for std::fs::FileTimes {
-    fn from(times: FileTimes) -> Self {
-        let mut std_times = std::fs::FileTimes::new();
-        if let Some(accessed) = times.accessed() {
-            std_times = std_times.set_accessed(accessed);
-        }
-        if let Some(modified) = times.modified() {
-            std_times = std_times.set_modified(modified);
-        }
-        std_times
     }
 }
 
