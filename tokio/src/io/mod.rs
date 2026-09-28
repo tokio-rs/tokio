@@ -299,6 +299,7 @@ cfg_io_blocking! {
     mod sys {
         // TODO: don't rename
         pub(crate) use crate::blocking::spawn_blocking as run;
+        pub(crate) use crate::blocking::spawn_mandatory_blocking;
         pub(crate) use crate::blocking::JoinHandle as Blocking;
     }
 }

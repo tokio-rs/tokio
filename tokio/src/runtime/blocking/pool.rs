@@ -244,11 +244,11 @@ where
     rt.spawn_blocking(func)
 }
 
-cfg_fs! {
+cfg_io_blocking! {
     #[cfg_attr(any(
         all(loom, not(test)), // the function is covered by loom tests
         test,
-        target_os = "emscripten", // fs uses the inline shim
+        target_os = "emscripten", // fs and io-std use the inline shim
     ), allow(dead_code))]
     /// Runs the provided function on an executor dedicated to blocking
     /// operations. Tasks will be scheduled as mandatory, meaning they are
@@ -388,12 +388,12 @@ impl Spawner {
         }
     }
 
-    cfg_fs! {
+    cfg_io_blocking! {
         #[track_caller]
         #[cfg_attr(any(
             all(loom, not(test)), // the function is covered by loom tests
             test,
-            target_os = "emscripten", // fs uses the inline shim
+            target_os = "emscripten", // fs and io-std use the inline shim
         ), allow(dead_code))]
         pub(crate) fn spawn_mandatory_blocking<F, R>(&self, rt: &Handle, func: F) -> Option<JoinHandle<R>>
         where

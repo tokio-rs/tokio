@@ -568,7 +568,7 @@ cfg_rt! {
         pub(crate) use blocking::Mandatory;
     }
 
-    cfg_fs! {
+    cfg_io_blocking! {
         // Emscripten uses the inline shim in `crate::blocking`.
         #[cfg_attr(target_os = "emscripten", allow(unused_imports))]
         pub(crate) use blocking::spawn_mandatory_blocking;
