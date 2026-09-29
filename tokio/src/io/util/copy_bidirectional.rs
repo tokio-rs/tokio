@@ -64,9 +64,10 @@ where
 ///
 /// # Errors
 ///
-/// The future will immediately return an error if any IO operation on `a`
-/// or `b` returns an error. Some data read from either stream may be lost (not
-/// written to the other stream) in this case.
+/// Interrupted reads and writes are retried. The future will immediately
+/// return any other read or write error, or any flush or shutdown error. Some
+/// data read from either stream may be lost (not written to the other stream)
+/// in this case.
 ///
 /// # Return value
 ///

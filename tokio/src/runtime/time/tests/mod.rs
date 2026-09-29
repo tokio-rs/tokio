@@ -48,11 +48,15 @@ fn single_timer() {
 
         let inner = handle.inner.clone();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(inner.clone());
+            let entry = TimerEntry::new();
             pin!(entry);
-            entry.as_mut().init(inner.driver().now() + 1000);
+            entry.as_mut().init(&inner, inner.driver().now() + 1000);
 
-            block_on(std::future::poll_fn(|cx| entry.as_mut().poll_elapsed(cx))).unwrap();
+            block_on(std::future::poll_fn(|cx| {
+                entry.as_mut().poll_elapsed(cx, &inner)
+            }))
+            .unwrap();
+            entry.cancel(&inner);
         });
 
         thread::yield_now();
@@ -75,16 +79,19 @@ fn drop_timer() {
 
         let inner = handle.inner.clone();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(inner.clone());
+            let entry = TimerEntry::new();
             pin!(entry);
-            entry.as_mut().init(inner.driver().now() + 1000);
+            entry.as_mut().init(&inner, inner.driver().now() + 1000);
 
-            let _ = entry
-                .as_mut()
-                .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
-            let _ = entry
-                .as_mut()
-                .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
+            let _ = entry.as_mut().poll_elapsed(
+                &mut Context::from_waker(futures::task::noop_waker_ref()),
+                &inner,
+            );
+            let _ = entry.as_mut().poll_elapsed(
+                &mut Context::from_waker(futures::task::noop_waker_ref()),
+                &inner,
+            );
+            entry.cancel(&inner);
         });
 
         thread::yield_now();
@@ -107,15 +114,20 @@ fn change_waker() {
 
         let inner = handle.inner.clone();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(inner.clone());
+            let entry = TimerEntry::new();
             pin!(entry);
-            entry.as_mut().init(inner.driver().now() + 1000);
+            entry.as_mut().init(&inner, inner.driver().now() + 1000);
 
-            let _ = entry
-                .as_mut()
-                .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
+            let _ = entry.as_mut().poll_elapsed(
+                &mut Context::from_waker(futures::task::noop_waker_ref()),
+                &inner,
+            );
 
-            block_on(std::future::poll_fn(|cx| entry.as_mut().poll_elapsed(cx))).unwrap();
+            block_on(std::future::poll_fn(|cx| {
+                entry.as_mut().poll_elapsed(cx, &inner)
+            }))
+            .unwrap();
+            entry.cancel(&inner);
         });
 
         thread::yield_now();
@@ -143,20 +155,25 @@ fn reset_future() {
         let start = handle.inner.driver().now();
 
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(inner.clone());
+            let entry = TimerEntry::new();
             pin!(entry);
-            entry.as_mut().init(start + 1000);
+            entry.as_mut().init(&inner, start + 1000);
 
-            let _ = entry
-                .as_mut()
-                .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
+            let _ = entry.as_mut().poll_elapsed(
+                &mut Context::from_waker(futures::task::noop_waker_ref()),
+                &inner,
+            );
 
-            entry.as_mut().reset(start + 2000);
+            entry.as_mut().reset(&inner, start + 2000);
 
             // shouldn't complete before 2s
-            block_on(std::future::poll_fn(|cx| entry.as_mut().poll_elapsed(cx))).unwrap();
+            block_on(std::future::poll_fn(|cx| {
+                entry.as_mut().poll_elapsed(cx, &inner)
+            }))
+            .unwrap();
 
             finished_early_.store(true, Ordering::Relaxed);
+            entry.cancel(&inner);
         });
 
         thread::yield_now();
@@ -193,12 +210,14 @@ fn poll_process_levels() {
     let mut entries = vec![];
 
     for i in 0..normal_or_miri(1024, 64) {
-        let mut entry = Box::pin(TimerEntry::new(handle.inner.clone()));
-        entry.as_mut().init(handle.inner.driver().now() + i);
+        let mut entry = Box::pin(TimerEntry::new());
+        entry
+            .as_mut()
+            .init(&handle.inner, handle.inner.driver().now() + i);
 
         let _ = entry
             .as_mut()
-            .poll_elapsed(&mut Context::from_waker(noop_waker_ref()));
+            .poll_elapsed(&mut Context::from_waker(noop_waker_ref()), &handle.inner);
 
         entries.push(entry);
     }
@@ -209,9 +228,15 @@ fn poll_process_levels() {
         for (deadline, future) in entries.iter_mut().enumerate() {
             let mut context = Context::from_waker(noop_waker_ref());
             if deadline <= t {
-                assert!(future.as_mut().poll_elapsed(&mut context).is_ready());
+                assert!(future
+                    .as_mut()
+                    .poll_elapsed(&mut context, &handle.inner)
+                    .is_ready());
             } else {
-                assert!(future.as_mut().poll_elapsed(&mut context).is_pending());
+                assert!(future
+                    .as_mut()
+                    .poll_elapsed(&mut context, &handle.inner)
+                    .is_pending());
             }
         }
     }
@@ -225,16 +250,21 @@ fn poll_process_levels_targeted() {
     let rt = rt(true);
     let handle = rt.handle();
 
-    let e1 = TimerEntry::new(handle.inner.clone());
+    let e1 = TimerEntry::new();
     pin!(e1);
-    e1.as_mut().init(handle.inner.driver().now() + 193);
+    e1.as_mut()
+        .init(&handle.inner, handle.inner.driver().now() + 193);
 
-    let handle = handle.inner.driver().time();
+    let time = handle.inner.driver().time();
 
-    handle.process_at_time(62);
-    assert!(e1.as_mut().poll_elapsed(&mut context).is_pending());
-    handle.process_at_time(192);
-    handle.process_at_time(192);
+    time.process_at_time(62);
+    assert!(e1
+        .as_mut()
+        .poll_elapsed(&mut context, &handle.inner)
+        .is_pending());
+    time.process_at_time(192);
+    time.process_at_time(192);
+    e1.cancel(&handle.inner);
 }
 
 #[test]

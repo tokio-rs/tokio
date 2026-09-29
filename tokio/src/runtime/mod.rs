@@ -418,6 +418,9 @@ pub(crate) mod context;
 
 pub(crate) mod park;
 
+#[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+pub(crate) mod jspi;
+
 pub(crate) mod driver;
 
 pub(crate) mod scheduler;
@@ -458,10 +461,10 @@ cfg_time! {
     impl Timer {
         #[cfg_attr(not(all(tokio_unstable, feature = "rt-multi-thread")), allow(unused_variables))]
         #[track_caller]
-        pub(crate) fn new(handle: scheduler::Handle, deadline: u64) -> Self {
+        pub(crate) fn new(handle: &scheduler::Handle, deadline: u64) -> Self {
             match handle.timer_flavor() {
                 TimerFlavor::Traditional => {
-                    Timer::Traditional(time::TimerEntry::new(handle))
+                    Timer::Traditional(time::TimerEntry::new())
                 }
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
                 TimerFlavor::Alternative => {
@@ -470,13 +473,13 @@ cfg_time! {
             }
         }
 
-        pub(crate) fn init(self: Pin<&mut Self>, deadline: u64) {
+        pub(crate) fn init(self: Pin<&mut Self>, handle: &scheduler::Handle, deadline: u64) {
             // Safety: we never move the inner entries.
             let this = unsafe { self.get_unchecked_mut() };
             match this {
                 // Safety: we never move the inner entries.
                 Timer::Traditional(entry) => unsafe {
-                    Pin::new_unchecked(entry).init(deadline)
+                    Pin::new_unchecked(entry).init(handle, deadline);
                 }
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
                 Timer::Alternative(_) => {},
@@ -491,19 +494,36 @@ cfg_time! {
             }
         }
 
-        #[cfg_attr(not(all(tokio_unstable, feature = "rt-multi-thread")), allow(unused_variables))]
-        pub(crate) fn reset(self: Pin<&mut Self>, handle: scheduler::Handle, deadline: u64) {
+        pub(crate) fn cancel(self: Pin<&mut Self>, handle: &scheduler::Handle) {
             // Safety: we never move the inner entries.
             let this = unsafe { self.get_unchecked_mut() };
             match this {
                 // Safety: we never move the inner entries.
                 Timer::Traditional(entry) => unsafe {
-                    Pin::new_unchecked(entry).reset(deadline)
+                    Pin::new_unchecked(entry).cancel(handle);
                 }
                 // Safety: we never move the inner entries.
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
                 Timer::Alternative(entry) => unsafe {
-                    Pin::new_unchecked(entry).set(time_alt::Timer::new(handle, deadline))
+                    Pin::new_unchecked(entry).cancel();
+                }
+            }
+        }
+
+        pub(crate) fn reset(self: Pin<&mut Self>, handle: &scheduler::Handle, deadline: u64) {
+            // Safety: we never move the inner entries.
+            let this = unsafe { self.get_unchecked_mut() };
+            match this {
+                // Safety: we never move the inner entries.
+                Timer::Traditional(entry) => unsafe {
+                    Pin::new_unchecked(entry).reset(handle, deadline);
+                }
+                // Safety: we never move the inner entries.
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Timer::Alternative(entry) => unsafe {
+                    let mut entry = Pin::new_unchecked(entry);
+                    entry.cancel();
+                    entry.set(time_alt::Timer::new(handle, deadline));
                 },
             }
         }
@@ -511,13 +531,14 @@ cfg_time! {
         pub(crate) fn poll_elapsed(
             self: Pin<&mut Self>,
             cx: &mut Context<'_>,
+            handle: &scheduler::Handle,
         ) -> Poll<Result<(), crate::time::error::Error>> {
             // Safety: we never move the inner entries.
             let this = unsafe { self.get_unchecked_mut() };
             match this {
                 // Safety: we never move the inner entries.
                 Timer::Traditional(entry) => unsafe {
-                    Pin::new_unchecked(entry).poll_elapsed(cx)
+                    Pin::new_unchecked(entry).poll_elapsed(cx, handle)
                 }
                 // Safety: we never move the inner entries.
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
@@ -547,12 +568,9 @@ cfg_rt! {
         pub(crate) use blocking::Mandatory;
     }
 
-    cfg_fs! {
-        // Non-pthread emscripten uses the inline shim in `crate::blocking`.
-        #[cfg_attr(
-            all(target_os = "emscripten", not(target_feature = "atomics")),
-            allow(unused_imports)
-        )]
+    cfg_io_blocking! {
+        // Emscripten uses the inline shim in `crate::blocking`.
+        #[cfg_attr(target_os = "emscripten", allow(unused_imports))]
         pub(crate) use blocking::spawn_mandatory_blocking;
     }
 

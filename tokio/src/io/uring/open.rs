@@ -17,15 +17,25 @@ pub(crate) struct Open {
     path: CString,
 }
 
+/// Distinguishes whether an `Interrupted` error allows retrying the open operation.
+#[derive(Debug)]
+pub(crate) enum OpenError {
+    /// A submission error: return it without retrying, even for `Interrupted`.
+    Submission(io::Error),
+    /// An error reported by the CQE: retry only if it is `Interrupted`.
+    Completion(io::Error),
+}
+
 impl Completable for Open {
-    type Output = io::Result<crate::fs::File>;
+    type Output = Result<crate::fs::File, OpenError>;
     fn complete(self, cqe: CqeResult) -> Self::Output {
         cqe.result
             .map(|fd| unsafe { crate::fs::File::from_raw_fd(fd as i32) })
+            .map_err(OpenError::Completion)
     }
 
     fn complete_with_error(self, err: Error) -> Self::Output {
-        Err(err)
+        Err(OpenError::Submission(err))
     }
 }
 
@@ -55,5 +65,15 @@ impl Op<Open> {
         // SAFETY: Parameters are valid for the entire duration of the operation
         let op = unsafe { Op::new(open_op, Open { path }) };
         Ok(op)
+    }
+}
+
+pub(crate) async fn open(path: &Path, options: &UringOpenOptions) -> io::Result<crate::fs::File> {
+    loop {
+        match Op::open(path, options)?.await {
+            Ok(file) => return Ok(file),
+            Err(OpenError::Completion(e)) if e.kind() == io::ErrorKind::Interrupted => continue,
+            Err(OpenError::Completion(e) | OpenError::Submission(e)) => return Err(e),
+        }
     }
 }

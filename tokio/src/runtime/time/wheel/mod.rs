@@ -107,7 +107,7 @@ impl Wheel {
         debug_assert!({
             self.levels[level]
                 .next_expiration(self.elapsed)
-                .map_or(true, |e| e.deadline >= self.elapsed)
+                .is_none_or(|e| e.deadline >= self.elapsed)
         });
 
         Ok(when)

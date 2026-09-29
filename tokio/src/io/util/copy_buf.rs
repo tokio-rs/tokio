@@ -48,9 +48,9 @@ cfg_io_util! {
     ///
     /// # Errors
     ///
-    /// The returned future will finish with an error will return an error
-    /// immediately if any call to `poll_fill_buf` or `poll_write` returns an
-    /// error.
+    /// Errors from `poll_fill_buf` and `poll_write` are returned immediately,
+    /// except [`io::ErrorKind::Interrupted`], which is retried. Errors from
+    /// flushing the writer are returned without retrying.
     ///
     /// # Examples
     ///
@@ -118,6 +118,7 @@ where
                     coop.made_progress();
                     buffer
                 }
+                Poll::Ready(Err(err)) if err.kind() == io::ErrorKind::Interrupted => continue,
                 Poll::Ready(Err(err)) => {
                     #[cfg(any(
                         feature = "fs",
@@ -149,7 +150,10 @@ where
                 return Poll::Ready(Ok(self.amt));
             }
 
-            let i = ready!(Pin::new(&mut *me.writer).poll_write(cx, buffer))?;
+            let i = match ready!(Pin::new(&mut *me.writer).poll_write(cx, buffer)) {
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                res => res?,
+            };
             if i == 0 {
                 return Poll::Ready(Err(std::io::ErrorKind::WriteZero.into()));
             }

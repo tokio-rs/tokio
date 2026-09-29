@@ -16,9 +16,9 @@ unsafe impl<T> Sync for Empty<T> {}
 
 /// Creates a stream that yields nothing.
 ///
-/// The returned stream is immediately ready and returns `None`. Use
-/// [`stream::pending()`](super::pending()) to obtain a stream that is never
-/// ready.
+/// The returned stream returns `None`. It may return `Poll::Pending` to
+/// cooperate with the executor. Use [`stream::pending()`](super::pending())
+/// to obtain a stream that is never ready.
 ///
 /// # Examples
 ///
