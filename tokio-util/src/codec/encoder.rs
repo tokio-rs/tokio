@@ -35,10 +35,7 @@ pub trait Encoder<Item> {
     /// use bytes::BytesMut;
     ///
     /// fn reclaim(dst: &mut BytesMut) {
-    ///     let unconsumed: Vec<u8> = dst.to_vec();
-    ///     let mut fresh = BytesMut::with_capacity(unconsumed.len());
-    ///     fresh.extend_from_slice(&unconsumed);
-    ///     *dst = fresh;
+    ///     *dst = BytesMut::from(&dst[..]);
     /// }
     ///
     /// let mut dst = BytesMut::new();
@@ -46,10 +43,11 @@ pub trait Encoder<Item> {
     /// dst.truncate(3);
     /// dst[0..3].copy_from_slice(b"abc");
     ///
+    /// let before = dst.capacity();
     /// reclaim(&mut dst);
     ///
     /// assert_eq!(&dst[..], b"abc");
-    /// assert_eq!(dst.capacity(), 3);
+    /// assert!(dst.capacity() < before);
     /// ```
     ///
     /// This copies the unconsumed bytes, so it should only be done when the

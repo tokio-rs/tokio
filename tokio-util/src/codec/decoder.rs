@@ -125,9 +125,9 @@ pub trait Decoder {
     /// ## Reclaiming capacity
     ///
     /// `BytesMut` has no method to release spare capacity, so a buffer that
-    /// grew to hold one large frame keeps that allocation for the lifetime of
-    /// the connection. [`clear`], [`truncate`], [`split_to`] and [`split`]
-    /// discard data but all preserve the existing capacity:
+    /// grew to hold one large frame keeps that allocation for as long as it is
+    /// in use. [`clear`] and [`truncate`] discard the data but leave the
+    /// allocation untouched:
     ///
     /// ```
     /// use bytes::BytesMut;
@@ -142,9 +142,12 @@ pub trait Decoder {
     /// assert_eq!(src.capacity(), 1024 * 1024);
     /// ```
     ///
+    /// [`split_to`] and [`split`] do not free it either, they just move the
+    /// existing allocation across to another buffer.
+    ///
     /// This matters when a large frame is rare: the buffer permanently holds
     /// the peak size, so a connection that saw one large message can sit on
-    /// that much memory for the rest of its life. To shrink it, move the
+    /// that much memory for the rest of its life. To shrink it, copy the
     /// unconsumed bytes into a newly allocated buffer:
     ///
     /// ```
@@ -153,10 +156,7 @@ pub trait Decoder {
     /// fn reclaim(src: &mut BytesMut) {
     ///     // Copy the bytes that have not been consumed yet into a fresh
     ///     // allocation, then drop the oversized one.
-    ///     let unconsumed: Vec<u8> = src.to_vec();
-    ///     let mut fresh = BytesMut::with_capacity(unconsumed.len());
-    ///     fresh.extend_from_slice(&unconsumed);
-    ///     *src = fresh;
+    ///     *src = BytesMut::from(&src[..]);
     /// }
     ///
     /// let mut src = BytesMut::new();
@@ -164,10 +164,11 @@ pub trait Decoder {
     /// src.truncate(3);
     /// src[0..3].copy_from_slice(b"abc");
     ///
+    /// let before = src.capacity();
     /// reclaim(&mut src);
     ///
     /// assert_eq!(&src[..], b"abc");
-    /// assert_eq!(src.capacity(), 3);
+    /// assert!(src.capacity() < before);
     /// ```
     ///
     /// This copies, so it should not be run on every call. A decoder that
