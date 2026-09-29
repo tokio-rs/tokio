@@ -483,7 +483,8 @@
 //!
 //! When the build links WebAssembly JavaScript Promise Integration (JSPI), a
 //! wait that would block suspends on the host event loop rather than blocking.
-//! This requires Emscripten 6.0.10 or later. Without JSPI, such a wait panics.
+//! JSPI builds require Emscripten 6.0.10 or later; builds without JSPI link
+//! against any Emscripten the Rust target supports, and such a wait panics.
 //!
 //! Suspension requires the current export to have been wrapped with
 //! `WebAssembly.promising`. A wait from any other activation throws
