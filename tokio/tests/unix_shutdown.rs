@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", unix))] // Unix domain sockets are only available on Unix
+#![cfg(not(miri))] // No Unix domain sockets on miri.
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
