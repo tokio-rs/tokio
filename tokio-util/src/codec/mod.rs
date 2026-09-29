@@ -139,6 +139,15 @@
 //! ```
 //! The example above uses `yield` whenever the `Stream` produces an item.
 //!
+//! ## Buffer management
+//!
+//! `BytesMut` cannot release spare capacity in place. A buffer that grew to hold
+//! one large frame keeps that allocation, so a connection that saw a single
+//! large message holds that much memory until it is closed. If frame sizes vary
+//! wildly, an encoder or decoder can shrink the buffer by copying the unconsumed
+//! bytes into a fresh allocation. See [`Decoder::decode`] and [`Encoder::encode`]
+//! for the details and an example.
+//!
 //! ## Example decoder
 //!
 //! As an example, consider a protocol that can be used to send strings where

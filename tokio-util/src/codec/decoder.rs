@@ -121,6 +121,71 @@ pub trait Decoder {
     ///
     /// An optimal buffer management strategy minimizes reallocations and
     /// over-allocations.
+    ///
+    /// ## Reclaiming capacity
+    ///
+    /// `BytesMut` has no method to release spare capacity, so a buffer that
+    /// grew to hold one large frame keeps that allocation for the lifetime of
+    /// the connection. [`clear`], [`truncate`], [`split_to`] and [`split`]
+    /// discard data but all preserve the existing capacity:
+    ///
+    /// ```
+    /// use bytes::BytesMut;
+    ///
+    /// let mut src = BytesMut::new();
+    /// src.resize(1024 * 1024, 0u8);
+    /// assert_eq!(src.capacity(), 1024 * 1024);
+    ///
+    /// src.clear();
+    /// assert_eq!(src.len(), 0);
+    /// // The allocation is still there.
+    /// assert_eq!(src.capacity(), 1024 * 1024);
+    /// ```
+    ///
+    /// This matters when a large frame is rare: the buffer permanently holds
+    /// the peak size, so a connection that saw one large message can sit on
+    /// that much memory for the rest of its life. To shrink it, move the
+    /// unconsumed bytes into a newly allocated buffer:
+    ///
+    /// ```
+    /// use bytes::BytesMut;
+    ///
+    /// fn reclaim(src: &mut BytesMut) {
+    ///     // Copy the bytes that have not been consumed yet into a fresh
+    ///     // allocation, then drop the oversized one.
+    ///     let unconsumed: Vec<u8> = src.to_vec();
+    ///     let mut fresh = BytesMut::with_capacity(unconsumed.len());
+    ///     fresh.extend_from_slice(&unconsumed);
+    ///     *src = fresh;
+    /// }
+    ///
+    /// let mut src = BytesMut::new();
+    /// src.resize(1024 * 1024, 0u8);
+    /// src.truncate(3);
+    /// src[0..3].copy_from_slice(b"abc");
+    ///
+    /// reclaim(&mut src);
+    ///
+    /// assert_eq!(&src[..], b"abc");
+    /// assert_eq!(src.capacity(), 3);
+    /// ```
+    ///
+    /// This copies, so it should not be run on every call. A decoder that
+    /// knows it has just consumed an unusually large frame can call it
+    /// conditionally, and otherwise keep reusing the allocation, which is
+    /// cheaper than allocating a new one per frame.
+    ///
+    /// Note that the old allocation is not necessarily freed immediately:
+    /// [`Bytes`] values previously handed out by [`split_to`] or
+    /// [`split_to`]/[`freeze`] share it and keep it alive until they are
+    /// dropped.
+    ///
+    /// [`clear`]: bytes::BytesMut::clear
+    /// [`truncate`]: bytes::BytesMut::truncate
+    /// [`split_to`]: bytes::BytesMut::split_to
+    /// [`split`]: bytes::BytesMut::split
+    /// [`Bytes`]: bytes::Bytes
+    /// [`freeze`]: bytes::BytesMut::freeze
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error>;
 
     /// A default method available to be called when there are no more bytes
