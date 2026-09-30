@@ -13,6 +13,7 @@ use tokio::sync::Mutex;
 use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready};
 
+#[cfg(not(target_family = "wasm"))]
 use futures::FutureExt;
 use std::sync::Arc;
 
@@ -178,6 +179,7 @@ async fn mutex_debug() {
     assert_eq!(format!("{m:?}"), r#"Mutex { data: <locked> }"#)
 }
 
+#[cfg(not(target_family = "wasm"))]
 #[maybe_tokio_test]
 async fn mutex_fifo_with_coop_budget() {
     let m = Arc::new(Mutex::new(()));
