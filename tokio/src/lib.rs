@@ -476,6 +476,19 @@
 //! `test-util` features. The `rt-multi-thread` feature is additionally
 //! supported when building with Emscripten pthreads (`-pthread`). The `net`,
 //! `process`, and `signal` features are not supported.
+//!
+//! Emscripten's filesystem is synchronous, so `tokio::fs` and `io-std` run
+//! their operations inline on the calling thread rather than on the blocking
+//! pool, in pthreads builds too.
+//!
+//! When the build links WebAssembly JavaScript Promise Integration (JSPI), a
+//! wait that would block suspends on the host event loop rather than blocking.
+//! This requires Emscripten 6.0.10 or later. Without JSPI, such a wait panics.
+//!
+//! Suspension requires the current export to have been wrapped with
+//! `WebAssembly.promising`. A wait from any other activation throws
+//! `WebAssembly.SuspendError`. That is a foreign exception rather than a Rust
+//! panic, so it can't be caught by `catch_unwind`.
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at
 // least 32 bits, which a lot of components in Tokio currently assumes.

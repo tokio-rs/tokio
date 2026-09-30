@@ -1,4 +1,4 @@
-331
+333
 &
 +
 <
@@ -163,6 +163,7 @@ IP
 IPv4
 IPv6
 iteratively
+JSPI
 Kotlin's
 latencies
 Lauck
@@ -328,5 +329,6 @@ wakeups
 WASI
 Wasm
 watchOS
+WebAssembly
 workstealing
 ZST

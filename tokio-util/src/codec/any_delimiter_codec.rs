@@ -114,7 +114,6 @@ impl AnyDelimiterCodec {
     /// Returns the maximum chunk length when decoding.
     ///
     /// ```
-    /// use std::usize;
     /// use tokio_util::codec::AnyDelimiterCodec;
     ///
     /// let codec = AnyDelimiterCodec::new(b",;\n".to_vec(), b";".to_vec());

@@ -164,6 +164,24 @@ rt_test! {
     }
 
     #[test]
+    fn stdout_shutdown_before_started() {
+        use tokio::io::AsyncWriteExt;
+        let rt = rt();
+        let _enter = rt.enter();
+        rt.shutdown_timeout(Duration::from_secs(1000));
+
+        let err = Handle::current()
+            .block_on(async { tokio::io::stdout().write_all(b"x").await })
+            .unwrap_err();
+        assert!(tokio::runtime::is_rt_shutdown_err(&err));
+
+        let err = Handle::current()
+            .block_on(async { tokio::io::stderr().write_all(b"x").await })
+            .unwrap_err();
+        assert!(tokio::runtime::is_rt_shutdown_err(&err));
+    }
+
+    #[test]
     fn basic_spawn_blocking() {
         use tokio::task::spawn_blocking;
         let rt = rt();
@@ -376,7 +394,7 @@ rt_test! {
 
     #[test]
     #[should_panic(
-        expected = "Cannot start a runtime from within a runtime. This happens because a function (like `block_on`) attempted to block the current thread while the thread is being used to drive asynchronous tasks."
+        expected = "Cannot start a runtime from within a runtime. This happens because a function (like `block_on`) attempted to block the current thread while the thread is being used to drive asynchronous tasks. If you are in an async function, use `.await` on the future instead of blocking on it."
     )]
     fn nesting() {
         fn some_non_async_function() -> i32 {

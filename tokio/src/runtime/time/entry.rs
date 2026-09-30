@@ -284,9 +284,6 @@ pin_project! {
     // before polling.
     #[derive(Debug)]
     pub(crate) struct TimerEntry {
-        // Arc reference to the runtime handle. We can only free the driver after
-        // deregistering everything from their respective timer wheels.
-        driver: scheduler::Handle,
         // Shared inner structure; this is part of an intrusive linked list, and
         // therefore other references can exist to it while mutable references to
         // Entry exist.
@@ -294,12 +291,6 @@ pin_project! {
         // This is manipulated only under the inner mutex.
         #[pin]
         inner: TimerShared,
-    }
-
-    impl PinnedDrop for TimerEntry {
-        fn drop(this: Pin<&mut Self>) {
-            this.cancel();
-        }
     }
 }
 
@@ -470,17 +461,18 @@ unsafe impl linked_list::Link for TimerShared {
 // ===== impl Entry =====
 
 impl TimerEntry {
-    pub(crate) fn new(handle: scheduler::Handle) -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            driver: handle,
             inner: TimerShared::new(),
         }
     }
 
-    pub(crate) fn init(self: Pin<&mut Self>, deadline: u64) {
+    pub(crate) fn init(self: Pin<&mut Self>, handle: &scheduler::Handle, deadline: u64) {
         unsafe {
-            self.driver()
-                .reregister(&self.driver.driver().io, deadline, (&self.inner).into());
+            handle
+                .driver()
+                .time()
+                .reregister(&handle.driver().io, deadline, (&self.inner).into());
         }
     }
 
@@ -490,7 +482,7 @@ impl TimerEntry {
     }
 
     /// Cancels and deregisters the timer. This operation is irreversible.
-    pub(crate) fn cancel(self: Pin<&mut Self>) {
+    pub(crate) fn cancel(self: Pin<&mut Self>, handle: &scheduler::Handle) {
         // We need to perform an acq/rel fence with the driver thread, and the
         // simplest way to do so is to grab the driver lock.
         //
@@ -513,35 +505,34 @@ impl TimerEntry {
         // driver did so far and happens-before everything the driver does in
         // the future. While we have the lock held, we also go ahead and
         // deregister the entry if necessary.
-        unsafe { self.driver().clear_entry(NonNull::from(&self.inner)) };
+        unsafe { handle.driver().time().clear_entry((&self.inner).into()) };
     }
 
-    pub(crate) fn reset(self: Pin<&mut Self>, deadline: u64) {
+    pub(crate) fn reset(self: Pin<&mut Self>, handle: &scheduler::Handle, deadline: u64) {
         if self.inner.extend_expiration(deadline).is_ok() {
             return;
         }
 
         unsafe {
-            self.driver()
-                .reregister(&self.driver.driver().io, deadline, (&self.inner).into());
+            handle
+                .driver()
+                .time()
+                .reregister(&handle.driver().io, deadline, (&self.inner).into());
         }
     }
 
     pub(crate) fn poll_elapsed(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
+        handle: &scheduler::Handle,
     ) -> Poll<Result<(), super::Error>> {
         assert!(
-            !self.driver().is_shutdown(),
+            !handle.driver().time().is_shutdown(),
             "{}",
             crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR
         );
 
         self.inner.state.poll(cx.waker())
-    }
-
-    fn driver(&self) -> &super::Handle {
-        self.driver.driver().time()
     }
 }
 

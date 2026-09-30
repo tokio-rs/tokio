@@ -20,7 +20,7 @@ use std::sync::Arc;
 /// they were requested. This fairness is also applied when `acquire_many` gets
 /// involved, so if a call to `acquire_many` at the front of the queue requests
 /// more permits than currently available, this can prevent a call to `acquire`
-/// from completing, even if the semaphore has enough permits complete the call
+/// from completing, even if the semaphore has enough permits to complete the call
 /// to `acquire`.
 ///
 /// To use the `Semaphore` in a poll function, you can use the [`PollSemaphore`]
@@ -1268,6 +1268,11 @@ impl<'a> SemaphorePermit<'a> {
             sem: self.sem,
             permits: n,
         })
+    }
+
+    /// Returns the [`Semaphore`] from which this permit was acquired.
+    pub fn semaphore(&self) -> &Semaphore {
+        self.sem
     }
 
     /// Returns the number of permits held by `self`.

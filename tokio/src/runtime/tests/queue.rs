@@ -211,6 +211,12 @@ fn stress1() {
 
         n += th.join().unwrap();
 
+        // A steal during the last round can leave a few tasks in the local
+        // queue after the stealer has exited.
+        while local.pop().is_some() {
+            n += 1;
+        }
+
         assert_eq!(n, NUM_LOCAL * NUM_PUSH);
     }
 }

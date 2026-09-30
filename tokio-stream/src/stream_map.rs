@@ -502,13 +502,7 @@ impl<K, V> StreamMap<K, V> {
         K: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        for i in 0..self.entries.len() {
-            if self.entries[i].0.borrow() == k {
-                return true;
-            }
-        }
-
-        false
+        self.entries.iter().any(|e| e.0.borrow() == k)
     }
 }
 
