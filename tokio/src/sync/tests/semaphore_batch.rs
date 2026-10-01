@@ -310,6 +310,111 @@ fn release_permits_at_drop() {
 }
 
 #[test]
+fn close_drops_wakers_outside_lock() {
+    use crate::sync::semaphore::*;
+    use futures::task::ArcWake;
+    use std::future::Future;
+    use std::sync::Arc;
+
+    struct ReleaseOnDrop {
+        _permit: OwnedSemaphorePermit,
+    }
+
+    impl ArcWake for ReleaseOnDrop {
+        fn wake_by_ref(_arc_self: &Arc<Self>) {}
+    }
+
+    let sem = Arc::new(Semaphore::new(1));
+
+    let mut fut = Box::pin(async {
+        let _ = sem.acquire().await;
+    });
+
+    let waker = futures::task::waker(Arc::new(ReleaseOnDrop {
+        _permit: sem.clone().try_acquire_owned().unwrap(),
+    }));
+    let mut cx = std::task::Context::from_waker(&waker);
+    assert!(fut.as_mut().poll(&mut cx).is_pending());
+    drop(waker);
+
+    // Waking the waiter drops the last reference to the waker, which releases
+    // a permit. This shouldn't deadlock.
+    sem.close();
+    assert_eq!(sem.available_permits(), 1);
+}
+
+#[test]
+fn close_wakes_waiters_outside_lock() {
+    use crate::sync::semaphore::*;
+    use futures::task::ArcWake;
+    use std::future::Future;
+    use std::sync::Arc;
+
+    struct ReleaseOnWake(Arc<Semaphore>);
+
+    impl ArcWake for ReleaseOnWake {
+        fn wake_by_ref(arc_self: &Arc<Self>) {
+            arc_self.0.add_permits(1);
+        }
+    }
+
+    let sem = Arc::new(Semaphore::new(0));
+
+    let mut fut = Box::pin(async {
+        let _ = sem.acquire().await;
+    });
+
+    let waker = futures::task::waker(Arc::new(ReleaseOnWake(sem.clone())));
+    let mut cx = std::task::Context::from_waker(&waker);
+    assert!(fut.as_mut().poll(&mut cx).is_pending());
+
+    // The waker releases a permit when it is woken. This shouldn't deadlock.
+    sem.close();
+    assert_eq!(sem.available_permits(), 1);
+}
+
+#[test]
+fn close_wakes_all_waiters() {
+    use crate::sync::semaphore::*;
+    use futures::task::ArcWake;
+    use std::future::Future;
+    use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
+    use std::sync::Arc;
+    use std::task::Poll;
+
+    // More waiters than are woken in one batch.
+    const WAITERS: usize = 100;
+
+    struct CountWakes(AtomicUsize);
+
+    impl ArcWake for CountWakes {
+        fn wake_by_ref(arc_self: &Arc<Self>) {
+            arc_self.0.fetch_add(1, SeqCst);
+        }
+    }
+
+    let sem = Semaphore::new(0);
+    let wakes = Arc::new(CountWakes(AtomicUsize::new(0)));
+    let waker = futures::task::waker(wakes.clone());
+    let mut cx = std::task::Context::from_waker(&waker);
+
+    let mut acquires: Vec<_> = (0..WAITERS).map(|_| Box::pin(sem.acquire())).collect();
+    for acquire in &mut acquires {
+        assert!(acquire.as_mut().poll(&mut cx).is_pending());
+    }
+
+    sem.close();
+    assert_eq!(wakes.0.load(SeqCst), WAITERS);
+
+    for acquire in &mut acquires {
+        assert!(matches!(
+            acquire.as_mut().poll(&mut cx),
+            Poll::Ready(Err(_))
+        ));
+    }
+}
+
+#[test]
 fn forget_permits_basic() {
     let s = Semaphore::new(10);
     assert_eq!(s.forget_permits(4), 4);
