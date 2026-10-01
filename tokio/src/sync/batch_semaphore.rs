@@ -620,6 +620,12 @@ impl Future for Acquire<'_> {
 
 impl<'a> Acquire<'a> {
     fn new(semaphore: &'a Semaphore, num_permits: usize) -> Self {
+        assert!(
+            num_permits <= Semaphore::MAX_PERMITS,
+            "a semaphore may not have more than MAX_PERMITS permits ({})",
+            Semaphore::MAX_PERMITS
+        );
+
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
         return Self {
             node: Waiter::new(num_permits),
