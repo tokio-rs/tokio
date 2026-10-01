@@ -956,3 +956,40 @@ async fn try_with_interest() {
 
     assert!(Arc::ptr_eq(&original, &returned));
 }
+
+#[tokio::test]
+async fn drop_after_closing_raw_fd_with_live_duplicate() {
+    #[repr(align(128))]
+    struct Canary([u8; 256]);
+
+    let (original, mut peer) = std::os::unix::net::UnixStream::pair().unwrap();
+    original.set_nonblocking(true).unwrap();
+    let duplicate = original.try_clone().unwrap();
+
+    let registered = AsyncFd::with_interest(original.as_raw_fd(), Interest::READABLE).unwrap();
+
+    // Closing the original fd while `duplicate` stays open keeps the open file
+    // description registered in epoll on Linux, while causing `EPOLL_CTL_DEL`
+    // to fail with `EBADF` when `registered` is dropped.
+    drop(original);
+    drop(registered);
+
+    // Let the I/O driver run a turn so any pending registration releases happen.
+    tokio::task::yield_now().await;
+
+    // Allocate canaries with the same size/alignment as `Arc<ScheduledIo>` to
+    // detect use-after-free writes even without AddressSanitizer.
+    let canaries: Vec<Box<Canary>> = (0..64).map(|_| Box::new(Canary([0u8; 256]))).collect();
+
+    peer.write_all(b"x").unwrap();
+    tokio::task::yield_now().await;
+
+    for canary in &canaries {
+        assert_eq!(
+            canary.0, [0u8; 256],
+            "freed ScheduledIo was written to after deregister failure"
+        );
+    }
+
+    drop(duplicate);
+}
