@@ -42,8 +42,10 @@ use windows_sys::{
 
 #[must_use = "futures do nothing unless polled"]
 pub(crate) struct Child {
-    child: StdChild,
+    // `waiting` must be dropped before `child` so that `UnregisterWaitEx`
+    // cancels any pending wait before `StdChild` closes the process handle.
     waiting: Option<Waiting>,
+    child: StdChild,
 }
 
 impl fmt::Debug for Child {
