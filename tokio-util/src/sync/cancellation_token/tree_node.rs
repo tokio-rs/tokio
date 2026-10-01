@@ -301,6 +301,12 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
         return;
     }
 
+    // Nodes that got cancelled, but whose waiters are not woken yet.
+    //
+    // The waiters are woken after all locks are released, as waking or
+    // dropping a waker may run code that locks one of the nodes again.
+    let mut cancelled = Vec::new();
+
     // One by one, adopt grandchildren and then cancel and detach the child
     while let Some(child) = locked_node.children.pop() {
         // This can't deadlock because the mutex we are already
@@ -339,7 +345,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
                 locked_grandchild.is_cancelled = true;
                 locked_grandchild.children = Vec::new();
                 drop(locked_grandchild);
-                grandchild.waker.notify_waiters();
+                cancelled.push(grandchild);
             } else {
                 // Otherwise, adopt grandchild
                 locked_grandchild.parent = Some(node.clone());
@@ -353,7 +359,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
         locked_child.is_cancelled = true;
         locked_child.children = Vec::new();
         drop(locked_child);
-        child.waker.notify_waiters();
+        cancelled.push(child);
 
         // Now the child is cancelled and detached and all its children are adopted.
         // Just continue until all (including adopted) children are cancelled and detached.
@@ -363,5 +369,9 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
     locked_node.is_cancelled = true;
     locked_node.children = Vec::new();
     drop(locked_node);
+
+    for descendant in cancelled {
+        descendant.waker.notify_waiters();
+    }
     node.waker.notify_waiters();
 }

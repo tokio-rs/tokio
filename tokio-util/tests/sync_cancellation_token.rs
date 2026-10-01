@@ -6,9 +6,11 @@ use tokio_util::sync::{CancellationToken, WaitForCancellationFuture};
 
 use core::future::Future;
 use core::hash::Hash;
-use core::task::{Context, Poll};
+use core::task::{Context, Poll, Waker};
 use futures_test::task::new_count_waker;
 use std::hash::{DefaultHasher, Hasher};
+use std::sync::Arc;
+use std::task::Wake;
 
 #[test]
 fn cancel_token() {
@@ -435,6 +437,76 @@ fn drop_parent_before_child_tokens() {
 
     drop(child1);
     drop(child2);
+}
+
+#[test]
+fn child_waker_creates_child_of_parent() {
+    struct ChildTokenWaker(CancellationToken);
+
+    impl Wake for ChildTokenWaker {
+        fn wake(self: Arc<Self>) {
+            drop(self.0.child_token());
+        }
+    }
+
+    let parent = CancellationToken::new();
+    let child = parent.child_token();
+    let waker = Waker::from(Arc::new(ChildTokenWaker(parent.clone())));
+
+    let fut = child.cancelled();
+    pin!(fut);
+    assert!(fut
+        .as_mut()
+        .poll(&mut Context::from_waker(&waker))
+        .is_pending());
+
+    // Waking the child's waiter must not deadlock on the parent's lock.
+    parent.cancel();
+
+    assert!(fut
+        .as_mut()
+        .poll(&mut Context::from_waker(&waker))
+        .is_ready());
+}
+
+#[test]
+fn grandchild_waker_drops_child_token() {
+    struct DropTokenWaker {
+        inner: Waker,
+        _token: CancellationToken,
+    }
+
+    impl Wake for DropTokenWaker {
+        fn wake(self: Arc<Self>) {
+            self.inner.wake_by_ref();
+        }
+    }
+
+    let (inner, wake_counter) = new_count_waker();
+    let parent = CancellationToken::new();
+    let child = parent.child_token();
+    let grandchild = child.child_token();
+
+    let fut = grandchild.cancelled();
+    pin!(fut);
+    {
+        let waker = Waker::from(Arc::new(DropTokenWaker {
+            inner,
+            _token: child.clone(),
+        }));
+        assert!(fut
+            .as_mut()
+            .poll(&mut Context::from_waker(&waker))
+            .is_pending());
+    }
+
+    // The waker is dropped when the grandchild's waiter is woken. This drops
+    // its handle to the child, which must not deadlock on the child's lock.
+    parent.cancel();
+
+    assert_eq!(wake_counter, 1);
+    assert!(child.is_cancelled());
+    assert!(grandchild.is_cancelled());
 }
 
 #[test]
