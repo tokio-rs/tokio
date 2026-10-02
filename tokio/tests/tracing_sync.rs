@@ -285,6 +285,7 @@ async fn test_semaphore_creates_span() {
 /// is in the middle of an operation.
 #[cfg(panic = "unwind")]
 mod subscriber_panic {
+    use std::future::Future;
     use std::panic::{catch_unwind, AssertUnwindSafe};
     use std::sync::atomic::{AtomicBool, Ordering};
     use tokio::sync;
@@ -355,5 +356,27 @@ mod subscriber_panic {
         sem.add_permits(1);
         drop(permit);
         assert_eq!(sem.available_permits(), 2);
+    }
+
+    #[test]
+    fn semaphore_acquire() {
+        // Polls `acquire` with a subscriber that panics on the event emitted
+        // once the permits have been taken from the semaphore. The `Acquire`
+        // future is dropped while unwinding, which must return the permits.
+        fn poll_with_panicking_subscriber<F: Future>(mut acquire: task::Spawn<F>) {
+            let subscriber = PanicOnEvent::new("runtime::resource::state_update");
+            let res = catch_unwind(AssertUnwindSafe(|| {
+                tracing::subscriber::with_default(subscriber, || {
+                    let _ = acquire.poll();
+                });
+            }));
+            assert!(res.is_err());
+        }
+
+        let sem = sync::Semaphore::new(1);
+
+        // Uncontended acquisition that takes the permit without queueing.
+        poll_with_panicking_subscriber(task::spawn(sem.acquire()));
+        assert_eq!(sem.available_permits(), 1);
     }
 }
