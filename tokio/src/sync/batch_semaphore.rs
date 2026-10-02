@@ -311,11 +311,15 @@ impl Semaphore {
             let mut waiters = lock.take().unwrap_or_else(|| self.waiters.lock());
             'inner: while wakers.can_push() {
                 // Was the waiter assigned enough permits to wake it?
-                match waiters.queue.last() {
+                let _assigned = match waiters.queue.last() {
                     Some(waiter) => {
-                        if !waiter.assign_permits(&mut rem) {
+                        let (should_remove, assigned) = waiter.assign_permits(&mut rem);
+                        if !should_remove {
+                            #[cfg(all(tokio_unstable, feature = "tracing"))]
+                            waiter.trace_assigned(assigned);
                             break 'inner;
                         }
+                        assigned
                     }
                     None => {
                         is_empty = true;
@@ -330,6 +334,9 @@ impl Semaphore {
                 {
                     wakers.push(waker);
                 }
+                // Safety: we have locked the wait list.
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                unsafe { waiter.as_ref() }.trace_assigned(_assigned);
             }
 
             if rem > 0 && is_empty {
@@ -485,7 +492,11 @@ impl Semaphore {
             )
         });
 
-        if node.assign_permits(&mut acquired) {
+        let (should_remove, _assigned) = node.assign_permits(&mut acquired);
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        node.trace_assigned(_assigned);
+
+        if should_remove {
             self.add_permits_locked(acquired, waiters);
             return Poll::Ready(Ok(()));
         }
@@ -547,8 +558,9 @@ impl Waiter {
 
     /// Assign permits to the waiter.
     ///
-    /// Returns `true` if the waiter should be removed from the queue
-    fn assign_permits(&self, n: &mut usize) -> bool {
+    /// Returns whether the waiter should be removed from the queue, and the
+    /// number of permits that were assigned to it.
+    fn assign_permits(&self, n: &mut usize) -> (bool, usize) {
         let mut curr = self.state.load(Acquire);
         loop {
             let assign = cmp::min(curr, *n);
@@ -556,19 +568,24 @@ impl Waiter {
             match self.state.compare_exchange(curr, next, AcqRel, Acquire) {
                 Ok(_) => {
                     *n -= assign;
-                    #[cfg(all(tokio_unstable, feature = "tracing"))]
-                    self.ctx.async_op_span.in_scope(|| {
-                        tracing::trace!(
-                            target: "runtime::resource::async_op::state_update",
-                            permits_obtained = assign,
-                            permits.op = "add",
-                        );
-                    });
-                    return next == 0;
+                    return (next == 0, assign);
                 }
                 Err(actual) => curr = actual,
             }
         }
+    }
+
+    /// Emit a tracing event for `assigned` permits having been assigned to
+    /// the waiter.
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    fn trace_assigned(&self, assigned: usize) {
+        self.ctx.async_op_span.in_scope(|| {
+            tracing::trace!(
+                target: "runtime::resource::async_op::state_update",
+                permits_obtained = assigned,
+                permits.op = "add",
+            );
+        });
     }
 }
 

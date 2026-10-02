@@ -280,3 +280,80 @@ async fn test_semaphore_creates_span() {
 
     handle.assert_finished();
 }
+
+/// Tests for panics in the tracing subscriber while a synchronization primitive
+/// is in the middle of an operation.
+#[cfg(panic = "unwind")]
+mod subscriber_panic {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use tokio::sync;
+    use tokio_test::{assert_pending, assert_ready_ok, task};
+    use tracing::span::{Attributes, Id, Record};
+    use tracing::{Event, Metadata, Subscriber};
+
+    /// A subscriber that panics on the first event with the given target.
+    ///
+    /// Later events, such as those emitted while unwinding, are ignored.
+    struct PanicOnEvent {
+        target: &'static str,
+        panicked: AtomicBool,
+    }
+
+    impl PanicOnEvent {
+        fn new(target: &'static str) -> Self {
+            Self {
+                target,
+                panicked: AtomicBool::new(false),
+            }
+        }
+    }
+
+    impl Subscriber for PanicOnEvent {
+        fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+            metadata.target() == self.target
+        }
+
+        fn event(&self, _event: &Event<'_>) {
+            if !self.panicked.swap(true, Ordering::SeqCst) {
+                panic!("tracing subscriber panicked");
+            }
+        }
+
+        fn new_span(&self, _span: &Attributes<'_>) -> Id {
+            Id::from_u64(1)
+        }
+
+        fn record(&self, _span: &Id, _values: &Record<'_>) {}
+
+        fn record_follows_from(&self, _span: &Id, _follows: &Id) {}
+
+        fn enter(&self, _span: &Id) {}
+
+        fn exit(&self, _span: &Id) {}
+    }
+
+    #[test]
+    fn semaphore_release() {
+        let sem = sync::Semaphore::new(0);
+        let mut acquire = task::spawn(sem.acquire());
+        assert_pending!(acquire.poll());
+
+        // The subscriber panics on the event emitted once the permit has been
+        // assigned to the waiter.
+        let subscriber = PanicOnEvent::new("runtime::resource::async_op::state_update");
+        let res = catch_unwind(AssertUnwindSafe(|| {
+            tracing::subscriber::with_default(subscriber, || sem.add_permits(1));
+        }));
+        assert!(res.is_err());
+
+        // The waiter has all of its permits, so the acquisition completes. It
+        // must have been removed from the wait queue, so dropping it and then
+        // releasing another permit must not access the freed waiter.
+        let permit = assert_ready_ok!(acquire.poll());
+        drop(acquire);
+        sem.add_permits(1);
+        drop(permit);
+        assert_eq!(sem.available_permits(), 2);
+    }
+}
