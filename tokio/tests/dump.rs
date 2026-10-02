@@ -308,3 +308,35 @@ mod dump_of_parked_workers {
         assert_dump_preserves_idle_bookkeeping(8);
     }
 }
+
+/// Regression test ensuring that a task currently running inside
+/// `block_in_place` is not notified for tracing.
+#[test]
+fn block_in_place_during_dump() {
+    use std::sync::mpsc;
+
+    let rt = runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(1)
+        .build()
+        .unwrap();
+
+    let (entered_tx, entered_rx) = mpsc::channel();
+    let (continue_tx, continue_rx) = mpsc::channel();
+
+    let task = rt.spawn(async move {
+        tokio::task::block_in_place(|| {
+            entered_tx.send(()).unwrap();
+            continue_rx.recv().unwrap();
+        });
+        tokio::task::yield_now().await;
+    });
+
+    entered_rx.recv().unwrap();
+
+    let dump = rt.block_on(rt.handle().dump());
+    assert_eq!(dump.tasks().iter().count(), 0);
+
+    continue_tx.send(()).unwrap();
+    rt.block_on(task).unwrap();
+}

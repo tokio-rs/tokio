@@ -463,7 +463,7 @@ impl<S: 'static> Task<S> {
     cfg_taskdump! {
         /// Notify the task for task dumping.
         ///
-        /// Returns `None` if the task has already been notified.
+        /// Returns `None` if the task has already been notified or is not idle.
         pub(super) fn notify_for_tracing(&self) -> Option<Notified<S>> {
             if self.as_raw().state().transition_to_notified_for_tracing() {
                 // SAFETY: `transition_to_notified_for_tracing` increments the

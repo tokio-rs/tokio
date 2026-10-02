@@ -419,12 +419,12 @@ cfg_rt_multi_thread! {
 /// in any other queue.
 fn trace_owned<S: Schedule>(owned: &OwnedTasks<S>, dequeued: Vec<Notified<S>>) -> Vec<(Id, Trace)> {
     let mut tasks = dequeued;
-    // Notify and trace all un-notified tasks. The dequeued tasks are already
-    // notified and so do not need to be re-notified.
+    // Notify and trace all un-notified idle tasks. The dequeued tasks are
+    // already notified and so do not need to be re-notified.
     owned.for_each(|task| {
         // Notify the task (and thus make it poll-able) and stash it. This fails
-        // if the task is already notified. In these cases, we skip tracing the
-        // task.
+        // if the task is already notified or not idle. In these cases, we skip
+        // tracing the task.
         if let Some(notified) = task.notify_for_tracing() {
             tasks.push(notified);
         }
