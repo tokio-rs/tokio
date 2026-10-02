@@ -75,9 +75,6 @@ async fn listen_and_stream() -> std::io::Result<()> {
 
     let ((mut server, _), mut client) = try_join(accept, connect).await?;
 
-    // A bound client's source path only propagates to the peer once node's
-    // `net.BoundSocket` supports AF_UNIX paths (nodejs/node#64399).
-    #[cfg(not(target_os = "emscripten"))]
     assert_eq!(
         server.peer_addr().unwrap().as_pathname().unwrap(),
         &peer_path
