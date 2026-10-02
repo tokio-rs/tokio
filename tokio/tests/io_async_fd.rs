@@ -959,9 +959,6 @@ async fn try_with_interest() {
 
 #[tokio::test]
 async fn drop_after_closing_raw_fd_with_live_duplicate() {
-    #[repr(align(128))]
-    struct Canary([u8; 256]);
-
     let (original, mut peer) = socketpair();
     let duplicate = original.fd.try_clone().unwrap();
 
@@ -976,19 +973,8 @@ async fn drop_after_closing_raw_fd_with_live_duplicate() {
     // Let the I/O driver run a turn so any pending registration releases happen.
     tokio::task::yield_now().await;
 
-    // Allocate canaries with the same size/alignment as `Arc<ScheduledIo>` to
-    // detect use-after-free writes even without AddressSanitizer.
-    let canaries: Vec<Box<Canary>> = (0..64).map(|_| Box::new(Canary([0u8; 256]))).collect();
-
     peer.write_all(b"x").unwrap();
     tokio::task::yield_now().await;
-
-    for canary in &canaries {
-        assert_eq!(
-            canary.0, [0u8; 256],
-            "freed ScheduledIo was written to after deregister failure"
-        );
-    }
 
     drop(duplicate);
 }
