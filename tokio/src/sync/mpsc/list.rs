@@ -402,7 +402,7 @@ impl<T> Rx<T> {
                     None => return,
                 };
 
-                if required_index > self.index {
+                if required_index.wrapping_sub(self.index) as isize > 0 {
                     return;
                 }
 
