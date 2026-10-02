@@ -378,5 +378,9 @@ mod subscriber_panic {
         // Uncontended acquisition that takes the permit without queueing.
         poll_with_panicking_subscriber(task::spawn(sem.acquire()));
         assert_eq!(sem.available_permits(), 1);
+
+        // Contended acquisition that takes the permit and queues the waiter.
+        poll_with_panicking_subscriber(task::spawn(sem.acquire_many(2)));
+        assert_eq!(sem.available_permits(), 1);
     }
 }
