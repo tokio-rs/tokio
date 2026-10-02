@@ -394,6 +394,8 @@ impl Spawner {
         let mut shared = self.inner.shared.lock();
 
         if shared.shutdown {
+            drop(shared);
+
             // Shutdown the task: it's fine to shutdown this task (even if
             // mandatory) because it was scheduled after the shutdown of the
             // runtime began.
