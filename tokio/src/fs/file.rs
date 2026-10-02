@@ -691,18 +691,29 @@ impl AsyncSeek for File {
                 let mut buf = buf_cell.take().unwrap();
 
                 // Factor in any unread data from the buf
+                let mut invalid_seek = false;
                 if !buf.is_empty() {
                     let n = buf.discard_read();
 
                     if let SeekFrom::Current(ref mut offset) = pos {
-                        *offset += n;
+                        match offset.checked_add(n) {
+                            Some(new_offset) => *offset = new_offset,
+                            None => invalid_seek = true,
+                        }
                     }
                 }
 
                 let std = me.std.clone();
 
                 inner.state = State::Busy(spawn_blocking(move || {
-                    let res = (&*std).seek(pos);
+                    let res = if invalid_seek {
+                        Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "cannot seek to a negative or overflowing position",
+                        ))
+                    } else {
+                        (&*std).seek(pos)
+                    };
                     (Operation::Seek(res), buf)
                 }));
                 Ok(())

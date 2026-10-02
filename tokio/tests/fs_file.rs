@@ -110,6 +110,58 @@ async fn rewind_seek_position() {
     assert_eq!(file.stream_position().await.unwrap(), 0);
 }
 
+#[test]
+fn buffered_seek_overflow() {
+    use std::future::{poll_fn, Future};
+    use std::sync::mpsc;
+    use std::task::Context;
+    use tokio::io::AsyncSeek;
+
+    let mut tempfile = tempfile();
+    tempfile.write_all(b"abcdefgh").unwrap();
+
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .max_blocking_threads(1)
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        let mut file = File::open(tempfile.path()).await.unwrap();
+
+        // Hold the sole blocking worker so the first read remains pending.
+        let (release, blocked) = mpsc::channel();
+        let (ready, started) = mpsc::channel();
+        let worker = tokio::task::spawn_blocking(move || {
+            ready.send(()).unwrap();
+            blocked.recv().unwrap();
+        });
+        started.recv().unwrap();
+
+        // Poll once, then cancel by dropping the future before releasing the worker.
+        let mut large = [0; 8];
+        {
+            let mut read = Box::pin(file.read(&mut large));
+            let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+            assert!(read.as_mut().poll(&mut cx).is_pending());
+        }
+
+        release.send(()).unwrap();
+        worker.await.unwrap();
+
+        // Finish the cancelled read, then consume only one of its eight bytes.
+        poll_fn(|cx| std::pin::Pin::new(&mut file).poll_complete(cx))
+            .await
+            .unwrap();
+        let mut byte = [0];
+        file.read_exact(&mut byte).await.unwrap();
+        assert_eq!(byte, [b'a']);
+
+        // Seeking with i64::MIN when buffered bytes remain must not panic with overflow.
+        let result = file.seek(SeekFrom::Current(i64::MIN)).await;
+        assert!(result.is_err(), "seeking before byte zero must fail");
+    });
+}
+
 #[tokio::test]
 async fn coop() {
     let mut tempfile = tempfile();
