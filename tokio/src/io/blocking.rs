@@ -285,9 +285,10 @@ cfg_io_uring! {
         /// for the kernel to write into.
         pub(crate) fn prepare_uring_read(&mut self, max_buf_size: usize) -> (*mut u8, u32) {
             assert!(self.is_empty());
+            let max_buf_size = cmp::min(max_buf_size, u32::MAX as usize);
             self.buf.reserve(max_buf_size);
             let spare = self.buf.spare_capacity_mut();
-            let len = std::cmp::min(spare.len(), max_buf_size);
+            let len = cmp::min(spare.len(), max_buf_size);
             let ptr = spare.as_mut_ptr().cast::<u8>();
             (ptr, len as u32)
         }

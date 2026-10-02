@@ -469,3 +469,27 @@ async fn test_file_partial_read_then_write() {
     assert_eq!(&result[13..16], b"NOP");
     assert_eq!(&result[16..], &data[16..]);
 }
+
+#[cfg(target_pointer_width = "64")]
+#[tokio::test]
+async fn test_file_read_4gib_buf_size() {
+    let data = b"nonempty file content for 4 GiB buffer test";
+    let (_tmp, path) = create_temp_file(data);
+
+    // Ensure the system can reserve two 4 GiB buffers (caller ReadBuf + File's internal Buf)
+    // before running the test, as `File::poll_read` uses `Vec::reserve` internally.
+    let mut dst = Vec::<u8>::new();
+    let mut reserve_check = Vec::<u8>::new();
+    if dst.try_reserve_exact(1usize << 32).is_err()
+        || reserve_check.try_reserve_exact(1usize << 32).is_err()
+    {
+        return;
+    }
+    drop(reserve_check);
+
+    let mut file = File::open(&path).await.unwrap();
+    file.set_max_buf_size(1usize << 32);
+    file.read_buf(&mut dst).await.unwrap();
+
+    assert_eq!(dst, data);
+}
