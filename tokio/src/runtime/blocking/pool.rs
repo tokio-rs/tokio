@@ -459,6 +459,14 @@ impl Spawner {
             .saturating_sub(self.inner.scheduler_threads)
     }
 
+    #[cfg(all(test, not(loom)))]
+    pub(super) fn sharded_queue(&self) -> (&ShardedImpl, &SpawnerMetrics) {
+        match &self.inner.inner_impl {
+            InnerImpl::Sharded(queue) => (queue, &self.inner.metrics),
+            InnerImpl::Locked(_) => panic!("expected a sharded blocking queue"),
+        }
+    }
+
     fn spawn_task(&self, task: Task, rt: &Handle) -> Result<(), SpawnError> {
         // The `on_no_idle` closure runs under the same lock as the queue
         // push, exactly like the pre-refactor code that called
