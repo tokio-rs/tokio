@@ -42,8 +42,10 @@ use windows_sys::{
 
 #[must_use = "futures do nothing unless polled"]
 pub(crate) struct Child {
-    // `waiting` must be dropped before `child` so that `UnregisterWaitEx`
-    // cancels any pending wait before `StdChild` closes the process handle.
+    // Field ordering is important for drop order: `waiting` must be dropped
+    // before `child` so that `UnregisterWaitEx` cancels any pending wait and
+    // waits for any running callback to finish before `StdChild` closes the
+    // process handle.
     waiting: Option<Waiting>,
     child: StdChild,
 }
