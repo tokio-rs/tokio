@@ -962,9 +962,8 @@ async fn drop_after_closing_raw_fd_with_live_duplicate() {
     #[repr(align(128))]
     struct Canary([u8; 256]);
 
-    let (original, mut peer) = std::os::unix::net::UnixStream::pair().unwrap();
-    original.set_nonblocking(true).unwrap();
-    let duplicate = original.try_clone().unwrap();
+    let (original, mut peer) = socketpair();
+    let duplicate = original.fd.try_clone().unwrap();
 
     let registered = AsyncFd::with_interest(original.as_raw_fd(), Interest::READABLE).unwrap();
 
