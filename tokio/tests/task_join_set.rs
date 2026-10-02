@@ -660,3 +660,37 @@ mod spawn_local_on {
         }
     }
 }
+
+#[test]
+fn replace_parent_waker_drops_outside_lock() {
+    use futures::task::noop_waker_ref;
+    use std::sync::Arc;
+    use std::task::{Context, Wake, Waker};
+
+    struct DriveOnDrop(tokio::runtime::Runtime);
+
+    impl Wake for DriveOnDrop {
+        fn wake(self: Arc<Self>) {}
+    }
+
+    impl Drop for DriveOnDrop {
+        fn drop(&mut self) {
+            self.0.block_on(tokio::task::yield_now());
+        }
+    }
+
+    let rt = rt();
+    let mut set = JoinSet::new();
+    set.spawn_on(async { 42 }, rt.handle());
+
+    let waker = Waker::from(Arc::new(DriveOnDrop(rt)));
+    assert!(set
+        .poll_join_next(&mut Context::from_waker(&waker))
+        .is_pending());
+    drop(waker);
+
+    assert!(set
+        .poll_join_next(&mut Context::from_waker(noop_waker_ref()))
+        .is_pending());
+    assert_eq!(set.try_join_next().unwrap().unwrap(), 42);
+}
