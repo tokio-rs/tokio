@@ -504,15 +504,20 @@ impl Semaphore {
         *queued = true;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let sub_permits = acquired;
+        let (should_remove, _assigned) = node.assign_permits(&mut acquired);
+
+        // The tracing events are emitted only once the permits have been
+        // assigned to the waiter, so that `Acquire::drop` returns them if the
+        // tracing subscriber panics.
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
         self.resource_span.in_scope(|| {
             tracing::trace!(
                 target: "runtime::resource::state_update",
-                permits = acquired,
+                permits = sub_permits,
                 permits.op = "sub",
             )
         });
-
-        let (should_remove, _assigned) = node.assign_permits(&mut acquired);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         node.trace_assigned(_assigned);
 
