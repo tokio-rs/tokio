@@ -388,15 +388,41 @@ mod tests {
     use super::*;
     use crate::runtime::blocking::pool::Mandatory;
     use crate::runtime::blocking::schedule::BlockingSchedule;
-    use crate::runtime::{task, Builder, Handle, Runtime};
+    use crate::runtime::blocking::task::BlockingTask;
+    #[cfg(not(target_family = "wasm"))]
+    use crate::runtime::Runtime;
+    use crate::runtime::{task, Builder, Handle};
+    use crate::util::trace::{blocking_task, SpawnMeta};
     use std::collections::HashMap;
     use std::sync::mpsc;
+    #[cfg(not(target_family = "wasm"))]
     use std::time::Instant;
 
+    #[cfg(not(target_family = "wasm"))]
     const TIMEOUT: Duration = Duration::from_secs(10);
+
+    fn blocking_task_for_test<F>(handle: &Handle, f: F) -> Task
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        let id = task::Id::next();
+        let fut = blocking_task::<F, BlockingTask<F>>(
+            BlockingTask::new(f),
+            SpawnMeta::new_unnamed(std::mem::size_of::<F>()),
+            id.as_u64(),
+        );
+        let (task, _) = task::unowned(
+            fut,
+            BlockingSchedule::new(handle),
+            id,
+            task::SpawnLocation::capture(),
+        );
+        Task::new(task, Mandatory::NonMandatory)
+    }
 
     // Bypass only random shard selection, leaving worker execution and its
     // queue-depth accounting intact.
+    #[cfg(not(target_family = "wasm"))]
     fn push_to_shard(
         handle: &Handle,
         queue: &ShardedImpl,
@@ -404,21 +430,15 @@ mod tests {
         index: usize,
         f: impl FnOnce() + Send + 'static,
     ) {
-        let (task, _) = task::unowned(
-            async move { f() },
-            BlockingSchedule::new(handle),
-            task::Id::next(),
-            task::SpawnLocation::capture(),
-        );
+        let task = blocking_task_for_test(handle, f);
         let mut shard = queue.shards[index].lock();
         assert!(!shard.sealed);
-        shard
-            .queue
-            .push_back(Task::new(task, Mandatory::NonMandatory));
+        shard.queue.push_back(task);
         metrics.inc_queue_depth();
         queue.non_empty_mask.fetch_or(1 << index, Ordering::Relaxed);
     }
 
+    #[cfg(not(target_family = "wasm"))]
     fn sharded_runtime() -> Runtime {
         let mut builder = Builder::new_current_thread();
         builder.sharded_blocking_queue = true;
@@ -431,6 +451,7 @@ mod tests {
 
     // Keep the hot shard replenished, but bound the chain so a regression
     // fails an ordering assertion instead of hanging runtime shutdown.
+    #[cfg(not(target_family = "wasm"))]
     fn replenish_hot_shard(handle: Handle, remaining: usize, tx: mpsc::Sender<usize>) {
         let next_handle = handle.clone();
         let (queue, metrics) = handle.inner.blocking_spawner().sharded_queue();
@@ -443,6 +464,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_family = "wasm"))]
     fn worker_services_cold_shard_while_hot_shard_is_replenished() {
         let rt = sharded_runtime();
         let (started_tx, started_rx) = mpsc::channel();
@@ -475,6 +497,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_family = "wasm"))]
     fn worker_preserves_cursor_after_idle() {
         let rt = sharded_runtime();
         let (started_tx, started_rx) = mpsc::channel();
@@ -542,16 +565,10 @@ mod tests {
             // Leave each shard non-empty across two complete batches.
             for sequence in 0..TASKS_PER_SHARD * 2 + 1 {
                 let tx = tx.clone();
-                let (task, _) = task::unowned(
-                    async move { tx.send((index, sequence)).unwrap() },
-                    BlockingSchedule::new(rt.handle()),
-                    task::Id::next(),
-                    task::SpawnLocation::capture(),
-                );
-                queue.shards[index]
-                    .lock()
-                    .queue
-                    .push_back(Task::new(task, Mandatory::NonMandatory));
+                let task = blocking_task_for_test(rt.handle(), move || {
+                    tx.send((index, sequence)).unwrap()
+                });
+                queue.shards[index].lock().queue.push_back(task);
                 queue.non_empty_mask.fetch_or(1 << index, Ordering::Relaxed);
             }
         }

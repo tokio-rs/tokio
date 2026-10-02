@@ -459,7 +459,7 @@ impl Spawner {
             .saturating_sub(self.inner.scheduler_threads)
     }
 
-    #[cfg(all(test, not(loom)))]
+    #[cfg(all(test, not(loom), not(target_family = "wasm")))]
     pub(super) fn sharded_queue(&self) -> (&ShardedImpl, &SpawnerMetrics) {
         match &self.inner.inner_impl {
             InnerImpl::Sharded(queue) => (queue, &self.inner.metrics),
