@@ -143,9 +143,7 @@ impl Decoder for AnyDelimiterCodec {
             let haystack = &buf[self.next_index..read_to];
             let new_chunk_offset = match self.seek_delimiters[..] {
                 [delimiter] => crate::util::memchr::memchr(delimiter, haystack),
-                _ => haystack
-                    .iter()
-                    .position(|b| self.seek_delimiters.contains(b)),
+                ref delims => haystack.iter().position(|b| delims.contains(b)),
             };
 
             match (self.is_discarding, new_chunk_offset) {
