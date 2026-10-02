@@ -72,6 +72,13 @@ pub(crate) struct Acquire<'a> {
     node: Waiter,
     semaphore: &'a Semaphore,
     num_permits: usize,
+    /// Whether `Acquire::drop` must clean up after the waiter, by removing it
+    /// from the wait queue if it is still linked and returning the permits
+    /// assigned to it to the semaphore.
+    ///
+    /// This is set as soon as `poll_acquire` assigns permits to the waiter or
+    /// links it into the wait queue, and it is only cleared once the future
+    /// completes and the permits are handed to the caller.
     queued: bool,
 }
 
@@ -406,11 +413,11 @@ impl Semaphore {
         cx: &mut Context<'_>,
         num_permits: usize,
         node: Pin<&mut Waiter>,
-        queued: bool,
+        queued: &mut bool,
     ) -> Poll<Result<(), AcquireError>> {
         let mut acquired = 0;
 
-        let needed = if queued {
+        let needed = if *queued {
             node.state.load(Acquire) << Self::PERMIT_SHIFT
         } else {
             num_permits << Self::PERMIT_SHIFT
@@ -453,7 +460,15 @@ impl Semaphore {
                 Ok(_) => {
                     acquired += acq;
                     if remaining == 0 {
-                        if !queued {
+                        if !*queued {
+                            // The waiter now holds all of its permits. Record
+                            // this in its state and set `queued`, so that
+                            // `Acquire::drop` returns the permits if the
+                            // future is dropped before it completes, e.g.
+                            // because the tracing subscriber panics below.
+                            node.state.store(0, Release);
+                            *queued = true;
+
                             #[cfg(all(tokio_unstable, feature = "tracing"))]
                             self.resource_span.in_scope(|| {
                                 tracing::trace!(
@@ -482,6 +497,11 @@ impl Semaphore {
         if waiters.closed {
             return Poll::Ready(Err(AcquireError::closed()));
         }
+
+        // The waiter is about to be assigned permits or linked into the wait
+        // queue, so `Acquire::drop` must clean up after it from now on.
+        let was_queued = *queued;
+        *queued = true;
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         self.resource_span.in_scope(|| {
@@ -518,7 +538,7 @@ impl Semaphore {
         });
 
         // If the waiter is not already in the wait queue, enqueue it.
-        if !queued {
+        if !was_queued {
             let node = unsafe {
                 let node = Pin::into_inner_unchecked(node) as *mut _;
                 NonNull::new_unchecked(node)
@@ -614,24 +634,27 @@ impl Future for Acquire<'_> {
         #[cfg(not(all(tokio_unstable, feature = "tracing")))]
         let coop = ready!(crate::task::coop::poll_proceed(cx));
 
-        let result = match semaphore.poll_acquire(cx, needed, node, *queued) {
-            Poll::Pending => {
-                *queued = true;
-                Poll::Pending
-            }
+        let result = match semaphore.poll_acquire(cx, needed, node, queued) {
+            Poll::Pending => Poll::Pending,
             Poll::Ready(r) => {
                 coop.made_progress();
                 r?;
-                *queued = false;
                 Poll::Ready(Ok(()))
             }
         };
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return trace_poll_op!("poll_acquire", result);
+        let result = trace_poll_op!("poll_acquire", result);
 
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return result;
+        // The permits are handed to the caller once the future completes, so
+        // `Acquire::drop` must no longer return them. Clear `queued` only after
+        // the last tracing event, so that the permits are still returned if
+        // the subscriber panics.
+        if result.is_ready() {
+            *queued = false;
+        }
+
+        result
     }
 }
 
