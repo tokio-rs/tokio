@@ -464,7 +464,6 @@ impl<T> fmt::Debug for Rx<T> {
 
 #[cfg(all(test, not(loom)))]
 mod tests {
-    use super::*;
     use crate::sync::mpsc::unbounded::unbounded_channel_from_index;
     use crate::sync::mpsc::BLOCK_CAP;
 
@@ -474,6 +473,8 @@ mod tests {
     #[test]
     #[cfg(not(target_family = "wasm"))]
     fn wraparound() {
+        use super::*;
+
         let (tx, mut rx) = channel_from_index(0usize.wrapping_sub(2 * BLOCK_CAP));
         let head = rx.free_head;
 
