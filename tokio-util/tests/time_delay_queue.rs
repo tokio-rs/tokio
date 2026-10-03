@@ -976,6 +976,7 @@ fn ms(n: u64) -> Duration {
 // so the fix routes huge timeouts into that existing, well-defined panic
 // instead of the raw `Instant` arithmetic overflow.
 #[tokio::test]
+#[cfg(panic = "unwind")]
 async fn insert_with_huge_timeout_does_not_panic_on_instant_overflow() {
     let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let mut queue = DelayQueue::<&str>::new();
@@ -992,6 +993,7 @@ async fn insert_with_huge_timeout_does_not_panic_on_instant_overflow() {
 }
 
 #[tokio::test]
+#[cfg(panic = "unwind")]
 async fn reset_with_huge_timeout_does_not_panic_on_instant_overflow() {
     let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let mut queue = DelayQueue::<&str>::new();
@@ -1008,6 +1010,7 @@ async fn reset_with_huge_timeout_does_not_panic_on_instant_overflow() {
     );
 }
 
+#[cfg(panic = "unwind")]
 fn panic_message(panic: &(dyn std::any::Any + Send)) -> &str {
     panic
         .downcast_ref::<String>()
