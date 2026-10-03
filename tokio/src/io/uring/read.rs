@@ -24,9 +24,10 @@ pub(crate) trait ReadBuffer: Send + 'static {
 
 impl ReadBuffer for Vec<u8> {
     fn uring_read_prepare(&mut self, max_len: usize) -> (*mut u8, u32) {
-        assert!(self.spare_capacity_mut().len() >= max_len);
+        let len = u32::try_from(max_len).unwrap_or(u32::MAX);
+        assert!(self.spare_capacity_mut().len() >= len as usize);
         let ptr = self.spare_capacity_mut().as_mut_ptr().cast();
-        (ptr, max_len as u32)
+        (ptr, len)
     }
 
     unsafe fn uring_read_complete(&mut self, n: u32) {

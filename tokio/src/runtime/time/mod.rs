@@ -385,7 +385,9 @@ impl Handle {
                 lock.wheel.remove(entry);
             }
 
-            entry.as_ref().handle().fire(Ok(()));
+            let waker = entry.as_ref().handle().fire(Ok(()));
+            drop(lock);
+            drop(waker);
         }
     }
 

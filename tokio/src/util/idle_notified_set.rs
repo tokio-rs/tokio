@@ -174,6 +174,9 @@ impl<T> IdleNotifiedSet<T> {
             return None;
         }
 
+        // Declare `_old_waker` before `lock` so that it is dropped after `lock`
+        // is released, including when returning early via `?`.
+        let _old_waker;
         let mut lock = self.lists.lock();
 
         let should_update_waker = match lock.waker.as_mut() {
@@ -181,7 +184,7 @@ impl<T> IdleNotifiedSet<T> {
             None => true,
         };
         if should_update_waker {
-            lock.waker = Some(waker.clone());
+            _old_waker = lock.waker.replace(waker.clone());
         }
 
         // Pop the entry, returning None if empty.
