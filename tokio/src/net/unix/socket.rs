@@ -3,6 +3,9 @@ use std::path::Path;
 
 use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use std::fs::Permissions;
+
 use crate::net::{UnixDatagram, UnixListener, UnixStream};
 
 cfg_net_unix! {
@@ -239,6 +242,33 @@ impl UnixSocket {
         };
 
         UnixDatagram::from_mio(mio)
+    }
+
+    /// Sets the permissions of the socket.
+    ///
+    /// Calling this function on a socket that has already been bound will return an error.
+    ///
+    /// This calls the `fchmod(2)` operating-system function.
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub fn set_permissions(&self, perm: Permissions) -> io::Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let is_bound = self.inner.local_addr()?.as_pathname().is_some();
+        if is_bound {
+            // Too late: socket file already created
+            return Err(io::Error::other(
+                "set_permissions cannot be called on a bound socket",
+            ));
+        }
+
+        // Safety: calling `fchmod` on an open fd is safe
+        let ret = unsafe { libc::fchmod(self.as_raw_fd(), perm.mode() as libc::mode_t) };
+
+        if ret == -1 {
+            return Err(io::Error::last_os_error());
+        }
+
+        Ok(())
     }
 }
 
