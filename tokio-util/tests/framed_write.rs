@@ -165,6 +165,34 @@ fn write_hits_backpressure() {
     })
 }
 
+#[test]
+fn into_parts_preserves_buffer() {
+    let mut task = task::spawn(());
+    let mock = mock! {
+        Ok(b"\x00\x00\x00\x05".to_vec()),
+    };
+    let mut framed = FramedWrite::new(mock, U32Encoder);
+
+    task.enter(|cx, _| {
+        assert!(assert_ready!(pin!(framed).poll_ready(cx)).is_ok());
+        assert!(pin!(framed).start_send(0x05).is_ok());
+        // Nothing written
+        assert_eq!(1, framed.get_ref().calls.len());
+
+        let parts = framed.into_parts();
+        assert_eq!(4, parts.write_buf.len());
+
+        let mut framed = FramedWrite::from_parts(parts);
+        // Nothing written
+        assert_eq!(1, framed.get_ref().calls.len());
+
+        // Flush the writes
+        assert!(assert_ready!(pin!(framed).poll_flush(cx)).is_ok());
+
+        assert_eq!(0, framed.get_ref().calls.len());
+    });
+}
+
 // // ===== Mock ======
 
 struct Mock {
