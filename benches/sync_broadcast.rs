@@ -1,6 +1,7 @@
 use rand::{Rng, RngCore, SeedableRng};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::{broadcast, Notify};
 
 use criterion::measurement::WallTime;
@@ -111,6 +112,67 @@ fn bench_try_recv(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(contention, bench_contention, bench_try_recv);
+/// Several senders sending concurrently while many receivers keep queuing
+/// themselves for the next value.
+fn contention_multi_tx_impl<const N_RX: usize>(g: &mut BenchmarkGroup<WallTime>) {
+    const N_TX: usize = 4;
+    const N_MSGS: usize = 1000;
+
+    let rt = rt();
+
+    let (tx, _rx) = broadcast::channel::<usize>(1024);
+
+    for _ in 0..N_RX {
+        let mut rx = tx.subscribe();
+        rt.spawn(async move {
+            loop {
+                match rx.recv().await {
+                    Ok(v) => {
+                        black_box(v);
+                    }
+                    Err(RecvError::Lagged(_)) => {}
+                    Err(RecvError::Closed) => break,
+                }
+            }
+        });
+    }
+
+    g.throughput(Throughput::Elements((N_TX * N_MSGS) as u64));
+    g.bench_function(N_RX.to_string(), |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let senders: Vec<_> = (0..N_TX)
+                    .map(|_| {
+                        let tx = tx.clone();
+                        tokio::spawn(async move {
+                            for i in 0..N_MSGS {
+                                tx.send(i).unwrap();
+                            }
+                        })
+                    })
+                    .collect();
+
+                for sender in senders {
+                    sender.await.unwrap();
+                }
+            })
+        })
+    });
+}
+
+fn bench_contention_multi_tx(c: &mut Criterion) {
+    let mut group = c.benchmark_group("contention_multi_tx");
+    contention_multi_tx_impl::<10>(&mut group);
+    contention_multi_tx_impl::<100>(&mut group);
+    contention_multi_tx_impl::<1000>(&mut group);
+    group.finish();
+}
+
+criterion_group!(
+    contention,
+    bench_contention,
+    bench_contention_multi_tx,
+    bench_try_recv
+);
 
 criterion_main!(contention);

@@ -224,9 +224,9 @@ fn close_while_waiting() {
     });
 }
 
-// Receivers waiting in different buckets must all be woken by a single send.
+// All receivers waiting for a value must be woken by a single send.
 #[test]
-fn send_wakes_all_buckets() {
+fn send_wakes_all_waiters() {
     loom::model(|| {
         let (tx, mut rx1) = broadcast::channel(2);
         let mut rx2 = tx.subscribe();

@@ -380,20 +380,18 @@ struct Shared<T> {
     /// True if the channel is closed.
     ///
     /// Only written while the `tail` lock is held. Readers that do not hold
-    /// the `tail` lock must hold one of the `waiters` locks (see `recv_ref`).
+    /// the `tail` lock must hold the `waiters` lock (see `recv_ref`).
     closed: AtomicBool,
 
-    /// Receivers waiting for a value, sharded into several buckets so that
-    /// receivers registering themselves do not all contend on a single lock
-    /// (and do not contend with senders on the `tail` lock).
+    /// Receivers waiting for a value.
     ///
-    /// Lock order: a `waiters` lock may be held while acquiring a slot lock,
+    /// This has its own lock, so that receivers registering themselves do not
+    /// contend with senders on the `tail` lock, and senders do not hold the
+    /// `tail` lock while waking receivers.
+    ///
+    /// Lock order: the `waiters` lock may be held while acquiring a slot lock,
     /// but must never be held while acquiring the `tail` lock.
-    waiters: [Mutex<LinkedList<Waiter>>; NUM_WAITER_BUCKETS],
-
-    /// Used to pick a bucket when no random number generator is available.
-    #[cfg(not(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros"))))]
-    next_bucket: AtomicUsize,
+    waiters: Mutex<LinkedList<Waiter>>,
 
     /// Number of outstanding Sender handles.
     num_tx: AtomicUsize,
@@ -414,14 +412,6 @@ struct Tail {
     rx_cnt: usize,
 }
 
-/// Number of buckets the rx wait list is sharded into.
-#[cfg(not(loom))]
-const NUM_WAITER_BUCKETS: usize = 8;
-
-/// Keep the loom state space small while still exercising several buckets.
-#[cfg(loom)]
-const NUM_WAITER_BUCKETS: usize = 2;
-
 /// Slot in the buffer.
 struct Slot<T> {
     /// Remaining number of receivers that are expected to see this value.
@@ -433,6 +423,10 @@ struct Slot<T> {
 
     /// Uniquely identifies the `send` stored in the slot.
     pos: u64,
+
+    /// True if a receiver queued itself to wait for the next value written to
+    /// this slot. Lets `send` skip the `waiters` lock when nobody waits.
+    has_waiters: bool,
 
     /// The value being broadcast.
     ///
@@ -449,9 +443,6 @@ struct Waiter {
     /// Task waiting on the broadcast channel.
     waker: Option<Waker>,
 
-    /// Index of the `Shared::waiters` bucket this waiter is queued in.
-    bucket: usize,
-
     /// Intrusive linked-list pointers.
     pointers: linked_list::Pointers<Waiter>,
 
@@ -464,7 +455,6 @@ impl Waiter {
         Self {
             queued: AtomicBool::new(false),
             waker: None,
-            bucket: 0,
             pointers: linked_list::Pointers::new(),
             _p: PhantomPinned,
         }
@@ -609,6 +599,7 @@ impl<T> Sender<T> {
             Mutex::new(Slot {
                 rem: 0,
                 pos: (i as u64).wrapping_sub(capacity as u64),
+                has_waiters: false,
                 val: None,
             })
         });
@@ -621,13 +612,7 @@ impl<T> Sender<T> {
                 rx_cnt: receiver_count,
             }),
             closed: AtomicBool::new(receiver_count == 0),
-            waiters: std::array::from_fn(|_| Mutex::new(LinkedList::new())),
-            #[cfg(not(all(
-                not(loom),
-                feature = "sync",
-                any(feature = "rt", feature = "macros")
-            )))]
-            next_bucket: AtomicUsize::new(0),
+            waiters: Mutex::new(LinkedList::new()),
             num_tx: AtomicUsize::new(1),
             num_weak_tx: AtomicUsize::new(0),
             notify_last_rx_drop: Notify::new(),
@@ -714,16 +699,21 @@ impl<T> Sender<T> {
         // Write the value
         slot.val = Some(value);
 
-        // Release the slot lock before notifying the receivers.
-        drop(slot);
+        // Receivers queue themselves while holding the slot lock, so every
+        // waiter for this value is accounted for here.
+        let has_waiters = std::mem::take(&mut slot.has_waiters);
 
-        // Release the tail lock before notifying, so that waking the receivers
-        // does not block other senders. This must happen after the slot lock
-        // is released: a receiver registering itself holds its `waiters` lock
-        // while checking the slot, so once `notify_rx` acquires that lock the
-        // receiver has either observed the new value or is queued.
+        // Release the locks before notifying the receivers, so that waking
+        // them does not block other senders. A receiver queuing itself holds
+        // the `waiters` lock while checking the slot, so once `notify_rx`
+        // acquires that lock the receiver has either observed the new value or
+        // is queued.
+        drop(slot);
         drop(tail);
-        self.shared.notify_rx();
+
+        if has_waiters {
+            self.shared.notify_rx();
+        }
 
         Ok(rem)
     }
@@ -1005,43 +995,43 @@ fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
     Receiver { shared, next }
 }
 
-/// List used in `Shared::notify_bucket`. It wraps a guarded linked list
-/// and gates the access to it on the bucket's `waiters` mutex. It also empties
+/// List used in `Shared::notify_rx`. It wraps a guarded linked list
+/// and gates the access to it on the `Shared.waiters` mutex. It also empties
 /// the list on drop.
-struct WaitersList<'a> {
+struct WaitersList<'a, T> {
     list: GuardedLinkedList<Waiter>,
     is_empty: bool,
-    bucket: &'a Mutex<LinkedList<Waiter>>,
+    shared: &'a Shared<T>,
 }
 
-impl<'a> Drop for WaitersList<'a> {
+impl<'a, T> Drop for WaitersList<'a, T> {
     fn drop(&mut self) {
         // If the list is not empty, we unlink all waiters from it.
         // We do not wake the waiters to avoid double panics.
         if !self.is_empty {
-            let _lock_guard = self.bucket.lock();
+            let _lock_guard = self.shared.waiters.lock();
             while self.list.pop_back().is_some() {}
         }
     }
 }
 
-impl<'a> WaitersList<'a> {
+impl<'a, T> WaitersList<'a, T> {
     fn new(
         unguarded_list: LinkedList<Waiter>,
         guard: Pin<&'a Waiter>,
-        bucket: &'a Mutex<LinkedList<Waiter>>,
+        shared: &'a Shared<T>,
     ) -> Self {
         let guard_ptr = NonNull::from(guard.get_ref());
         let list = unguarded_list.into_guarded(guard_ptr);
         WaitersList {
             list,
             is_empty: false,
-            bucket,
+            shared,
         }
     }
 
     /// Removes the last element from the guarded list. Modifying this list
-    /// requires an exclusive access to the bucket's main list.
+    /// requires an exclusive access to the main list in `Notify`.
     fn pop_back_locked(&mut self, _waiters: &mut LinkedList<Waiter>) -> Option<NonNull<Waiter>> {
         let result = self.list.pop_back();
         if result.is_none() {
@@ -1054,36 +1044,12 @@ impl<'a> WaitersList<'a> {
 }
 
 impl<T> Shared<T> {
-    /// Picks the `waiters` bucket a new `Recv` future queues itself in.
-    ///
-    /// Randomness performs better than circular access when it is available,
-    /// see `watch::big_notify::BigNotify`.
-    #[cfg(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros")))]
-    fn waiter_bucket(&self) -> usize {
-        crate::runtime::context::thread_rng_n(NUM_WAITER_BUCKETS as u32) as usize
-    }
-
-    #[cfg(not(all(not(loom), feature = "sync", any(feature = "rt", feature = "macros"))))]
-    fn waiter_bucket(&self) -> usize {
-        self.next_bucket.fetch_add(1, Relaxed) % NUM_WAITER_BUCKETS
-    }
-
     /// Wakes all queued receivers.
     ///
     /// Must be called after the change the receivers wait for (a new value in
     /// a slot, or `closed`) has been published and the slot lock released.
     fn notify_rx(&self) {
-        for bucket in &self.waiters {
-            Self::notify_bucket(bucket);
-        }
-    }
-
-    fn notify_bucket(bucket: &Mutex<LinkedList<Waiter>>) {
-        let mut waiters = bucket.lock();
-
-        if waiters.is_empty() {
-            return;
-        }
+        let mut waiters = self.waiters.lock();
 
         // It is critical for `GuardedLinkedList` safety that the guard node is
         // pinned in memory and is not dropped until the guarded list is dropped.
@@ -1093,12 +1059,12 @@ impl<T> Shared<T> {
         // We move all waiters to a secondary list. It uses a `GuardedLinkedList`
         // underneath to allow every waiter to safely remove itself from it.
         //
-        // * This list will be still guarded by the bucket lock.
+        // * This list will be still guarded by the `waiters` lock.
         //   `WaitersList` wrapper makes sure we hold the lock to modify it.
         // * This wrapper will empty the list on drop. It is critical for safety
         //   that we will not leave any list entry with a pointer to the local
         //   guard node after this function returns / panics.
-        let mut list = WaitersList::new(std::mem::take(&mut *waiters), guard.as_ref(), bucket);
+        let mut list = WaitersList::new(std::mem::take(&mut *waiters), guard.as_ref(), self);
 
         let mut wakers = WakeList::new();
         'outer: loop {
@@ -1107,14 +1073,14 @@ impl<T> Shared<T> {
                     Some(waiter) => {
                         unsafe {
                             // Safety: accessing `waker` is safe because
-                            // the bucket lock is held.
+                            // the `waiters` lock is held.
                             if let Some(waker) = (*waiter.as_ptr()).waker.take() {
                                 wakers.push(waker);
                             }
 
                             // Safety: `queued` is atomic.
                             let queued = &(*waiter.as_ptr()).queued;
-                            // `Relaxed` suffices because the bucket lock is held.
+                            // `Relaxed` suffices because the `waiters` lock is held.
                             assert!(queued.load(Relaxed));
                             // `Release` is needed to synchronize with `Recv::drop`.
                             // It is critical to set this variable **after** waker
@@ -1139,7 +1105,7 @@ impl<T> Shared<T> {
             wakers.wake_all();
 
             // Acquire the lock again.
-            waiters = bucket.lock();
+            waiters = self.waiters.lock();
         }
 
         // Release the lock before waking.
@@ -1330,21 +1296,17 @@ impl<T> Receiver<T> {
         if slot.pos != self.next {
             // Release the `slot` lock before attempting to acquire the
             // `waiters` or `tail` lock. Senders publish a value while holding
-            // the `tail` lock and the slot lock, and then acquire the
-            // `waiters` locks to notify. Acquiring the locks in reverse order
-            // here could result in a deadlock.
+            // the `tail` lock and the slot lock. Acquiring the locks in reverse
+            // order here would result in a potential deadlock.
             drop(slot);
 
             if let Some((waiter, waker)) = waiter {
-                // Safety: `bucket` is only written when the `Recv` future is
-                // created.
-                let bucket = waiter.with(|ptr| unsafe { (*ptr).bucket });
-                let mut waiters = self.shared.waiters[bucket].lock();
+                let mut waiters = self.shared.waiters.lock();
 
-                // Acquire slot lock again. Holding the bucket lock while
-                // checking the slot and registering the waiter guarantees that
-                // a concurrent `send` either stored its value before we check
-                // the slot, or acquires the bucket lock after we are queued.
+                // Acquire slot lock again. Holding the `waiters` lock while
+                // checking the slot and queuing the waiter guarantees that a
+                // concurrent `send` either stored its value before we check the
+                // slot, or sees `has_waiters` and notifies us once we are queued.
                 slot = self.shared.buffer[idx].lock();
 
                 if slot.pos == self.next {
@@ -1362,15 +1324,20 @@ impl<T> Receiver<T> {
                     // set a waker and return empty.
                     //
                     // `Acquire` pairs with the `Release` store in
-                    // `close_channel`. As with the slot, holding the bucket lock
-                    // guarantees that we either see `closed` or get notified.
+                    // `close_channel`, which notifies all waiters after the
+                    // store, so holding the `waiters` lock guarantees that we
+                    // either see `closed` or get notified.
                     if self.shared.closed.load(Acquire) {
                         return Err(TryRecvError::Closed);
                     }
 
+                    // Let the sender of the next value know that it has to
+                    // notify the waiters.
+                    slot.has_waiters = true;
+
                     let mut old_waker = None;
 
-                    // Safety: called while the bucket lock is held.
+                    // Safety: called while the `waiters` lock is held.
                     unsafe {
                         // Only queue if not already queued
                         waiter.with_mut(|ptr| {
@@ -1387,10 +1354,11 @@ impl<T> Receiver<T> {
 
                             // If the waiter is not already queued, enqueue it.
                             // `Relaxed` order suffices: we have synchronized with
-                            // all writers through the bucket lock that we hold.
+                            // all writers through the `waiters` lock that we hold.
                             if !(*ptr).queued.load(Relaxed) {
                                 // `Relaxed` order suffices: all the readers will
-                                // synchronize with this write through the bucket lock.
+                                // synchronize with this write through the
+                                // `waiters` lock.
                                 (*ptr).queued.store(true, Relaxed);
                                 waiters.push_front(NonNull::new_unchecked(&mut *ptr));
                             }
@@ -1424,8 +1392,8 @@ impl<T> Receiver<T> {
 
                 if next_pos == self.next {
                     // Slot positions only move forward, so a receiver that
-                    // registers a waiter only gets here if it never lagged,
-                    // and in that case it returned above.
+                    // queues a waiter only gets here if it never lagged, and
+                    // in that case it returned above.
                     debug_assert!(waiter.is_none());
 
                     // At this point the channel is empty for *this* receiver.
@@ -1736,12 +1704,13 @@ impl<T> Drop for Receiver<T> {
 
 impl<'a, T> Recv<'a, T> {
     fn new(receiver: &'a mut Receiver<T>) -> Recv<'a, T> {
-        let bucket = receiver.shared.waiter_bucket();
         Recv {
             receiver,
             waiter: WaiterCell(UnsafeCell::new(Waiter {
-                bucket,
-                ..Waiter::new()
+                queued: AtomicBool::new(false),
+                waker: None,
+                pointers: linked_list::Pointers::new(),
+                _p: PhantomPinned,
             })),
         }
     }
@@ -1795,15 +1764,12 @@ impl<'a, T> Drop for Recv<'a, T> {
         // If not, no further synchronization is required, since the waiter
         // is not in the list and, as such, is not shared with any other threads.
         if queued {
-            // Safety: `bucket` is only written when the future is created.
-            let bucket = self.waiter.0.with(|ptr| unsafe { (*ptr).bucket });
-
-            // Acquire the bucket lock. This is required for safety before
+            // Acquire the `waiters` lock. This is required for safety before
             // accessing the waiter node.
-            let mut waiters = self.receiver.shared.waiters[bucket].lock();
+            let mut waiters = self.receiver.shared.waiters.lock();
 
-            // Safety: bucket lock is held.
-            // `Relaxed` order suffices because we hold the bucket lock.
+            // Safety: `waiters` lock is held.
+            // `Relaxed` order suffices because we hold the `waiters` lock.
             let queued = self
                 .waiter
                 .0
@@ -1812,8 +1778,8 @@ impl<'a, T> Drop for Recv<'a, T> {
             if queued {
                 // Remove the node
                 //
-                // safety: bucket lock is held and the wait node is verified to be
-                // in the list.
+                // safety: `waiters` lock is held and the wait node is verified to
+                // be in the list.
                 unsafe {
                     self.waiter.0.with_mut(|ptr| {
                         waiters.remove((&mut *ptr).into());
