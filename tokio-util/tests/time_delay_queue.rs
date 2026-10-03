@@ -967,3 +967,51 @@ async fn wake_after_clear() {
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
+
+// `insert`/`reset` used to compute `Instant::now() + timeout` without any
+// overflow check, so an unreasonably large `timeout` (e.g. `Duration::MAX`)
+// panicked unconditionally inside `Instant::add`, with a message and
+// trigger threshold that vary by platform. `DelayQueue` already documents
+// (and panics for) timeouts that exceed what its timer wheel can represent,
+// so the fix routes huge timeouts into that existing, well-defined panic
+// instead of the raw `Instant` arithmetic overflow.
+#[tokio::test]
+async fn insert_with_huge_timeout_does_not_panic_on_instant_overflow() {
+    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut queue = DelayQueue::<&str>::new();
+        queue.insert("foo", Duration::MAX);
+    }))
+    .expect_err("DelayQueue::insert is documented to panic for an unreasonably large timeout");
+
+    let message = panic_message(panic.as_ref());
+    assert!(
+        !message.contains("overflow when adding duration to instant"),
+        "insert() panicked via raw `Instant` overflow instead of the documented \
+         max-duration check: {message}",
+    );
+}
+
+#[tokio::test]
+async fn reset_with_huge_timeout_does_not_panic_on_instant_overflow() {
+    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut queue = DelayQueue::<&str>::new();
+        let key = queue.insert("foo", Duration::from_secs(1));
+        queue.reset(&key, Duration::MAX);
+    }))
+    .expect_err("DelayQueue::reset is documented to panic for an unreasonably large timeout");
+
+    let message = panic_message(panic.as_ref());
+    assert!(
+        !message.contains("overflow when adding duration to instant"),
+        "reset() panicked via raw `Instant` overflow instead of the documented \
+         max-duration check: {message}",
+    );
+}
+
+fn panic_message(panic: &(dyn std::any::Any + Send)) -> &str {
+    panic
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| panic.downcast_ref::<&str>().copied())
+        .unwrap_or("<non-string panic payload>")
+}

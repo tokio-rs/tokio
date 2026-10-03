@@ -434,6 +434,21 @@ struct Data<T> {
 /// Maximum number of entries the queue can handle
 const MAX_ENTRIES: usize = (1 << 30) - 1;
 
+// Caps `duration` so that adding it to `Instant::now()` cannot overflow.
+//
+// Roughly 30 years from now.
+// 1000 years overflows on macOS, 100 years overflows on FreeBSD.
+//
+// Mirrors the fix applied to `Instant` arithmetic elsewhere in `tokio::time`
+// (see tokio-rs/tokio#8128); `DelayQueue` has its own, much smaller bound on
+// how far into the future a deadline may be (see `MAX_DURATION` in the
+// `wheel` module), so an out-of-range `timeout` still results in the panic
+// documented on `insert`/`reset` below, but via that bound instead of via an
+// unconditional, platform-dependent overflow in `Instant::add`.
+fn safe_delay(duration: Duration) -> Duration {
+    duration.min(Duration::from_secs(86400 * 365 * 30))
+}
+
 impl<T> DelayQueue<T> {
     /// Creates a new, empty, `DelayQueue`.
     ///
@@ -650,7 +665,7 @@ impl<T> DelayQueue<T> {
     /// [type]: #
     #[track_caller]
     pub fn insert(&mut self, value: T, timeout: Duration) -> Key {
-        self.insert_at(value, Instant::now() + timeout)
+        self.insert_at(value, Instant::now() + safe_delay(timeout))
     }
 
     #[track_caller]
@@ -1000,7 +1015,7 @@ impl<T> DelayQueue<T> {
     /// ```
     #[track_caller]
     pub fn reset(&mut self, key: &Key, timeout: Duration) {
-        self.reset_at(key, Instant::now() + timeout);
+        self.reset_at(key, Instant::now() + safe_delay(timeout));
     }
 
     /// Clears the queue, removing all items.
