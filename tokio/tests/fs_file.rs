@@ -111,6 +111,10 @@ async fn rewind_seek_position() {
 }
 
 #[test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "emscripten does not support spawn_blocking"
+)]
 fn buffered_seek_overflow() {
     use std::future::{poll_fn, Future};
     use std::sync::mpsc;
