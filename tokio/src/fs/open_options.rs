@@ -18,8 +18,9 @@ use std::fs::OpenOptions as StdOpenOptions;
 
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
-#[cfg(windows)]
-use std::os::windows::fs::OpenOptionsExt;
+cfg_windows! {
+    use crate::os::windows::fs::OpenOptionsExt as WindowsOpenOptionsExt;
+}
 
 /// Options and flags which can be used to configure how a file is opened.
 ///
@@ -556,10 +557,11 @@ impl OpenOptions {
         Ok(asyncify(move || opts.open(path)).await?.into())
     }
 
-    #[cfg(windows)]
-    pub(super) fn as_inner_mut(&mut self) -> &mut StdOpenOptions {
-        match &mut self.inner {
-            Kind::Std(ref mut opts) => opts,
+    cfg_windows! {
+        pub(super) fn as_inner_mut(&mut self) -> &mut StdOpenOptions {
+            match &mut self.inner {
+                Kind::Std(ref mut opts) => opts,
+            }
         }
     }
 }
@@ -639,7 +641,7 @@ feature! {
         pub fn custom_flags(&mut self, flags: i32) -> &mut OpenOptions {
             match &mut self.inner {
                 Kind::Std(opts) => {
-                    opts.custom_flags(flags);
+                    std::os::unix::fs::OpenOptionsExt::custom_flags(opts, flags);
                 }
                 #[cfg(all(
                     tokio_unstable,
@@ -748,7 +750,7 @@ cfg_windows! {
         /// [`CreateFile`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
         /// [`CreateFile2`]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfile2
         pub fn custom_flags(&mut self, flags: u32) -> &mut OpenOptions {
-            self.as_inner_mut().custom_flags(flags);
+            WindowsOpenOptionsExt::custom_flags(self.as_inner_mut(), flags);
             self
         }
 

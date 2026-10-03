@@ -254,8 +254,9 @@ use std::task::{ready, Context, Poll};
 
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
+cfg_windows! {
+    use crate::os::windows::process::CommandExt as WindowsCommandExt;
+}
 
 cfg_windows! {
     use crate::os::windows::io::{AsRawHandle, RawHandle};
