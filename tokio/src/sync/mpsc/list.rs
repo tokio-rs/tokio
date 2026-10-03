@@ -3,6 +3,8 @@
 use crate::loom::sync::atomic::{AtomicPtr, AtomicUsize};
 use crate::loom::thread;
 use crate::sync::mpsc::block::{self, Block};
+use crate::sync::mpsc::chan;
+use crate::sync::mpsc::TryPopResult;
 
 use std::fmt;
 use std::ptr::NonNull;
@@ -30,23 +32,8 @@ pub(crate) struct Rx<T> {
     free_head: NonNull<Block<T>>,
 }
 
-/// Return value of `Rx::try_pop`.
-pub(crate) enum TryPopResult<T> {
-    /// Successfully popped a value.
-    Ok(T),
-    /// The channel is empty.
-    ///
-    /// Note that `list.rs` only tracks the close state set by senders. If the
-    /// channel is closed by `Rx::close()`, then `TryPopResult::Empty` is still
-    /// returned, and the close state needs to be handled by `chan.rs`.
-    Empty,
-    /// The channel is empty and closed.
-    ///
-    /// Returned when the send half is closed (all senders dropped).
-    Closed,
-    /// The channel is not empty, but the first value is being written.
-    Busy,
-}
+#[derive(Debug)]
+pub(crate) struct Queue;
 
 pub(crate) fn channel<T>() -> (Tx<T>, Rx<T>) {
     // Create the initial block shared between the tx and rx halves.
@@ -67,6 +54,43 @@ pub(crate) fn channel<T>() -> (Tx<T>, Rx<T>) {
     };
 
     (tx, rx)
+}
+
+impl<T> chan::Queue<T> for Queue {
+    type Tx = Tx<T>;
+    type Rx = Rx<T>;
+
+    fn channel(_bound: usize) -> (Self::Tx, Self::Rx) {
+        channel()
+    }
+
+    fn push(tx: &Self::Tx, value: T) {
+        tx.push(value);
+    }
+
+    fn close(tx: &Self::Tx) {
+        tx.close();
+    }
+
+    fn is_empty(rx: &Self::Rx, tx: &Self::Tx) -> bool {
+        rx.is_empty(tx)
+    }
+
+    fn len(rx: &Self::Rx, tx: &Self::Tx) -> usize {
+        rx.len(tx)
+    }
+
+    fn pop(rx: &mut Self::Rx, tx: &Self::Tx) -> Option<super::block::Read<T>> {
+        rx.pop(tx)
+    }
+
+    fn try_pop(rx: &mut Self::Rx, tx: &Self::Tx) -> TryPopResult<T> {
+        rx.try_pop(tx)
+    }
+
+    unsafe fn free(rx: &mut Self::Rx) {
+        unsafe { rx.free_blocks() };
+    }
 }
 
 impl<T> Tx<T> {

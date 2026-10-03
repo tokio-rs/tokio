@@ -1,6 +1,7 @@
 use crate::loom::sync::{atomic::AtomicUsize, Arc};
 use crate::sync::mpsc::chan;
 use crate::sync::mpsc::error::{SendError, TryRecvError};
+use crate::sync::mpsc::list;
 
 use std::fmt;
 use std::task::{Context, Poll};
@@ -9,7 +10,7 @@ use std::task::{Context, Poll};
 ///
 /// Instances are created by the [`unbounded_channel`] function.
 pub struct UnboundedSender<T> {
-    chan: chan::Tx<T, Semaphore>,
+    chan: chan::Tx<T, Semaphore, list::Queue>,
 }
 
 /// An unbounded sender that does not prevent the channel from being closed.
@@ -43,7 +44,7 @@ pub struct UnboundedSender<T> {
 /// # }
 /// ```
 pub struct WeakUnboundedSender<T> {
-    chan: Arc<chan::Chan<T, Semaphore>>,
+    chan: Arc<chan::Chan<T, Semaphore, list::Queue>>,
 }
 
 impl<T> Clone for UnboundedSender<T> {
@@ -71,7 +72,7 @@ impl<T> fmt::Debug for UnboundedSender<T> {
 /// [`UnboundedReceiverStream`]: https://docs.rs/tokio-stream/0.1/tokio_stream/wrappers/struct.UnboundedReceiverStream.html
 pub struct UnboundedReceiver<T> {
     /// The channel receiver
-    chan: chan::Rx<T, Semaphore>,
+    chan: chan::Rx<T, Semaphore, list::Queue>,
 }
 
 impl<T> fmt::Debug for UnboundedReceiver<T> {
@@ -93,7 +94,7 @@ impl<T> fmt::Debug for UnboundedReceiver<T> {
 /// the channel. Using an `unbounded` channel has the ability of causing the
 /// process to run out of memory. In this case, the process will be aborted.
 pub fn unbounded_channel<T>() -> (UnboundedSender<T>, UnboundedReceiver<T>) {
-    let (tx, rx) = chan::channel(Semaphore(AtomicUsize::new(0)));
+    let (tx, rx) = chan::channel::<T, _, list::Queue>(Semaphore(AtomicUsize::new(0)), 0);
 
     let tx = UnboundedSender::new(tx);
     let rx = UnboundedReceiver::new(rx);
@@ -106,7 +107,7 @@ pub fn unbounded_channel<T>() -> (UnboundedSender<T>, UnboundedReceiver<T>) {
 pub(crate) struct Semaphore(pub(crate) AtomicUsize);
 
 impl<T> UnboundedReceiver<T> {
-    pub(crate) fn new(chan: chan::Rx<T, Semaphore>) -> UnboundedReceiver<T> {
+    pub(crate) fn new(chan: chan::Rx<T, Semaphore, list::Queue>) -> UnboundedReceiver<T> {
         UnboundedReceiver { chan }
     }
 
@@ -527,7 +528,7 @@ impl<T> UnboundedReceiver<T> {
 }
 
 impl<T> UnboundedSender<T> {
-    pub(crate) fn new(chan: chan::Tx<T, Semaphore>) -> UnboundedSender<T> {
+    pub(crate) fn new(chan: chan::Tx<T, Semaphore, list::Queue>) -> UnboundedSender<T> {
         UnboundedSender { chan }
     }
 
