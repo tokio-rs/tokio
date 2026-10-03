@@ -164,6 +164,12 @@ impl Driver {
         (driver, handle)
     }
 
+    /// A driver for a secondary I/O shard that shares the timer wheel owned
+    /// by the runtime `Handle`.
+    pub(crate) fn from_park(park: IoStack) -> Driver {
+        Driver { park }
+    }
+
     #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
     pub(crate) fn new_alt(clock: &Clock) -> Handle {
         let time_source = TimeSource::new(clock);
@@ -182,6 +188,12 @@ impl Driver {
         self.park_internal(handle, None);
     }
 
+    /// Zero-timeout poll of the underlying I/O stack, without touching the
+    /// wheel.
+    pub(crate) fn poll_io(&mut self, rt_handle: &driver::Handle) {
+        self.park.park_timeout(rt_handle, Duration::from_secs(0));
+    }
+
     pub(crate) fn park_timeout(&mut self, handle: &driver::Handle, duration: Duration) {
         self.park_internal(handle, Some(duration));
     }
@@ -190,6 +202,9 @@ impl Driver {
         let handle = rt_handle.time();
 
         if handle.is_shutdown() {
+            // Another I/O shard's driver already shut the shared wheel down;
+            // this shard's park (epoll instance + registrations) still needs it.
+            self.park.shutdown(rt_handle);
             return;
         }
 
@@ -322,6 +337,12 @@ impl Handle {
                     waker_list.wake_all();
 
                     lock = self.inner.lock();
+                    // Another shard's driver may have advanced the shared wheel
+                    // while the lock was released; `Wheel::poll` requires a
+                    // monotonic `now`.
+                    if now < lock.wheel.elapsed() {
+                        now = lock.wheel.elapsed();
+                    }
                 }
             }
         }

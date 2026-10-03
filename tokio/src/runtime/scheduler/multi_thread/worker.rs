@@ -271,7 +271,7 @@ const MAX_LIFO_POLLS_PER_TICK: usize = 3;
 #[allow(clippy::too_many_arguments)]
 pub(super) fn create(
     size: usize,
-    park: Parker,
+    parkers: Vec<Parker>,
     driver_handle: driver::Handle,
     blocking_spawner: blocking::Spawner,
     seed_generator: RngSeedGenerator,
@@ -283,11 +283,16 @@ pub(super) fn create(
     let mut remotes = Vec::with_capacity(size);
     let mut worker_metrics = Vec::with_capacity(size);
 
+    // Workers are split into `parkers.len()` contiguous groups; group `g`
+    // shares the driver (I/O shard) behind `parkers[g]`.
+    let num_groups = parkers.len().max(1);
+    debug_assert!(num_groups <= size.max(1));
+
     // Create the local queues
-    for _ in 0..size {
+    for index in 0..size {
         let (steal, run_queue) = queue::local();
 
-        let park = park.clone();
+        let park = parkers[index * num_groups / size].clone();
         let unpark = park.unpark();
         let metrics = WorkerMetrics::from_config(&config);
         let stats = Stats::new(&metrics);
@@ -858,6 +863,11 @@ impl Context {
                     break;
                 }
             }
+            // Leaving to run tasks or to search: if that leaves our I/O shard
+            // with no thread blocking on it, wake an idle sibling to take it.
+            if let Some(p) = core.park.as_mut() {
+                p.leave();
+            }
         }
 
         if let Some(f) = &self.worker.handle.shared.config.after_unpark {
@@ -895,11 +905,25 @@ impl Context {
             }
         };
 
+        // With several I/O shards, poll them before parking (`Parker::sweep`).
+        // If that woke tasks into our queue, which was empty when we decided
+        // to park, don't block; `transition_from_parked` picks them up.
+        let driver = &self.worker.handle.driver;
+        let tick = duration.as_ref().is_some_and(Duration::is_zero);
+        let helped = park.sweep(driver, tick, || {
+            self.core
+                .borrow()
+                .as_ref()
+                .is_some_and(|core| core.has_tasks())
+        });
+
         // Park thread
-        let had_driver = if let Some(timeout) = duration {
-            park.park_timeout(&self.worker.handle.driver, timeout)
+        let had_driver = if helped {
+            park::HadDriver::No
+        } else if let Some(timeout) = duration {
+            park.park_timeout(driver, timeout)
         } else {
-            park.park(&self.worker.handle.driver)
+            park.park(driver)
         };
 
         self.defer.wake();

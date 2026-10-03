@@ -53,14 +53,18 @@ impl RegistrationSet {
         self.num_pending_release.load(Acquire) != 0
     }
 
-    pub(super) fn allocate(&self, synced: &mut Synced) -> io::Result<Arc<ScheduledIo>> {
+    pub(super) fn allocate(
+        &self,
+        synced: &mut Synced,
+        shard: usize,
+    ) -> io::Result<Arc<ScheduledIo>> {
         if synced.is_shutdown {
             return Err(io::Error::other(
                 crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR,
             ));
         }
 
-        let ret = Arc::new(ScheduledIo::default());
+        let ret = Arc::new(ScheduledIo::new(shard));
 
         // Push a ref into the list of all resources.
         synced.registrations.push_front(ret.clone());
