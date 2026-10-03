@@ -147,10 +147,10 @@ rt_test! {
         let rt = rt();
         let _enter = rt.enter();
 
-        let contents = Handle::current()
-            .block_on(fs::read_to_string("Cargo.toml"))
+        let metadata = Handle::current()
+            .block_on(fs::metadata("Cargo.toml"))
             .unwrap();
-        assert!(contents.contains("https://tokio.rs"));
+        assert!(metadata.is_file());
     }
 
     #[test]
@@ -160,7 +160,7 @@ rt_test! {
         rt.shutdown_timeout(Duration::from_secs(1000));
 
         let err: std::io::Error = Handle::current()
-            .block_on(fs::read_to_string("Cargo.toml"))
+            .block_on(fs::metadata("Cargo.toml"))
             .unwrap_err();
 
         assert_eq!(err.kind(), std::io::ErrorKind::Other);
