@@ -7,11 +7,21 @@ use std::{io, path::Path};
 ///
 /// This is the async equivalent of [`std::fs::read_to_string`][std].
 ///
-/// This operation is implemented by running the equivalent blocking operation
-/// on a separate thread pool using [`spawn_blocking`].
+/// When io_uring is not used, this operation is implemented by running the
+/// equivalent blocking operation on a separate thread pool using [`spawn_blocking`].
 ///
 /// [`spawn_blocking`]: crate::task::spawn_blocking
 /// [std]: fn@std::fs::read_to_string
+///
+/// # io_uring support
+///
+/// On Linux, you can also use io_uring for executing system calls. To enable
+/// io_uring, you need to specify the `--cfg tokio_unstable` flag at compile time,
+/// enable the io-uring cargo feature, and set the `Builder::enable_io_uring`
+/// runtime option.
+///
+/// Support for io_uring is currently experimental, so its behavior may change
+/// or it may be removed in future versions.
 ///
 /// # Examples
 ///
