@@ -205,3 +205,77 @@ fn drop_multiple_rx_with_overflow() {
         assert_ok!(th2.join());
     });
 }
+
+// A receiver waiting for a value must observe the channel being closed.
+#[test]
+fn close_while_waiting() {
+    loom::model(|| {
+        let (tx, mut rx) = broadcast::channel::<i32>(2);
+
+        let th = thread::spawn(move || {
+            block_on(async {
+                assert_eq!(Err(Closed), rx.recv().await);
+            });
+        });
+
+        drop(tx);
+
+        assert_ok!(th.join());
+    });
+}
+
+// Receivers waiting in different buckets must all be woken by a single send.
+#[test]
+fn send_wakes_all_buckets() {
+    loom::model(|| {
+        let (tx, mut rx1) = broadcast::channel(2);
+        let mut rx2 = tx.subscribe();
+
+        let th1 = thread::spawn(move || {
+            block_on(async {
+                assert_eq!(1, assert_ok!(rx1.recv().await));
+            });
+        });
+
+        let th2 = thread::spawn(move || {
+            block_on(async {
+                assert_eq!(1, assert_ok!(rx2.recv().await));
+            });
+        });
+
+        assert_ok!(tx.send(1));
+
+        assert_ok!(th1.join());
+        assert_ok!(th2.join());
+    });
+}
+
+// Dropping a queued `Recv` future concurrently with a send must not race with
+// the sender draining the wait list, and must not lose the value.
+#[test]
+fn drop_recv_while_sending() {
+    use tokio_test::task;
+
+    loom::model(|| {
+        let (tx, mut rx) = broadcast::channel(2);
+
+        let th = thread::spawn(move || {
+            let first = {
+                let mut recv = task::spawn(rx.recv());
+                recv.poll()
+            };
+
+            match first {
+                // If the value was already sent, the first poll consumed it.
+                std::task::Poll::Ready(v) => assert_eq!(1, assert_ok!(v)),
+                std::task::Poll::Pending => block_on(async {
+                    assert_eq!(1, assert_ok!(rx.recv().await));
+                }),
+            }
+        });
+
+        assert_ok!(tx.send(1));
+
+        assert_ok!(th.join());
+    });
+}
