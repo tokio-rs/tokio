@@ -57,7 +57,10 @@ where
             // if our buffer is empty, then we need to read some data to continue.
             let rem = me.buf.remaining();
             if rem != 0 {
-                match ready!(Pin::new(&mut *me.reader).poll_read(cx, me.buf)) {
+                let coop = ready!(crate::util::coop::poll_proceed(cx));
+                let result = ready!(Pin::new(&mut *me.reader).poll_read(cx, me.buf));
+                coop.made_progress();
+                match result {
                     Ok(()) => {}
                     Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
                     Err(e) => return Err(e).into(),

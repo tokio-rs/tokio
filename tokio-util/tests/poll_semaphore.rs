@@ -82,3 +82,39 @@ async fn can_poll_different_amounts_of_permits() {
     assert!(semaphore_poll_many(&mut poll_sem, 5).poll().is_pending());
     assert!(semaphore_poll_many(&mut poll_sem, 4).poll().is_ready());
 }
+
+#[cfg(feature = "rt")]
+#[tokio::test]
+async fn available_semaphore_is_cooperative() {
+    let sem = Arc::new(Semaphore::new(1));
+    let mut sem = PollSemaphore::new(sem);
+    let mut task = tokio_test::task::spawn(async {
+        for _ in 0..256 {
+            let permit = std::future::poll_fn(|cx| sem.poll_acquire(cx))
+                .await
+                .unwrap();
+            // Return the permit so the next acquisition is also ready.
+            drop(permit);
+        }
+    });
+
+    tokio_test::assert_pending!(task.poll());
+    task.await;
+}
+
+#[cfg(feature = "rt")]
+#[tokio::test]
+async fn closed_semaphore_is_cooperative() {
+    let sem = Arc::new(Semaphore::new(1));
+    sem.close();
+    let mut sem = PollSemaphore::new(sem);
+    let mut task = tokio_test::task::spawn(async {
+        for _ in 0..256 {
+            let permit = std::future::poll_fn(|cx| sem.poll_acquire(cx)).await;
+            assert!(permit.is_none());
+        }
+    });
+
+    tokio_test::assert_pending!(task.poll());
+    task.await;
+}
