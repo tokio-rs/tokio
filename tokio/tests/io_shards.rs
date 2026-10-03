@@ -224,6 +224,9 @@ fn pre_park_polls_take_the_busy_batch() {
     const PER_SHARD: usize = 40;
     const SOCKETS: usize = SHARDS * PER_SHARD;
     const BUSY: usize = 8;
+    // A long sweep gives the two saturated sweeps a 100 ms window, so the
+    // test does not depend on how fast eight no-op tasks run.
+    const SWEEP: Duration = Duration::from_millis(200);
 
     struct Flags {
         woken: Vec<AtomicBool>,
@@ -258,9 +261,7 @@ fn pre_park_polls_take_the_busy_batch() {
         .max_io_events_per_busy_tick(BUSY)
         // No maintenance tick, so only the pre-park polls run during the test.
         .event_interval(u32::MAX)
-        // A long sweep gives the two saturated sweeps a 100 ms window, so the
-        // test does not depend on how fast eight no-op tasks run.
-        .io_shard_sweep_interval(Some(Duration::from_millis(200)))
+        .io_shard_sweep_interval(Some(SWEEP))
         .enable_all()
         .build()
         .unwrap();
@@ -343,7 +344,10 @@ fn pre_park_polls_take_the_busy_batch() {
     for addr in &addrs {
         sender.send_to(b"x", addr).unwrap();
     }
-    std::thread::sleep(Duration::from_millis(50));
+    // The wedged workers cannot sweep, so wait out the window here. Draining
+    // the registration events can end in a saturated sweep, and that one must
+    // not count as the first of the two below.
+    std::thread::sleep(SWEEP / 2 + Duration::from_millis(50));
     assert_eq!(flags.done.load(SeqCst), 0);
 
     // The released worker parks with no tasks. It polls its own shard, runs
