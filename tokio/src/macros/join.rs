@@ -189,16 +189,20 @@ doc! {macro_rules! join {
             if is_pending {
                 $crate::macros::support::Poll::Pending
             } else {
-                $crate::macros::support::Poll::Ready(($({
-                    // Extract the future for this branch from the tuple.
-                    let ( $($skip,)* fut, .. ) = &mut futures;
+                // Unreachable if an output type is uninhabited (e.g. `Infallible`).
+                #[allow(unreachable_code)]
+                {
+                    $crate::macros::support::Poll::Ready(($({
+                        // Extract the future for this branch from the tuple.
+                        let ( $($skip,)* fut, .. ) = &mut futures;
 
-                    // Safety: future is stored on the stack above
-                    // and never moved.
-                    let mut fut = unsafe { $crate::macros::support::Pin::new_unchecked(fut) };
+                        // Safety: future is stored on the stack above
+                        // and never moved.
+                        let mut fut = unsafe { $crate::macros::support::Pin::new_unchecked(fut) };
 
-                    fut.take_output().expect("expected completed future")
-                },)*))
+                        fut.take_output().expect("expected completed future")
+                    },)*))
+                }
             }
         }).await
     }};
