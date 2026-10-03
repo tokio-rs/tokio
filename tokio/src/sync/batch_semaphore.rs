@@ -585,28 +585,30 @@ impl Future for Acquire<'_> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let _async_op_poll_span = self.node.ctx.async_op_poll_span.clone().entered();
 
-        let (node, semaphore, needed, queued) = self.project();
+        let (mut node, semaphore, needed, queued) = self.project();
 
-        // First, ensure the current task has enough budget to proceed.
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let coop = ready!(trace_poll_op!(
-            "poll_acquire",
-            crate::task::coop::poll_proceed(cx),
-        ));
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let coop = ready!(crate::task::coop::poll_proceed(cx));
-
-        let result = match semaphore.poll_acquire(cx, needed, node, *queued) {
+        let result = match semaphore.poll_acquire(cx, needed, node.as_mut(), *queued) {
             Poll::Pending => {
                 *queued = true;
                 Poll::Pending
             }
             Poll::Ready(r) => {
-                coop.made_progress();
                 r?;
-                *queued = false;
-                Poll::Ready(Ok(()))
+
+                match crate::task::coop::poll_proceed(cx) {
+                    Poll::Ready(coop) => {
+                        coop.made_progress();
+                        *queued = false;
+                        Poll::Ready(Ok(()))
+                    }
+                    Poll::Pending => {
+                        if !*queued {
+                            node.state.store(0, Release);
+                            *queued = true;
+                        }
+                        Poll::Pending
+                    }
+                }
             }
         };
 
