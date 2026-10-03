@@ -101,7 +101,7 @@ impl<R: AsyncRead> Stream for ReaderStream<R> {
         };
 
         if this.buf.capacity() == 0 {
-            this.buf.reserve(*this.capacity);
+            this.buf.reserve((*this.capacity).max(1));
         }
 
         match poll_read_buf(reader, cx, &mut this.buf) {
