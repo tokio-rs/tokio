@@ -9,7 +9,7 @@ macro_rules! doc {
         /// The `select!` macro accepts one or more branches with the following pattern:
         ///
         /// ```text
-        /// <pattern> = <async expression> (, if <precondition>)? => <handler>,
+        /// (#[cfg(<condition>)])? <pattern> = <async expression> (, if <precondition>)? => <handler>,
         /// ```
         ///
         /// Additionally, the `select!` macro may include a single, optional `else`
@@ -30,16 +30,26 @@ macro_rules! doc {
         /// `<async expression>` is still evaluated but the resulting future is never
         /// polled. This capability is useful when using `select!` within a loop.
         ///
+        /// A branch may also begin with exactly one `#[cfg(...)]` attribute. The
+        /// condition is evaluated in the context of the crate that invokes `select!`.
+        /// When the condition is false, the entire branch is absent: its pattern,
+        /// future, precondition, and handler do not need to resolve or type-check and
+        /// do not affect branch selection. The disabled branch must still be
+        /// syntactically valid. Other branch attributes, including `cfg_attr`, are not
+        /// supported.
+        ///
         /// The complete lifecycle of a `select!` expression is as follows:
         ///
-        /// 1. Evaluate all provided `<precondition>` expressions. If the precondition
-        ///    returns `false`, disable the branch for the remainder of the current call
-        ///    to `select!`. Re-entering `select!` due to a loop clears the "disabled"
-        ///    state.
-        /// 2. Aggregate the `<async expression>`s from each branch, including the
-        ///    disabled ones. If the branch is disabled, `<async expression>` is still
-        ///    evaluated, but the resulting future is not polled.
-        /// 3. If **all** branches are disabled: go to step 6.
+        /// 1. For each branch included by `#[cfg]`, evaluate its provided
+        ///    `<precondition>` expression. If the precondition returns `false`, disable
+        ///    the branch for the remainder of the current call to `select!`. Re-entering
+        ///    `select!` due to a loop clears the "disabled" state.
+        /// 2. Aggregate the `<async expression>`s from each included branch, including
+        ///    those disabled by a precondition. If a branch is disabled by its
+        ///    precondition, `<async expression>` is still evaluated, but the resulting
+        ///    future is not polled.
+        /// 3. If **all** included branches are disabled, or no branch is included: go
+        ///    to step 6.
         /// 4. Concurrently await on the results for all remaining `<async expression>`s.
         /// 5. Once an `<async expression>` returns a value, attempt to apply the value to the
         ///    provided `<pattern>`. If the pattern matches, evaluate the `<handler>` and return.
@@ -85,7 +95,8 @@ macro_rules! doc {
         /// The `select!` macro panics if all branches are disabled **and** there is no
         /// provided `else` branch. A branch is disabled when the provided `if`
         /// precondition returns `false` **or** when the pattern does not match the
-        /// result of `<async expression>`.
+        /// result of `<async expression>`. The macro also panics when `#[cfg]` excludes
+        /// every branch and no `else` branch is provided.
         ///
         /// # Cancellation safety
         ///
@@ -151,6 +162,23 @@ macro_rules! doc {
         /// read data is lost.
         ///
         /// # Examples
+        ///
+        /// Conditionally including branches. The conditions in this example are
+        /// deterministic: `all()` is true and `any()` is false.
+        ///
+        /// ```
+        /// # #[tokio::main(flavor = "current_thread")]
+        /// # async fn main() {
+        /// let value = tokio::select! {
+        ///     #[cfg(any())]
+        ///     _ = unavailable_future() => unreachable!(),
+        ///     #[cfg(all())]
+        ///     value = async { 1 } => value,
+        /// };
+        ///
+        /// assert_eq!(value, 1);
+        /// # }
+        /// ```
         ///
         /// Basic select with two branches.
         ///
@@ -562,6 +590,9 @@ doc! {macro_rules! select {
             biased;
         )?
         $(
+            $(
+                #[cfg($($cfg:tt)*)]
+            )?
             $bind:pat = $fut:expr $(, if $cond:expr)? => $handler:expr,
         )*
         $(
@@ -760,6 +791,12 @@ doc! {macro_rules! select {
     // These rules match a single `select!` branch and normalize it for
     // processing by the first rule.
 
+    (@ { start=$_start:expr; () } ) => {{
+        panic!("all branches are disabled and there is no else branch")
+    }};
+    (@ { start=$_start:expr; () } else => $else:expr $(,)?) => {{
+        $else
+    }};
     (@ { start=$start:expr; $($t:tt)* } ) => {
         // No `else` branch
         $crate::select!(@{ start=$start; $($t)*; panic!("all branches are disabled and there is no else branch") })
@@ -767,6 +804,86 @@ doc! {macro_rules! select {
     (@ { start=$start:expr; $($t:tt)* } else => $else:expr $(,)?) => {
         $crate::select!(@{ start=$start; $($t)*; $else })
     };
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($($meta:tt)*)] $p:pat = $f:expr, if $c:expr => $h:block, $($r:tt)* ) => {{
+        #[cfg($($meta)*)]
+        {
+            $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if $c => $h, } $($r)*)
+        }
+        #[cfg(not($($meta)*))]
+        {
+            $crate::select!(@{ start=$start; ($($s)*) $($t)* } $($r)*)
+        }
+    }};
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($($meta:tt)*)] $p:pat = $f:expr => $h:block, $($r:tt)* ) => {{
+        #[cfg($($meta)*)]
+        {
+            $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if true => $h, } $($r)*)
+        }
+        #[cfg(not($($meta)*))]
+        {
+            $crate::select!(@{ start=$start; ($($s)*) $($t)* } $($r)*)
+        }
+    }};
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($($meta:tt)*)] $p:pat = $f:expr, if $c:expr => $h:block $($r:tt)* ) => {{
+        #[cfg($($meta)*)]
+        {
+            $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if $c => $h, } $($r)*)
+        }
+        #[cfg(not($($meta)*))]
+        {
+            $crate::select!(@{ start=$start; ($($s)*) $($t)* } $($r)*)
+        }
+    }};
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($($meta:tt)*)] $p:pat = $f:expr => $h:block $($r:tt)* ) => {{
+        #[cfg($($meta)*)]
+        {
+            $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if true => $h, } $($r)*)
+        }
+        #[cfg(not($($meta)*))]
+        {
+            $crate::select!(@{ start=$start; ($($s)*) $($t)* } $($r)*)
+        }
+    }};
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($($meta:tt)*)] $p:pat = $f:expr, if $c:expr => $h:expr ) => {{
+        #[cfg($($meta)*)]
+        {
+            $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if $c => $h, })
+        }
+        #[cfg(not($($meta)*))]
+        {
+            $crate::select!(@{ start=$start; ($($s)*) $($t)* })
+        }
+    }};
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($($meta:tt)*)] $p:pat = $f:expr => $h:expr ) => {{
+        #[cfg($($meta)*)]
+        {
+            $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if true => $h, })
+        }
+        #[cfg(not($($meta)*))]
+        {
+            $crate::select!(@{ start=$start; ($($s)*) $($t)* })
+        }
+    }};
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($($meta:tt)*)] $p:pat = $f:expr, if $c:expr => $h:expr, $($r:tt)* ) => {{
+        #[cfg($($meta)*)]
+        {
+            $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if $c => $h, } $($r)*)
+        }
+        #[cfg(not($($meta)*))]
+        {
+            $crate::select!(@{ start=$start; ($($s)*) $($t)* } $($r)*)
+        }
+    }};
+    (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } #[cfg($($meta:tt)*)] $p:pat = $f:expr => $h:expr, $($r:tt)* ) => {{
+        #[cfg($($meta)*)]
+        {
+            $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if true => $h, } $($r)*)
+        }
+        #[cfg(not($($meta)*))]
+        {
+            $crate::select!(@{ start=$start; ($($s)*) $($t)* } $($r)*)
+        }
+    }};
     (@ { start=$start:expr; ( $($s:tt)* ) $($t:tt)* } $p:pat = $f:expr, if $c:expr => $h:block, $($r:tt)* ) => {
         $crate::select!(@{ start=$start; ($($s)* _) $($t)* ($($s)*) $p = $f, if $c => $h, } $($r)*)
     };
@@ -798,8 +915,16 @@ doc! {macro_rules! select {
         $else
     }};
 
+    (biased; #[cfg($($meta:tt)*)] $p:pat = $($t:tt)* ) => {
+        $crate::select!(@{ start=0; () } #[cfg($($meta)*)] $p = $($t)*)
+    };
+
     (biased; $p:pat = $($t:tt)* ) => {
         $crate::select!(@{ start=0; () } $p = $($t)*)
+    };
+
+    (#[cfg($($meta:tt)*)] $p:pat = $($t:tt)* ) => {
+        $crate::select!(@{ start={ $crate::macros::support::thread_rng_n(BRANCHES) }; () } #[cfg($($meta)*)] $p = $($t)*)
     };
 
     ( $p:pat = $($t:tt)* ) => {
