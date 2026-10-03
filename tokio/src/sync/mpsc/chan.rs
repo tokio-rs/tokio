@@ -114,7 +114,23 @@ impl<T, S> panic::UnwindSafe for Chan<T, S> {}
 
 pub(crate) fn channel<T, S: Semaphore>(semaphore: S) -> (Tx<T, S>, Rx<T, S>) {
     let (tx, rx) = list::channel();
+    channel_from_list(tx, rx, semaphore)
+}
 
+#[cfg(all(test, not(loom)))]
+pub(crate) fn channel_from_index<T, S: Semaphore>(
+    start_index: usize,
+    semaphore: S,
+) -> (Tx<T, S>, Rx<T, S>) {
+    let (tx, rx) = list::channel_from_index(start_index);
+    channel_from_list(tx, rx, semaphore)
+}
+
+fn channel_from_list<T, S: Semaphore>(
+    tx: list::Tx<T>,
+    rx: list::Rx<T>,
+    semaphore: S,
+) -> (Tx<T, S>, Rx<T, S>) {
     let chan = Arc::new(Chan {
         notify_rx_closed: Notify::new(),
         tx: CachePadded::new(tx),

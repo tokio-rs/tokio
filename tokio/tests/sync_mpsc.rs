@@ -1690,6 +1690,38 @@ async fn test_is_empty_32_msgs() {
 }
 
 #[test]
+#[cfg(panic = "unwind")]
+fn permit_send_panicking_rx_waker() {
+    use std::task::{Context, Wake, Waker};
+
+    struct PanickingWaker;
+
+    impl Wake for PanickingWaker {
+        fn wake(self: Arc<Self>) {
+            panic!("waker panicked");
+        }
+    }
+
+    let (tx, mut rx) = mpsc::channel(1);
+    let waker = Waker::from(Arc::new(PanickingWaker));
+    let mut cx = Context::from_waker(&waker);
+    assert_pending!(rx.poll_recv(&mut cx));
+
+    let permit = tx.try_reserve().unwrap();
+    assert!(panic::catch_unwind(|| permit.send(7)).is_err());
+
+    assert_eq!(tx.capacity(), 0);
+    assert_eq!(rx.len(), 1);
+
+    assert_eq!(rx.try_recv(), Ok(7));
+    assert_eq!(tx.capacity(), 1);
+    assert_eq!(tx.max_capacity(), 1);
+
+    rx.close();
+    assert_eq!(rx.try_recv(), Err(TryRecvError::Disconnected));
+}
+
+#[test]
 #[cfg(not(panic = "abort"))]
 fn drop_all_elements_during_panic() {
     use std::sync::atomic::AtomicUsize;

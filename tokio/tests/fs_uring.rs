@@ -145,6 +145,53 @@ async fn cancel_op_future() {
     assert!(res.is_cancelled());
 }
 
+#[cfg(panic = "unwind")]
+#[test]
+fn completion_waker_panic_preserves_uring() {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+    use std::sync::Arc;
+    use std::task::{Context, Wake, Waker};
+
+    struct PanicWaker;
+    impl Wake for PanicWaker {
+        fn wake(self: Arc<Self>) {
+            panic!("completion waker panic");
+        }
+    }
+
+    if io_uring::IoUring::new(2).is_err() {
+        return;
+    }
+
+    let rt = Builder::new_current_thread().enable_all().build().unwrap();
+
+    // Initialize io_uring on the runtime.
+    rt.block_on(tokio::fs::File::open("/dev/null")).unwrap();
+
+    let mut open_fut = Box::pin(tokio::fs::File::open("/dev/null"));
+    {
+        let _enter = rt.enter();
+        let waker = Waker::from(Arc::new(PanicWaker));
+        let mut cx = Context::from_waker(&waker);
+        tokio_test::assert_pending!(open_fut.as_mut().poll_unpin(&mut cx));
+    }
+
+    let res = catch_unwind(AssertUnwindSafe(|| {
+        rt.block_on(std::future::pending::<()>());
+    }));
+    assert!(res.is_err());
+
+    // The completed operation recorded its CQE before waking, and the ring is still intact.
+    {
+        let _enter = rt.enter();
+        open_fut.now_or_never().unwrap().unwrap();
+
+        let mut next_open = Box::pin(tokio::fs::File::open("/dev/null"));
+        let mut cx = Context::from_waker(Waker::noop());
+        tokio_test::assert_pending!(next_open.as_mut().poll_unpin(&mut cx));
+    }
+}
+
 fn create_tmp_files(num_files: usize) -> (Vec<NamedTempFile>, Vec<PathBuf>) {
     let mut files = Vec::with_capacity(num_files);
     for _ in 0..num_files {

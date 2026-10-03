@@ -115,9 +115,14 @@ impl Wheel {
             .next_expiration()
             .filter(|expiration| expiration.deadline <= now)
         {
-            self.process_expiration(&expiration, wake_queue);
+            self.process_expiration(&expiration, now, wake_queue);
 
-            self.set_elapsed(expiration.deadline);
+            // During shutdown (`now == u64::MAX`), slots are drained directly
+            // without cascading entries across levels, so keep `self.elapsed`
+            // unchanged until all slots are empty.
+            if now != u64::MAX {
+                self.set_elapsed(expiration.deadline);
+            }
         }
         self.set_elapsed(now);
     }
@@ -159,6 +164,7 @@ impl Wheel {
     pub(crate) fn process_expiration(
         &mut self,
         expiration: &Expiration,
+        now: u64,
         wake_queue: &mut WakeQueue,
     ) {
         // Note that we need to take _all_ of the entries off the list before
@@ -174,13 +180,13 @@ impl Wheel {
         let mut entries = self.take_entries(expiration);
 
         while let Some(hdl) = entries.pop_back() {
-            if expiration.level == 0 {
+            if expiration.level == 0 && now != u64::MAX {
                 debug_assert_eq!(hdl.deadline(), expiration.deadline);
             }
 
             let deadline = hdl.deadline();
 
-            if deadline > expiration.deadline {
+            if now != u64::MAX && deadline > expiration.deadline {
                 let level = level_for(expiration.deadline, deadline);
                 unsafe {
                     self.levels[level].add_entry(hdl);

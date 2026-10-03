@@ -143,6 +143,22 @@ async fn try_wait() {
 }
 
 #[tokio::test]
+async fn drop_pending_child_after_poll() {
+    let mut child = cat().spawn().unwrap();
+    let stdin = child.stdin.take().unwrap();
+
+    {
+        let mut wait = std::pin::pin!(child.wait());
+        let waker = futures::task::noop_waker();
+        let mut cx = std::task::Context::from_waker(&waker);
+        assert!(std::future::Future::poll(wait.as_mut(), &mut cx).is_pending());
+    }
+
+    drop(child);
+    drop(stdin);
+}
+
+#[tokio::test]
 async fn pipe_from_one_command_to_another() {
     let mut first = cat().spawn().expect("first cmd");
     let mut third = cat().spawn().expect("third cmd");

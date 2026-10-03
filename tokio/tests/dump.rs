@@ -202,3 +202,39 @@ fn notified_during_tracing() {
         );
     });
 }
+
+#[test]
+fn local_runtime_foreign_dump_does_not_poll_on_wrong_thread() {
+    use std::rc::Rc;
+    use std::sync::{Arc, Mutex};
+
+    let local = runtime::LocalRuntime::new().unwrap();
+    let owner = std::thread::current().id();
+    let observed = Arc::new(Mutex::new(None));
+    let captured = observed.clone();
+    let rc = Rc::new(String::from("non-Send data"));
+    let task_rc = rc.clone();
+
+    let task = local.spawn_local(async move {
+        let current = std::thread::current().id();
+        assert_eq!(task_rc.as_str(), "non-Send data");
+        *captured.lock().unwrap() = Some(current);
+    });
+
+    let handle = local.handle().clone();
+    std::thread::spawn(move || {
+        let other = runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let dump = other.block_on(async { handle.dump().await });
+        assert_eq!(dump.tasks().iter().count(), 0);
+    })
+    .join()
+    .unwrap();
+
+    assert!(observed.lock().unwrap().is_none());
+
+    local.block_on(task).unwrap();
+    assert_eq!(*observed.lock().unwrap(), Some(owner));
+}

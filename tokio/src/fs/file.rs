@@ -674,18 +674,32 @@ impl AsyncSeek for File {
                 let mut buf = buf_cell.take().unwrap();
 
                 // Factor in any unread data from the buf
-                if !buf.is_empty() {
+                let extra_seek = if !buf.is_empty() {
                     let n = buf.discard_read();
 
                     if let SeekFrom::Current(ref mut offset) = pos {
-                        *offset += n;
+                        match offset.checked_add(n) {
+                            Some(new_offset) => {
+                                *offset = new_offset;
+                                None
+                            }
+                            None => Some(SeekFrom::Current(n)),
+                        }
+                    } else {
+                        None
                     }
-                }
+                } else {
+                    None
+                };
 
                 let std = me.std.clone();
 
                 inner.state = State::Busy(spawn_blocking(move || {
-                    let res = (&*std).seek(pos);
+                    let res = if let Some(extra_seek) = extra_seek {
+                        (&*std).seek(extra_seek).and_then(|_| (&*std).seek(pos))
+                    } else {
+                        (&*std).seek(pos)
+                    };
                     (Operation::Seek(res), buf)
                 }));
                 Ok(())
