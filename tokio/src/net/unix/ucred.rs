@@ -72,7 +72,8 @@ pub(crate) use self::impl_aix::get_peer_cred;
     target_os = "fuchsia",
     target_os = "hurd",
     target_os = "nuttx",
-    target_os = "vita"
+    target_os = "vita",
+    target_os = "emscripten"
 ))]
 pub(crate) use self::impl_noproc::get_peer_cred;
 
@@ -404,7 +405,8 @@ pub(crate) mod impl_aix {
     target_os = "fuchsia",
     target_os = "hurd",
     target_os = "nuttx",
-    target_os = "vita"
+    target_os = "vita",
+    target_os = "emscripten"
 ))]
 pub(crate) mod impl_noproc {
     use crate::net::unix::UnixStream;

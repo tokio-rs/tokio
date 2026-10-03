@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 #![cfg(unix)]
+#![cfg(not(target_os = "emscripten"))] // No datagram AF_UNIX on emscripten's node backend.
 
 use tokio::io::ReadBuf;
 use tokio::net::UnixDatagram;
