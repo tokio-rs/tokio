@@ -32,11 +32,102 @@ mod doc {
     pub(super) use mio::windows as mio_windows;
 }
 
-// NB: none of these shows up in public API, so don't document them.
+// NB: none of these shows up in public API, so don't document them. This is
+// the only form of this module that is ever compiled on a non-Windows
+// platform: `cfg_net_windows!` only enables the module for `docsrs` builds or
+// on Windows itself.
 #[cfg(not(windows))]
 mod doc {
+    pub(super) use crate::os::windows::ffi::OsStrExt;
     pub(super) mod mio_windows {
         pub type NamedPipe = crate::doc::NotDefinedHere;
+    }
+
+    /// Stand-in for the `windows-sys` items this module calls into.
+    ///
+    /// `windows-sys` is only a dependency on Windows, so the constants and
+    /// functions used by the code below have nothing to resolve against when
+    /// documentation is built on another platform. Only their signatures
+    /// matter there, so every function diverges and every constant is zero.
+    pub(super) mod windows_sys {
+        use crate::doc::NotDefinedHere;
+
+        pub type HANDLE = NotDefinedHere;
+
+        pub const INVALID_HANDLE_VALUE: *mut std::ffi::c_void = std::ptr::null_mut();
+
+        pub const ACCESS_SYSTEM_SECURITY: u32 = 0;
+        pub const FILE_FLAG_FIRST_PIPE_INSTANCE: u32 = 0;
+        pub const FILE_FLAG_OVERLAPPED: u32 = 0;
+        pub const GENERIC_READ: u32 = 0;
+        pub const GENERIC_WRITE: u32 = 0;
+        pub const OPEN_EXISTING: u32 = 0;
+        pub const PIPE_ACCEPT_REMOTE_CLIENTS: u32 = 0;
+        pub const PIPE_ACCESS_INBOUND: u32 = 0;
+        pub const PIPE_ACCESS_OUTBOUND: u32 = 0;
+        pub const PIPE_READMODE_BYTE: u32 = 0;
+        pub const PIPE_READMODE_MESSAGE: u32 = 0;
+        pub const PIPE_REJECT_REMOTE_CLIENTS: u32 = 0;
+        pub const PIPE_SERVER_END: u32 = 0;
+        pub const PIPE_TYPE_BYTE: u32 = 0;
+        pub const PIPE_TYPE_MESSAGE: u32 = 0;
+        pub const PIPE_UNLIMITED_INSTANCES: u32 = 0;
+        pub const SECURITY_IDENTIFICATION: u32 = 0;
+        pub const SECURITY_SQOS_PRESENT: u32 = 0;
+        pub const WRITE_DAC: u32 = 0;
+        pub const WRITE_OWNER: u32 = 0;
+
+        pub unsafe fn CreateNamedPipeW(
+            _name: *const u16,
+            _open_mode: u32,
+            _pipe_mode: u32,
+            _max_instances: u32,
+            _out_buffer_size: u32,
+            _in_buffer_size: u32,
+            _default_timeout: u32,
+            _security_attributes: *mut std::ffi::c_void,
+        ) -> HANDLE {
+            unreachable!()
+        }
+
+        pub unsafe fn CreateFileW(
+            _name: *const u16,
+            _desired_access: u32,
+            _share_mode: u32,
+            _security_attributes: *mut std::ffi::c_void,
+            _creation_disposition: u32,
+            _flags_and_attributes: u32,
+            _template_file: *mut std::ffi::c_void,
+        ) -> HANDLE {
+            unreachable!()
+        }
+
+        pub unsafe fn SetNamedPipeHandleState(
+            _pipe: HANDLE,
+            _mode: *const u32,
+            _max_collection_count: *mut u32,
+            _collect_data_timeout: *mut u32,
+        ) -> u32 {
+            unreachable!()
+        }
+
+        pub unsafe fn GetNamedPipeInfo(
+            _pipe: HANDLE,
+            _flags: *mut u32,
+            _out_buffer_size: *mut u32,
+            _in_buffer_size: *mut u32,
+            _max_instances: *mut u32,
+        ) -> u32 {
+            unreachable!()
+        }
+    }
+
+    // `HANDLE` is uninhabited, so it can only be compared against a real
+    // pointer, never constructed.
+    impl PartialEq<*mut std::ffi::c_void> for crate::doc::NotDefinedHere {
+        fn eq(&self, _other: &*mut std::ffi::c_void) -> bool {
+            unreachable!()
+        }
     }
 }
 
