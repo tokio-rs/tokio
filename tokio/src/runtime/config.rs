@@ -9,6 +9,13 @@ pub(crate) struct Config {
     /// How many ticks before pulling a task from the global/remote queue?
     pub(crate) global_queue_interval: Option<u32>,
 
+    /// The share of the global queue a multi-threaded scheduler worker takes
+    /// per pull, as a fraction in `0.0..=1.0`. `Some(f)` means take
+    /// `floor(len * f) + 1` of the `len` queued tasks per lock (at least one,
+    /// capped by local-queue space); `None` keeps the default `1 / N` share,
+    /// where `N` is the number of workers.
+    pub(crate) global_queue_share_per_worker: Option<f32>,
+
     /// How many ticks before yielding to the driver for timer and I/O events?
     pub(crate) event_interval: u32,
 
