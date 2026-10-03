@@ -170,3 +170,86 @@ async fn multiple_wait() {
         start.elapsed().as_millis()
     );
 }
+
+// https://github.com/tokio-rs/tokio/issues/8329
+#[tokio::test(flavor = "current_thread")]
+#[should_panic(expected = "unexpected write")]
+async fn unexpected_write_panics_when_only_read_is_scripted() {
+    let mut mock = Builder::new().read(b"z").build();
+    let _ = mock.write_all(b"w").await;
+}
+
+#[tokio::test]
+async fn write_with_handle_behind_queued_read() {
+    let (mut mock, mut handle) = Builder::new().read(b"z").build_with_handle();
+    handle.write(b"w");
+
+    mock.write_all(b"w").await.expect("write");
+
+    let mut buf = [0; 1];
+    mock.read_exact(&mut buf).await.expect("read");
+    assert_eq!(&buf, b"z");
+}
+
+#[tokio::test]
+async fn write_drains_interleaved_handle_read_before_write() {
+    // A single poll_action would enqueue only the Read and then hang; the write
+    // path must keep draining until a Write is available.
+    let (mut mock, mut handle) = Builder::new().build_with_handle();
+    handle.read(b"z");
+    handle.write(b"w");
+
+    mock.write_all(b"w").await.expect("write");
+
+    let mut buf = [0; 1];
+    mock.read_exact(&mut buf).await.expect("read");
+    assert_eq!(&buf, b"z");
+}
+
+#[test]
+#[should_panic(expected = "unexpected write")]
+fn write_before_handle_action_panics() {
+    use tokio_test::task;
+
+    // Actions must already be queued; waiting for a later handle write is not
+    // supported.
+    let (mock, _handle) = Builder::new().build_with_handle();
+    let mut write = task::spawn(async move {
+        let mut mock = mock;
+        mock.write_all(b"hello ").await
+    });
+
+    let _ = write.poll();
+}
+
+#[tokio::test]
+async fn write_skips_queued_read_to_match_builder_write() {
+    let mut mock = Builder::new().read(b"z").write(b"w").build();
+
+    mock.write_all(b"w").await.expect("write");
+
+    let mut buf = [0; 1];
+    mock.read_exact(&mut buf).await.expect("read");
+    assert_eq!(&buf, b"z");
+}
+
+#[tokio::test]
+async fn write_error_behind_queued_read() {
+    let error = io::Error::new(io::ErrorKind::Other, "no thanks!");
+    let mock = Builder::new().read(b"payload").write_error(error).build();
+    let (mut reader, mut writer) = tokio::io::split(mock);
+
+    let write = tokio::spawn(async move { writer.write_all(b"x").await });
+
+    let mut buf = vec![0; 7];
+    reader.read_exact(&mut buf).await.expect("read");
+    assert_eq!(&buf[..], b"payload");
+
+    match write.await.expect("join") {
+        Err(error) => {
+            assert_eq!(error.kind(), io::ErrorKind::Other);
+            assert_eq!(format!("{error}"), "no thanks!");
+        }
+        Ok(()) => panic!("error not received"),
+    }
+}
