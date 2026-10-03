@@ -281,6 +281,7 @@ cfg_io_util! {
         /// [`ErrorKind::UnexpectedEof`]. The contents of `buf` are unspecified
         /// in this case.
         ///
+        /// Errors of kind [`std::io::ErrorKind::Interrupted`] are retried.
         /// If any other read error is encountered then the operation
         /// immediately returns. The contents of `buf` are unspecified in this
         /// case.
@@ -1321,7 +1322,8 @@ cfg_io_util! {
         ///
         /// # Errors
         ///
-        /// If a read error is encountered then the `read_to_end` operation
+        /// Errors of kind [`std::io::ErrorKind::Interrupted`] are retried.
+        /// If another read error is encountered then the `read_to_end` operation
         /// immediately completes. Any bytes which have already been read will
         /// be appended to `buf`.
         ///

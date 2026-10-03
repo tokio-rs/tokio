@@ -86,6 +86,9 @@ impl TcpStream {
         /// result in a successful connection, the error returned from the last
         /// connection attempt (the last address) is returned.
         ///
+        /// For example, on a host without IPv6 connectivity, the
+        /// `AddrNotAvailable` error of a later IPv6 attempt can hide an earlier
+        /// IPv4 failure such as connection refused.
         /// To configure the socket before connecting, you can use the [`TcpSocket`]
         /// type.
         ///

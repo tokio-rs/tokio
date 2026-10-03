@@ -612,7 +612,7 @@ impl AsyncRead for File {
         cx: &mut Context<'_>,
         dst: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
 
         let me = self.get_mut();
         let inner = me.inner.get_mut();
@@ -684,26 +684,39 @@ impl AsyncSeek for File {
         let inner = me.inner.get_mut();
 
         match inner.state {
-            State::Busy(_) => Err(io::Error::new(
-                io::ErrorKind::Other,
+            State::Busy(_) => Err(io::Error::other(
                 "other file operation is pending, call poll_complete before start_seek",
             )),
             State::Idle(ref mut buf_cell) => {
                 let mut buf = buf_cell.take().unwrap();
 
                 // Factor in any unread data from the buf
-                if !buf.is_empty() {
+                let extra_seek = if !buf.is_empty() {
                     let n = buf.discard_read();
 
                     if let SeekFrom::Current(ref mut offset) = pos {
-                        *offset += n;
+                        match offset.checked_add(n) {
+                            Some(new_offset) => {
+                                *offset = new_offset;
+                                None
+                            }
+                            None => Some(SeekFrom::Current(n)),
+                        }
+                    } else {
+                        None
                     }
-                }
+                } else {
+                    None
+                };
 
                 let std = me.std.clone();
 
                 inner.state = State::Busy(spawn_blocking(move || {
-                    let res = (&*std).seek(pos);
+                    let res = if let Some(extra_seek) = extra_seek {
+                        (&*std).seek(extra_seek).and_then(|_| (&*std).seek(pos))
+                    } else {
+                        (&*std).seek(pos)
+                    };
                     (Operation::Seek(res), buf)
                 }));
                 Ok(())
@@ -712,7 +725,7 @@ impl AsyncSeek for File {
     }
 
     fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
         let inner = self.inner.get_mut();
 
         loop {
@@ -753,7 +766,7 @@ impl AsyncWrite for File {
         cx: &mut Context<'_>,
         src: &[u8],
     ) -> Poll<io::Result<usize>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
         let me = self.get_mut();
         let inner = me.inner.get_mut();
 
@@ -784,7 +797,7 @@ impl AsyncWrite for File {
 
                         (Operation::Write(res), buf)
                     })
-                    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "background task failed"));
+                    .ok_or_else(|| io::Error::other("background task failed"));
 
                     if res.is_err() {
                         // Restore a valid Idle state before returning the error.
@@ -833,7 +846,7 @@ impl AsyncWrite for File {
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<Result<usize, io::Error>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
         let me = self.get_mut();
         let inner = me.inner.get_mut();
 
@@ -864,7 +877,7 @@ impl AsyncWrite for File {
 
                         (Operation::Write(res), buf)
                     })
-                    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "background task failed"));
+                    .ok_or_else(|| io::Error::other("background task failed"));
 
                     if res.is_err() {
                         // Restore a valid Idle state before returning the error.
@@ -913,13 +926,13 @@ impl AsyncWrite for File {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
         let inner = self.inner.get_mut();
         inner.poll_flush(cx)
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
         self.poll_flush(cx)
     }
 }
@@ -1023,20 +1036,20 @@ impl Inner {
         ))]
         {
             if let Ok(handle) = crate::runtime::Handle::try_current() {
-                let driver_handle = handle.inner.driver().io();
+                if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
+                    if driver_handle.is_uring_ready(io_uring::opcode::Read::CODE) {
+                        // Fast path: uring already initialized and Read supported.
+                        let fd: crate::io::uring::utils::ArcFd = std;
+                        return Ok(spawn(Self::uring_read(fd, buf, max_buf_size)));
+                    }
 
-                if driver_handle.is_uring_ready(io_uring::opcode::Read::CODE) {
-                    // Fast path: uring already initialized and Read supported.
-                    let fd: crate::io::uring::utils::ArcFd = std;
-                    return Ok(spawn(Self::uring_read(fd, buf, max_buf_size)));
+                    if !driver_handle.is_uring_probed() {
+                        // Not yet probed: lazy init inside an async task so
+                        // `File::from_std()` can still benefit from io-uring.
+                        return Ok(spawn(Self::lazy_init_read(std, buf, max_buf_size)));
+                    }
                 }
-
-                if !driver_handle.is_uring_probed() {
-                    // Not yet probed: lazy init inside an async task so
-                    // `File::from_std()` can still benefit from io-uring.
-                    return Ok(spawn(Self::lazy_init_read(std, buf, max_buf_size)));
-                }
-                // Probed but unsupported: fall through to spawn_blocking.
+                // No IO driver or probed but unsupported: fall through to spawn_blocking.
             }
         }
 
@@ -1089,23 +1102,25 @@ impl Inner {
         target_os = "linux",
     ))]
     async fn lazy_init_read(std: Arc<StdFile>, buf: Buf, max_buf_size: usize) -> (Operation, Buf) {
-        let handle = crate::runtime::Handle::current();
-        let driver_handle = handle.inner.driver().io();
-        if driver_handle
-            .check_and_init(io_uring::opcode::Read::CODE)
-            .await
-            .unwrap_or_default()
-        {
-            let fd: crate::io::uring::utils::ArcFd = std;
-            Self::uring_read(fd, buf, max_buf_size).await
-        } else {
-            match Self::spawn_blocking_read(buf, std, max_buf_size).await {
-                Ok(result) => result,
-                Err(e) => (
-                    Operation::Read(Err(io::Error::new(io::ErrorKind::Other, e))),
-                    Buf::with_capacity(0),
-                ),
+        if let Ok(handle) = crate::runtime::Handle::try_current() {
+            if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
+                if driver_handle
+                    .check_and_init(io_uring::opcode::Read::CODE)
+                    .await
+                    .unwrap_or_default()
+                {
+                    let fd: crate::io::uring::utils::ArcFd = std;
+                    return Self::uring_read(fd, buf, max_buf_size).await;
+                }
             }
+        }
+
+        match Self::spawn_blocking_read(buf, std, max_buf_size).await {
+            Ok(result) => result,
+            Err(e) => (
+                Operation::Read(Err(io::Error::other(e))),
+                Buf::with_capacity(0),
+            ),
         }
     }
 
@@ -1131,7 +1146,7 @@ impl Inner {
     }
 
     fn poll_complete_inflight(&mut self, cx: &mut Context<'_>) -> Poll<()> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
         match self.poll_flush(cx) {
             Poll::Ready(Err(e)) => {
                 self.last_write_err = Some(e.kind());

@@ -259,3 +259,27 @@ fn async_fd_try_with_interest_panic_caller() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+#[test]
+fn buf_reader_with_capacity_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let _ = io::BufReader::with_capacity(0, io::empty());
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+fn buf_stream_with_capacity_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let _ = io::BufStream::with_capacity(0, 1, io::duplex(1).0);
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}

@@ -455,8 +455,8 @@ impl Interval {
     /// [`Context`] passed to the most recent call is scheduled to receive a
     /// wakeup.
     pub fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<Instant> {
-        // Wait for the delay to be done
-        ready!(Pin::new(&mut self.delay).poll(cx));
+        // Wait for the internal timer to elapse.
+        ready!(self.delay.as_mut().poll(cx));
 
         // Get the time when we were scheduled to tick
         let timeout = self.delay.deadline();
@@ -477,10 +477,10 @@ impl Interval {
             timeout + self.period
         };
 
-        // When we arrive here, the internal delay returned `Poll::Ready`.
-        // Reset the delay but do not register it. It should be registered with
+        // Do not register the internal timer yet. It should be registered with
         // the next call to [`poll_tick`].
-        self.delay.as_mut().reset_without_timer(next);
+        // SAFETY: the internal timer is elapsed.
+        unsafe { self.delay.as_mut().reset_without_timer(next) }
 
         // Return the time when we were scheduled to tick
         Poll::Ready(timeout)

@@ -59,8 +59,7 @@ impl RegistrationSet {
         shard: usize,
     ) -> io::Result<Arc<ScheduledIo>> {
         if synced.is_shutdown {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(io::Error::other(
                 crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR,
             ));
         }

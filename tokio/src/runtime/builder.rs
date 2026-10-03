@@ -1966,6 +1966,10 @@ impl Builder {
     ///
     /// [`max_io_events_per_busy_tick`]: Builder::max_io_events_per_busy_tick
     ///
+    /// # Panics
+    ///
+    /// Panics if `capacity` is zero.
+    ///
     /// # Examples
     ///
     /// ```
@@ -1977,7 +1981,9 @@ impl Builder {
     ///     .build()
     ///     .unwrap();
     /// ```
+    #[track_caller]
     pub fn max_io_events_per_tick(&mut self, capacity: usize) -> &mut Self {
+        assert!(capacity > 0, "max_io_events_per_tick must be non-zero");
         self.nevents = capacity;
         self
     }

@@ -49,6 +49,6 @@ impl<T> Stream for Pending<T> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, None)
+        (0, Some(0))
     }
 }

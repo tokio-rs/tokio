@@ -168,6 +168,14 @@ fn split() {
     assert_eq!(sem.available_permits(), 5);
 }
 
+#[test]
+fn permit_semaphore() {
+    let sem = Semaphore::new(1);
+    let permit = sem.try_acquire().unwrap();
+
+    assert!(std::ptr::eq(permit.semaphore(), &sem));
+}
+
 #[tokio::test]
 #[cfg(feature = "full")]
 async fn stress_test() {
@@ -220,6 +228,22 @@ fn add_more_than_max_amount_permits2() {
 #[should_panic]
 fn panic_when_exceeds_maxpermits() {
     let _ = Semaphore::new(Semaphore::MAX_PERMITS + 1);
+}
+
+#[cfg(target_pointer_width = "32")]
+#[test]
+#[should_panic(expected = "a semaphore may not have more than MAX_PERMITS permits")]
+fn acquire_many_exceeds_maxpermits() {
+    let s = Semaphore::new(0);
+    let _ = tokio_test::task::spawn(s.acquire_many((Semaphore::MAX_PERMITS as u32) + 1)).poll();
+}
+
+#[cfg(target_pointer_width = "32")]
+#[test]
+#[should_panic(expected = "a semaphore may not have more than MAX_PERMITS permits")]
+fn acquire_many_top_bit_exceeds_maxpermits() {
+    let s = Semaphore::new(0);
+    let _ = tokio_test::task::spawn(s.acquire_many(1_u32 << 31)).poll();
 }
 
 #[test]

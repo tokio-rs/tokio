@@ -26,6 +26,28 @@ fn fused_iter<T>(items: Vec<T>) -> impl FusedStream<Item = T> {
     tokio_stream::iter(items).fuse()
 }
 
+#[tokio::test]
+async fn empty_is_terminated_immediately() {
+    let mut stream = tokio_stream::empty::<i32>();
+    assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
+    assert!(stream.is_terminated());
+}
+
+#[tokio::test]
+async fn once_not_terminated_before_polled() {
+    let stream = tokio_stream::once(1);
+    assert!(!stream.is_terminated());
+}
+
+#[tokio::test]
+async fn once_terminated_after_item_yielded() {
+    let mut stream = tokio_stream::once(1);
+    assert_eq!(stream.next().await, Some(1));
+    assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
+}
+
 // ── map ──────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
@@ -244,5 +266,24 @@ async fn stream_notify_close_does_not_poll_inner_after_close_notification() {
     assert!(!stream.is_terminated());
     assert_eq!(stream.next().await, Some(None));
     assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
+}
+
+// ── throttle ─────────────────────────────────────────────────────────────────
+
+#[tokio::test(start_paused = true)]
+async fn throttle_not_terminated_before_done() {
+    let stream = fused_iter(vec![1, 2]).throttle(std::time::Duration::from_millis(100));
+    assert!(!stream.is_terminated());
+}
+
+#[tokio::test(start_paused = true)]
+async fn throttle_terminated_after_inner_done() {
+    let stream = fused_iter(vec![1]).throttle(std::time::Duration::from_millis(100));
+    tokio::pin!(stream);
+    assert_eq!(stream.next().await, Some(1));
+    assert!(!stream.as_ref().get_ref().is_terminated());
+    assert_eq!(stream.next().await, None);
+    assert!(stream.as_ref().get_ref().is_terminated());
     assert_eq!(stream.next().await, None);
 }
