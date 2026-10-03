@@ -39,18 +39,27 @@ extern "C" {
     fn emscripten_clear_immediate(id: i32);
 }
 
+/// `em_settled_result_t`, returned by value.
+#[repr(C)]
+struct SettledResult {
+    result: i32,
+    value: *mut c_void,
+}
+
 extern "C-unwind" {
     // Suspending import (Emscripten marks it `__async`): resolves to the
-    // promise's value once it settles. Under `-sJSPI` the wrapper is
+    // promise's settled result. Under `-sJSPI` the wrapper is
     // `Asyncify.handleAsync`, which keeps the runtime alive across the
-    // suspension. Linkable without JSPI, where it aborts if reached.
+    // suspension. Linkable without JSPI, where it aborts if reached. Present
+    // in every Emscripten the Rust target supports, unlike the newer
+    // `emscripten_promise_await_unchecked`.
     //
     // Suspension needs a `WebAssembly.promising` activation on the stack.
     // From any other activation (a plain host callback into the module) the
     // engine throws `WebAssembly.SuspendError` out of this import instead. It
     // is a foreign exception to Rust: drops run as it unwinds, `catch_unwind`
     // does not catch it, and it aborts at the first `extern "C"` frame.
-    fn emscripten_promise_await_unchecked(promise: Promise) -> *mut c_void;
+    fn emscripten_promise_await(promise: Promise) -> SettledResult;
 }
 
 /// Whether JSPI suspension is available: linked with `-sJSPI`.
@@ -160,8 +169,9 @@ pub(crate) fn park(slot: &Slot, dur: Option<Duration>) {
 
     // SAFETY: the handle is live. Under `-sJSPI` this suspends the
     // activation; the caller has checked `jspi_enabled`. A `SuspendError`
-    // unwinding out of it drops `park`, clearing the timer and handle.
-    unsafe { emscripten_promise_await_unchecked(park.promise) };
+    // unwinding out of it drops `park`, clearing the timer and handle. The
+    // promise is only ever fulfilled, so the result carries nothing.
+    let _ = unsafe { emscripten_promise_await(park.promise) };
 }
 
 /// Resume the activation parked on `slot`, if any.
