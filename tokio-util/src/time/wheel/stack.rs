@@ -25,6 +25,13 @@ pub(crate) trait Stack: Default {
     /// Peek into the stack.
     fn peek(&self) -> Option<Self::Owned>;
 
+    /// Peek at the item in the stack with the earliest deadline.
+    ///
+    /// Unlike `peek`, this does not have to agree with `pop`: a slot in a level
+    /// above zero spans a range of deadlines, so its entries are only ordered
+    /// once they cascade down.
+    fn peek_earliest(&self, store: &Self::Store) -> Option<Self::Owned>;
+
     fn remove(&mut self, item: &Self::Borrowed, store: &mut Self::Store);
 
     fn when(item: &Self::Borrowed, store: &Self::Store) -> u64;

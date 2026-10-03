@@ -147,7 +147,9 @@ impl Context {
     pub(crate) fn is_tracing() -> bool {
         // SAFETY: This call can only access the trace_leaf_fn field, so it cannot break the trace
         // frame linked list.
-        unsafe { Self::try_with_current(|ctx| ctx.trace_leaf_fn.get().is_some()).unwrap_or(false) }
+        unsafe {
+            Self::try_with_current(|ctx| ctx.trace_leaf_fn.get().is_some()).unwrap_or_default()
+        }
     }
 }
 
@@ -384,21 +386,14 @@ pub(in crate::runtime) fn trace_current_thread(
 }
 
 cfg_rt_multi_thread! {
-    use crate::loom::sync::Mutex;
+    use crate::runtime::scheduler::inject::InjectQueue;
     use crate::runtime::scheduler::multi_thread;
-    use crate::runtime::scheduler::multi_thread::Synced;
-    use crate::runtime::scheduler::inject::Shared;
 
-    /// Trace and poll all tasks of the `current_thread` runtime.
-    ///
-    /// ## Safety
-    ///
-    /// Must be called with the same `synced` that `injection` was created with.
-    pub(in crate::runtime) unsafe fn trace_multi_thread(
+    /// Trace and poll all tasks of the `multi_thread` runtime.
+    pub(in crate::runtime) fn trace_multi_thread(
         owned: &OwnedTasks<Arc<multi_thread::Handle>>,
         local: &mut multi_thread::queue::Local<Arc<multi_thread::Handle>>,
-        synced: &Mutex<Synced>,
-        injection: &Shared<Arc<multi_thread::Handle>>,
+        injection: &InjectQueue<Arc<multi_thread::Handle>>,
     ) -> Vec<(Id, Trace)> {
         let mut dequeued = Vec::new();
 
@@ -408,13 +403,7 @@ cfg_rt_multi_thread! {
         }
 
         // clear the injection queue
-        let mut synced = synced.lock();
-        // Safety: exactly the same safety requirements as `trace_multi_thread` function.
-        while let Some(notified) = unsafe { injection.pop(&mut synced.inject) } {
-            dequeued.push(notified);
-        }
-
-        drop(synced);
+        injection.drain_into(&mut dequeued);
 
         // precondition: we have drained the tasks from the local and injection
         // queues.
@@ -430,12 +419,12 @@ cfg_rt_multi_thread! {
 /// in any other queue.
 fn trace_owned<S: Schedule>(owned: &OwnedTasks<S>, dequeued: Vec<Notified<S>>) -> Vec<(Id, Trace)> {
     let mut tasks = dequeued;
-    // Notify and trace all un-notified tasks. The dequeued tasks are already
-    // notified and so do not need to be re-notified.
+    // Notify and trace all un-notified idle tasks. The dequeued tasks are
+    // already notified and so do not need to be re-notified.
     owned.for_each(|task| {
         // Notify the task (and thus make it poll-able) and stash it. This fails
-        // if the task is already notified. In these cases, we skip tracing the
-        // task.
+        // if the task is already notified or not idle. In these cases, we skip
+        // tracing the task.
         if let Some(notified) = task.notify_for_tracing() {
             tasks.push(notified);
         }

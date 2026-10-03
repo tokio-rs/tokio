@@ -1,5 +1,13 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "macros",
+        feature = "test-util"
+    )
+))]
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -166,6 +174,18 @@ async fn skip() {
 
     time::advance(ms(300)).await;
     check_interval_poll!(i, start, 1800);
+}
+
+#[tokio::test]
+async fn reset_doesnt_panic_max_duration() {
+    let mut interval = time::interval(Duration::MAX);
+    interval.reset();
+}
+
+#[tokio::test]
+async fn reset_after_doesnt_panic_max_duration() {
+    let mut interval = time::interval(ms(1));
+    interval.reset_after(Duration::MAX);
 }
 
 #[tokio::test(start_paused = true)]

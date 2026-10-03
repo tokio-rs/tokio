@@ -2,7 +2,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use tokio::sync::watch;
@@ -491,6 +491,19 @@ fn has_changed_errors_on_closed_channel_with_seen_value() {
 
     rx.has_changed()
         .expect_err("`has_changed` returns an error if and only if channel is closed.");
+}
+
+#[test]
+fn receiver_is_closed_after_all_senders_are_dropped() {
+    let (tx, rx) = watch::channel("A");
+    let tx2 = tx.clone();
+    assert!(!rx.is_closed());
+
+    drop(tx);
+    assert!(!rx.is_closed());
+
+    drop(tx2);
+    assert!(rx.is_closed());
 }
 
 #[tokio::test]

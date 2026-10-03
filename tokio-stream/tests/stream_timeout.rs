@@ -107,3 +107,11 @@ async fn no_timeouts() {
     assert_ready_eq!(stream.poll_next(), Some(Ok(5)));
     assert_ready_eq!(stream.poll_next(), None);
 }
+
+#[tokio::test]
+async fn duration_max_does_not_overflow() {
+    let stream = stream::iter([1]).timeout(Duration::MAX);
+    let mut stream = task::spawn(stream);
+
+    assert_ready_eq!(stream.poll_next(), Some(Ok(1)));
+}

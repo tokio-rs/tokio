@@ -1,4 +1,8 @@
 use tokio_stream::{self as stream, Stream, StreamExt};
+use tokio_test::{assert_pending, assert_ready, task};
+
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 #[tokio::test]
 async fn size_hint_without_peek() {
@@ -120,4 +124,94 @@ async fn size_hint_unbounded_upper() {
     assert_eq!(s.size_hint(), (1, None));
     let _ = s.peek().await;
     assert_eq!(s.size_hint(), (2, None)); // still unbounded after peek
+}
+
+#[tokio::test]
+async fn peek_does_not_consume() {
+    let mut stream = stream::iter(vec![1, 2, 3]).peekable();
+
+    assert_eq!(stream.peek().await, Some(&1));
+    assert_eq!(stream.peek().await, Some(&1));
+    assert_eq!(stream.next().await, Some(1));
+    assert_eq!(stream.next().await, Some(2));
+}
+
+#[tokio::test]
+async fn peek_mut_mutates_yielded_item() {
+    let mut stream = stream::iter(vec![1, 2, 3]).peekable();
+
+    if let Some(item) = stream.peek_mut().await {
+        *item += 10;
+    }
+
+    assert_eq!(stream.next().await, Some(11));
+    assert_eq!(stream.next().await, Some(2));
+}
+
+#[tokio::test]
+async fn peek_on_empty_stream() {
+    let mut stream = stream::iter(Vec::<i32>::new()).peekable();
+
+    assert_eq!(stream.peek().await, None);
+    assert_eq!(stream.peek_mut().await, None);
+    assert_eq!(stream.next().await, None);
+}
+
+#[test]
+fn poll_peek_does_not_advance_stream() {
+    let mut stream = task::spawn(stream::iter(vec![1, 2, 3]).peekable());
+
+    let first = stream.enter(|cx, s| s.poll_peek(cx).map(|opt| opt.copied()));
+    assert_eq!(assert_ready!(first), Some(1));
+
+    let second = stream.enter(|cx, s| s.poll_peek(cx).map(|opt| opt.copied()));
+    assert_eq!(assert_ready!(second), Some(1));
+
+    let next = stream.enter(|cx, s| s.poll_next(cx));
+    assert_eq!(assert_ready!(next), Some(1));
+
+    let next = stream.enter(|cx, s| s.poll_next(cx));
+    assert_eq!(assert_ready!(next), Some(2));
+}
+
+#[test]
+fn poll_peek_mutates_buffered_item() {
+    let mut stream = task::spawn(stream::iter(vec![1, 2, 3]).peekable());
+
+    stream.enter(|cx, s| {
+        if let Poll::Ready(Some(item)) = s.poll_peek(cx) {
+            *item += 100;
+        }
+    });
+
+    let next = stream.enter(|cx, s| s.poll_next(cx));
+    assert_eq!(assert_ready!(next), Some(101));
+}
+
+struct PendingOnce {
+    polled: bool,
+}
+
+impl Stream for PendingOnce {
+    type Item = i32;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<i32>> {
+        if self.polled {
+            Poll::Ready(Some(7))
+        } else {
+            self.polled = true;
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    }
+}
+
+#[test]
+fn poll_peek_propagates_pending() {
+    let mut stream = task::spawn(PendingOnce { polled: false }.peekable());
+
+    assert_pending!(stream.enter(|cx, s| s.poll_peek(cx).map(|opt| opt.copied())));
+
+    let ready = stream.enter(|cx, s| s.poll_peek(cx).map(|opt| opt.copied()));
+    assert_eq!(assert_ready!(ready), Some(7));
 }

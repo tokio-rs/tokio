@@ -326,7 +326,7 @@ fn contains_impl_trait(ty: &syn::Type) -> bool {
                     _ => false,
                 }),
                 syn::PathArguments::Parenthesized(args) => {
-                    args.inputs.iter().any(contains_impl_trait)
+                    args.inputs.iter().any(|arg| contains_impl_trait(&arg.ty))
                         || matches!(&args.output, syn::ReturnType::Type(_, t) if contains_impl_trait(t))
                 }
                 syn::PathArguments::None => false,
@@ -453,13 +453,13 @@ fn parse_knobs(mut input: ItemFn, is_test: bool, config: FinalConfig) -> TokenSt
         (start, end)
     };
 
-    let crate_path = config
-        .crate_name
-        .map(ToTokens::into_token_stream)
-        .unwrap_or_else(|| {
+    let crate_path = config.crate_name.map_or_else(
+        || {
             Ident::new("tokio", Span::call_site().located_at(last_stmt_start_span))
                 .into_token_stream()
-        });
+        },
+        ToTokens::into_token_stream,
+    );
 
     let use_builder = quote_spanned! {Span::call_site().located_at(last_stmt_start_span)=>
         use #crate_path::runtime::Builder;

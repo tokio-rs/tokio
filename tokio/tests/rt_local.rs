@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", tokio_unstable))]
+#![cfg(feature = "full")]
 
 use std::panic;
 use tokio::runtime::LocalOptions;
@@ -118,25 +118,25 @@ fn test_spawn_local_from_guard_other_thread() {
 // the task would belong.
 // The test creates a `LocalRuntime` and `LocalSet`, drives the `LocalSet` on the `LocalRuntime`'s thread,
 // then spawns a **separate OS thread** and tries to call
-// `tokio::task::spawn_local` there. `std::panic::catch_unwind` is then used
-// to capture the panic and to assert that it indeed occurs.
+// `tokio::task::spawn_local` there.
 #[test]
+#[should_panic = "`spawn_local` called from outside of a `task::LocalSet` or `runtime::LocalRuntime`"]
 #[cfg_attr(target_family = "wasm", ignore)] // threads not supported
 fn test_spawn_local_panic() {
     let rt = rt();
     let local = LocalSet::new();
 
     rt.block_on(local.run_until(async {
-        let thread_result = std::thread::spawn(|| {
-            let panic_result = panic::catch_unwind(|| {
-                let _jh = tokio::task::spawn_local(async {
-                    println!("you will never see this line");
-                });
+        let panic = std::thread::spawn(|| {
+            let _jh = tokio::task::spawn_local(async {
+                println!("you will never see this line");
             });
-            assert!(panic_result.is_err(), "Expected panic, but none occurred");
         })
-        .join();
-        assert!(thread_result.is_ok(), "Thread itself panicked unexpectedly");
+        .join()
+        .unwrap_err();
+
+        // When panic=unwind
+        panic::resume_unwind(panic);
     }));
 }
 

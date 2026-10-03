@@ -1,12 +1,48 @@
 cfg_rt! {
+    #[cfg(not(target_os = "emscripten"))]
     pub(crate) use crate::runtime::spawn_blocking;
 
-    cfg_fs! {
+    cfg_io_blocking! {
+        #[cfg(not(target_os = "emscripten"))]
         #[allow(unused_imports)]
         pub(crate) use crate::runtime::spawn_mandatory_blocking;
     }
 
+    #[cfg(not(target_os = "emscripten"))]
     pub(crate) use crate::task::JoinHandle;
+
+    // Emscripten's filesystem is synchronous, so `fs` and `io-std` run inline
+    // here, pthread builds included. Public `task::spawn_blocking` is unaffected.
+    //
+    // The completed future is wrapped in `Coop` so that polling it consumes
+    // task budget exactly like the native `task::JoinHandle::poll` does. The
+    // `fs` and `io-std` consumers rely on that budget for their yield points:
+    // without it a loop of always-ready file reads never returns `Pending`
+    // and starves every other task on the single-threaded runtime.
+    #[cfg(target_os = "emscripten")]
+    pub(crate) type JoinHandle<T> =
+        crate::task::coop::Coop<std::future::Ready<Result<T, crate::task::JoinError>>>;
+
+    #[cfg(target_os = "emscripten")]
+    pub(crate) fn spawn_blocking<F, R>(f: F) -> JoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        crate::task::coop::cooperative(std::future::ready(Ok(f())))
+    }
+
+    #[cfg(all(target_os = "emscripten", any(feature = "fs", feature = "io-std")))]
+    // `fs` unit tests use the `fs::mocks` version instead, so this is unused
+    // when `io-std` is disabled.
+    #[allow(dead_code)]
+    pub(crate) fn spawn_mandatory_blocking<F, R>(f: F) -> Option<JoinHandle<R>>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        Some(spawn_blocking(f))
+    }
 }
 
 cfg_not_rt! {
@@ -24,7 +60,7 @@ cfg_not_rt! {
         panic!("requires the `rt` Tokio feature flag")
     }
 
-    cfg_fs! {
+    cfg_io_blocking! {
         pub(crate) fn spawn_mandatory_blocking<F, R>(_f: F) -> Option<JoinHandle<R>>
         where
             F: FnOnce() -> R + Send + 'static,

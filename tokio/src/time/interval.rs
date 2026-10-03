@@ -1,4 +1,4 @@
-use crate::time::{sleep_until, Duration, Instant, Sleep};
+use crate::time::{safe_delay, sleep_until, Duration, Instant, Sleep};
 use crate::util::trace;
 
 use std::future::{poll_fn, Future};
@@ -133,7 +133,7 @@ fn internal_interval_at(
 
     Interval {
         delay: Box::pin(sleep_until(start)),
-        period,
+        period: safe_delay(period),
         missed_tick_behavior: MissedTickBehavior::default(),
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         resource_span,
@@ -337,21 +337,21 @@ impl MissedTickBehavior {
             Self::Burst => timeout + period,
             Self::Delay => now + period,
             Self::Skip => {
-                now + period
-                    - Duration::from_nanos(
-                        ((now - timeout).as_nanos() % period.as_nanos())
-                            .try_into()
-                            // This operation is practically guaranteed not to
-                            // fail, as in order for it to fail, `period` would
-                            // have to be longer than `now - timeout`, and both
-                            // would have to be longer than 584 years.
-                            //
-                            // If it did fail, there's not a good way to pass
-                            // the error along to the user, so we just panic.
-                            .expect(
-                                "too much time has elapsed since the interval was supposed to tick",
-                            ),
-                    )
+                let offset = Duration::from_nanos(
+                    ((now - timeout).as_nanos() % period.as_nanos())
+                        .try_into()
+                        // This operation is practically guaranteed not to
+                        // fail, as in order for it to fail, `period` would
+                        // have to be longer than `now - timeout`, and both
+                        // would have to be longer than 584 years.
+                        //
+                        // If it did fail, there's not a good way to pass
+                        // the error along to the user, so we just panic.
+                        .expect(
+                            "too much time has elapsed since the interval was supposed to tick",
+                        ),
+                );
+                now + (period - offset)
             }
         }
     }
@@ -455,8 +455,8 @@ impl Interval {
     /// [`Context`] passed to the most recent call is scheduled to receive a
     /// wakeup.
     pub fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<Instant> {
-        // Wait for the delay to be done
-        ready!(Pin::new(&mut self.delay).poll(cx));
+        // Wait for the internal timer to elapse.
+        ready!(self.delay.as_mut().poll(cx));
 
         // Get the time when we were scheduled to tick
         let timeout = self.delay.deadline();
@@ -474,15 +474,13 @@ impl Interval {
             self.missed_tick_behavior
                 .next_timeout(timeout, now, self.period)
         } else {
-            timeout
-                .checked_add(self.period)
-                .unwrap_or_else(Instant::far_future)
+            timeout + self.period
         };
 
-        // When we arrive here, the internal delay returned `Poll::Ready`.
-        // Reset the delay but do not register it. It should be registered with
+        // Do not register the internal timer yet. It should be registered with
         // the next call to [`poll_tick`].
-        self.delay.as_mut().reset_without_timer(next);
+        // SAFETY: the internal timer is elapsed.
+        unsafe { self.delay.as_mut().reset_without_timer(next) }
 
         // Return the time when we were scheduled to tick
         Poll::Ready(timeout)
@@ -582,7 +580,8 @@ impl Interval {
     /// # }
     /// ```
     pub fn reset_after(&mut self, after: Duration) {
-        self.delay.as_mut().reset(Instant::now() + after);
+        let deadline = Instant::now() + safe_delay(after);
+        self.delay.as_mut().reset(deadline);
     }
 
     /// Resets the interval to a [`crate::time::Instant`] deadline.

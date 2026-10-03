@@ -17,9 +17,6 @@ cfg_rt_multi_thread! {
     mod block_in_place;
     pub(crate) use block_in_place::block_in_place;
 
-    mod lock;
-    use lock::Lock;
-
     pub(crate) mod multi_thread;
     pub(crate) use multi_thread::MultiThread;
 }
@@ -142,7 +139,7 @@ cfg_rt! {
         /// Returns true if this is a local runtime and the runtime is owned by the current thread.
         pub(crate) fn can_spawn_local_on_local_runtime(&self) -> bool {
             match self {
-                Handle::CurrentThread(h) => h.local_tid.map(|x| std::thread::current().id() == x).unwrap_or(false),
+                Handle::CurrentThread(h) => h.local_tid.is_some_and(|x| std::thread::current().id() == x),
 
                 #[cfg(feature = "rt-multi-thread")]
                 Handle::MultiThread(_) => false,
@@ -281,7 +278,6 @@ cfg_rt! {
             match_flavor!(self, Context(context) => context.defer(waker));
         }
 
-        #[cfg(tokio_unstable)]
         pub(crate) fn worker_index(&self) -> Option<usize> {
             match self {
                 Context::CurrentThread(_) => Some(0),

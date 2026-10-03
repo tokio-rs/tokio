@@ -5,7 +5,7 @@ use crate::runtime;
 use crate::runtime::task::{
     self, JoinHandle, LocalOwnedTasks, SpawnLocation, Task, TaskHarnessScheduleHooks,
 };
-use crate::runtime::{context, ThreadId, BOX_FUTURE_THRESHOLD};
+use crate::runtime::{context, AutoBox, ThreadId};
 use crate::sync::AtomicWaker;
 use crate::util::trace::SpawnMeta;
 use crate::util::RcCell;
@@ -390,7 +390,6 @@ cfg_rt! {
     /// [`LocalSet`]: struct@crate::task::LocalSet
     /// [`LocalRuntime`]: struct@crate::runtime::LocalRuntime
     /// [`tokio::spawn`]: fn@crate::task::spawn
-    /// [unstable]: ../../tokio/index.html#unstable-features
     #[track_caller]
     pub fn spawn_local<F>(future: F) -> JoinHandle<F::Output>
     where
@@ -398,7 +397,7 @@ cfg_rt! {
         F::Output: 'static,
     {
         let fut_size = std::mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
+        if AutoBox::<F>::SHOULD_BOX {
             spawn_local_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
             spawn_local_inner(future, SpawnMeta::new_unnamed(fut_size))
@@ -595,7 +594,7 @@ impl LocalSet {
         F::Output: 'static,
     {
         let fut_size = mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
+        if AutoBox::<F>::SHOULD_BOX {
             self.spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
             self.spawn_named(future, SpawnMeta::new_unnamed(fut_size))
@@ -1267,9 +1266,7 @@ impl LocalState {
             // if we couldn't get the thread ID because we're dropping the local
             // data, skip the assertion --- the `Drop` impl is not going to be
             // called from another thread, because `LocalSet` is `!Send`
-            context::thread_id()
-                .map(|id| id == self.owner)
-                .unwrap_or(true),
+            context::thread_id().map_or(true, |id| id == self.owner),
             "`LocalSet`'s local run queue must not be accessed by another thread!"
         );
     }
@@ -1279,7 +1276,7 @@ impl LocalState {
 // ensure they are on the same thread that owns the `LocalSet`.
 unsafe impl Send for LocalState {}
 
-#[cfg(all(test, not(loom)))]
+#[cfg(all(test, not(loom), not(target_os = "emscripten")))]
 mod tests {
     use super::*;
 

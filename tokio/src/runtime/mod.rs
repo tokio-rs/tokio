@@ -418,6 +418,9 @@ pub(crate) mod context;
 
 pub(crate) mod park;
 
+#[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+pub(crate) mod jspi;
+
 pub(crate) mod driver;
 
 pub(crate) mod scheduler;
@@ -444,8 +447,6 @@ cfg_time! {
     #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
     pub(crate) mod time_alt;
 
-    use crate::time::Instant;
-
     use std::task::{Context, Poll};
     use std::pin::Pin;
 
@@ -460,10 +461,10 @@ cfg_time! {
     impl Timer {
         #[cfg_attr(not(all(tokio_unstable, feature = "rt-multi-thread")), allow(unused_variables))]
         #[track_caller]
-        pub(crate) fn new(handle: scheduler::Handle, deadline: Instant) -> Self {
+        pub(crate) fn new(handle: &scheduler::Handle, deadline: u64) -> Self {
             match handle.timer_flavor() {
                 TimerFlavor::Traditional => {
-                    Timer::Traditional(time::TimerEntry::new(handle))
+                    Timer::Traditional(time::TimerEntry::new())
                 }
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
                 TimerFlavor::Alternative => {
@@ -472,13 +473,13 @@ cfg_time! {
             }
         }
 
-        pub(crate) fn init(self: Pin<&mut Self>, deadline: Instant) {
+        pub(crate) fn init(self: Pin<&mut Self>, handle: &scheduler::Handle, deadline: u64) {
             // Safety: we never move the inner entries.
             let this = unsafe { self.get_unchecked_mut() };
             match this {
                 // Safety: we never move the inner entries.
                 Timer::Traditional(entry) => unsafe {
-                    Pin::new_unchecked(entry).init(deadline)
+                    Pin::new_unchecked(entry).init(handle, deadline);
                 }
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
                 Timer::Alternative(_) => {},
@@ -493,19 +494,36 @@ cfg_time! {
             }
         }
 
-        #[cfg_attr(not(all(tokio_unstable, feature = "rt-multi-thread")), allow(unused_variables))]
-        pub(crate) fn reset(self: Pin<&mut Self>, handle: scheduler::Handle, deadline: Instant) {
+        pub(crate) fn cancel(self: Pin<&mut Self>, handle: &scheduler::Handle) {
             // Safety: we never move the inner entries.
             let this = unsafe { self.get_unchecked_mut() };
             match this {
                 // Safety: we never move the inner entries.
                 Timer::Traditional(entry) => unsafe {
-                    Pin::new_unchecked(entry).reset(deadline)
+                    Pin::new_unchecked(entry).cancel(handle);
                 }
                 // Safety: we never move the inner entries.
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
                 Timer::Alternative(entry) => unsafe {
-                    Pin::new_unchecked(entry).set(time_alt::Timer::new(handle, deadline))
+                    Pin::new_unchecked(entry).cancel();
+                }
+            }
+        }
+
+        pub(crate) fn reset(self: Pin<&mut Self>, handle: &scheduler::Handle, deadline: u64) {
+            // Safety: we never move the inner entries.
+            let this = unsafe { self.get_unchecked_mut() };
+            match this {
+                // Safety: we never move the inner entries.
+                Timer::Traditional(entry) => unsafe {
+                    Pin::new_unchecked(entry).reset(handle, deadline);
+                }
+                // Safety: we never move the inner entries.
+                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
+                Timer::Alternative(entry) => unsafe {
+                    let mut entry = Pin::new_unchecked(entry);
+                    entry.cancel();
+                    entry.set(time_alt::Timer::new(handle, deadline));
                 },
             }
         }
@@ -513,13 +531,14 @@ cfg_time! {
         pub(crate) fn poll_elapsed(
             self: Pin<&mut Self>,
             cx: &mut Context<'_>,
+            handle: &scheduler::Handle,
         ) -> Poll<Result<(), crate::time::error::Error>> {
             // Safety: we never move the inner entries.
             let this = unsafe { self.get_unchecked_mut() };
             match this {
                 // Safety: we never move the inner entries.
                 Timer::Traditional(entry) => unsafe {
-                    Pin::new_unchecked(entry).poll_elapsed(cx)
+                    Pin::new_unchecked(entry).poll_elapsed(cx, handle)
                 }
                 // Safety: we never move the inner entries.
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
@@ -549,7 +568,9 @@ cfg_rt! {
         pub(crate) use blocking::Mandatory;
     }
 
-    cfg_fs! {
+    cfg_io_blocking! {
+        // Emscripten uses the inline shim in `crate::blocking`.
+        #[cfg_attr(target_os = "emscripten", allow(unused_imports))]
         pub(crate) use blocking::spawn_mandatory_blocking;
     }
 
@@ -558,43 +579,45 @@ cfg_rt! {
     cfg_unstable! {
         pub use self::builder::UnhandledPanic;
         pub use crate::util::rand::RngSeed;
+    }
 
-        /// Returns the index of the current worker thread, if called from a
-        /// runtime worker thread.
-        ///
-        /// The returned value is a 0-based index matching the worker indices
-        /// used by [`RuntimeMetrics`] methods such as
-        /// [`worker_total_busy_duration`](RuntimeMetrics::worker_total_busy_duration).
-        ///
-        /// Returns `None` when called from outside a runtime worker thread
-        /// (for example, from a blocking thread or a non-Tokio thread). On the
-        /// multi-thread runtime, the thread that calls [`Runtime::block_on`] is
-        /// not a worker thread, so this also returns `None` there.
-        ///
-        /// For the current-thread runtime and [`LocalRuntime`], this always
-        /// returns `Some(0)` (including inside `block_on`, since the calling
-        /// thread *is* the worker thread).
-        ///
-        /// Note that the result may change across `.await` points, as the
-        /// task may be moved to a different worker thread by the scheduler.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// # #[cfg(not(target_family = "wasm"))]
-        /// # {
-        /// #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
-        /// async fn main() {
-        ///     let index = tokio::spawn(async {
-        ///         tokio::runtime::worker_index()
-        ///     }).await.unwrap();
-        ///     println!("Task ran on worker {:?}", index);
-        /// }
-        /// # }
-        /// ```
-        pub fn worker_index() -> Option<usize> {
-            context::worker_index()
-        }
+    /// Returns the index of the current worker thread, if called from a
+    /// runtime worker thread.
+    ///
+    /// The returned value is a 0-based index matching the worker indices
+    /// used by [`RuntimeMetrics`] methods such as
+    /// [`worker_total_busy_duration`](RuntimeMetrics::worker_total_busy_duration).
+    ///
+    /// Returns `None` when called from outside a runtime worker thread
+    /// (for example, from a blocking thread or a non-Tokio thread). On the
+    /// multi-thread runtime, the thread that calls [`Runtime::block_on`] is
+    /// not a worker thread, so this also returns `None` there.
+    ///
+    /// For the current-thread runtime, this returns `Some(0)` when called from
+    /// the thread that currently owns the runtime driver. If multiple threads
+    /// call [`Runtime::block_on`] concurrently, calls on threads that do not
+    /// own the driver return `None`. A [`LocalRuntime`] can only be driven from
+    /// its owning thread, so calls inside `block_on` always return `Some(0)`.
+    ///
+    /// Note that the result may change across `.await` points, as the
+    /// task may be moved to a different worker thread by the scheduler.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
+    /// async fn main() {
+    ///     let index = tokio::spawn(async {
+    ///         tokio::runtime::worker_index()
+    ///     }).await.unwrap();
+    ///     println!("Task ran on worker {:?}", index);
+    /// }
+    /// # }
+    /// ```
+    pub fn worker_index() -> Option<usize> {
+        context::worker_index()
     }
 
     cfg_taskdump! {
@@ -630,6 +653,24 @@ cfg_rt! {
     } else {
         16384
     };
+
+    /// Decides whether a future or closure of type `T` is boxed before it is
+    /// turned into a task, based on [`BOX_FUTURE_THRESHOLD`].
+    ///
+    /// The decision is an associated constant rather than a runtime
+    /// comparison of `std::mem::size_of::<T>()` so that only the taken branch
+    /// is instantiated. With a runtime `if`, both branches are instantiated
+    /// for every `T` (one task harness for `T`, one for `Pin<Box<T>>`),
+    /// doubling the generated code for every spawned future in a crate. A
+    /// branch on a constant that is known once `T` is known is pruned by the
+    /// monomorphization collector, so only the harness that is actually used
+    /// is generated.
+    pub(crate) struct AutoBox<T>(std::marker::PhantomData<T>);
+
+    impl<T> AutoBox<T> {
+        /// `true` if a value of type `T` is larger than [`BOX_FUTURE_THRESHOLD`].
+        pub(crate) const SHOULD_BOX: bool = std::mem::size_of::<T>() > BOX_FUTURE_THRESHOLD;
+    }
 
     mod thread_id;
     pub(crate) use thread_id::ThreadId;

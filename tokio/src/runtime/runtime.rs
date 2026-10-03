@@ -1,4 +1,4 @@
-use super::BOX_FUTURE_THRESHOLD;
+use super::AutoBox;
 use crate::runtime::blocking::BlockingPool;
 use crate::runtime::scheduler::CurrentThread;
 use crate::runtime::{context, EnterGuard, Handle};
@@ -165,6 +165,11 @@ impl Runtime {
     /// // Use the runtime...
     /// ```
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the I/O driver or other OS resources required by the
+    /// runtime cannot be initialized.
+    ///
     /// [mod]: index.html
     /// [main]: ../attr.main.html
     /// [threaded scheduler]: index.html#threaded-scheduler
@@ -242,7 +247,7 @@ impl Runtime {
         F::Output: Send + 'static,
     {
         let fut_size = mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
+        if AutoBox::<F>::SHOULD_BOX {
             self.handle
                 .spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
@@ -334,12 +339,10 @@ impl Runtime {
     /// });
     /// # }
     /// ```
-    ///
-    /// [handle]: fn@Handle::block_on
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         let fut_size = mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
+        if AutoBox::<F>::SHOULD_BOX {
             self.block_on_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
             self.block_on_inner(future, SpawnMeta::new_unnamed(fut_size))

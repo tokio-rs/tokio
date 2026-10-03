@@ -1,4 +1,5 @@
 use crate::Stream;
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -89,5 +90,14 @@ where
         } else {
             (0, Some(0))
         }
+    }
+}
+
+impl<S> FusedStream for StreamNotifyClose<S>
+where
+    S: Stream,
+{
+    fn is_terminated(&self) -> bool {
+        self.inner.is_none()
     }
 }

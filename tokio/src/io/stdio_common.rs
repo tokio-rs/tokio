@@ -83,7 +83,7 @@ where
                 .rev()
                 .take(MAX_BYTES_PER_CHAR)
                 .position(|byte| *byte < 0b1000_0000 || *byte >= 0b1100_0000)
-                .unwrap_or(0)
+                .unwrap_or_default()
                 + 1;
             buf = &buf[..buf.len() - trailing_incomplete_char_size];
         }
@@ -108,6 +108,7 @@ where
 
 #[cfg(test)]
 #[cfg(not(loom))]
+#[cfg(not(target_os = "emscripten"))]
 mod tests {
     use crate::io::blocking::DEFAULT_MAX_BUF_SIZE;
     use crate::io::AsyncWriteExt;
@@ -198,7 +199,10 @@ mod tests {
         // was not shrunk too much.
         let checked_count = super::MAGIC_CONST * super::MAX_BYTES_PER_CHAR;
         let mut data: Vec<u8> = str::repeat("a", checked_count).into();
-        data.extend(std::iter::repeat(0b1010_1010).take(DEFAULT_MAX_BUF_SIZE - checked_count + 1));
+        data.extend(std::iter::repeat_n(
+            0b1010_1010,
+            DEFAULT_MAX_BUF_SIZE - checked_count + 1,
+        ));
         let mut writer = LoggingMockWriter::new();
         let mut splitter = super::SplitByUtf8BoundaryIfWindows::new(&mut writer);
         crate::runtime::Builder::new_current_thread()

@@ -16,7 +16,6 @@ async fn spawning() -> usize {
     join.await.unwrap()
 }
 
-#[cfg(tokio_unstable)]
 #[tokio::main(flavor = "local")]
 async fn local_main() -> usize {
     let join = tokio::task::spawn_local(async { 1 });
@@ -33,6 +32,5 @@ fn shell() {
     assert_eq!(1, basic_main());
     assert_eq!(bool::default(), generic_fun::<bool>());
 
-    #[cfg(tokio_unstable)]
     assert_eq!(1, local_main());
 }

@@ -15,9 +15,7 @@ const NUM_BATCHES: usize = 100;
 const BATCH_SIZE: usize = 16;
 
 fn spawn_blocking_concurrency(c: &mut Criterion) {
-    let max_parallelism = std::thread::available_parallelism()
-        .map(|p| p.get())
-        .unwrap_or(1);
+    let max_parallelism = std::thread::available_parallelism().map_or(1, |p| p.get());
 
     let parallelism_levels: Vec<usize> = [1, 2, 4, 8, 16, 32, 64]
         .into_iter()

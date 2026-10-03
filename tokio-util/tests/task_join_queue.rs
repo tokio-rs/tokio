@@ -1,5 +1,8 @@
 #![warn(rust_2018_idioms)]
 
+use std::task::Context;
+
+use futures_test::task::new_count_waker;
 use tokio::sync::oneshot;
 use tokio::task::yield_now;
 use tokio::time::Duration;
@@ -274,6 +277,60 @@ async fn test_join_queue_try_join_next() {
     assert!(queue.try_join_next().is_some());
     assert!(queue.is_empty());
     check_try_join_next_is_noop(&mut queue);
+}
+
+#[tokio::test]
+async fn test_join_queue_try_join_next_does_not_replace_waker() {
+    let (send, recv) = oneshot::channel();
+    let mut queue = JoinQueue::new();
+    queue.spawn(async move {
+        recv.await.unwrap();
+        42
+    });
+
+    let (waker, wake_count) = new_count_waker();
+    let mut cx = Context::from_waker(&waker);
+
+    assert_pending!(queue.poll_join_next(&mut cx));
+    assert_eq!(wake_count, 0);
+    assert!(queue.try_join_next().is_none());
+
+    send.send(()).unwrap();
+    yield_now().await;
+
+    assert_eq!(wake_count, 1);
+    assert_eq!(
+        assert_ready!(queue.poll_join_next(&mut cx))
+            .unwrap()
+            .unwrap(),
+        42
+    );
+}
+
+#[tokio::test]
+async fn test_join_queue_try_join_next_with_id_does_not_replace_waker() {
+    let (send, recv) = oneshot::channel();
+    let mut queue = JoinQueue::new();
+    queue.spawn(async move {
+        recv.await.unwrap();
+        42
+    });
+
+    let (waker, wake_count) = new_count_waker();
+    let mut cx = Context::from_waker(&waker);
+
+    assert_pending!(queue.poll_join_next_with_id(&mut cx));
+    assert_eq!(wake_count, 0);
+    assert!(queue.try_join_next_with_id().is_none());
+
+    send.send(()).unwrap();
+    yield_now().await;
+
+    assert_eq!(wake_count, 1);
+    let (_, output) = assert_ready!(queue.poll_join_next_with_id(&mut cx))
+        .unwrap()
+        .unwrap();
+    assert_eq!(output, 42);
 }
 
 #[tokio::test]

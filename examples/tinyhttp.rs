@@ -264,8 +264,7 @@ mod date {
                 let now = SystemTime::now();
                 let now_unix = now
                     .duration_since(SystemTime::UNIX_EPOCH)
-                    .map(|since_epoch| since_epoch.as_secs())
-                    .unwrap_or(0);
+                    .map_or(0, |since_epoch| since_epoch.as_secs());
                 if cache.unix_date != now_unix {
                     cache.update(now, now_unix);
                 }

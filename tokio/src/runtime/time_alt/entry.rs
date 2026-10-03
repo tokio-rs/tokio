@@ -210,12 +210,16 @@ impl Handle {
         }
     }
 
-    pub(crate) fn register_cancel_tx(&self, cancel_tx: Sender) {
+    /// Returns `false` if the `self` has already been cancelled or woken up.
+    pub(crate) fn register_cancel_tx(&self, cancel_tx: Sender) -> bool {
         let mut lock = self.entry.state.lock();
         if !lock.cancelled && !lock.woken_up {
             let old_tx = lock.cancel_tx.replace(cancel_tx);
             // don't unlock — poisoning the `Mutex` stops others from using the bad state.
             assert!(old_tx.is_none(), "cancel_tx is already registered");
+            true
+        } else {
+            false
         }
     }
 

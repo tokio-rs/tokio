@@ -580,12 +580,7 @@ impl<T> DelayQueue<T> {
     /// current task for wakeup if the value is not yet available, and returning
     /// `None` if the queue is exhausted.
     pub fn poll_expired(&mut self, cx: &mut task::Context<'_>) -> Poll<Option<Expired<T>>> {
-        if !self
-            .waker
-            .as_ref()
-            .map(|w| w.will_wake(cx.waker()))
-            .unwrap_or(false)
-        {
+        if !self.waker.as_ref().is_some_and(|w| w.will_wake(cx.waker())) {
             self.waker = Some(cx.waker().clone());
         }
 
@@ -956,7 +951,7 @@ impl<T> DelayQueue<T> {
     pub fn peek(&self) -> Option<Key> {
         use self::wheel::Stack;
 
-        self.expired.peek().or_else(|| self.wheel.peek())
+        self.expired.peek().or_else(|| self.wheel.peek(&self.slab))
     }
 
     /// Returns the next time to poll as determined by the wheel.
@@ -1036,10 +1031,18 @@ impl<T> DelayQueue<T> {
     /// # }
     /// ```
     pub fn clear(&mut self) {
+        let had_entries = !self.slab.is_empty();
+
         self.slab.clear();
         self.expired = Stack::default();
         self.wheel = Wheel::new();
         self.delay = None;
+
+        if had_entries {
+            if let Some(waker) = self.waker.take() {
+                waker.wake();
+            }
+        }
     }
 
     /// Returns the number of elements the queue can hold without reallocating.
@@ -1255,6 +1258,27 @@ impl<T> wheel::Stack for Stack<T> {
 
     fn peek(&self) -> Option<Self::Owned> {
         self.head
+    }
+
+    fn peek_earliest(&self, store: &Self::Store) -> Option<Self::Owned> {
+        let head = self.head?;
+        let mut earliest = (head, store[head].when);
+        let mut curr = store[head].next;
+
+        while let Some(key) = curr {
+            let data = &store[key];
+
+            // The comparison is strict so that the first entry seen wins a tie,
+            // which agrees with `pop` when every entry in the slot shares a
+            // deadline.
+            if data.when < earliest.1 {
+                earliest = (key, data.when);
+            }
+
+            curr = data.next;
+        }
+
+        Some(earliest.0)
     }
 
     #[track_caller]

@@ -62,6 +62,7 @@ pub struct Builder {
     /// Whether or not to enable the I/O driver
     enable_io: bool,
     nevents: usize,
+    nevents_busy: Option<usize>,
 
     /// Whether or not to enable the time driver
     enable_time: bool,
@@ -139,6 +140,9 @@ pub struct Builder {
     pub(super) metrics_poll_count_histogram: HistogramBuilder,
 
     /// When true, enables task schedule latency instrumentation.
+    pub(super) track_task_schedule_latency: bool,
+
+    /// When true, enables the task schedule latency histogram.
     pub(super) metrics_schedule_latency_histogram_enabled: bool,
 
     /// Configures the task schedule latency histogram.
@@ -152,6 +156,9 @@ pub struct Builder {
     /// Whether or not to enable eager hand-off for the I/O and time drivers (in
     /// `tokio_unstable`).
     enable_eager_driver_handoff: bool,
+
+    /// When true, the blocking pool uses the sharded queue implementation.
+    pub(super) sharded_blocking_queue: bool,
 }
 
 cfg_unstable! {
@@ -240,6 +247,16 @@ cfg_unstable! {
 
 pub(crate) type ThreadNameFn = std::sync::Arc<dyn Fn() -> String + Send + Sync + 'static>;
 
+/// The default for the `sharded_blocking_queue` option: enabled iff the
+/// `TOKIO_UNSTABLE_SHARDED_BLOCKING_QUEUE` environment variable is set to a
+/// value other than `0`.
+fn sharded_blocking_queue_default() -> bool {
+    match std::env::var_os("TOKIO_UNSTABLE_SHARDED_BLOCKING_QUEUE") {
+        Some(value) => !value.is_empty() && value != "0",
+        None => false,
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(crate) enum Kind {
     CurrentThread,
@@ -292,6 +309,7 @@ impl Builder {
             // I/O defaults to "off"
             enable_io: false,
             nevents: 1024,
+            nevents_busy: None,
 
             // Time defaults to "off"
             enable_time: false,
@@ -341,6 +359,8 @@ impl Builder {
 
             metrics_poll_count_histogram: HistogramBuilder::default(),
 
+            track_task_schedule_latency: false,
+
             metrics_schedule_latency_histogram_enabled: false,
 
             metrics_schedule_latency_histogram: HistogramBuilder::default(),
@@ -351,6 +371,8 @@ impl Builder {
 
             // Eager driver handoff is disabled by default.
             enable_eager_driver_handoff: false,
+
+            sharded_blocking_queue: sharded_blocking_queue_default(),
         }
     }
 
@@ -462,6 +484,47 @@ impl Builder {
     #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt-multi-thread"))))]
     pub fn enable_eager_driver_handoff(&mut self) -> &mut Self {
         self.enable_eager_driver_handoff = true;
+        self
+    }
+
+    /// Enables the sharded `spawn_blocking` queue, which is disabled by
+    /// default.
+    ///
+    /// By default, the blocking pool's task queue is protected by a single
+    /// mutex, which can become a point of contention when many threads spawn
+    /// blocking tasks concurrently. When this option is enabled, tasks are
+    /// instead distributed across several independently-locked queue shards.
+    ///
+    /// The sharded queue can also be enabled by setting the
+    /// `TOKIO_UNSTABLE_SHARDED_BLOCKING_QUEUE` environment variable to any
+    /// value other than `0`.
+    ///
+    /// [Click here to share your experience with the sharded queue](https://github.com/tokio-rs/tokio/issues/8067)
+    ///
+    /// **Note**: This is an [unstable API][unstable]. The sharded
+    /// `spawn_blocking` queue is an experimental feature that may be removed
+    /// or become the default behavior in 1.x releases. See
+    /// [the documentation on unstable features][unstable] for details.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_multi_thread()
+    ///   .enable_sharded_blocking_queue()
+    ///   .build()
+    ///   .unwrap();
+    /// # }
+    /// ```
+    ///
+    /// [unstable]: crate#unstable-features
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    pub fn enable_sharded_blocking_queue(&mut self) -> &mut Self {
+        self.sharded_blocking_queue = true;
         self
     }
 
@@ -914,6 +977,9 @@ impl Builder {
     /// [`tokio::spawn`](crate::spawn) can be called, and may result in this callback being
     /// invoked immediately.
     ///
+    /// When task schedule latency tracking is enabled, the latency is available
+    /// from `TaskMeta::schedule_latency`.
+    ///
     /// **Note**: This is an [unstable API][unstable]. The public API of this type
     /// may break in 1.x releases. See [the documentation on unstable
     /// features][unstable] for details.
@@ -960,6 +1026,9 @@ impl Builder {
     /// `f` is called within the Tokio context, so functions like
     /// [`tokio::spawn`](crate::spawn) can be called, and may result in this callback being
     /// invoked immediately.
+    ///
+    /// When task schedule latency tracking is enabled, the latency is available
+    /// from `TaskMeta::schedule_latency`.
     ///
     /// **Note**: This is an [unstable API][unstable]. The public API of this type
     /// may break in 1.x releases. See [the documentation on unstable
@@ -1069,6 +1138,11 @@ impl Builder {
     /// });
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the I/O driver or other OS resources required by the
+    /// runtime cannot be initialized.
     pub fn build(&mut self) -> io::Result<Runtime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_runtime(),
@@ -1100,8 +1174,12 @@ impl Builder {
     ///     println!("Hello from the Tokio runtime");
     /// });
     /// ```
-    #[allow(unused_variables, unreachable_patterns)]
-    pub fn build_local(&mut self, options: LocalOptions) -> io::Result<LocalRuntime> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the I/O driver or other OS resources required by the
+    /// runtime cannot be initialized.
+    pub fn build_local(&mut self, _options: LocalOptions) -> io::Result<LocalRuntime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_local_runtime(),
             #[cfg(feature = "rt-multi-thread")]
@@ -1120,6 +1198,7 @@ impl Builder {
             enable_time: self.enable_time,
             start_paused: self.start_paused,
             nevents: self.nevents,
+            nevents_busy: self.nevents_busy,
             timer_flavor: self.timer_flavor,
         }
     }
@@ -1683,7 +1762,7 @@ impl Builder {
         let (driver, driver_handle) = driver::Driver::new(cfg)?;
 
         // Blocking pool
-        let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
+        let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads, 0);
         let blocking_spawner = blocking_pool.spawner().clone();
 
         // Generate a rng seed for this runtime.
@@ -1719,6 +1798,7 @@ impl Builder {
                 enable_eager_driver_handoff: false,
                 seed_generator: seed_generator_1,
                 metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
+                track_task_schedule_latency: self.track_task_schedule_latency,
                 metrics_schedule_latency_histogram: self
                     .metrics_schedule_latency_histogram_builder(),
             },
@@ -1748,48 +1828,100 @@ impl Builder {
             None
         }
     }
-}
 
-cfg_io_driver! {
-    impl Builder {
-        /// Enables the I/O driver.
-        ///
-        /// Doing this enables using net, process, signal, and some I/O types on
-        /// the runtime.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime;
-        ///
-        /// let rt = runtime::Builder::new_multi_thread()
-        ///     .enable_io()
-        ///     .build()
-        ///     .unwrap();
-        /// ```
-        pub fn enable_io(&mut self) -> &mut Self {
-            self.enable_io = true;
-            self
-        }
+    /// Enables the I/O driver.
+    ///
+    /// Doing this enables using net, process, signal, and some I/O types on
+    /// the runtime.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_current_thread()
+    ///     .enable_io()
+    ///     .build()
+    ///     .unwrap();
+    /// ```
+    pub fn enable_io(&mut self) -> &mut Self {
+        self.enable_io = true;
+        self
+    }
 
-        /// Enables the I/O driver and configures the max number of events to be
-        /// processed per tick.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use tokio::runtime;
-        ///
-        /// let rt = runtime::Builder::new_current_thread()
-        ///     .enable_io()
-        ///     .max_io_events_per_tick(1024)
-        ///     .build()
-        ///     .unwrap();
-        /// ```
-        pub fn max_io_events_per_tick(&mut self, capacity: usize) -> &mut Self {
-            self.nevents = capacity;
-            self
-        }
+    /// Sets the max number of I/O events processed per tick.
+    ///
+    /// To take a smaller batch on polls that do not wait, see
+    /// [`max_io_events_per_busy_tick`].
+    ///
+    /// [`max_io_events_per_busy_tick`]: Builder::max_io_events_per_busy_tick
+    ///
+    /// # Panics
+    ///
+    /// Panics if `capacity` is zero.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_current_thread()
+    ///     .enable_io()
+    ///     .max_io_events_per_tick(1024)
+    ///     .build()
+    ///     .unwrap();
+    /// ```
+    #[track_caller]
+    pub fn max_io_events_per_tick(&mut self, capacity: usize) -> &mut Self {
+        assert!(capacity > 0, "max_io_events_per_tick must be non-zero");
+        self.nevents = capacity;
+        self
+    }
+
+    /// Sets the max number of I/O events a worker processes when it polls
+    /// the driver while it still has tasks to run.
+    ///
+    /// A busy worker polls the driver every [`event_interval`] tasks, and
+    /// every task that poll wakes goes to its local queue. A large batch
+    /// overflows that queue, and under sustained overload the overflow
+    /// grows until requests time out. A small busy batch leaves the rest
+    /// in the kernel. An idle worker still takes up to
+    /// [`max_io_events_per_tick`] events.
+    ///
+    /// The runtime treats any poll that does not wait as busy. That
+    /// includes a park with a timer that has already expired, because the
+    /// worker runs that timer's task next.
+    ///
+    /// A multi-thread worker's local queue holds 256 tasks, so set
+    /// `max_io_events_per_tick` to at most 256 as well, with room for the
+    /// tasks those tasks wake.
+    ///
+    /// The default is to use the same value as [`max_io_events_per_tick`].
+    ///
+    /// [`event_interval`]: Builder::event_interval
+    /// [`max_io_events_per_tick`]: Builder::max_io_events_per_tick
+    ///
+    /// # Panics
+    ///
+    /// Panics if `capacity` is zero.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::runtime;
+    ///
+    /// let rt = runtime::Builder::new_current_thread()
+    ///     .enable_io()
+    ///     .max_io_events_per_tick(128)
+    ///     .max_io_events_per_busy_tick(8)
+    ///     .build()
+    ///     .unwrap();
+    /// ```
+    #[track_caller]
+    pub fn max_io_events_per_busy_tick(&mut self, capacity: usize) -> &mut Self {
+        assert!(capacity > 0, "max_io_events_per_busy_tick must be non-zero");
+        self.nevents_busy = Some(capacity);
+        self
     }
 }
 
@@ -1871,6 +2003,46 @@ cfg_test_util! {
 
 cfg_schedule_latency! {
     impl Builder {
+        /// Enables tracking task schedule latency.
+        ///
+        /// Task schedule latency is measured from a task's most recent
+        /// transition to the scheduled state until immediately before it is
+        /// polled. Waking a task that is already scheduled does not reset the
+        /// measurement. Once enabled, the latency is available to task poll
+        /// hooks through [`TaskMeta::schedule_latency`].
+        ///
+        /// Task schedule latencies are not tracked by default as doing so
+        /// requires calling [`Instant::now()`] when a task is scheduled and
+        /// when it is polled, which could add measurable overhead.
+        ///
+        /// The [`enable_metrics_schedule_latency_histogram`] method also
+        /// enables tracking and records the latencies in a histogram.
+        ///
+        /// **This feature is only supported on 64-bit targets.**
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// # use tokio::runtime;
+        /// let runtime = runtime::Builder::new_current_thread()
+        ///     .track_task_schedule_latency()
+        ///     .on_before_task_poll(|meta| {
+        ///         if let Some(latency) = meta.schedule_latency() {
+        ///             println!("task schedule latency: {latency:?}");
+        ///         }
+        ///     })
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        ///
+        /// [`TaskMeta::schedule_latency`]: crate::runtime::TaskMeta::schedule_latency
+        /// [`Instant::now()`]: std::time::Instant::now
+        /// [`enable_metrics_schedule_latency_histogram`]: Builder::enable_metrics_schedule_latency_histogram
+        pub fn track_task_schedule_latency(&mut self) -> &mut Self {
+            self.track_task_schedule_latency = true;
+            self
+        }
+
         /// Enables tracking the distribution of task schedule latencies. Task
         /// schedule latency is the time between when a task is scheduled for
         /// execution and when it is polled.
@@ -1886,6 +2058,10 @@ cfg_schedule_latency! {
         /// This has an extremely low memory footprint, but may not provide enough granularity. For
         /// better granularity with low memory usage, use [`metrics_schedule_latency_histogram_configuration()`]
         /// to select [`LogHistogram`] instead.
+        ///
+        /// On the multi-thread runtime, each task polled from the LIFO slot is
+        /// recorded as a separate schedule-latency sample. Task poll hooks
+        /// receive the same per-task latency through [`TaskMeta::schedule_latency`].
         ///
         /// # Examples
         ///
@@ -1912,6 +2088,7 @@ cfg_schedule_latency! {
         /// [`LogHistogram`]: crate::runtime::LogHistogram
         /// [`metrics_schedule_latency_histogram_configuration()`]: Builder::metrics_schedule_latency_histogram_configuration
         pub fn enable_metrics_schedule_latency_histogram(&mut self) -> &mut Self {
+            self.track_task_schedule_latency = true;
             self.metrics_schedule_latency_histogram_enabled = true;
             self
         }
@@ -2011,7 +2188,7 @@ cfg_rt_multi_thread! {
 
             // Create the blocking pool
             let blocking_pool =
-                blocking::create_blocking_pool(self, self.max_blocking_threads + worker_threads);
+                blocking::create_blocking_pool(self, self.max_blocking_threads + worker_threads, worker_threads);
             let blocking_spawner = blocking_pool.spawner().clone();
 
             // Generate a rng seed for this runtime.
@@ -2041,6 +2218,7 @@ cfg_rt_multi_thread! {
                     enable_eager_driver_handoff: self.enable_eager_driver_handoff,
                     seed_generator: seed_generator_1,
                     metrics_poll_count_histogram: self.metrics_poll_count_histogram_builder(),
+                    track_task_schedule_latency: self.track_task_schedule_latency,
                     metrics_schedule_latency_histogram: self.metrics_schedule_latency_histogram_builder(),
                 },
                 self.timer_flavor,

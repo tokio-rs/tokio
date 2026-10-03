@@ -41,7 +41,7 @@ impl ScheduleLatencyInstant {
 /// `ScheduleLatencyContext` contains all the data required to calculate the time elapsed
 /// since a task was scheduled.
 ///
-/// `ScheduleLatencyInstant` on its own in insufficient because it only contains a delta.
+/// `ScheduleLatencyInstant` on its own is insufficient because it only contains a delta.
 /// The scheduler startup time is required to convert the delta back into an actual time
 /// but is omitted from `ScheduleLatencyInstant` to keep its memory size minimal.
 pub(crate) struct ScheduleLatencyContext {

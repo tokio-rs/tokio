@@ -22,6 +22,7 @@ If you are unsure where to begin, use the following guides:
     - [Triaging a Bug Report](contributing-in-issues.md#triaging-a-bug-report)
     - [Resolving a Bug Report](contributing-in-issues.md#resolving-a-bug-report)
 - [Pull Requests](pull-requests.md)
+    - [Step-by-Step Contribution Workflow](pull-requests.md#step-by-step-contribution-workflow)
     - [Cargo Commands](pull-requests.md#cargo-commands)
     - [Performing spellcheck on Tokio codebase](pull-requests.md#performing-spellcheck-on-tokio-codebase)
     - [Tests](pull-requests.md#tests)

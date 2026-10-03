@@ -188,6 +188,10 @@ impl<T> JoinQueue<T> {
     /// Note that on success the handle will panic on subsequent polls
     /// since it becomes consumed.
     fn try_poll_handle(jh: &mut AbortOnDropHandle<T>) -> Option<Result<T, JoinError>> {
+        if !jh.is_finished() {
+            return None;
+        }
+
         let waker = futures_util::task::noop_waker();
         let mut cx = Context::from_waker(&waker);
 

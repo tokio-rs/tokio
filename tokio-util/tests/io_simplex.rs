@@ -354,3 +354,16 @@ async fn poll_write_vectored_3() {
     let n = assert_ready!(tx.poll_write_vectored(&mut noop_context(), io_slices)).unwrap();
     assert_eq!(n, 0);
 }
+
+/// The `Sender::poll_write_vectored` should return `Poll::Ready(Ok(0))`
+/// if all the input buffers have zero length, even when the channel is full.
+#[tokio::test]
+async fn poll_write_vectored_4() {
+    let (mut tx, _rx) = simplex::new(1);
+    tx.write_all(&[1]).await.unwrap();
+
+    let io_slices = &[IoSlice::new(&[]), IoSlice::new(&[])];
+    tokio::pin!(tx);
+    let n = assert_ready!(tx.poll_write_vectored(&mut noop_context(), io_slices)).unwrap();
+    assert_eq!(n, 0);
+}
