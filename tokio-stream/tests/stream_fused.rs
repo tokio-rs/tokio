@@ -269,6 +269,35 @@ async fn stream_notify_close_does_not_poll_inner_after_close_notification() {
     assert_eq!(stream.next().await, None);
 }
 
+// ── timeout ──────────────────────────────────────────────────────────────────
+
+#[tokio::test(start_paused = true)]
+async fn timeout_terminated_after_inner_done() {
+    let stream = fused_iter(vec![1]).timeout(std::time::Duration::from_secs(1));
+    tokio::pin!(stream);
+
+    assert!(!stream.as_ref().get_ref().is_terminated());
+    assert_eq!(stream.next().await, Some(Ok(1)));
+    assert!(!stream.as_ref().get_ref().is_terminated());
+    assert_eq!(stream.next().await, None);
+    assert!(stream.as_ref().get_ref().is_terminated());
+    assert_eq!(stream.next().await, None);
+}
+
+#[tokio::test(start_paused = true)]
+async fn timeout_repeating_terminated_after_inner_done() {
+    let interval = tokio::time::interval(std::time::Duration::from_secs(1));
+    let stream = fused_iter(vec![1]).timeout_repeating(interval);
+    tokio::pin!(stream);
+
+    assert!(!stream.as_ref().get_ref().is_terminated());
+    assert_eq!(stream.next().await, Some(Ok(1)));
+    assert!(!stream.as_ref().get_ref().is_terminated());
+    assert_eq!(stream.next().await, None);
+    assert!(stream.as_ref().get_ref().is_terminated());
+    assert_eq!(stream.next().await, None);
+}
+
 // ── throttle ─────────────────────────────────────────────────────────────────
 
 #[tokio::test(start_paused = true)]
