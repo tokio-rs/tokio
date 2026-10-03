@@ -50,6 +50,15 @@ pub(crate) enum LocalRuntimeScheduler {
     CurrentThread(CurrentThread),
 }
 
+cfg_event_loop! {
+    impl LocalRuntime {
+        pub(crate) fn current_thread(&self) -> &CurrentThread {
+            let LocalRuntimeScheduler::CurrentThread(s) = &self.scheduler;
+            s
+        }
+    }
+}
+
 impl LocalRuntime {
     pub(crate) fn from_parts(
         scheduler: LocalRuntimeScheduler,
