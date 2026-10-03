@@ -202,3 +202,17 @@ async fn mutex_fifo_with_coop_budget() {
     assert!(t_a.is_woken());
     assert!(!t_b.is_woken());
 }
+
+#[cfg(not(target_family = "wasm"))]
+#[maybe_tokio_test]
+async fn mutex_coop_drop_after_take_permit() {
+    let m = Arc::new(Mutex::new(()));
+    let m_a = Arc::clone(&m);
+    let mut t_a = spawn(async move {
+        while tokio::task::coop::consume_budget().now_or_never().is_some() {}
+        m_a.lock_owned().await
+    });
+    assert_pending!(t_a.poll());
+    drop(t_a);
+    assert!(m.try_lock().is_ok());
+}
