@@ -1,7 +1,17 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use tokio::io::{duplex, AsyncReadExt, AsyncWriteExt};
+use futures::task::{noop_waker_ref, ArcWake};
+use futures::FutureExt;
+use std::io::IoSlice;
+use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::task::{Context, Waker};
+use tokio::io::{
+    duplex, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadBuf,
+};
+use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok};
 
 #[tokio::test]
 async fn ping_pong() {
@@ -118,4 +128,127 @@ async fn duplex_is_cooperative() {
         } => {},
         _ = tokio::task::yield_now() => {}
     }
+}
+
+/// Returns a waker that calls `f` when woken, like an executor that polls the
+/// woken task right away.
+fn waker_fn(f: impl Fn() + Send + Sync + 'static) -> Waker {
+    struct WakeFn<F>(F);
+
+    impl<F: Fn() + Send + Sync + 'static> ArcWake for WakeFn<F> {
+        fn wake_by_ref(arc_self: &Arc<Self>) {
+            (arc_self.0)();
+        }
+    }
+
+    futures::task::waker(Arc::new(WakeFn(f)))
+}
+
+#[test]
+fn wake_reader_outside_lock() {
+    let ops: [fn(DuplexStream); 4] = [
+        |mut writer| assert_eq!(writer.write(b"x").now_or_never().unwrap().unwrap(), 1),
+        |mut writer| {
+            let bufs = [IoSlice::new(b"x")];
+            let n = writer
+                .write_vectored(&bufs)
+                .now_or_never()
+                .unwrap()
+                .unwrap();
+            assert_eq!(n, 1);
+        },
+        |mut writer| writer.shutdown().now_or_never().unwrap().unwrap(),
+        drop,
+    ];
+
+    for op in ops {
+        let (writer, reader) = duplex(1);
+        let reader = Arc::new(Mutex::new(reader));
+        let woken = Arc::new(AtomicBool::new(false));
+
+        let waker = waker_fn({
+            let reader = reader.clone();
+            let woken = woken.clone();
+            move || {
+                let mut buf = [0; 1];
+                let mut reader = reader.lock().unwrap();
+                assert!(reader.read(&mut buf).now_or_never().is_some());
+                woken.store(true, Ordering::SeqCst);
+            }
+        });
+
+        let mut buf = [0; 1];
+        let mut buf = ReadBuf::new(&mut buf);
+        let mut cx = Context::from_waker(&waker);
+        assert_pending!(Pin::new(&mut *reader.lock().unwrap()).poll_read(&mut cx, &mut buf));
+
+        op(writer);
+        assert!(woken.load(Ordering::SeqCst));
+    }
+}
+
+#[test]
+fn wake_writer_outside_lock() {
+    let ops: [fn(DuplexStream); 2] = [
+        |mut reader| assert_eq!(reader.read(&mut [0; 1]).now_or_never().unwrap().unwrap(), 1),
+        drop,
+    ];
+
+    for op in ops {
+        let (writer, reader) = duplex(1);
+        let writer = Arc::new(Mutex::new(writer));
+        let woken = Arc::new(AtomicBool::new(false));
+
+        let waker = waker_fn({
+            let writer = writer.clone();
+            let woken = woken.clone();
+            move || {
+                let mut writer = writer.lock().unwrap();
+                assert!(writer.write(b"y").now_or_never().is_some());
+                woken.store(true, Ordering::SeqCst);
+            }
+        });
+
+        let mut writer_guard = writer.lock().unwrap();
+        assert_eq!(writer_guard.write(b"x").now_or_never().unwrap().unwrap(), 1);
+        let mut cx = Context::from_waker(&waker);
+        assert_pending!(Pin::new(&mut *writer_guard).poll_write(&mut cx, b"y"));
+        drop(writer_guard);
+
+        op(reader);
+        assert!(woken.load(Ordering::SeqCst));
+    }
+}
+
+#[test]
+fn drop_replaced_waker_outside_lock() {
+    // A waker that owns the other end of the pipe.
+    struct Owner {
+        _peer: DuplexStream,
+    }
+
+    impl ArcWake for Owner {
+        fn wake_by_ref(_: &Arc<Self>) {}
+    }
+
+    let mut cx = Context::from_waker(noop_waker_ref());
+
+    let (mut reader, peer) = duplex(1);
+    let waker = futures::task::waker(Arc::new(Owner { _peer: peer }));
+    let mut buf = [0; 1];
+    let mut buf = ReadBuf::new(&mut buf);
+    assert_pending!(Pin::new(&mut reader).poll_read(&mut Context::from_waker(&waker), &mut buf));
+    drop(waker);
+    // Replacing the waker drops the other end, which closes the pipe.
+    assert_pending!(Pin::new(&mut reader).poll_read(&mut cx, &mut buf));
+    assert_ready_ok!(Pin::new(&mut reader).poll_read(&mut cx, &mut buf));
+    assert!(buf.filled().is_empty());
+
+    let (mut writer, peer) = duplex(1);
+    assert_ready_ok!(Pin::new(&mut writer).poll_write(&mut cx, b"x"));
+    let waker = futures::task::waker(Arc::new(Owner { _peer: peer }));
+    assert_pending!(Pin::new(&mut writer).poll_write(&mut Context::from_waker(&waker), b"y"));
+    drop(waker);
+    assert_pending!(Pin::new(&mut writer).poll_write(&mut cx, b"y"));
+    assert_ready_err!(Pin::new(&mut writer).poll_write(&mut cx, b"y"));
 }
