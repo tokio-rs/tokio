@@ -516,11 +516,7 @@ The MSRV is increased to 1.71.
 
 ### Fixed
 
-- macros: fix hygiene issue in `join!` and `try_join!` ([#7638])
 - net: fix copy/paste errors in udp peek methods ([#7604])
-- process: fix error when runtime is shut down on nightly-2025-10-12 ([#7672])
-- runtime: use release ordering in `wake_by_ref()` even if already woken ([#7622])
-- sync: close the `broadcast::Sender` in `broadcast::Sender::new()` ([#7629])
 - sync: fix implementation of unused `RwLock::try_*` methods ([#7587])
 
 ### Unstable
@@ -585,11 +581,8 @@ The MSRV is increased to 1.71.
 [#7611]: https://github.com/tokio-rs/tokio/pull/7611
 [#7617]: https://github.com/tokio-rs/tokio/pull/7617
 [#7621]: https://github.com/tokio-rs/tokio/pull/7621
-[#7622]: https://github.com/tokio-rs/tokio/pull/7622
 [#7628]: https://github.com/tokio-rs/tokio/pull/7628
-[#7629]: https://github.com/tokio-rs/tokio/pull/7629
 [#7635]: https://github.com/tokio-rs/tokio/pull/7635
-[#7638]: https://github.com/tokio-rs/tokio/pull/7638
 [#7641]: https://github.com/tokio-rs/tokio/pull/7641
 [#7645]: https://github.com/tokio-rs/tokio/pull/7645
 [#7651]: https://github.com/tokio-rs/tokio/pull/7651
@@ -599,7 +592,6 @@ The MSRV is increased to 1.71.
 [#7665]: https://github.com/tokio-rs/tokio/pull/7665
 [#7666]: https://github.com/tokio-rs/tokio/pull/7666
 [#7669]: https://github.com/tokio-rs/tokio/pull/7669
-[#7672]: https://github.com/tokio-rs/tokio/pull/7672
 [#7675]: https://github.com/tokio-rs/tokio/pull/7675
 
 # 1.47.5 (May 7th, 2026)
