@@ -306,6 +306,173 @@ fn reopened_after_subscribe() {
 }
 
 #[test]
+fn sender_opened_with_receiver() {
+    let (tx, rx) = watch::channel("one");
+
+    assert_ready!(spawn(tx.opened()).poll());
+    let rx2 = rx.clone();
+    drop(rx);
+    assert_ready!(spawn(tx.opened()).poll());
+    drop(rx2);
+    assert_pending!(spawn(tx.opened()).poll());
+}
+
+#[test]
+fn sender_opened_after_subscribe() {
+    let (tx, rx) = watch::channel("one");
+    drop(rx);
+    let mut opened = spawn(tx.opened());
+    assert_pending!(opened.poll());
+    assert!(!opened.is_woken());
+
+    let mut rx = tx.subscribe();
+    assert!(opened.is_woken());
+    assert_ready!(opened.poll());
+    assert!(!rx.has_changed().unwrap());
+    tx.send("two").unwrap();
+    assert_ready_ok!(spawn(rx.changed()).poll());
+    assert_eq!(*rx.borrow(), "two");
+}
+
+#[test]
+fn sender_opened_wakes_all_waiters() {
+    let (tx, rx) = watch::channel(());
+    let tx2 = tx.clone();
+    drop(rx);
+    let mut opened = spawn(tx.opened());
+    let mut opened2 = spawn(tx2.opened());
+    assert_pending!(opened.poll());
+    assert_pending!(opened2.poll());
+
+    let _rx = tx.subscribe();
+    assert!(opened.is_woken());
+    assert!(opened2.is_woken());
+    assert_ready!(opened.poll());
+    assert_ready!(opened2.poll());
+}
+
+#[test]
+fn sender_opened_waits_after_transient_subscribe() {
+    let (tx, rx) = watch::channel(());
+    drop(rx);
+    let mut opened = spawn(tx.opened());
+    assert_pending!(opened.poll());
+
+    drop(tx.subscribe());
+    assert!(opened.is_woken());
+    assert_pending!(opened.poll());
+    assert!(!opened.is_woken());
+
+    let _rx = tx.subscribe();
+    assert!(opened.is_woken());
+    assert_ready!(opened.poll());
+}
+
+#[test]
+fn sender_opened_cancel_safe() {
+    let (tx, rx) = watch::channel(());
+    drop(rx);
+    let mut canceled = spawn(tx.opened());
+    assert_pending!(canceled.poll());
+    let mut opened = spawn(tx.opened());
+    assert_pending!(opened.poll());
+    drop(canceled);
+
+    let _rx = tx.subscribe();
+    assert!(opened.is_woken());
+    assert_ready!(opened.poll());
+    assert_ready!(spawn(tx.opened()).poll());
+}
+
+#[test]
+#[cfg(panic = "unwind")]
+#[cfg(not(target_family = "wasm"))]
+fn sender_opened_panicking_waker() {
+    use std::future::Future;
+    use std::sync::Arc;
+    use std::task::{Context, Wake, Waker};
+
+    struct PanickingWaker;
+    impl Wake for PanickingWaker {
+        fn wake(self: Arc<Self>) {
+            panic!("waker panicked");
+        }
+    }
+
+    let (tx, rx) = watch::channel(());
+    drop(rx);
+    let waker = Waker::from(Arc::new(PanickingWaker));
+    let mut cx = Context::from_waker(&waker);
+    let mut opened = Box::pin(tx.opened());
+    assert_pending!(opened.as_mut().poll(&mut cx));
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tx.subscribe()));
+    assert!(result.is_err());
+    assert_eq!(tx.receiver_count(), 0);
+    assert!(tx.is_closed());
+    drop(opened);
+
+    let mut opened = spawn(tx.opened());
+    assert_pending!(opened.poll());
+    let _rx = tx.subscribe();
+    assert!(opened.is_woken());
+    assert_ready!(opened.poll());
+}
+
+#[test]
+fn sender_closed_waits_after_transient_close() {
+    let (tx, rx) = watch::channel(());
+    let mut closed = spawn(tx.closed());
+    assert_pending!(closed.poll());
+    drop(rx);
+    let rx = tx.subscribe();
+    assert!(closed.is_woken());
+    assert_pending!(closed.poll());
+    assert!(!closed.is_woken());
+
+    let rx2 = rx.clone();
+    assert!(!closed.is_woken());
+    drop(rx);
+    assert!(!closed.is_woken());
+    drop(rx2);
+    assert!(closed.is_woken());
+    assert_ready!(closed.poll());
+}
+
+#[test]
+fn sender_opened_repeated_cycles() {
+    let (tx, mut rx) = watch::channel(0);
+    for value in 1..=3 {
+        drop(rx);
+        assert_ready!(spawn(tx.closed()).poll());
+        let mut opened = spawn(tx.opened());
+        assert_pending!(opened.poll());
+        tx.send_replace(value);
+        assert!(!opened.is_woken());
+
+        rx = tx.subscribe();
+        assert!(opened.is_woken());
+        assert_ready!(opened.poll());
+        assert_eq!(*rx.borrow(), value);
+        assert!(!rx.has_changed().unwrap());
+    }
+}
+
+#[tokio::test]
+async fn sender_opened_is_cooperative() {
+    let (tx, _rx) = watch::channel(());
+    tokio::select! {
+        biased;
+        _ = async {
+            loop {
+                tx.opened().await;
+            }
+        } => unreachable!(),
+        _ = tokio::task::yield_now() => {},
+    }
+}
+
+#[test]
 #[cfg(panic = "unwind")]
 #[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 fn send_modify_panic() {

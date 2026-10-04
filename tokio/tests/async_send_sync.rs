@@ -534,6 +534,9 @@ async_assert_fn!(tokio::sync::watch::Receiver<YY>::changed(_): Send & Sync & !Un
 async_assert_fn!(tokio::sync::watch::Sender<NN>::closed(_): !Send & !Sync & !Unpin);
 async_assert_fn!(tokio::sync::watch::Sender<YN>::closed(_): !Send & !Sync & !Unpin);
 async_assert_fn!(tokio::sync::watch::Sender<YY>::closed(_): Send & Sync & !Unpin);
+async_assert_fn!(tokio::sync::watch::Sender<NN>::opened(_): !Send & !Sync & !Unpin);
+async_assert_fn!(tokio::sync::watch::Sender<YN>::opened(_): !Send & !Sync & !Unpin);
+async_assert_fn!(tokio::sync::watch::Sender<YY>::opened(_): Send & Sync & !Unpin);
 async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::join_next(_): Send & Sync & !Unpin);
 async_assert_fn!(tokio::task::JoinSet<Cell<u32>>::shutdown(_): Send & Sync & !Unpin);
 async_assert_fn!(tokio::task::JoinSet<Rc<u32>>::join_next(_): !Send & !Sync & !Unpin);

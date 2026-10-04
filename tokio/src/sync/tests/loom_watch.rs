@@ -108,3 +108,36 @@ fn multiple_sender_drop_concurrently() {
         assert!(rx.has_changed().is_err());
     });
 }
+
+#[test]
+fn opened_concurrent_subscribe() {
+    loom::model(|| {
+        let (tx, rx) = watch::channel(());
+        drop(rx);
+        let tx2 = tx.clone();
+
+        let subscribe = thread::spawn(move || tx2.subscribe());
+        block_on(tx.opened());
+        let rx = subscribe.join().unwrap();
+        assert_eq!(tx.receiver_count(), 1);
+        drop(rx);
+    });
+}
+
+#[test]
+fn opened_multiple_waiters() {
+    loom::model(|| {
+        let (tx, rx) = watch::channel(());
+        drop(rx);
+        let tx2 = tx.clone();
+        let tx3 = tx.clone();
+
+        let waiter = thread::spawn(move || block_on(tx2.opened()));
+        let subscribe = thread::spawn(move || tx3.subscribe());
+        block_on(tx.opened());
+        waiter.join().unwrap();
+        let rx = subscribe.join().unwrap();
+        assert_eq!(tx.receiver_count(), 1);
+        drop(rx);
+    });
+}

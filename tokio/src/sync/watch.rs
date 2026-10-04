@@ -312,7 +312,7 @@ struct Shared<T> {
     /// Notifies waiting receivers that the value changed.
     notify_rx: big_notify::BigNotify,
 
-    /// Notifies any task listening for `Receiver` dropped events.
+    /// Notifies tasks when the receiver count changes between zero and nonzero.
     notify_tx: Notify,
 }
 
@@ -575,11 +575,15 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
 
 impl<T> Receiver<T> {
     fn from_shared(version: Version, shared: Arc<Shared<T>>) -> Self {
+        let receiver = Self { shared, version };
+
         // No synchronization necessary as this is only used as a counter and
         // not memory access.
-        shared.ref_count_rx.fetch_add(1, Relaxed);
+        if receiver.shared.ref_count_rx.fetch_add(1, Relaxed) == 0 {
+            receiver.shared.notify_tx.notify_waiters();
+        }
 
-        Self { shared, version }
+        receiver
     }
 
     /// Returns a reference to the most recently sent value.
@@ -1342,6 +1346,57 @@ impl<T> Sender<T> {
                 notified.await;
                 // The channel could have been reopened in the meantime by calling
                 // `subscribe`, so we loop again.
+            }
+        })
+        .await;
+    }
+
+    /// Completes when the channel has at least one receiver.
+    ///
+    /// This allows a producer to wait for interest in its values before doing
+    /// work, or to resume work after [`closed`](Self::closed) completes and a
+    /// new receiver is created with [`subscribe`](Self::subscribe).
+    ///
+    /// If a receiver is created and dropped before this future is polled again,
+    /// this call might return, but it is also possible that it does not notice
+    /// that the channel was open for a brief amount of time.
+    ///
+    /// # Cancel safety
+    ///
+    /// This method is cancel safe.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::watch;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = watch::channel("hello");
+    /// drop(rx);
+    ///
+    /// let subscriber = tx.clone();
+    /// let task = tokio::spawn(async move { subscriber.subscribe() });
+    ///
+    /// tx.opened().await;
+    /// tx.send("world").unwrap();
+    /// let rx = task.await.unwrap();
+    /// assert_eq!(*rx.borrow(), "world");
+    /// # }
+    /// ```
+    pub async fn opened(&self) {
+        cooperative(async {
+            crate::trace::async_trace_leaf().await;
+
+            while self.receiver_count() == 0 {
+                let notified = self.shared.notify_tx.notified();
+
+                if self.receiver_count() > 0 {
+                    return;
+                }
+
+                notified.await;
+                // Receivers may have been dropped again while we were notified.
             }
         })
         .await;
