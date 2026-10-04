@@ -1424,9 +1424,6 @@ jobs:
             sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
           run: |
             . $HOME/.cargo/env
-            # Work around the FreeBSD regression in libc 0.2.190 until fixed upstream.
-            # https://github.com/rust-lang/libc/issues/5598
-            cargo update -p libc --precise 0.2.189
             cargo test --workspace --features $TOKIO_STABLE_FEATURES
             # Enable all unstable features except `io_uring` and `taskdump`,
             # which are Linux-only features.
@@ -1482,8 +1479,5 @@ jobs:
           run: |
             . $HOME/.cargo/env
             rustup target add i686-unknown-freebsd
-            # Work around the FreeBSD regression in libc 0.2.190 until fixed upstream.
-            # https://github.com/rust-lang/libc/issues/5598
-            cargo update -p libc --precise 0.2.189
             cargo test --workspace --features $TOKIO_STABLE_FEATURES \
               --target i686-unknown-freebsd
