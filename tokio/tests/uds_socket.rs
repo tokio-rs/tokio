@@ -124,8 +124,8 @@ async fn assert_usage() -> std::io::Result<()> {
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[cfg_attr(miri, ignore)] // No Unix domain sockets in miri.
 async fn set_permissions_applies_on_bind() -> io::Result<()> {
-    use std::fs::Permissions;
     use std::os::unix::fs::PermissionsExt;
+    use tokio::net::unix::Permissions;
 
     let dir = tempfile::tempdir().unwrap();
     let sock_path = dir.path().join("permissions.sock");
@@ -144,8 +144,7 @@ async fn set_permissions_applies_on_bind() -> io::Result<()> {
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[cfg_attr(miri, ignore)] // No Unix domain sockets in miri.
 async fn set_permissions_after_bind_fails() -> io::Result<()> {
-    use std::fs::Permissions;
-    use std::os::unix::fs::PermissionsExt;
+    use tokio::net::unix::Permissions;
 
     let dir = tempfile::tempdir().unwrap();
     let sock_path = dir.path().join("permissions.sock");
@@ -153,9 +152,11 @@ async fn set_permissions_after_bind_fails() -> io::Result<()> {
     let socket = UnixSocket::new_stream()?;
     socket.bind(&sock_path)?;
 
-    assert!(socket
-        .set_permissions(Permissions::from_mode(0o600))
-        .is_err());
+    let result = socket.set_permissions(Permissions::from_mode(0o600));
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        "set_permissions cannot be called on a bound socket"
+    );
 
     Ok(())
 }

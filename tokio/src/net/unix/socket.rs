@@ -4,7 +4,7 @@ use std::path::Path;
 use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-use std::fs::Permissions;
+use crate::net::unix::Permissions;
 
 use crate::net::{UnixDatagram, UnixListener, UnixStream};
 
@@ -244,15 +244,16 @@ impl UnixSocket {
         UnixDatagram::from_mio(mio)
     }
 
-    /// Sets the permissions of the socket.
+    /// Sets the mode that [`bind`] creates the socket file with (subject to the
+    /// process `umask`).
     ///
     /// Calling this function on a socket that has already been bound will return an error.
     ///
     /// This calls the `fchmod(2)` operating-system function.
+    ///
+    /// [`bind`]: `UnixSocket::bind`
     #[cfg(any(target_os = "linux", target_os = "android"))]
     pub fn set_permissions(&self, perm: Permissions) -> io::Result<()> {
-        use std::os::unix::fs::PermissionsExt;
-
         let is_bound = self.inner.local_addr()?.as_pathname().is_some();
         if is_bound {
             // Too late: socket file already created
