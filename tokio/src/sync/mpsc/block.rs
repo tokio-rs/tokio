@@ -178,10 +178,7 @@ impl<T> Block<T> {
     ///
     /// Always returns false when given an index from a different block.
     pub(crate) fn has_value(&self, slot_index: usize) -> bool {
-        if slot_index < self.header.start_index {
-            return false;
-        }
-        if slot_index >= self.header.start_index + super::BLOCK_CAP {
+        if start_index(slot_index) != self.header.start_index {
             return false;
         }
 
@@ -358,9 +355,9 @@ impl<T> Block<T> {
         // Create the new block. It is assumed that the block will become the
         // next one after `&self`. If this turns out to not be the case,
         // `start_index` is updated accordingly.
-        let new_block = Block::new(self.header.start_index + BLOCK_CAP);
+        let new_block = Block::new(self.header.start_index.wrapping_add(BLOCK_CAP));
 
-        let mut new_block = NonNull::from(Box::leak(new_block));
+        let mut new_block = unsafe { NonNull::new_unchecked(Box::into_raw(new_block)) };
 
         // Attempt to store the block. The first compare-and-swap attempt is
         // "unrolled" due to minor differences in logic
