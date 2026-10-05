@@ -302,13 +302,16 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
     }
 
     // One by one, adopt grandchildren and then cancel and detach the child
-    while let Some(child) = locked_node.children.pop() {
+    let mut idx = 0;
+    while idx < locked_node.children.len() {
+        // Take any unprocessed element from the range children[idx..].
+        let child = locked_node.children.pop().unwrap();
+
         // This can't deadlock because the mutex we are already
         // holding is the parent of child.
         let mut locked_child = child.inner.lock().unwrap();
 
         // Detach the child from node
-        // No need to modify node.children, as the child already got removed with `.pop`
         locked_child.parent = None;
         locked_child.parent_idx = 0;
 
@@ -317,7 +320,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
             continue;
         }
 
-        // Cancel or adopt grandchildren
+        // Adopt grandchildren
         while let Some(grandchild) = locked_child.children.pop() {
             // This can't deadlock because the two mutexes we are already
             // holding is the parent and grandparent of grandchild.
@@ -332,36 +335,36 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
                 continue;
             }
 
-            // For performance reasons, only adopt grandchildren that have children.
-            // Otherwise, just cancel them right away, no need for another iteration.
-            if locked_grandchild.children.is_empty() {
-                // Cancel the grandchild
-                locked_grandchild.is_cancelled = true;
-                locked_grandchild.children = Vec::new();
-                drop(locked_grandchild);
-                grandchild.waker.notify_waiters();
-            } else {
-                // Otherwise, adopt grandchild
-                locked_grandchild.parent = Some(node.clone());
-                locked_grandchild.parent_idx = locked_node.children.len();
-                drop(locked_grandchild);
-                locked_node.children.push(grandchild);
-            }
+            // Adopt grandchild
+            locked_grandchild.parent = Some(node.clone());
+            locked_grandchild.parent_idx = locked_node.children.len();
+            drop(locked_grandchild);
+            locked_node.children.push(grandchild);
         }
 
         // Cancel the child
         locked_child.is_cancelled = true;
         locked_child.children = Vec::new();
         drop(locked_child);
-        child.waker.notify_waiters();
+
+        // Fast version of children.insert(idx, child) that might change the
+        // order of elements after the newly inserted item.
+        locked_node.children.push(child);
+        let last = locked_node.children.len() - 1;
+        locked_node.children.swap(idx, last);
 
         // Now the child is cancelled and detached and all its children are adopted.
         // Just continue until all (including adopted) children are cancelled and detached.
+        idx += 1;
     }
 
     // Cancel the node itself.
     locked_node.is_cancelled = true;
-    locked_node.children = Vec::new();
+    let to_notify = std::mem::take(&mut locked_node.children);
     drop(locked_node);
+
+    for child in to_notify {
+        child.waker.notify_waiters();
+    }
     node.waker.notify_waiters();
 }

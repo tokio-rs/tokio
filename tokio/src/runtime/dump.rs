@@ -226,11 +226,13 @@ impl Trace {
     /// Also see [`Handle::dump`] for more documentation about dumps, but unlike [`Handle::dump`], this function
     /// should not be much slower than calling `f` directly.
     ///
-    /// Due to the way tracing is implemented, Tokio leaf futures will usually, instead of doing their
-    /// actual work, return `Poll::Pending` without registering the task's waker with any driver.
-    /// This means forward progress will probably not happen unless you eventually call your future
-    /// outside of `capture`, or explicitly re-schedule the task (e.g. by calling
-    /// [`cx.waker().wake_by_ref()`][std::task::Waker::wake_by_ref]) after `capture` returns.
+    /// Due to the way tracing is implemented, Tokio leaf futures return `Poll::Pending` at captured
+    /// yield points instead of doing their actual work. When running on a Tokio scheduler, each
+    /// captured leaf's waker is deferred until the scheduler regains control, so that the future
+    /// can be polled again.
+    ///
+    /// The future must be polled outside of `capture` to make progress. Capturing on every poll can
+    /// cause a wake-and-capture loop even when the future has no work to do.
     ///
     /// [`Handle::dump`]: crate::runtime::Handle::dump
     ///

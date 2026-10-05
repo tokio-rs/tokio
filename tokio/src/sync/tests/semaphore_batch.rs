@@ -183,6 +183,27 @@ fn validates_max_permits() {
 }
 
 #[test]
+#[should_panic(expected = "a semaphore may not have more than MAX_PERMITS permits")]
+fn try_acquire_validates_max_permits() {
+    let s = Semaphore::new(0);
+    let _ = s.try_acquire(MAX_PERMITS + 1);
+}
+
+#[test]
+#[should_panic(expected = "a semaphore may not have more than MAX_PERMITS permits")]
+fn acquire_validates_max_permits() {
+    let s = Semaphore::new(0);
+    let _ = task::spawn(s.acquire(MAX_PERMITS + 1)).poll();
+}
+
+#[test]
+#[should_panic(expected = "a semaphore may not have more than MAX_PERMITS permits")]
+fn acquire_validates_top_bit_permits() {
+    let s = Semaphore::new(0);
+    let _ = task::spawn(s.acquire(1usize << (usize::BITS - 1))).poll();
+}
+
+#[test]
 fn close_semaphore_prevents_acquire() {
     let s = Semaphore::new(5);
     s.close();
