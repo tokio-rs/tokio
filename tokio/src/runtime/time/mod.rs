@@ -287,6 +287,15 @@ impl Driver {
 }
 
 impl Handle {
+    cfg_event_loop! {
+        /// Time until the wheel's next expiration, if any timer is registered.
+        pub(crate) fn next_timeout(&self, clock: &Clock) -> Option<Duration> {
+            let tick = self.inner.lock().wheel.next_expiration_time()?;
+            let now = self.time_source().now(clock);
+            Some(self.time_source().tick_to_duration(tick.saturating_sub(now)))
+        }
+    }
+
     pub(self) fn process(&self, clock: &Clock) {
         let now = self.time_source().now(clock);
 

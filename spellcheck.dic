@@ -1,4 +1,4 @@
-333
+338
 &
 +
 <
@@ -88,6 +88,7 @@ decrement
 decrementing
 demangled
 dequeued
+dequeues
 dereferenced
 derefs
 deregister
@@ -168,6 +169,8 @@ Kotlin's
 latencies
 Lauck
 libc
+libuv
+libuv's
 lifecycle
 lifo
 LLVM
@@ -213,6 +216,7 @@ peekable
 PGID
 PID
 plaintext
+pollable
 poller
 POSIX
 proxied
@@ -321,6 +325,7 @@ versioned
 versioning
 visionOS
 vtable
+waitable
 waker
 wakers
 Wakers
