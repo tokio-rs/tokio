@@ -24,6 +24,10 @@ use std::time::Duration;
 use std::time::Instant;
 use std::{fmt, thread};
 
+cfg_event_loop! {
+    mod event_loop;
+}
+
 /// Executes tasks on the current thread
 pub(crate) struct CurrentThread {
     /// Core scheduler data is acquired by a thread entering `block_on`.

@@ -19,3 +19,6 @@ wildcards = "deny"
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+# TEMPORARY: `AsRawHandle` for mio's `Registry` on Windows (tokio-rs/mio#2023),
+# until it is released.
+allow-git = ["https://github.com/guybedford/mio"]
