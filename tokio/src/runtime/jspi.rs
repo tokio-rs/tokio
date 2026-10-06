@@ -15,8 +15,77 @@ use std::sync::atomic::{AtomicPtr, Ordering::SeqCst};
 use std::sync::OnceLock;
 use std::time::Duration;
 
+#[cfg(all(tokio_unstable, feature = "rt", feature = "net"))]
+use std::cell::Cell;
+
+#[cfg(all(tokio_unstable, feature = "rt", feature = "net"))]
+thread_local! {
+    /// An event loop's driver turn is on the stack: a zero-duration park or
+    /// `epoll_wait` from a host callback, which already has the host turn
+    /// and has no stack to hold a suspension. Such a park returns at once.
+    static HOST_TURN: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Run `f` as an event loop's driver turn.
+#[cfg(all(tokio_unstable, feature = "rt", feature = "net"))]
+pub(crate) fn host_turn<R>(f: impl FnOnce() -> R) -> R {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            HOST_TURN.with(|t| t.set(false));
+        }
+    }
+    let _reset = Reset;
+    HOST_TURN.with(|t| t.set(true));
+    f()
+}
+
+#[cfg(all(tokio_unstable, feature = "rt", feature = "net"))]
+thread_local! {
+    /// Work for the moment no runtime is entered on this thread. A hosted
+    /// event loop's callback arriving while a `block_on` is suspended through
+    /// JSPI waits here rather than polling for the exit.
+    static AFTER_EXIT: std::cell::RefCell<Vec<Box<dyn FnOnce()>>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// If a runtime is entered on this thread, queues `f` to run once it exits
+/// and returns `true`; otherwise returns `false` without running it.
+#[cfg(all(tokio_unstable, feature = "rt", feature = "net"))]
+pub(crate) fn defer_after_runtime_exit(f: impl FnOnce() + 'static) -> bool {
+    let entered = crate::runtime::context::is_entered();
+    if entered {
+        AFTER_EXIT.with(|q| q.borrow_mut().push(Box::new(f)));
+    }
+    entered
+}
+
+/// Held by the runtime's enter guard; its drop runs the deferred work, after
+/// the guard has cleared the entered state and the current handle.
+#[cfg(all(tokio_unstable, feature = "rt", feature = "net"))]
+pub(crate) struct RuntimeExit;
+
+#[cfg(all(tokio_unstable, feature = "rt", feature = "net"))]
+impl Drop for RuntimeExit {
+    fn drop(&mut self) {
+        for f in AFTER_EXIT.take() {
+            f();
+        }
+    }
+}
+
+pub(crate) fn in_host_turn() -> bool {
+    #[cfg(all(tokio_unstable, feature = "rt", feature = "net"))]
+    return HOST_TURN.with(Cell::get);
+    #[cfg(not(all(tokio_unstable, feature = "rt", feature = "net")))]
+    return false;
+}
+
 /// `em_promise_t`: an index into the host's promise table, never null.
 type Promise = *mut c_void;
+
+/// Host timer callback ABI, shared with the hosted event loop.
+type Callback = unsafe extern "C-unwind" fn(*mut c_void);
 
 const EM_PROMISE_FULFILL: i32 = 0;
 
@@ -29,13 +98,9 @@ extern "C" {
     fn emscripten_promise_destroy(promise: Promise);
     fn emscripten_promise_resolve(promise: Promise, result: i32, value: *mut c_void);
 
-    fn emscripten_set_timeout(
-        cb: extern "C" fn(*mut c_void),
-        msecs: f64,
-        user_data: *mut c_void,
-    ) -> i32;
+    fn emscripten_set_timeout(cb: Callback, msecs: f64, user_data: *mut c_void) -> i32;
     fn emscripten_clear_timeout(id: i32);
-    fn emscripten_set_immediate(cb: extern "C" fn(*mut c_void), user_data: *mut c_void) -> i32;
+    fn emscripten_set_immediate(cb: Callback, user_data: *mut c_void) -> i32;
     fn emscripten_clear_immediate(id: i32);
 }
 
@@ -116,7 +181,7 @@ impl Drop for Timer {
     }
 }
 
-extern "C" fn resolve(promise: *mut c_void) {
+unsafe extern "C-unwind" fn resolve(promise: *mut c_void) {
     // SAFETY: the timer holding this pointer is cleared before the promise
     // is destroyed, so it is live.
     unsafe { emscripten_promise_resolve(promise, EM_PROMISE_FULFILL, ptr::null_mut()) }
@@ -199,7 +264,10 @@ pub(crate) fn sleep(dur: Duration) {
 #[cfg(all(feature = "rt", feature = "net"))]
 pub(crate) fn io_wait<R>(max_wait: Option<Duration>, wait: impl FnOnce() -> R) -> R {
     let immediate = max_wait == Some(Duration::ZERO);
-    if jspi_enabled() {
+    if in_host_turn() {
+        assert!(immediate, "an event loop's driver turn cannot wait");
+        wait()
+    } else if jspi_enabled() {
         if immediate {
             sleep(Duration::ZERO);
             return wait();

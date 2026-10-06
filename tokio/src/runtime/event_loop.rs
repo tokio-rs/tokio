@@ -13,6 +13,14 @@
 //! handle: I/O readiness and signals directly, and spawns, wakes from other
 //! threads and nearer timers through the driver's waker, which is registered
 //! in the same set. No thread is owned, and nothing is polled.
+//!
+//! On `wasm32-unknown-emscripten` without threads the JavaScript host loop
+//! can be the host itself: a *hosted* event loop ([`emscripten`]) registers
+//! the descriptor and the timeout with it, so the program spawns and returns
+//! to the host.
+
+#[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+mod emscripten;
 
 use crate::runtime::local_runtime::LocalRuntime;
 use crate::runtime::{context, Handle};
@@ -25,6 +33,7 @@ use std::io;
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsHandle, AsRawHandle, BorrowedHandle, RawHandle};
+use std::rc::Rc;
 use std::thread::ThreadId;
 use std::time::Duration;
 
@@ -64,6 +73,13 @@ type Reactor = RawHandle;
 /// `LocalRuntime` does; the handle is closed with it, so the host must
 /// remove it from its set first.
 ///
+/// On `wasm32-unknown-emscripten` without threads, a *hosted* event loop
+/// (`Builder::build_hosted_local_event_loop`) is driven by the JavaScript
+/// host loop itself: the program spawns and returns to the host. Such a loop
+/// keeps the Emscripten runtime alive while it has tasks. A
+/// [`Handle::block_on`] suspended through JSPI on the same thread defers
+/// hosted drives until it returns.
+///
 /// # Example
 ///
 /// A minimal host loop over `poll(2)`:
@@ -97,6 +113,15 @@ type Reactor = RawHandle;
 /// [`Handle::block_on`]: crate::runtime::Handle::block_on
 #[derive(Debug)]
 pub struct LocalEventLoop {
+    shared: Rc<Shared>,
+}
+
+#[derive(Debug)]
+pub(super) struct Shared {
+    /// Detaches from the host before the runtime, and its descriptor,
+    /// drop.
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    hosted: std::sync::OnceLock<emscripten::Hosted>,
     runtime: LocalRuntime,
     handle: Handle,
     reactor: Reactor,
@@ -104,7 +129,9 @@ pub struct LocalEventLoop {
 }
 
 impl LocalEventLoop {
-    pub(crate) fn new(runtime: LocalRuntime) -> io::Result<LocalEventLoop> {
+    /// `hosted` attaches the loop to the ambient JavaScript host loop, where
+    /// there is one.
+    pub(crate) fn new(runtime: LocalRuntime, hosted: bool) -> io::Result<LocalEventLoop> {
         let handle = runtime.handle().clone();
         let Some(io) = handle.inner.driver().io.as_ref() else {
             return Err(io::Error::other(
@@ -115,12 +142,22 @@ impl LocalEventLoop {
         let reactor = io.registry_raw_fd();
         #[cfg(windows)]
         let reactor = io.registry_raw_handle();
-        Ok(LocalEventLoop {
+        let shared = Rc::new(Shared {
+            #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+            hosted: std::sync::OnceLock::new(),
             runtime,
             handle,
             reactor,
             tid: std::thread::current().id(),
-        })
+        });
+        #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+        if hosted {
+            let _ = shared.hosted.set(emscripten::Hosted::new(&shared));
+            shared.hosted.get().expect("just set").attach()?;
+        }
+        #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
+        assert!(!hosted, "no ambient host loop on this target");
+        Ok(LocalEventLoop { shared })
     }
 
     /// Spawns a future onto the runtime. It is queued, and the reactor
@@ -134,12 +171,12 @@ impl LocalEventLoop {
         let meta = SpawnMeta::new_unnamed(std::mem::size_of::<F>());
         // SAFETY: `LocalEventLoop` is `!Send`, so this is the thread that
         // built the runtime, and `drive` polls only on that thread.
-        unsafe { self.handle.spawn_local_named(future, meta) }
+        unsafe { self.shared.handle.spawn_local_named(future, meta) }
     }
 
     /// Returns a handle to the runtime.
     pub fn handle(&self) -> &Handle {
-        &self.handle
+        &self.shared.handle
     }
 
     /// Time until the soonest timer, if any is registered. `Some(ZERO)` means
@@ -150,16 +187,7 @@ impl LocalEventLoop {
     /// `Handle::block_on` elsewhere, also signals the reactor handle, so a
     /// host that re-reads after every wake stays current.
     pub fn next_timeout(&self) -> Option<Duration> {
-        let driver = self.handle.inner.driver();
-        #[cfg(feature = "time")]
-        {
-            driver.time.as_ref()?.next_timeout(&driver.clock)
-        }
-        #[cfg(not(feature = "time"))]
-        {
-            let _ = driver;
-            None
-        }
+        self.shared.next_timeout()
     }
 
     /// Takes one turn of the driver without waiting (I/O readiness, due
@@ -180,15 +208,47 @@ impl LocalEventLoop {
     ///
     /// [shut down on unhandled panics]: crate::runtime::Builder::unhandled_panic
     pub fn drive(&self) -> bool {
+        self.shared.drive()
+    }
+}
+
+impl Shared {
+    fn next_timeout(&self) -> Option<Duration> {
+        let driver = self.handle.inner.driver();
+        #[cfg(feature = "time")]
+        {
+            driver.time.as_ref()?.next_timeout(&driver.clock)
+        }
+        #[cfg(not(feature = "time"))]
+        {
+            let _ = driver;
+            None
+        }
+    }
+
+    fn drive(&self) -> bool {
         assert_eq!(
             std::thread::current().id(),
             self.tid,
             "a `LocalEventLoop` must be driven on the thread that built it"
         );
         let handle = self.handle.inner.as_current_thread();
-        context::enter_runtime(&self.handle.inner, false, |_| {
-            self.runtime.current_thread().drive(handle)
-        })
+        let drive = || {
+            context::enter_runtime(&self.handle.inner, false, |_| {
+                self.runtime.current_thread().drive(handle)
+            })
+        };
+        #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
+        let busy = drive();
+        // The driver's turn must neither yield to nor suspend on the host
+        // loop: a host callback already has the turn.
+        #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+        let busy = crate::runtime::jspi::host_turn(drive);
+        #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+        if let Some(hosted) = self.hosted.get() {
+            hosted.after_drive(self, busy);
+        }
+        busy
     }
 }
 
@@ -197,7 +257,7 @@ impl AsRawFd for LocalEventLoop {
     /// The reactor's descriptor: readable while the driver has pending
     /// events. Level-triggered; a drive consumes them.
     fn as_raw_fd(&self) -> RawFd {
-        self.reactor
+        self.shared.reactor
     }
 }
 
@@ -206,7 +266,7 @@ impl AsFd for LocalEventLoop {
     fn as_fd(&self) -> BorrowedFd<'_> {
         // SAFETY: the reactor owns the descriptor for the lifetime of the
         // runtime, which `self` holds.
-        unsafe { BorrowedFd::borrow_raw(self.reactor) }
+        unsafe { BorrowedFd::borrow_raw(self.shared.reactor) }
     }
 }
 
@@ -215,7 +275,7 @@ impl AsRawHandle for LocalEventLoop {
     /// The reactor's completion port: signaled while the driver has pending
     /// packets, and not reset by waiting. A drive dequeues them.
     fn as_raw_handle(&self) -> RawHandle {
-        self.reactor
+        self.shared.reactor
     }
 }
 
@@ -224,6 +284,6 @@ impl AsHandle for LocalEventLoop {
     fn as_handle(&self) -> BorrowedHandle<'_> {
         // SAFETY: the reactor owns the port for the lifetime of the runtime,
         // which `self` holds.
-        unsafe { BorrowedHandle::borrow_raw(self.reactor) }
+        unsafe { BorrowedHandle::borrow_raw(self.shared.reactor) }
     }
 }
