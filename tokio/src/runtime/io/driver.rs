@@ -55,6 +55,12 @@ pub(crate) struct Handle {
 
     pub(crate) metrics: IoDriverMetrics,
 
+    /// Whether the last turn dequeued any events. mio's Windows selector
+    /// re-arms a socket's readiness poll only at the start of the next
+    /// `poll`, so after a turn that dequeued, a sleep would miss them.
+    #[cfg(all(tokio_unstable, feature = "rt", not(loom), windows))]
+    dequeued: std::sync::atomic::AtomicBool,
+
     #[cfg(all(
         tokio_unstable,
         feature = "io-uring",
@@ -140,6 +146,8 @@ impl Driver {
             #[cfg(not(target_os = "wasi"))]
             waker,
             metrics: IoDriverMetrics::default(),
+            #[cfg(all(tokio_unstable, feature = "rt", not(loom), windows))]
+            dequeued: std::sync::atomic::AtomicBool::new(false),
             #[cfg(all(
                 tokio_unstable,
                 feature = "io-uring",
@@ -219,6 +227,11 @@ impl Driver {
             Err(e) => panic!("unexpected error when polling the I/O driver: {e:?}"),
         }
 
+        #[cfg(all(tokio_unstable, feature = "rt", not(loom), windows))]
+        handle
+            .dequeued
+            .store(!events.is_empty(), std::sync::atomic::Ordering::Relaxed);
+
         // Process all the events that came in, dispatching appropriately
         let mut ready_count = 0;
         for event in events.iter() {
@@ -281,6 +294,30 @@ impl fmt::Debug for Driver {
 }
 
 impl Handle {
+    cfg_event_loop! {
+        /// The reactor's own descriptor (`epoll`, `kqueue`), readable while it
+        /// has pending events.
+        #[cfg(unix)]
+        pub(crate) fn registry_raw_fd(&self) -> std::os::fd::RawFd {
+            use std::os::fd::AsRawFd;
+            self.registry.as_raw_fd()
+        }
+
+        /// The reactor's completion port, signaled while it has pending
+        /// packets.
+        #[cfg(windows)]
+        pub(crate) fn registry_raw_handle(&self) -> std::os::windows::io::RawHandle {
+            use std::os::windows::io::AsRawHandle;
+            self.registry.as_raw_handle()
+        }
+
+        /// Whether the last turn dequeued any events.
+        #[cfg(windows)]
+        pub(crate) fn dequeued(&self) -> bool {
+            self.dequeued.load(std::sync::atomic::Ordering::Relaxed)
+        }
+    }
+
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
     /// makes the next call to `turn` return immediately.
     ///
