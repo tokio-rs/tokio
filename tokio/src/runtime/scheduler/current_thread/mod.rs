@@ -725,6 +725,7 @@ impl Schedule for Arc<Handle> {
                 if let Some(core) = core.as_mut() {
                     core.push_task(self, task);
                 }
+                self.driver.unpark_self();
             }
             _ => {
                 // Track that a task was scheduled from **outside** of the runtime.
@@ -791,7 +792,9 @@ impl Wake for Handle {
             // If we are already running on the runtime, then it's not required to wake up the
             // runtime.
             context::with_scheduler(|maybe_cx| match maybe_cx {
-                Some(CurrentThread(cx)) if Arc::ptr_eq(arc_self, &cx.handle) => {}
+                Some(CurrentThread(cx)) if Arc::ptr_eq(arc_self, &cx.handle) => {
+                    arc_self.driver.unpark_self();
+                }
                 _ => {
                     arc_self.driver.unpark();
                 }
