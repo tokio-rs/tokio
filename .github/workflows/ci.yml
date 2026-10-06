@@ -18,7 +18,7 @@ env:
   rust_stable: stable
   rust_nightly: nightly-2025-10-12
   # Pin a specific miri version
-  rust_miri_nightly: nightly-2026-06-29
+  rust_miri_nightly: nightly-2026-10-06
   rust_emscripten_nightly: nightly-2026-08-17
   emsdk_version: '6.0.10'
   rust_clippy: '1.88'
