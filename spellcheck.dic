@@ -1,4 +1,4 @@
-333
+338
 &
 +
 0o777
@@ -155,6 +155,7 @@ decrement
 decrementing
 demangled
 dequeued
+dequeues
 dereferenced
 derefs
 deregister
@@ -207,6 +208,8 @@ io_uring
 iteratively
 latencies
 libc
+libuv
+libuv's
 lifecycle
 lifo
 lookups
@@ -237,6 +240,7 @@ parker
 parsers
 peekable
 plaintext
+pollable
 poller
 proxied
 pthreads
@@ -320,6 +324,7 @@ versioned
 versioning
 visionOS
 vtable
+waitable
 waker
 wakers
 wakeup
