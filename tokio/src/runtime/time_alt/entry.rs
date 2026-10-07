@@ -185,11 +185,18 @@ impl From<&Handle> for NonNull<Entry> {
 
 impl Handle {
     pub(crate) fn new(deadline: u64) -> Self {
+        Self::new_with_waker(deadline, None)
+    }
+
+    pub(super) fn new_with_waker(deadline: u64, waker: Option<Waker>) -> Self {
         let entry = Arc::new(Entry {
             cancel_pointers: linked_list::Pointers::new(),
             extra_pointers: linked_list::Pointers::new(),
             deadline,
-            state: Mutex::new(State::default()),
+            state: Mutex::new(State {
+                waker,
+                ..State::default()
+            }),
             _pin: PhantomPinned,
         });
 
@@ -244,6 +251,10 @@ impl Handle {
     }
 
     pub(crate) fn cancel(&self) {
+        drop(self.cancel_and_take_waker());
+    }
+
+    pub(super) fn cancel_and_take_waker(&self) -> Option<Waker> {
         let mut lock = self.entry.state.lock();
         if !lock.cancelled {
             lock.cancelled = true;
@@ -259,7 +270,9 @@ impl Handle {
                 }
             }
 
-            drop(waker);
+            waker
+        } else {
+            None
         }
     }
 
