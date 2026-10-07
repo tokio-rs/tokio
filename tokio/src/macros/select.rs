@@ -222,19 +222,6 @@ macro_rules! doc {
         /// # }
         /// ```
         ///
-        /// Patterns can also destructure references in a future's output.
-        ///
-        /// ```edition2024
-        /// # #[tokio::main(flavor = "current_thread")]
-        /// # async fn main() {
-        /// let mut value = 1;
-        /// let selected = tokio::select! {
-        ///     Some(&mut n) = async { Some(&mut value) } => n,
-        /// };
-        /// assert_eq!(selected, 1);
-        /// # }
-        /// ```
-        ///
         /// Using the same future in multiple `select!` expressions can be done by passing
         /// a reference to the future. Doing so requires the future to be [`Unpin`]. A
         /// future can be made [`Unpin`] by either using [`Box::pin`] or stack pinning.
@@ -734,19 +721,16 @@ doc! {macro_rules! select {
                                 disabled |= mask;
 
                                 // The future returned a value, check if matches
-                                // the specified pattern. The tuple allows match
-                                // ergonomics to borrow the output even when the
-                                // pattern starts with a reference.
-                                let out = (out,);
+                                // the specified pattern.
                                 #[allow(unused_variables)]
                                 #[allow(unused_mut)]
                                 match &out {
-                                    ($crate::select_priv_clean_pattern!($bind),) => {}
+                                    $crate::select_priv_clean_pattern!($bind) => {}
                                     _ => continue,
                                 }
 
                                 // The select is complete, return the value
-                                return $crate::macros::support::Poll::Ready($crate::select_variant!(__tokio_select_util::Out, ($($skip)*))(out.0));
+                                return $crate::macros::support::Poll::Ready($crate::select_variant!(__tokio_select_util::Out, ($($skip)*))(out));
                             }
                         )*
                         _ => unreachable!("reaching this means there probably is an off by one bug"),

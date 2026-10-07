@@ -661,6 +661,21 @@ pub fn select_priv_declare_output_enum(input: TokenStream) -> TokenStream {
 
 /// Implementation detail of the `select!` macro. This macro is **not** intended
 /// to be used as part of the public API and is permitted to change.
+///
+/// The preliminary check borrows the output, including for Rust 2024 callers.
+///
+/// ```edition2024
+/// use tokio_macros::select_priv_clean_pattern;
+///
+/// let mut value = 1;
+/// let output = Some(&mut value);
+/// assert!(!matches!(&output, select_priv_clean_pattern!(Some(&mut 2))));
+/// assert!(matches!(&output, select_priv_clean_pattern!(Some(&mut 1))));
+///
+/// let text = String::from("a");
+/// let output = &text;
+/// assert!(matches!(&output, select_priv_clean_pattern!(&ref value)));
+/// ```
 #[proc_macro]
 #[doc(hidden)]
 pub fn select_priv_clean_pattern(input: TokenStream) -> TokenStream {

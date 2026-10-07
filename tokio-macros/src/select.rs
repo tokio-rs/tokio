@@ -52,7 +52,31 @@ pub(crate) fn clean_pattern_macro(input: TokenStream) -> TokenStream {
     };
 
     clean_pattern(&mut input, false);
+    borrow_pattern(&mut input);
     quote::ToTokens::into_token_stream(input).into()
+}
+
+// The generated match borrows the output. An explicit reference pattern does
+// not use match ergonomics to skip that extra reference, so add it explicitly.
+fn borrow_pattern(pat: &mut syn::Pat) {
+    match pat {
+        syn::Pat::Reference(_) => {
+            *pat = syn::parse_quote!(&(#pat));
+        }
+        syn::Pat::Or(or) => {
+            for case in &mut or.cases {
+                borrow_pattern(case);
+            }
+        }
+        syn::Pat::Paren(paren) => borrow_pattern(&mut paren.pat),
+        syn::Pat::Ident(ident) => {
+            if let Some((_, pat)) = &mut ident.subpat {
+                borrow_pattern(pat);
+            }
+        }
+        syn::Pat::Type(type_pat) => borrow_pattern(&mut type_pat.pat),
+        _ => {}
+    }
 }
 
 // Removes binding modifiers that would move or mutably borrow the output.

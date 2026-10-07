@@ -674,6 +674,11 @@ async fn parenthesized_mut_ref_patterns() {
             assert_eq!(x, "ab");
         },
     }
+
+    let mut value = 1;
+    tokio::select! {
+        (&mut x) = async { &mut value } => assert_eq!(x, 1),
+    }
 }
 
 #[maybe_tokio_test]
@@ -693,6 +698,25 @@ async fn or_mut_ref_patterns() {
             assert_eq!(x, "ab");
         },
     }
+
+    let mut value = 2;
+    tokio::select! {
+        &mut 1 | &mut 2 = async { &mut value } => {},
+    }
+}
+
+#[maybe_tokio_test]
+async fn reference_subpatterns() {
+    let mut value = 1;
+    tokio::select! {
+        ref mut output @ &mut 1 = async { &mut value } => **output += 1,
+    }
+    assert_eq!(value, 2);
+
+    tokio::select! {
+        output @ (&mut 1 | &mut 2) = async { &mut value } => *output += 1,
+    }
+    assert_eq!(value, 3);
 }
 
 #[cfg(tokio_unstable)]
