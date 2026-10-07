@@ -1,4 +1,4 @@
-333
+340
 &
 +
 <
@@ -32,6 +32,7 @@
 8MB
 ABI
 accessors
+activations
 adaptor
 adaptors
 Adaptors
@@ -88,6 +89,7 @@ decrement
 decrementing
 demangled
 dequeued
+dequeues
 dereferenced
 derefs
 deregister
@@ -114,6 +116,7 @@ enqueued
 EntryInner
 enum
 eof
+epoll
 Erlang's
 errored
 EWMA
@@ -168,6 +171,8 @@ Kotlin's
 latencies
 Lauck
 libc
+libuv
+libuv's
 lifecycle
 lifo
 LLVM
@@ -213,6 +218,7 @@ peekable
 PGID
 PID
 plaintext
+pollable
 poller
 POSIX
 proxied
@@ -321,6 +327,7 @@ versioned
 versioning
 visionOS
 vtable
+waitable
 waker
 wakers
 Wakers

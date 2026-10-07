@@ -27,6 +27,16 @@ pub(crate) struct EnterRuntimeGuard {
 
     // Tracks the previous random number generator seed
     old_seed: RngSeed,
+
+    /// Runs work deferred to the runtime's exit; last, so it drops after
+    /// `handle` and that work sees no runtime as current.
+    #[cfg(all(
+        tokio_unstable,
+        feature = "net",
+        target_os = "emscripten",
+        not(target_feature = "atomics")
+    ))]
+    _exit: crate::runtime::jspi::RuntimeExit,
 }
 
 /// Marks the current thread as being within the dynamic extent of an
@@ -57,6 +67,13 @@ where
                 blocking: BlockingRegionGuard::new(),
                 handle: c.set_current(handle),
                 old_seed,
+                #[cfg(all(
+                    tokio_unstable,
+                    feature = "net",
+                    target_os = "emscripten",
+                    not(target_feature = "atomics")
+                ))]
+                _exit: crate::runtime::jspi::RuntimeExit,
             })
         }
     });
@@ -91,6 +108,19 @@ impl Drop for EnterRuntimeGuard {
             c.rng.set(Some(rng));
         });
     }
+}
+
+/// Whether a runtime is entered on this thread.
+#[cfg(all(
+    tokio_unstable,
+    feature = "net",
+    target_os = "emscripten",
+    not(target_feature = "atomics")
+))]
+pub(crate) fn is_entered() -> bool {
+    CONTEXT
+        .try_with(|c| c.runtime.get().is_entered())
+        .unwrap_or(false)
 }
 
 impl EnterRuntime {

@@ -1187,6 +1187,60 @@ impl Builder {
         }
     }
 
+    cfg_event_loop! {
+        /// Creates the configured runtime as a [`LocalEventLoop`]: a
+        /// [`LocalRuntime`] driven by a host event loop instead of by parking
+        /// a thread. The host waits on the event loop's reactor handle and
+        /// [`next_timeout`], and calls [`drive`] when either fires.
+        ///
+        /// # Panics
+        ///
+        /// This will panic if the runtime is configured with [`new_multi_thread()`].
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the I/O driver is not enabled, or if OS
+        /// resources required by the runtime cannot be initialized.
+        ///
+        /// [`new_multi_thread()`]: Builder::new_multi_thread
+        /// [`LocalEventLoop`]: crate::runtime::LocalEventLoop
+        /// [`next_timeout`]: crate::runtime::LocalEventLoop::next_timeout
+        /// [`drive`]: crate::runtime::LocalEventLoop::drive
+        pub fn build_local_event_loop(
+            &mut self,
+            options: LocalOptions,
+        ) -> io::Result<crate::runtime::LocalEventLoop> {
+            let runtime = self.build_local(options)?;
+            crate::runtime::LocalEventLoop::new(runtime, false)
+        }
+
+        /// Creates the configured runtime as a [`LocalEventLoop`] driven by the
+        /// JavaScript host event loop itself: the runtime registers its
+        /// descriptor and timeout with the host, so the program spawns and
+        /// returns to the host, and the tasks run from there. The event loop
+        /// keeps the Emscripten runtime alive while it has tasks.
+        ///
+        /// # Panics
+        ///
+        /// This will panic if the runtime is configured with [`new_multi_thread()`].
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the I/O driver is not enabled, or if OS
+        /// resources required by the runtime cannot be initialized.
+        ///
+        /// [`new_multi_thread()`]: Builder::new_multi_thread
+        /// [`LocalEventLoop`]: crate::runtime::LocalEventLoop
+        #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+        pub fn build_hosted_local_event_loop(
+            &mut self,
+            options: LocalOptions,
+        ) -> io::Result<crate::runtime::LocalEventLoop> {
+            let runtime = self.build_local(options)?;
+            crate::runtime::LocalEventLoop::new(runtime, true)
+        }
+    }
+
     fn get_cfg(&self) -> driver::Cfg {
         driver::Cfg {
             enable_pause_time: match self.kind {

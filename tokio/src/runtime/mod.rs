@@ -220,6 +220,14 @@
 //!   it when the `LocalSet` is `.awaited` or otherwise driven using one of its
 //!   methods for this purpose.
 //!
+//! - Under `tokio_unstable`, a `LocalEventLoop`, built with
+//!   `Builder::build_local_event_loop`, is a `LocalRuntime` driven by a host
+//!   event loop: instead of blocking a thread, it exposes the reactor's
+//!   handle and the time until its soonest timer, and the host calls `drive`
+//!   when either fires. This is for embedding in an existing loop
+//!   (libuv, a GUI toolkit, another reactor) where the runtime must never
+//!   block.
+//!
 //! Please be aware that [`Handle::block_on`] does not drive the runtime.
 //! There must be at least one call to [`Runtime::block_on`] when using the current
 //! thread runtime. [`Handle::block_on`] is not enough.
@@ -641,6 +649,11 @@ cfg_rt! {
 
     mod local_runtime;
     pub use local_runtime::{LocalRuntime, LocalOptions};
+
+    cfg_event_loop! {
+        mod event_loop;
+        pub use event_loop::LocalEventLoop;
+    }
 
     mod id;
     pub use id::Id;
