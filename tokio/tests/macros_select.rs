@@ -629,6 +629,72 @@ async fn mut_ref_patterns() {
     };
 }
 
+#[maybe_tokio_test]
+#[allow(clippy::needless_borrowed_reference)]
+async fn reference_patterns() {
+    let mut value = 1;
+
+    tokio::select! {
+        Some(&mut 2) = async { Some(&mut value) } => panic!("pattern should not match"),
+        else => {},
+    }
+
+    tokio::select! {
+        Some(&mut x) = async { Some(&mut value) } => assert_eq!(x, 1),
+    }
+
+    tokio::select! {
+        &mut x = async { &mut value } => assert_eq!(x, 1),
+    }
+
+    let mut pair = (1, 2);
+    tokio::select! {
+        &mut (1, 2) = async { &mut pair } => {},
+    }
+
+    let text = String::from("a");
+    tokio::select! {
+        &ref x = async { &text } => assert_eq!(x, "a"),
+    }
+}
+
+#[maybe_tokio_test]
+#[allow(unused_parens)]
+async fn parenthesized_mut_ref_patterns() {
+    tokio::select! {
+        (Some(mut x)) = async { Some(String::from("a")) } => {
+            x.push('b');
+            assert_eq!(x, "ab");
+        },
+    }
+
+    tokio::select! {
+        Some((ref mut x)) = async { Some(String::from("a")) } => {
+            x.push('b');
+            assert_eq!(x, "ab");
+        },
+    }
+}
+
+#[maybe_tokio_test]
+async fn or_mut_ref_patterns() {
+    for result in [Ok(String::from("a")), Err(String::from("a"))] {
+        tokio::select! {
+            Ok(mut x) | Err(mut x) = async { result } => {
+                x.push('b');
+                assert_eq!(x, "ab");
+            },
+        }
+    }
+
+    tokio::select! {
+        | Ok(ref mut x) | Err(ref mut x) = async { Ok::<_, String>(String::from("a")) } => {
+            x.push('b');
+            assert_eq!(x, "ab");
+        },
+    }
+}
+
 #[cfg(tokio_unstable)]
 mod unstable {
     use tokio::runtime::RngSeed;
