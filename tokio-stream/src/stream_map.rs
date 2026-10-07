@@ -718,12 +718,19 @@ where
     }
 }
 
-impl<K, V> Extend<(K, V)> for StreamMap<K, V> {
+impl<K: PartialEq, V> Extend<(K, V)> for StreamMap<K, V> {
+    /// Extends the map with key-stream pairs, replacing streams with the same key.
     fn extend<T>(&mut self, iter: T)
     where
         T: IntoIterator<Item = (K, V)>,
     {
-        self.entries.extend(iter);
+        for (key, stream) in iter {
+            if let Some(entry) = self.entries.iter_mut().find(|(k, _)| *k == key) {
+                *entry = (key, stream);
+            } else {
+                self.entries.push((key, stream));
+            }
+        }
     }
 }
 

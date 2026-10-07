@@ -199,6 +199,55 @@ async fn replace() {
 }
 
 #[test]
+fn extend_replaces_existing_keys() {
+    let mut map = StreamMap::new();
+    map.insert("foo", stream::iter([1]));
+    map.insert("bar", stream::iter([2]));
+
+    map.extend([("foo", stream::iter([3]))]);
+
+    assert_eq!(map.len(), 2);
+    let mut replaced = task::spawn(map.remove("foo").unwrap());
+    assert_eq!(assert_ready_some!(replaced.poll_next()), 3);
+    assert_ready_none!(replaced.poll_next());
+    assert!(!map.contains_key("foo"));
+    assert!(map.contains_key("bar"));
+}
+
+#[test]
+fn extend_replaces_duplicate_keys() {
+    let mut map = StreamMap::new();
+    map.extend([
+        ("foo", stream::iter([1])),
+        ("bar", stream::iter([2])),
+        ("foo", stream::iter([3])),
+    ]);
+
+    assert_eq!(map.len(), 2);
+    let mut replaced = task::spawn(map.remove("foo").unwrap());
+    assert_eq!(assert_ready_some!(replaced.poll_next()), 3);
+    assert_ready_none!(replaced.poll_next());
+    assert!(!map.contains_key("foo"));
+    assert!(map.contains_key("bar"));
+}
+
+#[test]
+fn extend_with_partial_eq_only_keys() {
+    #[derive(Debug, PartialEq)]
+    struct Key(u8);
+
+    let mut map = StreamMap::new();
+    map.extend([(Key(1), stream::iter([1])), (Key(1), stream::iter([2]))]);
+
+    assert_eq!(map.len(), 1);
+    let (key, stream) = map.iter_mut().next().unwrap();
+    assert_eq!(key, &Key(1));
+    let mut stream = task::spawn(stream);
+    assert_eq!(assert_ready_some!(stream.poll_next()), 2);
+    assert_ready_none!(stream.poll_next());
+}
+
+#[test]
 fn size_hint_with_upper() {
     let mut map = StreamMap::new();
 
