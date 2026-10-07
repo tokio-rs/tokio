@@ -117,8 +117,7 @@ async fn buf_reader_seek_after_write() {
         (SeekFrom::End(-2), HELLO.len() - 2),
         (SeekFrom::Current(-2), HELLO.len() - 2),
     ] {
-        let tempfile = tempfile();
-        let file = File::from_std(tempfile.reopen().unwrap());
+        let file = File::from_std(tempfile().into_file());
         let mut reader = BufReader::new(file);
 
         reader.write_all(HELLO).await.unwrap();
