@@ -613,3 +613,42 @@ mod tests {
         assert!(io.ready_event(Interest::READABLE).ready.is_readable());
     }
 }
+
+#[cfg(all(test, loom))]
+mod loom_tests {
+    use super::*;
+    use loom::future::block_on;
+    use loom::sync::Arc;
+    use loom::thread;
+
+    #[test]
+    fn shutdown_wakes_readiness() {
+        loom::model(|| {
+            let io = Arc::new(ScheduledIo::default());
+            let shutdown_io = io.clone();
+            let shutdown = thread::spawn(move || shutdown_io.shutdown());
+
+            // Joining before polling would hide a lost wakeup during registration.
+            let event = block_on(io.readiness(Interest::READABLE));
+            assert!(event.is_shutdown);
+
+            shutdown.join().unwrap();
+        });
+    }
+
+    #[test]
+    fn shutdown_wakes_poll_readiness() {
+        for direction in [Direction::Read, Direction::Write] {
+            loom::model(move || {
+                let io = Arc::new(ScheduledIo::default());
+                let shutdown_io = io.clone();
+                let shutdown = thread::spawn(move || shutdown_io.shutdown());
+
+                let event = block_on(std::future::poll_fn(|cx| io.poll_readiness(cx, direction)));
+                assert!(event.is_shutdown);
+
+                shutdown.join().unwrap();
+            });
+        }
+    }
+}
