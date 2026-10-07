@@ -498,6 +498,7 @@ async fn duplicate_keys() {
     assert!(map.join_next().await.is_none());
 }
 
+#[cfg(not(target_os = "wasi"))] // The WASI test configuration does not support blocking thread parking.
 #[tokio::test]
 async fn join_empty_map_with_replaced_blocking_task() {
     let mut map = JoinMap::new();
@@ -521,6 +522,7 @@ async fn join_empty_map_with_replaced_blocking_task() {
     assert!(matches!(next, Some(None)));
 }
 
+#[cfg(not(target_os = "wasi"))] // The WASI test configuration does not support blocking thread parking.
 #[tokio::test]
 async fn shutdown_waits_for_replaced_blocking_task() {
     let mut map = JoinMap::new();
