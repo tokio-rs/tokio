@@ -235,9 +235,11 @@ impl<K, V, S> JoinMap<K, V, S> {
     /// ```
     #[inline]
     pub fn capacity(&self) -> usize {
-        let capacity = self.tasks_by_key.capacity();
-        debug_assert_eq!(capacity, self.hashes_by_task.capacity());
-        capacity
+        // Removing entries can leave different amounts of spare capacity in
+        // the two tables, since keys and task IDs are hashed independently.
+        self.tasks_by_key
+            .capacity()
+            .min(self.hashes_by_task.capacity())
     }
 }
 
