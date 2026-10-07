@@ -191,7 +191,16 @@ impl<R: AsyncRead + AsyncSeek> AsyncSeek for BufReader<R> {
     }
 
     fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        let res = match mem::replace(self.as_mut().project().seek_state, SeekState::Init) {
+        let state = mem::replace(self.as_mut().project().seek_state, SeekState::Init);
+        if let SeekState::Start(pos) = state {
+            // Finish any pending operation before starting a new seek.
+            if self.as_mut().get_pin_mut().poll_complete(cx)?.is_pending() {
+                *self.as_mut().project().seek_state = SeekState::Start(pos);
+                return Poll::Pending;
+            }
+        }
+
+        let res = match state {
             SeekState::Init => {
                 // 1.x AsyncSeek recommends calling poll_complete before start_seek.
                 // We don't have to guarantee that the value returned by

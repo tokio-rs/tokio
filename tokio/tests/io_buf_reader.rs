@@ -139,6 +139,63 @@ async fn test_buffered_reader_seek() {
 }
 
 #[tokio::test]
+async fn seek_waits_for_pending_operation() {
+    struct PendingOperation {
+        inner: Cursor<&'static [u8]>,
+        pending: bool,
+    }
+
+    impl AsyncRead for PendingOperation {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            Pin::new(&mut self.inner).poll_read(cx, buf)
+        }
+    }
+
+    impl AsyncSeek for PendingOperation {
+        fn start_seek(mut self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
+            assert!(!self.pending, "previous operation is still pending");
+            Pin::new(&mut self.inner).start_seek(pos)
+        }
+
+        fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+            if self.pending {
+                self.pending = false;
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            } else {
+                Pin::new(&mut self.inner).poll_complete(cx)
+            }
+        }
+    }
+
+    let inner = PendingOperation {
+        inner: Cursor::new(b"abcd"),
+        pending: false,
+    };
+    let mut reader = BufReader::with_capacity(2, inner);
+    assert_eq!(reader.fill_buf().await.unwrap(), b"ab");
+    reader.get_mut().pending = true;
+
+    Pin::new(&mut reader)
+        .start_seek(SeekFrom::Current(1))
+        .unwrap();
+    let mut seek = spawn(std::future::poll_fn(|cx| {
+        Pin::new(&mut reader).poll_complete(cx)
+    }));
+    assert_pending!(seek.poll());
+    assert!(seek.is_woken());
+    assert_eq!(assert_ready!(seek.poll()).unwrap(), 1);
+    drop(seek);
+
+    assert!(reader.buffer().is_empty());
+    assert_eq!(reader.fill_buf().await.unwrap(), b"bc");
+}
+
+#[tokio::test]
 async fn test_buffered_reader_seek_underflow() {
     // gimmick reader that yields its position modulo 256 for each byte
     struct PositionReader {
