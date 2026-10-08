@@ -6,8 +6,7 @@ use std::hash::Hash;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
-/// Combine many streams into one, indexing each source stream with a unique
-/// key.
+/// Combine many streams into one, indexing each source stream with a key.
 ///
 /// `StreamMap` is similar to [`StreamExt::merge`] in that it combines source
 /// streams into a single merged stream that yields values in the order that
@@ -25,6 +24,12 @@ use std::task::{ready, Context, Poll};
 /// included with the value when a source stream yields a value. The key is also
 /// used to remove the stream from the `StreamMap` before the stream has
 /// completed streaming.
+///
+/// [`Extend::extend`] appends entries without comparing keys, so multiple streams
+/// may have the same key. In that case, [`remove`](StreamMap::remove) removes
+/// only one of the streams with that key. To build a map with unique keys, use
+/// [`insert`](StreamMap::insert) for each key-stream pair or collect an iterator
+/// into a new `StreamMap`.
 ///
 /// # `Unpin`
 ///
@@ -718,19 +723,29 @@ where
     }
 }
 
-impl<K: PartialEq, V> Extend<(K, V)> for StreamMap<K, V> {
-    /// Extends the map with key-stream pairs, replacing streams with the same key.
+impl<K, V> Extend<(K, V)> for StreamMap<K, V> {
+    /// Appends all key-stream pairs from an iterator.
+    ///
+    /// Keys are not compared, so entries with the same key are retained. To
+    /// replace an existing stream with the same key, call [`StreamMap::insert`]
+    /// for each pair instead.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio_stream::{pending, StreamMap};
+    ///
+    /// let mut map = StreamMap::new();
+    /// map.insert("a", pending::<()>());
+    /// map.extend([("a", pending()), ("b", pending())]);
+    ///
+    /// assert_eq!(map.len(), 3);
+    /// ```
     fn extend<T>(&mut self, iter: T)
     where
         T: IntoIterator<Item = (K, V)>,
     {
-        for (key, stream) in iter {
-            if let Some(entry) = self.entries.iter_mut().find(|(k, _)| *k == key) {
-                *entry = (key, stream);
-            } else {
-                self.entries.push((key, stream));
-            }
-        }
+        self.entries.extend(iter);
     }
 }
 
