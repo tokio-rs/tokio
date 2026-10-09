@@ -144,16 +144,20 @@ pub(crate) mod impl_linux {
     }
 }
 
-#[cfg(any(target_os = "netbsd", target_os = "nto"))]
+#[cfg(target_os = "netbsd")]
 pub(crate) mod impl_netbsd {
     use crate::net::unix::{self, UnixStream};
 
-    use libc::{c_void, getsockopt, socklen_t, unpcbid, LOCAL_PEEREID, SOL_SOCKET};
+    use libc::{c_void, getsockopt, socklen_t, unpcbid, LOCAL_PEEREID};
     use std::io;
     use std::mem::size_of;
     use std::os::unix::io::AsRawFd;
 
     pub(crate) fn get_peer_cred(sock: &UnixStream) -> io::Result<super::UCred> {
+        // `SOL_LOCAL` is not re-exported by `libc` for NetBSD; it is defined
+        // as 0 in `<sys/un.h>`.
+        const SOL_LOCAL: libc::c_int = 0;
+
         unsafe {
             let raw_fd = sock.as_raw_fd();
 
@@ -168,7 +172,7 @@ pub(crate) mod impl_netbsd {
 
             let ret = getsockopt(
                 raw_fd,
-                SOL_SOCKET,
+                SOL_LOCAL,
                 LOCAL_PEEREID,
                 &mut unpcbid as *mut unpcbid as *mut c_void,
                 &mut unpcbid_size,

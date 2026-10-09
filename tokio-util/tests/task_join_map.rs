@@ -170,6 +170,18 @@ async fn alternating() {
 }
 
 #[tokio::test]
+async fn capacity_after_replacing_tasks() {
+    let mut map = JoinMap::new();
+
+    for key in 0..3 {
+        map.spawn(key, pending::<()>());
+    }
+
+    map.spawn(0, pending::<()>());
+    assert_eq!(map.capacity(), 3);
+}
+
+#[tokio::test]
 async fn test_keys() {
     use std::collections::HashSet;
 
