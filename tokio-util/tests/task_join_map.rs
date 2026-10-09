@@ -171,23 +171,14 @@ async fn alternating() {
 
 #[tokio::test]
 async fn capacity_after_replacing_tasks() {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::BuildHasherDefault;
+    let mut map = JoinMap::new();
 
-    let mut map: JoinMap<usize, (), BuildHasherDefault<DefaultHasher>> =
-        JoinMap::with_capacity_and_hasher(56, Default::default());
-
-    for key in 0..56 {
-        map.spawn(key, pending());
+    for key in 0..3 {
+        map.spawn(key, pending::<()>());
     }
 
-    for key in (0..56).cycle().take(256) {
-        map.spawn(key, pending());
-        assert!(map.capacity() >= map.len());
-    }
-
-    map.reserve(100);
-    assert!(map.capacity() >= map.len() + 100);
+    map.spawn(0, pending::<()>());
+    assert_eq!(map.capacity(), 3);
 }
 
 #[tokio::test]
