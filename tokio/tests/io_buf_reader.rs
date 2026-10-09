@@ -180,16 +180,16 @@ async fn seek_waits_for_pending_operation() {
     assert_eq!(reader.fill_buf().await.unwrap(), b"ab");
     reader.get_mut().pending = true;
 
-    Pin::new(&mut reader)
-        .start_seek(SeekFrom::Current(1))
-        .unwrap();
-    let mut seek = spawn(std::future::poll_fn(|cx| {
+    let mut complete = spawn(std::future::poll_fn(|cx| {
         Pin::new(&mut reader).poll_complete(cx)
     }));
-    assert_pending!(seek.poll());
-    assert!(seek.is_woken());
-    assert_eq!(assert_ready!(seek.poll()).unwrap(), 1);
-    drop(seek);
+    assert_pending!(complete.poll());
+    assert!(complete.is_woken());
+    assert_ready!(complete.poll()).unwrap();
+    drop(complete);
+
+    assert_eq!(reader.buffer(), b"ab");
+    assert_eq!(reader.seek(SeekFrom::Current(1)).await.unwrap(), 1);
 
     assert!(reader.buffer().is_empty());
     assert_eq!(reader.fill_buf().await.unwrap(), b"bc");
