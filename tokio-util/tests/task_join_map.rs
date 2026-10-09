@@ -498,6 +498,24 @@ async fn duplicate_keys() {
     assert!(map.join_next().await.is_none());
 }
 
+#[tokio::test]
+async fn join_empty_map_cooperates() {
+    let mut map = JoinMap::<(), ()>::new();
+    assert!(matches!(map.join_next().now_or_never(), Some(None)));
+
+    let mut task = tokio_test::task::spawn(async {
+        // Large enough to exhaust the cooperative budget.
+        for _ in 0..1000 {
+            assert!(map.join_next().await.is_none());
+        }
+    });
+
+    tokio_test::assert_pending!(task.poll());
+    tokio::task::yield_now().await;
+    assert!(task.is_woken());
+    task.await;
+}
+
 #[cfg(not(target_os = "wasi"))] // The WASI test configuration does not support blocking thread parking.
 #[tokio::test]
 async fn join_empty_map_with_replaced_blocking_task() {

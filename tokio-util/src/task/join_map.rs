@@ -454,6 +454,7 @@ where
     /// [`tokio::select!`]: https://docs.rs/tokio/latest/tokio/macro.select.html
     pub async fn join_next(&mut self) -> Option<(K, Result<V, JoinError>)> {
         if self.is_empty() {
+            tokio::task::coop::consume_budget().await;
             return None;
         }
         self.join_next_inner().await
