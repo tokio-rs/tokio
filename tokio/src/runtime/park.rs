@@ -147,18 +147,22 @@ impl Inner {
             return;
         }
 
-        // Without JSPI a real wait is impossible: suspending would trap and
-        // busy-waiting would starve the host loop the wake depends on. A
-        // zero-duration park returns immediately as on native.
+        // If JSPI is disabled, then we cannot park on JSPI, so instead use a
+        // spin loop for a timed park, and a panic for any other suspension.
+        // A zero-duration park returns immediately as on native.
         if !crate::runtime::jspi::jspi_enabled() {
-            if dur == Some(Duration::ZERO) {
-                return;
+            match dur {
+                Some(Duration::ZERO) => return,
+                Some(dur) => {
+                    std::thread::sleep(dur);
+                    return;
+                }
+                None => panic!(
+                    "cannot block on wasm32-unknown-emscripten: this wait would \
+                     suspend on the host event loop, which needs the build to \
+                     link `-sJSPI`"
+                ),
             }
-            panic!(
-                "cannot block on wasm32-unknown-emscripten: this wait would \
-                 suspend on the host event loop, which needs the build to \
-                 link `-sJSPI`"
-            );
         }
 
         // Suspend until a host timer fires or a later activation (a host

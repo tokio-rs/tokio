@@ -80,8 +80,6 @@ impl Wheel {
     /// already passed. In this case, the caller should fire the timeout
     /// immediately.
     ///
-    /// `Err(Invalid)` indicates an invalid `when` argument as been supplied.
-    ///
     /// # Safety
     ///
     /// This function registers item into an intrusive linked list. The caller

@@ -235,9 +235,9 @@ impl<K, V, S> JoinMap<K, V, S> {
     /// ```
     #[inline]
     pub fn capacity(&self) -> usize {
-        let capacity = self.tasks_by_key.capacity();
-        debug_assert_eq!(capacity, self.hashes_by_task.capacity());
-        capacity
+        // Removing entries can leave different amounts of spare capacity in
+        // the two tables, since keys and task IDs are hashed independently.
+        usize::min(self.tasks_by_key.capacity(), self.hashes_by_task.capacity())
     }
 }
 
@@ -453,6 +453,16 @@ where
     ///
     /// [`tokio::select!`]: https://docs.rs/tokio/latest/tokio/macro.select.html
     pub async fn join_next(&mut self) -> Option<(K, Result<V, JoinError>)> {
+        if self.is_empty() {
+            tokio::task::coop::consume_budget().await;
+            return None;
+        }
+        self.join_next_inner().await
+    }
+
+    // Also waits for replaced tasks, allowing `shutdown` to drain all tasks
+    // even after the map becomes empty.
+    async fn join_next_inner(&mut self) -> Option<(K, Result<V, JoinError>)> {
         loop {
             let (res, id) = match self.tasks.join_next_with_id().await {
                 Some(Ok((id, output))) => (Ok(output), id),
@@ -524,17 +534,17 @@ where
 
     /// Aborts all tasks and waits for them to finish shutting down.
     ///
-    /// Calling this method is equivalent to calling [`abort_all`] and then calling [`join_next`] in
-    /// a loop until it returns `None`.
+    /// Calls [`abort_all`] and waits for all tasks, including tasks that have been
+    /// replaced. Blocking tasks that have already started cannot be aborted and
+    /// will be allowed to finish.
     ///
     /// This method ignores any panics in the tasks shutting down. When this call returns, the
     /// `JoinMap` will be empty.
     ///
     /// [`abort_all`]: fn@Self::abort_all
-    /// [`join_next`]: fn@Self::join_next
     pub async fn shutdown(&mut self) {
         self.abort_all();
-        while self.join_next().await.is_some() {}
+        while self.join_next_inner().await.is_some() {}
     }
 
     /// Abort the task corresponding to the provided `key`.
