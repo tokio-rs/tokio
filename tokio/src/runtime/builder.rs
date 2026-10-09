@@ -537,7 +537,14 @@ impl Builder {
     ///
     /// # Default
     ///
-    /// The default value is the number of cores available to the system.
+    /// The default value is the number of cores available to the system.via [`std::thread::available_parallelism`].
+    ///
+    /// Note that `available_parallelism` inspects cgroups within the container's
+    /// current cgroup namespace. If CPU limits are configured on a parent cgroup
+    /// slice outside the container namespace (such as AWS ECS EC2 tasks), Tokio
+    /// will not detect these limits and will default to the host machine's CPU count.
+    /// In such environments, set the `TOKIO_WORKER_THREADS` environment variable
+    /// or configure `.worker_threads()` explicitly.
     ///
     /// When using the `current_thread` runtime this method has no effect.
     ///
