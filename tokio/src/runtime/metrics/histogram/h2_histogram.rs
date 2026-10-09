@@ -196,7 +196,7 @@ impl LogHistogramBuilder {
     /// # Panics
     /// - `p` > 10
     ///
-    /// [`HistogramScale::Log`]: [crate::runtime::HistogramScale]
+    /// [`HistogramScale::Log`]: crate::runtime::HistogramScale::Log
     pub fn precision_exact(mut self, p: u32) -> Self {
         assert!(p <= MAX_PRECISION, "precision must be <= {MAX_PRECISION}");
         self.precision = Some(p);
