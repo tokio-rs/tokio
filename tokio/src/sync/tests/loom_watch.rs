@@ -90,6 +90,34 @@ fn wait_for_returns_correct_value() {
 }
 
 #[test]
+fn weak_sender_upgrade_concurrent_with_last_sender_drop() {
+    loom::model(move || {
+        let (tx, rx) = watch::channel(0);
+        let tx_weak = tx.downgrade();
+
+        let jh = thread::spawn(move || {
+            drop(tx);
+        });
+
+        let upgraded = tx_weak.upgrade();
+        let did_upgrade = upgraded.is_some();
+
+        jh.join().unwrap();
+
+        // Upgrading and dropping the last sender must not interleave into a
+        // closed channel that still has a sender: the channel is closed if and
+        // only if the upgrade lost the race.
+        assert_eq!(did_upgrade, rx.has_changed().is_ok());
+
+        drop(upgraded);
+
+        // Whichever way the race went, no sender remains now.
+        assert!(rx.has_changed().is_err());
+        assert!(tx_weak.upgrade().is_none());
+    });
+}
+
+#[test]
 fn multiple_sender_drop_concurrently() {
     loom::model(move || {
         let (tx1, rx) = watch::channel(0);
