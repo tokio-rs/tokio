@@ -1,5 +1,5 @@
 use bytes::{Bytes, BytesMut};
-use futures_core::stream::Stream;
+use futures_core::stream::{FusedStream, Stream};
 use pin_project_lite::pin_project;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -119,5 +119,11 @@ impl<R: AsyncRead> Stream for ReaderStream<R> {
                 Poll::Ready(Some(Ok(chunk.freeze())))
             }
         }
+    }
+}
+
+impl<R: AsyncRead> FusedStream for ReaderStream<R> {
+    fn is_terminated(&self) -> bool {
+        self.reader.is_none()
     }
 }
