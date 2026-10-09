@@ -237,9 +237,7 @@ impl<K, V, S> JoinMap<K, V, S> {
     pub fn capacity(&self) -> usize {
         // Removing entries can leave different amounts of spare capacity in
         // the two tables, since keys and task IDs are hashed independently.
-        self.tasks_by_key
-            .capacity()
-            .min(self.hashes_by_task.capacity())
+        usize::min(self.tasks_by_key.capacity(), self.hashes_by_task.capacity())
     }
 }
 
