@@ -594,7 +594,7 @@ impl Drop for Readiness<'_> {
 unsafe impl Send for Readiness<'_> {}
 unsafe impl Sync for Readiness<'_> {}
 
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
 

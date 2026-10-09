@@ -80,6 +80,22 @@ jobs:
         run: cargo test --lib --release --features full -- --nocapture runtime::time
         working-directory: tokio
 
+  loom-io:
+    name: loom I/O driver
+    # base_ref is null when it's not a pull request
+    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-io') || (github.base_ref == null))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust ${{ env.rust_stable }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+            toolchain: ${{ env.rust_stable }}
+      - uses: Swatinem/rust-cache@v2
+      - name: run tests
+        run: cargo test --lib --release --features full -- --nocapture runtime::io
+        working-directory: tokio
+
   loom-current-thread:
     name: loom current-thread scheduler
     # base_ref is null when it's not a pull request
