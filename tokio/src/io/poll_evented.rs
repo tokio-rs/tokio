@@ -176,7 +176,7 @@ feature! {
         /// if more data is waiting. The flag is set on the write end, so the reader can't see it.
         ///
         /// Read more:
-        /// https://github.com/tokio-rs/tokio/issues/7051
+        /// <https://github.com/tokio-rs/tokio/issues/7051>
         ///
         // Safety: The caller must ensure that `E` can read into uninitialized memory
         #[cfg(unix)]
