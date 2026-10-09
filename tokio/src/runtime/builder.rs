@@ -782,7 +782,7 @@ impl Builder {
     ///
     /// ```
     /// # #[cfg(not(target_family = "wasm"))]
-    /// {
+    /// # {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
