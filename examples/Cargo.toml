@@ -31,7 +31,7 @@ libc = "0.2"
 tokio = { version = "1.0.0", path = "../tokio", features = ["full", "tracing", "taskdump"] }
 
 [target.'cfg(windows)'.dev-dependencies.windows-sys]
-version = "0.61"
+version = ">=0.60, <0.62"
 
 [[example]]
 name = "chat"
