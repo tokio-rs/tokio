@@ -30,6 +30,10 @@ name = "macros_select"
 name = "rt_yield"
 required-features = ["rt", "macros", "sync"]
 
+[[test]]
+name = "rt_handle_time"
+required-features = ["rt"]
+
 [features]
 # For mem check
 rt-net = ["tokio/rt", "tokio/rt-multi-thread", "tokio/net"]
@@ -46,6 +50,7 @@ full = [
     "macros",
     "rt",
     "rt-multi-thread",
+    "time",
 
     "tokio/full",
     "tokio-test"
@@ -54,6 +59,7 @@ macros = ["tokio/macros"]
 sync = ["tokio/sync"]
 rt = ["tokio/rt"]
 rt-multi-thread = ["rt", "tokio/rt-multi-thread"]
+time = ["tokio/time"]
 
 [dependencies]
 tokio = { version = "1.0.0", path = "../tokio" }
