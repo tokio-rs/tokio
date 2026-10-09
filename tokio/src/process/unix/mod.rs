@@ -102,6 +102,26 @@ impl OrphanQueue<StdChild> for GlobalOrphanQueue {
     }
 }
 
+/// After the OS has already created a process, failures while wrapping it for
+/// Tokio (stdio registration, pidfd, SIGCHLD listener) must not drop the
+/// `StdChild` handle without reaping or enqueuing. Otherwise the process can
+/// become an unreapable zombie until this process exits.
+///
+/// If `try_wait` reports that the child has already exited, it has been reaped
+/// and nothing else is needed. Otherwise push onto the orphan queue so the
+/// process driver can reap it later.
+fn orphan_child_on_error<W, Q>(mut child: W, orphan_queue: Q, err: io::Error) -> io::Error
+where
+    W: Wait,
+    Q: OrphanQueue<W>,
+{
+    match child.try_wait() {
+        Ok(Some(_)) => {}
+        Ok(None) | Err(_) => orphan_queue.push_orphan(child),
+    }
+    err
+}
+
 #[must_use = "futures do nothing unless polled"]
 pub(crate) enum Child {
     SignalReaper(Reaper<StdChild, GlobalOrphanQueue, Signal>),
@@ -116,9 +136,18 @@ impl fmt::Debug for Child {
 }
 
 pub(crate) fn build_child(mut child: StdChild) -> io::Result<SpawnedChild> {
-    let stdin = child.stdin.take().map(stdio).transpose()?;
-    let stdout = child.stdout.take().map(stdio).transpose()?;
-    let stderr = child.stderr.take().map(stdio).transpose()?;
+    let stdin = match child.stdin.take().map(stdio).transpose() {
+        Ok(io) => io,
+        Err(e) => return Err(orphan_child_on_error(child, GlobalOrphanQueue, e)),
+    };
+    let stdout = match child.stdout.take().map(stdio).transpose() {
+        Ok(io) => io,
+        Err(e) => return Err(orphan_child_on_error(child, GlobalOrphanQueue, e)),
+    };
+    let stderr = match child.stderr.take().map(stdio).transpose() {
+        Ok(io) => io,
+        Err(e) => return Err(orphan_child_on_error(child, GlobalOrphanQueue, e)),
+    };
 
     #[cfg(all(target_os = "linux", feature = "rt"))]
     match pidfd_reaper::PidfdReaper::new(child, GlobalOrphanQueue) {
@@ -130,11 +159,16 @@ pub(crate) fn build_child(mut child: StdChild) -> io::Result<SpawnedChild> {
                 stderr,
             })
         }
-        Err((Some(err), _child)) => return Err(err),
+        Err((Some(err), child)) => {
+            return Err(orphan_child_on_error(child, GlobalOrphanQueue, err));
+        }
         Err((None, child_returned)) => child = child_returned,
     }
 
-    let signal = signal(SignalKind::child())?;
+    let signal = match signal(SignalKind::child()) {
+        Ok(signal) => signal,
+        Err(e) => return Err(orphan_child_on_error(child, GlobalOrphanQueue, e)),
+    };
 
     Ok(SpawnedChild {
         child: Child::SignalReaper(Reaper::new(child, GlobalOrphanQueue, signal)),
@@ -371,4 +405,72 @@ where
     set_nonblocking(&mut pipe, true)?;
 
     PollEvented::new(pipe).map(|inner| ChildStdio { inner })
+}
+
+#[cfg(all(test, not(loom)))]
+mod orphan_on_error_tests {
+    use super::orphan_child_on_error;
+    use crate::process::unix::orphan::test::MockQueue;
+    use crate::process::unix::orphan::Wait;
+    use std::cell::Cell;
+    use std::io;
+    use std::os::unix::process::ExitStatusExt;
+    use std::process::ExitStatus;
+    use std::rc::Rc;
+
+    struct MockWait {
+        total_waits: Rc<Cell<usize>>,
+        /// Number of `try_wait` calls that return `Ok(None)` before reporting exit.
+        still_running_waits: usize,
+    }
+
+    impl MockWait {
+        fn still_running() -> Self {
+            Self {
+                total_waits: Rc::new(Cell::new(0)),
+                still_running_waits: 1,
+            }
+        }
+
+        fn already_exited() -> Self {
+            Self {
+                total_waits: Rc::new(Cell::new(0)),
+                still_running_waits: 0,
+            }
+        }
+    }
+
+    impl Wait for MockWait {
+        fn id(&self) -> u32 {
+            42
+        }
+
+        fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
+            let waits = self.total_waits.get();
+            self.total_waits.set(waits + 1);
+            if waits < self.still_running_waits {
+                Ok(None)
+            } else {
+                Ok(Some(ExitStatus::from_raw(0)))
+            }
+        }
+    }
+
+    #[test]
+    fn orphan_child_on_error_enqueues_when_still_running() {
+        let queue = MockQueue::new();
+        let err = io::Error::new(io::ErrorKind::Other, "setup failed");
+        let returned = orphan_child_on_error(MockWait::still_running(), &queue, err);
+        assert_eq!(returned.kind(), io::ErrorKind::Other);
+        assert_eq!(queue.all_enqueued.borrow().len(), 1);
+    }
+
+    #[test]
+    fn orphan_child_on_error_skips_queue_when_already_exited() {
+        let queue = MockQueue::new();
+        let err = io::Error::new(io::ErrorKind::Other, "setup failed");
+        let returned = orphan_child_on_error(MockWait::already_exited(), &queue, err);
+        assert_eq!(returned.kind(), io::ErrorKind::Other);
+        assert!(queue.all_enqueued.borrow().is_empty());
+    }
 }
