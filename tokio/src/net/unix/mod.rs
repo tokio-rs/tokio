@@ -9,6 +9,9 @@ pub(crate) mod listener;
 
 pub(crate) mod socket;
 
+mod permissions;
+pub use permissions::Permissions;
+
 mod split;
 pub use split::{ReadHalf, WriteHalf};
 
@@ -37,3 +40,7 @@ pub type gid_t = u32;
 /// A type representing process and process group IDs.
 #[allow(non_camel_case_types)]
 pub type pid_t = i32;
+
+/// A type representing file mode bits.
+#[allow(non_camel_case_types)]
+pub type mode_t = u32;
