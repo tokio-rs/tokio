@@ -900,42 +900,50 @@ impl<T: AsRawFd> AsyncFd<T> {
             .try_io(interest, || f(self.inner.as_mut().unwrap()))
     }
 
-    /// Deprecated. Use [`AsyncFd::register`] instead. See [#8539] for more information.
+    /// Deprecated. Use [`AsyncFd::register`] instead. See [#8587] for more information.
     ///
-    /// [#8539]: https://github.com/tokio-rs/tokio/issues/8539
+    /// [#8587]: https://github.com/tokio-rs/tokio/pull/8587
     #[inline]
     #[track_caller]
-    #[deprecated(note = "use `AsyncFd::register` instead")]
+    #[deprecated(
+        note = "unsound due to lack of I/O safety; use `AsyncFd::register` instead (see https://github.com/tokio-rs/tokio/pull/8587)"
+    )]
     pub fn new(inner: T) -> io::Result<Self> {
         unsafe { Ok(Self::register(inner)?) }
     }
 
-    /// Deprecated. Use [`AsyncFd::register_with_interest`] instead. See [#8539] for more information.
+    /// Deprecated. Use [`AsyncFd::register_with_interest`] instead. See [#8587] for more information.
     ///
-    /// [#8539]: https://github.com/tokio-rs/tokio/issues/8539
+    /// [#8587]: https://github.com/tokio-rs/tokio/pull/8587
     #[inline]
     #[track_caller]
-    #[deprecated(note = "use `AsyncFd::register_with_interest` instead")]
+    #[deprecated(
+        note = "unsound due to lack of I/O safety; use `AsyncFd::register_with_interest` instead (see https://github.com/tokio-rs/tokio/pull/8587)"
+    )]
     pub fn with_interest(inner: T, interest: Interest) -> io::Result<Self> {
         unsafe { Ok(Self::register_with_interest(inner, interest)?) }
     }
 
-    /// Deprecated. Use [`AsyncFd::register`] instead. See [#8539] for more information.
+    /// Deprecated. Use [`AsyncFd::register`] instead. See [#8587] for more information.
     ///
-    /// [#8539]: https://github.com/tokio-rs/tokio/issues/8539
+    /// [#8587]: https://github.com/tokio-rs/tokio/pull/8587
     #[inline]
     #[track_caller]
-    #[deprecated(note = "use `AsyncFd::register` instead")]
+    #[deprecated(
+        note = "unsound due to lack of I/O safety; use `AsyncFd::register` instead (see https://github.com/tokio-rs/tokio/pull/8587)"
+    )]
     pub fn try_new(inner: T) -> Result<Self, AsyncFdRegisterError<T>> {
         unsafe { Self::register(inner) }
     }
 
-    /// Deprecated. Use [`AsyncFd::register_with_interest`] instead. See [#8539] for more information.
+    /// Deprecated. Use [`AsyncFd::register_with_interest`] instead. See [#8587] for more information.
     ///
-    /// [#8539]: https://github.com/tokio-rs/tokio/issues/8539
+    /// [#8587]: https://github.com/tokio-rs/tokio/pull/8587
     #[inline]
     #[track_caller]
-    #[deprecated(note = "use `AsyncFd::register_with_interest` instead")]
+    #[deprecated(
+        note = "unsound due to lack of I/O safety; use `AsyncFd::register_with_interest` instead (see https://github.com/tokio-rs/tokio/pull/8587)"
+    )]
     pub fn try_with_interest(
         inner: T,
         interest: Interest,
