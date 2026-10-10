@@ -644,3 +644,41 @@ async fn try_io_readable() -> io::Result<()> {
 
     Ok(())
 }
+
+// A read on a packet mode pipe returns a single packet, so a read that is shorter than the buffer
+// does not mean that the pipe is drained.
+//
+// https://github.com/tokio-rs/tokio/issues/7051
+#[tokio::test]
+#[cfg(target_os = "linux")]
+async fn read_every_packet_of_a_packet_mode_pipe() -> io::Result<()> {
+    use nix::fcntl::{fcntl, FcntlArg, OFlag};
+    use std::time::Duration;
+
+    const PACKET_SIZE: usize = 4096;
+
+    let (tx, mut rx) = pipe::pipe()?;
+
+    // O_DIRECT on the write end makes the pipe a packet mode pipe. The read end does not get the
+    // flag, so the receiver can't tell from its own file description.
+    let flags = OFlag::from_bits_retain(fcntl(&tx, FcntlArg::F_GETFL)?);
+    fcntl(&tx, FcntlArg::F_SETFL(flags | OFlag::O_DIRECT))?;
+
+    // Write two packets before reading, so that a single readiness event covers both.
+    for packet in 0..2u8 {
+        tx.writable().await?;
+        assert_eq!(tx.try_write(&[packet; PACKET_SIZE])?, PACKET_SIZE);
+    }
+
+    // The buffer has to be larger than a packet, or the rest of the packet is discarded.
+    let mut buf = vec![0u8; 16 * PACKET_SIZE];
+    for packet in 0..2u8 {
+        let n = tokio::time::timeout(Duration::from_secs(5), rx.read(&mut buf))
+            .await
+            .expect("the read got stuck")?;
+        assert_eq!(n, PACKET_SIZE);
+        assert!(buf[..n].iter().all(|b| *b == packet));
+    }
+
+    Ok(())
+}

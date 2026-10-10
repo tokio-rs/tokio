@@ -1463,7 +1463,7 @@ impl AsyncRead for Receiver {
     ) -> Poll<io::Result<()>> {
         // Safety: `mio_pipe::Receiver` uses a `std::fs::File` underneath,
         // which correctly handles reads into uninitialized memory.
-        unsafe { self.io.poll_read(cx, buf) }
+        unsafe { self.io.poll_read_pipe(cx, buf) }
     }
 }
 

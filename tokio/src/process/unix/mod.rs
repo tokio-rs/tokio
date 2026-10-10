@@ -335,7 +335,7 @@ impl AsyncRead for ChildStdio {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         // Safety: pipes support reading into uninitialized memory
-        unsafe { self.inner.poll_read(cx, buf) }
+        unsafe { self.inner.poll_read_pipe(cx, buf) }
     }
 }
 
