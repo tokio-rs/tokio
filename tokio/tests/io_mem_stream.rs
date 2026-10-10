@@ -251,4 +251,15 @@ fn drop_replaced_waker_outside_lock() {
     drop(waker);
     assert_pending!(Pin::new(&mut writer).poll_write(&mut cx, b"y"));
     assert_ready_err!(Pin::new(&mut writer).poll_write(&mut cx, b"y"));
+
+    let (mut writer, peer) = duplex(1);
+    assert_ready_ok!(Pin::new(&mut writer).poll_write(&mut cx, b"x"));
+    let waker = futures::task::waker(Arc::new(Owner { _peer: peer }));
+    let bufs = [IoSlice::new(b"y")];
+    assert_pending!(
+        Pin::new(&mut writer).poll_write_vectored(&mut Context::from_waker(&waker), &bufs)
+    );
+    drop(waker);
+    assert_pending!(Pin::new(&mut writer).poll_write_vectored(&mut cx, &bufs));
+    assert_ready_err!(Pin::new(&mut writer).poll_write_vectored(&mut cx, &bufs));
 }
