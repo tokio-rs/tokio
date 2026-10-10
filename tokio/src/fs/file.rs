@@ -7,6 +7,7 @@ use crate::io::blocking::{Buf, DEFAULT_MAX_BUF_SIZE};
 use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use crate::sync::Mutex;
 
+use super::file_times::FileTimes;
 use std::cmp;
 use std::fmt;
 use std::fs::{Metadata, Permissions};
@@ -564,6 +565,34 @@ impl File {
     pub async fn set_permissions(&self, perm: Permissions) -> io::Result<()> {
         let std = self.std.clone();
         asyncify(move || std.set_permissions(perm)).await
+    }
+
+    /// Changes the timestamps on the underlying file.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the user lacks permission to change
+    /// timestamps on the underlying file. It may also return an error in other
+    /// os-specific unspecified cases.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::{File, FileTimes};
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::open("foo.txt").await?;
+    /// let times = FileTimes::new()
+    ///     .set_accessed(std::time::SystemTime::now())
+    ///     .set_modified(std::time::SystemTime::now());
+    /// file.set_times(times).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn set_times(&self, times: FileTimes) -> io::Result<()> {
+        let std = self.std.clone();
+        let std_times = times.into_std();
+        asyncify(move || std.set_times(std_times)).await
     }
 
     /// Set the maximum buffer size for the underlying [`AsyncRead`] / [`AsyncWrite`] operation.
