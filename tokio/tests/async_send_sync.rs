@@ -703,6 +703,7 @@ assert_value!(tokio::runtime::TryCurrentError: Send & Sync & Unpin);
 
 assert_value!(tokio::time::Interval: Send & Sync & Unpin);
 assert_value!(tokio::time::Instant: Send & Sync & Unpin);
+assert_value!(tokio::time::MissedTickBehavior: Send & Sync & Unpin);
 assert_value!(tokio::time::Sleep: Send & Sync & !Unpin);
 assert_value!(tokio::time::Timeout<BoxFutureSync<()>>: Send & Sync & !Unpin);
 assert_value!(tokio::time::Timeout<BoxFutureSend<()>>: Send & !Sync & !Unpin);
