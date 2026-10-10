@@ -13,6 +13,8 @@ use tokio::sync::Mutex;
 use tokio_test::task::spawn;
 use tokio_test::{assert_pending, assert_ready};
 
+#[cfg(not(target_family = "wasm"))]
+use futures::FutureExt;
 use std::sync::Arc;
 
 #[test]
@@ -175,4 +177,42 @@ async fn mutex_debug() {
     assert_eq!(format!("{m:?}"), r#"Mutex { data: "data" }"#);
     let _guard = m.lock().await;
     assert_eq!(format!("{m:?}"), r#"Mutex { data: <locked> }"#)
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[maybe_tokio_test]
+async fn mutex_fifo_with_coop_budget() {
+    let m = Arc::new(Mutex::new(()));
+
+    let mut t0 = spawn(m.clone().lock_owned());
+    let g0 = assert_ready!(t0.poll());
+
+    let m_a = Arc::clone(&m);
+    let mut t_a = spawn(async move {
+        while tokio::task::coop::consume_budget().now_or_never().is_some() {}
+        m_a.lock_owned().await
+    });
+    assert_pending!(t_a.poll());
+
+    let mut t_b = spawn(m.clone().lock_owned());
+    assert_pending!(t_b.poll());
+
+    drop(g0);
+
+    assert!(t_a.is_woken());
+    assert!(!t_b.is_woken());
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[maybe_tokio_test]
+async fn mutex_coop_drop_after_take_permit() {
+    let m = Arc::new(Mutex::new(()));
+    let m_a = Arc::clone(&m);
+    let mut t_a = spawn(async move {
+        while tokio::task::coop::consume_budget().now_or_never().is_some() {}
+        m_a.lock_owned().await
+    });
+    assert_pending!(t_a.poll());
+    drop(t_a);
+    assert!(m.try_lock().is_ok());
 }
