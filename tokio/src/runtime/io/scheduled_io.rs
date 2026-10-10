@@ -300,7 +300,7 @@ impl ScheduledIo {
         wakers.wake_all();
     }
 
-    pub(super) fn ready_event(&self, interest: Interest) -> ReadyEvent {
+    pub(crate) fn ready_event(&self, interest: Interest) -> ReadyEvent {
         let curr = self.readiness.load(Acquire);
 
         ReadyEvent {
@@ -315,7 +315,7 @@ impl ScheduledIo {
     /// These are to support `AsyncRead` and `AsyncWrite` polling methods,
     /// which cannot use the `async fn` version. This uses reserved reader
     /// and writer slots.
-    pub(super) fn poll_readiness(
+    pub(crate) fn poll_readiness(
         &self,
         cx: &mut Context<'_>,
         direction: Direction,

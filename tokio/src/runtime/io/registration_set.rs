@@ -2,19 +2,19 @@ use crate::loom::sync::atomic::AtomicUsize;
 use crate::runtime::io::ScheduledIo;
 use crate::util::linked_list::{self, LinkedList};
 
+use crate::loom::sync::Arc;
 use std::io;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{Acquire, Release};
-use std::sync::Arc;
 
 // Kind of arbitrary, but buffering 16 `ScheduledIo`s doesn't seem like much
 const NOTIFY_AFTER: usize = 16;
 
-pub(super) struct RegistrationSet {
+pub(crate) struct RegistrationSet {
     num_pending_release: AtomicUsize,
 }
 
-pub(super) struct Synced {
+pub(crate) struct Synced {
     // True when the I/O driver shutdown. At this point, no more registrations
     // should be added to the set.
     is_shutdown: bool,
@@ -30,7 +30,7 @@ pub(super) struct Synced {
 }
 
 impl RegistrationSet {
-    pub(super) fn new() -> (RegistrationSet, Synced) {
+    pub(crate) fn new() -> (RegistrationSet, Synced) {
         let set = RegistrationSet {
             num_pending_release: AtomicUsize::new(0),
         };
@@ -49,11 +49,11 @@ impl RegistrationSet {
     }
 
     /// Returns `true` if there are registrations that need to be released
-    pub(super) fn needs_release(&self) -> bool {
+    pub(crate) fn needs_release(&self) -> bool {
         self.num_pending_release.load(Acquire) != 0
     }
 
-    pub(super) fn allocate(&self, synced: &mut Synced) -> io::Result<Arc<ScheduledIo>> {
+    pub(crate) fn allocate(&self, synced: &mut Synced) -> io::Result<Arc<ScheduledIo>> {
         if synced.is_shutdown {
             return Err(io::Error::other(
                 crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR,
@@ -70,7 +70,7 @@ impl RegistrationSet {
 
     // Returns `true` if the caller should unblock the I/O driver to purge
     // registrations pending release.
-    pub(super) fn deregister(&self, synced: &mut Synced, registration: &Arc<ScheduledIo>) -> bool {
+    pub(crate) fn deregister(&self, synced: &mut Synced, registration: &Arc<ScheduledIo>) -> bool {
         synced.pending_release.push(registration.clone());
 
         let len = synced.pending_release.len();
@@ -100,7 +100,7 @@ impl RegistrationSet {
         ret
     }
 
-    pub(super) fn release(&self, synced: &mut Synced) {
+    pub(crate) fn release(&self, synced: &mut Synced) {
         let pending = std::mem::take(&mut synced.pending_release);
 
         for io in pending {
