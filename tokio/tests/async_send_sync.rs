@@ -354,6 +354,8 @@ cfg_not_wasi! {
         async_assert_fn!(tokio::process::Child::kill(_): Send & Sync & !Unpin);
         async_assert_fn!(tokio::process::Child::wait(_): Send & Sync & !Unpin);
         async_assert_fn!(tokio::process::Child::wait_with_output(_): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::process::Command::output(_): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::process::Command::status(_): Send & Sync & !Unpin);
     }
 
     async_assert_fn!(tokio::signal::ctrl_c(): Send & Sync & !Unpin);
