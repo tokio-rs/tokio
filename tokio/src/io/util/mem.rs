@@ -205,6 +205,8 @@ impl Drop for DuplexStream {
 ///
 /// A `DuplexStream` keeps its `SimplexStream`s behind a mutex, and wakes and
 /// drops these wakers only after releasing it, as they may access the pipe.
+/// The halves returned by `simplex()` are still polled under the mutex in
+/// `split`.
 #[derive(Default)]
 struct Wakers {
     /// The waker of the other side of the pipe, which needs to be woken.
