@@ -132,6 +132,8 @@ project.
 In addition to the crates in this repository, the Tokio project also maintains
 several other libraries, including:
 
+* [`toasty`]: An async ORM for Rust supporting both SQL and NoSQL databases.
+
 * [`axum`]: A web application framework that focuses on ergonomics and modularity.
 
 * [`hyper`]: A fast and correct HTTP/1.1 and HTTP/2 implementation for Rust.
@@ -150,6 +152,7 @@ several other libraries, including:
 
 * [`loom`]: A testing tool for concurrent Rust code.
 
+[`toasty`]: https://github.com/tokio-rs/toasty
 [`axum`]: https://github.com/tokio-rs/axum
 [`warp`]: https://github.com/seanmonstar/warp
 [`hyper`]: https://github.com/hyperium/hyper

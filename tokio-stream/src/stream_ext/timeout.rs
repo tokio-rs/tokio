@@ -5,6 +5,7 @@ use tokio::time::{sleep, Sleep};
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 use std::fmt;
 use std::time::Duration;
@@ -79,6 +80,12 @@ impl<S: Stream> Stream for Timeout<S> {
         }
 
         (lower, twice_plus_one(upper))
+    }
+}
+
+impl<S: Stream> FusedStream for Timeout<S> {
+    fn is_terminated(&self) -> bool {
+        self.stream.is_terminated()
     }
 }
 

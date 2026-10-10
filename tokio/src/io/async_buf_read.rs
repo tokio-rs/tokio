@@ -88,11 +88,11 @@ where
     P::Target: AsyncBufRead,
 {
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
-        crate::util::pin_as_deref_mut(self).poll_fill_buf(cx)
+        self.as_deref_mut().poll_fill_buf(cx)
     }
 
     fn consume(self: Pin<&mut Self>, amt: usize) {
-        crate::util::pin_as_deref_mut(self).consume(amt);
+        self.as_deref_mut().consume(amt);
     }
 }
 

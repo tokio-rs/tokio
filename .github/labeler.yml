@@ -13,6 +13,8 @@ R-loom-sync:
 R-loom-time-driver:
 - changed-files:
   - any-glob-to-any-file:
+    - tokio/src/runtime/io/*
+    - tokio/src/runtime/io/**/*
     - tokio/src/runtime/time/*
     - tokio/src/runtime/time/**/*
     - tokio/src/runtime/time_alt/*

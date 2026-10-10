@@ -321,6 +321,14 @@ where
         tokio::io::AsyncWrite::poll_write(self.project().inner, cx, buf)
     }
 
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        tokio::io::AsyncWrite::poll_write_vectored(self.project().inner, cx, bufs)
+    }
+
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         tokio::io::AsyncWrite::poll_flush(self.project().inner, cx)
     }
