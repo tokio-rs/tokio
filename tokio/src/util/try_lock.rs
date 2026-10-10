@@ -42,6 +42,12 @@ impl<T> TryLock<T> {
         new!(data)
     }
 
+    /// Whether the lock is currently held (advisory).
+    #[cfg(feature = "rt-multi-thread")]
+    pub(crate) fn is_locked(&self) -> bool {
+        self.locked.load(SeqCst)
+    }
+
     /// Attempt to acquire lock
     pub(crate) fn try_lock(&self) -> Option<LockGuard<'_, T>> {
         if self
