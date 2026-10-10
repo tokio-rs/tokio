@@ -237,7 +237,7 @@ doc! {macro_rules! try_join {
                                 .expect("expected completed future")
                                 .err()
                                 .map($crate::macros::support::Result::Err)
-                                .expect("expected Err(_)")
+                                .unwrap()
                         )
                     }
                 } else {
