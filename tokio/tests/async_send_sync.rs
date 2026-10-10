@@ -589,14 +589,17 @@ async_assert_fn!(tokio::time::Interval::tick(_): Send & Sync & !Unpin);
 assert_value!(tokio::io::BufReader<TcpStream>: Send & Sync & Unpin);
 assert_value!(tokio::io::BufStream<TcpStream>: Send & Sync & Unpin);
 assert_value!(tokio::io::BufWriter<TcpStream>: Send & Sync & Unpin);
+assert_value!(tokio::io::Chain<TcpStream, TcpStream>: Send & Sync & Unpin);
 assert_value!(tokio::io::DuplexStream: Send & Sync & Unpin);
 assert_value!(tokio::io::Empty: Send & Sync & Unpin);
 assert_value!(tokio::io::Interest: Send & Sync & Unpin);
+assert_value!(tokio::io::Join<TcpStream, TcpStream>: Send & Sync & Unpin);
 assert_value!(tokio::io::Lines<TcpStream>: Send & Sync & Unpin);
 assert_value!(tokio::io::ReadBuf<'_>: Send & Sync & Unpin);
 assert_value!(tokio::io::ReadHalf<TcpStream>: Send & Sync & Unpin);
 assert_value!(tokio::io::Ready: Send & Sync & Unpin);
 assert_value!(tokio::io::Repeat: Send & Sync & Unpin);
+assert_value!(tokio::io::SimplexStream: Send & Sync & Unpin);
 assert_value!(tokio::io::Sink: Send & Sync & Unpin);
 assert_value!(tokio::io::Split<TcpStream>: Send & Sync & Unpin);
 assert_value!(tokio::io::Stderr: Send & Sync & Unpin);
@@ -608,9 +611,17 @@ async_assert_fn!(tokio::io::copy(&mut TcpStream, &mut TcpStream): Send & Sync & 
 async_assert_fn!(
     tokio::io::copy_bidirectional(&mut TcpStream, &mut TcpStream): Send & Sync & !Unpin
 );
+async_assert_fn!(
+    tokio::io::copy_bidirectional_with_sizes(&mut TcpStream, &mut TcpStream, usize, usize): Send
+        & Sync
+        & !Unpin
+);
 async_assert_fn!(tokio::io::copy_buf(&mut tokio::io::BufReader<TcpStream>, &mut TcpStream): Send & Sync & !Unpin);
+async_assert_fn!(tokio::io::duplex(usize): Send & Sync & Unpin);
 async_assert_fn!(tokio::io::empty(): Send & Sync & Unpin);
+async_assert_fn!(tokio::io::join(TcpStream, TcpStream): Send & Sync & Unpin);
 async_assert_fn!(tokio::io::repeat(u8): Send & Sync & Unpin);
+async_assert_fn!(tokio::io::simplex(usize): Send & Sync & Unpin);
 async_assert_fn!(tokio::io::sink(): Send & Sync & Unpin);
 async_assert_fn!(tokio::io::split(TcpStream): Send & Sync & Unpin);
 async_assert_fn!(tokio::io::stderr(): Send & Sync & Unpin);
@@ -655,6 +666,7 @@ async_assert_fn!(
     tokio::io::AsyncReadExt::read_to_string(&mut BoxAsyncRead, &mut String): Send & Sync & !Unpin
 );
 async_assert_fn!(tokio::io::AsyncSeekExt::seek(&mut BoxAsyncSeek, SeekFrom): Send & Sync & !Unpin);
+async_assert_fn!(tokio::io::AsyncSeekExt::rewind(&mut BoxAsyncSeek): Send & Sync & !Unpin);
 async_assert_fn!(tokio::io::AsyncSeekExt::stream_position(&mut BoxAsyncSeek): Send & Sync & !Unpin);
 async_assert_fn!(tokio::io::AsyncWriteExt::write(&mut BoxAsyncWrite, &[u8]): Send & Sync & !Unpin);
 async_assert_fn!(
@@ -762,19 +774,45 @@ mod unix_asyncfd {
     assert_value!(AsyncFdReadyMutGuard<'_, ImplsFd<YY>>: Send & Sync & Unpin);
     assert_value!(AsyncFdReadyMutGuard<'_, ImplsFd<YN>>: Send & !Sync & Unpin);
     assert_value!(AsyncFdReadyMutGuard<'_, ImplsFd<NN>>: !Send & !Sync & Unpin);
+    assert_value!(AsyncFdTryNewError<ImplsFd<YY>>: Send & Sync & Unpin);
+    assert_value!(AsyncFdTryNewError<ImplsFd<YN>>: Send & !Sync & Unpin);
+    assert_value!(AsyncFdTryNewError<ImplsFd<NN>>: !Send & !Sync & Unpin);
     assert_value!(TryIoError: Send & Sync & Unpin);
+    async_assert_fn!(AsyncFd<ImplsFd<YY>>::async_io(_, tokio::io::Interest, fn(&ImplsFd<YY>) -> std::io::Result<()>): Send & Sync & !Unpin);
+    async_assert_fn!(AsyncFd<ImplsFd<YY>>::async_io_mut(_, tokio::io::Interest, fn(&mut ImplsFd<YY>) -> std::io::Result<()>): Send & Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<YY>>::readable(_): Send & Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<YY>>::readable_mut(_): Send & Sync & !Unpin);
+    async_assert_fn!(AsyncFd<ImplsFd<YY>>::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
+    async_assert_fn!(AsyncFd<ImplsFd<YY>>::ready_mut(_, tokio::io::Interest): Send & Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<YY>>::writable(_): Send & Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<YY>>::writable_mut(_): Send & Sync & !Unpin);
+    async_assert_fn!(AsyncFd<ImplsFd<YN>>::async_io(_, tokio::io::Interest, fn(&ImplsFd<YN>) -> std::io::Result<()>): !Send & !Sync & !Unpin);
+    async_assert_fn!(AsyncFd<ImplsFd<YN>>::async_io_mut(_, tokio::io::Interest, fn(&mut ImplsFd<YN>) -> std::io::Result<()>): Send & !Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<YN>>::readable(_): !Send & !Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<YN>>::readable_mut(_): Send & !Sync & !Unpin);
+    async_assert_fn!(AsyncFd<ImplsFd<YN>>::ready(_, tokio::io::Interest): !Send & !Sync & !Unpin);
+    async_assert_fn!(AsyncFd<ImplsFd<YN>>::ready_mut(_, tokio::io::Interest): Send & !Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<YN>>::writable(_): !Send & !Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<YN>>::writable_mut(_): Send & !Sync & !Unpin);
+    async_assert_fn!(AsyncFd<ImplsFd<NN>>::async_io(_, tokio::io::Interest, fn(&ImplsFd<NN>) -> std::io::Result<()>): !Send & !Sync & !Unpin);
+    async_assert_fn!(AsyncFd<ImplsFd<NN>>::async_io_mut(_, tokio::io::Interest, fn(&mut ImplsFd<NN>) -> std::io::Result<()>): !Send & !Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<NN>>::readable(_): !Send & !Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<NN>>::readable_mut(_): !Send & !Sync & !Unpin);
+    async_assert_fn!(AsyncFd<ImplsFd<NN>>::ready(_, tokio::io::Interest): !Send & !Sync & !Unpin);
+    async_assert_fn!(AsyncFd<ImplsFd<NN>>::ready_mut(_, tokio::io::Interest): !Send & !Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<NN>>::writable(_): !Send & !Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<NN>>::writable_mut(_): !Send & !Sync & !Unpin);
+}
+
+#[cfg(target_os = "freebsd")]
+mod freebsd_aio {
+    use super::*;
+    use tokio::io::bsd::*;
+
+    assert_value!(Aio<YY>: Send & Sync & Unpin);
+    assert_value!(Aio<YN>: Send & !Sync & Unpin);
+    assert_value!(Aio<NN>: !Send & !Sync & Unpin);
+    assert_value!(AioEvent: Send & Sync & Unpin);
 }
 
 mod local_runtime {
