@@ -483,7 +483,7 @@
 //!
 //! When the build links WebAssembly JavaScript Promise Integration (JSPI), a
 //! wait that would block suspends on the host event loop rather than blocking.
-//! This requires Emscripten 6.0.10 or later. Without JSPI, such a wait panics.
+//! Builds without JSPI will spin on timed parks, and panic otherwise.
 //!
 //! Suspension requires the current export to have been wrapped with
 //! `WebAssembly.promising`. A wait from any other activation throws
@@ -633,14 +633,14 @@ mod trace {
     cfg_not_taskdump! {
         #[inline(always)]
         #[allow(dead_code)]
-        pub(crate) fn trace_leaf() -> std::task::Poll<()> {
+        pub(crate) fn trace_leaf(_: &mut std::task::Context<'_>) -> std::task::Poll<()> {
             std::task::Poll::Ready(())
         }
     }
 
     #[cfg_attr(not(feature = "sync"), allow(dead_code))]
     pub(crate) async fn async_trace_leaf() {
-        std::future::poll_fn(|_cx| trace_leaf()).await
+        std::future::poll_fn(trace_leaf).await
     }
 }
 

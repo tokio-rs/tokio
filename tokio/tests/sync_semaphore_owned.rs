@@ -114,6 +114,23 @@ fn merge_unrelated_permits() {
     p1.merge(p2)
 }
 
+#[cfg(target_pointer_width = "32")]
+#[test]
+#[should_panic(expected = "a semaphore may not have more than MAX_PERMITS permits")]
+fn acquire_many_owned_exceeds_maxpermits() {
+    let s = Arc::new(Semaphore::new(0));
+    let _ =
+        tokio_test::task::spawn(s.acquire_many_owned((Semaphore::MAX_PERMITS as u32) + 1)).poll();
+}
+
+#[cfg(target_pointer_width = "32")]
+#[test]
+#[should_panic(expected = "a semaphore may not have more than MAX_PERMITS permits")]
+fn acquire_many_owned_top_bit_exceeds_maxpermits() {
+    let s = Arc::new(Semaphore::new(0));
+    let _ = tokio_test::task::spawn(s.acquire_many_owned(1_u32 << 31)).poll();
+}
+
 #[test]
 fn split() {
     let sem = Arc::new(Semaphore::new(5));
