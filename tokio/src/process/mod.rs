@@ -278,9 +278,9 @@ pub struct Command {
 
 pub(crate) struct SpawnedChild {
     child: imp::Child,
-    stdin: Option<imp::ChildStdio>,
-    stdout: Option<imp::ChildStdio>,
-    stderr: Option<imp::ChildStdio>,
+    stdin: Option<imp::ChildStdin>,
+    stdout: Option<imp::ChildStdout>,
+    stderr: Option<imp::ChildStderr>,
 }
 
 impl Command {
@@ -1478,9 +1478,13 @@ impl Child {
 ///
 /// This type implements the `AsyncWrite` trait to pass data to the stdin
 /// handle of a child process asynchronously.
+///
+/// On Unix, shutting down this stream closes its pipe. Further writes and
+/// conversions to [`Stdio`] or an owned file descriptor return an error.
+/// Accessing the file descriptor with `as_raw_fd` or `as_fd` after shutdown panics.
 #[derive(Debug)]
 pub struct ChildStdin {
-    inner: imp::ChildStdio,
+    inner: imp::ChildStdin,
 }
 
 /// The standard output stream for spawned children.
@@ -1489,7 +1493,7 @@ pub struct ChildStdin {
 /// handle of a child process asynchronously.
 #[derive(Debug)]
 pub struct ChildStdout {
-    inner: imp::ChildStdio,
+    inner: imp::ChildStdout,
 }
 
 /// The standard error stream for spawned children.
@@ -1498,7 +1502,7 @@ pub struct ChildStdout {
 /// handle of a child process asynchronously.
 #[derive(Debug)]
 pub struct ChildStderr {
-    inner: imp::ChildStdio,
+    inner: imp::ChildStderr,
 }
 
 impl ChildStdin {
@@ -1600,7 +1604,7 @@ impl TryInto<Stdio> for ChildStdin {
     type Error = io::Error;
 
     fn try_into(self) -> Result<Stdio, Self::Error> {
-        imp::convert_to_stdio(self.inner)
+        self.inner.into_stdio()
     }
 }
 
@@ -1608,7 +1612,7 @@ impl TryInto<Stdio> for ChildStdout {
     type Error = io::Error;
 
     fn try_into(self) -> Result<Stdio, Self::Error> {
-        imp::convert_to_stdio(self.inner)
+        self.inner.into_stdio()
     }
 }
 
@@ -1616,7 +1620,7 @@ impl TryInto<Stdio> for ChildStderr {
     type Error = io::Error;
 
     fn try_into(self) -> Result<Stdio, Self::Error> {
-        imp::convert_to_stdio(self.inner)
+        self.inner.into_stdio()
     }
 }
 
