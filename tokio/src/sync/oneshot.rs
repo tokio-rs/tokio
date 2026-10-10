@@ -818,7 +818,7 @@ impl<T> Sender<T> {
     /// # }
     /// ```
     pub fn poll_closed(&mut self, cx: &mut Context<'_>) -> Poll<()> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
 
         // Keep track of task budget
         let coop = ready!(crate::task::coop::poll_proceed(cx));
@@ -1315,7 +1315,7 @@ impl<T> Inner<T> {
     }
 
     fn poll_recv(&self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
         // Keep track of task budget
         let coop = ready!(crate::task::coop::poll_proceed(cx));
 

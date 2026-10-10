@@ -170,6 +170,18 @@ async fn alternating() {
 }
 
 #[tokio::test]
+async fn capacity_after_replacing_tasks() {
+    let mut map = JoinMap::new();
+
+    for key in 0..3 {
+        map.spawn(key, pending::<()>());
+    }
+
+    map.spawn(0, pending::<()>());
+    assert_eq!(map.capacity(), 3);
+}
+
+#[tokio::test]
 async fn test_keys() {
     use std::collections::HashSet;
 
@@ -496,6 +508,75 @@ async fn duplicate_keys() {
     assert_eq!(res.unwrap(), 2);
 
     assert!(map.join_next().await.is_none());
+}
+
+#[tokio::test]
+async fn join_empty_map_cooperates() {
+    let mut map = JoinMap::<(), ()>::new();
+    assert!(matches!(map.join_next().now_or_never(), Some(None)));
+
+    let mut task = tokio_test::task::spawn(async {
+        // Large enough to exhaust the cooperative budget.
+        for _ in 0..1000 {
+            assert!(map.join_next().await.is_none());
+        }
+    });
+
+    tokio_test::assert_pending!(task.poll());
+    tokio::task::yield_now().await;
+    assert!(task.is_woken());
+    task.await;
+}
+
+#[cfg(not(target_os = "wasi"))] // The WASI test configuration does not support blocking thread parking.
+#[tokio::test]
+async fn join_empty_map_with_replaced_blocking_task() {
+    let mut map = JoinMap::new();
+    let (started_tx, started_rx) = oneshot::channel();
+    let (release_tx, release_rx) = oneshot::channel::<()>();
+
+    map.spawn_blocking(1, move || {
+        started_tx.send(()).unwrap();
+        let _ = release_rx.blocking_recv();
+    });
+    started_rx.await.unwrap();
+
+    map.spawn(1, async {});
+    let (key, result) = map.join_next().await.unwrap();
+    assert_eq!(key, 1);
+    result.unwrap();
+    assert!(map.is_empty());
+
+    let next = map.join_next().now_or_never();
+    release_tx.send(()).unwrap();
+    assert!(matches!(next, Some(None)));
+}
+
+#[cfg(not(target_os = "wasi"))] // The WASI test configuration does not support blocking thread parking.
+#[tokio::test]
+async fn shutdown_waits_for_replaced_blocking_task() {
+    let mut map = JoinMap::new();
+    let (started_tx, started_rx) = oneshot::channel();
+    let (release_tx, release_rx) = oneshot::channel::<()>();
+    let (finished_tx, mut finished_rx) = oneshot::channel();
+
+    map.spawn_blocking(1, move || {
+        started_tx.send(()).unwrap();
+        let _ = release_rx.blocking_recv();
+        let _ = finished_tx.send(());
+    });
+    started_rx.await.unwrap();
+
+    map.spawn(1, async {});
+    map.join_next().await.unwrap().1.unwrap();
+    assert!(map.is_empty());
+
+    let mut shutdown = Box::pin(map.shutdown());
+    assert!(shutdown.as_mut().now_or_never().is_none());
+    release_tx.send(()).unwrap();
+    shutdown.await;
+    assert!(finished_rx.try_recv().is_ok());
+    assert!(map.is_empty());
 }
 
 #[tokio::test]

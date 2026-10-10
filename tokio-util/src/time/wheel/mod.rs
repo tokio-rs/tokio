@@ -90,7 +90,7 @@ where
     /// already passed. In this case, the caller should fire the timeout
     /// immediately.
     ///
-    /// `Err(Invalid)` indicates an invalid `when` argument as been supplied.
+    /// `Err(Invalid)` indicates an invalid `when` argument has been supplied.
     pub(crate) fn insert(
         &mut self,
         when: u64,
