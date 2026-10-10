@@ -18,7 +18,7 @@ env:
   rust_stable: stable
   rust_nightly: nightly-2025-10-12
   # Pin a specific miri version
-  rust_miri_nightly: nightly-2026-06-29
+  rust_miri_nightly: nightly-2026-08-17
   rust_emscripten_nightly: nightly-2026-08-17
   emsdk_version: '6.0.10'
   rust_clippy: '1.88'
@@ -1424,6 +1424,8 @@ jobs:
             sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
           run: |
             . $HOME/.cargo/env
+            # Workaround for https://github.com/rust-lang/libc/issues/5598
+            cargo update -p libc --precise 0.2.189
             cargo test --workspace --features $TOKIO_STABLE_FEATURES
             # Enable all unstable features except `io_uring` and `taskdump`,
             # which are Linux-only features.
@@ -1453,6 +1455,8 @@ jobs:
             sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_nightly }}
           run: |
             . $HOME/.cargo/env
+            # Workaround for https://github.com/rust-lang/libc/issues/5598
+            cargo update -p libc --precise 0.2.189
             # We use `--features $TOKIO_STABLE_FEATURES,tracing` instead of
             # `--all-features` to exclude `taskdump` and `io_uring`, which are Linux-only
             # features.
@@ -1478,6 +1482,8 @@ jobs:
             sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
           run: |
             . $HOME/.cargo/env
+            # Workaround for https://github.com/rust-lang/libc/issues/5598
+            cargo update -p libc --precise 0.2.189
             rustup target add i686-unknown-freebsd
             cargo test --workspace --features $TOKIO_STABLE_FEATURES \
               --target i686-unknown-freebsd

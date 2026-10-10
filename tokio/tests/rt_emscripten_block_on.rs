@@ -1,7 +1,8 @@
 //! `Runtime::block_on` drives the scheduler synchronously to a fixed point:
 //! immediate futures return their value. A wait that would block suspends on
-//! the host loop when the build linked `-sJSPI` (see `rt_emscripten_jspi`)
-//! and panics when it did not. Both CI lanes run this file.
+//! the host loop when the build linked `-sJSPI` (see `rt_emscripten_jspi`).
+//! Without JSPI a timed wait spins until its deadline and an untimed wait
+//! panics. Both CI lanes run this file.
 
 #![cfg(all(
     target_os = "emscripten",
@@ -84,18 +85,21 @@ fn block_on_drives_many_ready_spawned_tasks() {
 }
 
 #[test]
-fn timer_wait_needs_jspi() {
-    let sleep = || {
-        rt().block_on(async {
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        });
-    };
+fn timer_wait_completes_without_jspi() {
+    // Without JSPI the park spins until the deadline rather than suspending,
+    // so timer-only workloads complete as they did before JSPI support.
+    let start = std::time::Instant::now();
+    rt().block_on(async {
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    });
+    assert!(start.elapsed() >= Duration::from_millis(10));
+}
 
-    if jspi_linked() {
-        sleep();
-    } else {
-        assert_panics_cannot_block_on(sleep);
-    }
+#[test]
+fn timeout_elapses_without_jspi() {
+    let (_tx, rx) = tokio::sync::oneshot::channel::<u32>();
+    let res = rt().block_on(async { tokio::time::timeout(Duration::from_millis(10), rx).await });
+    assert!(res.is_err());
 }
 
 #[test]

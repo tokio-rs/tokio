@@ -46,6 +46,8 @@
 
 # 1.53.0 (July 17th, 2026)
 
+The 1.53.0 release includes all changes up to 1.52.4.
+
 ### Added
 
 - fs: implement `From<OwnedFd>` and `From<OwnedHandle>` for `File` ([#8266])
@@ -167,6 +169,8 @@ This release reverts the LIFO slot stealing change introduced in 1.51.0
 [#8057]: https://github.com/tokio-rs/tokio/pull/8057
 
 # 1.52.0 (April 14th, 2026)
+
+The 1.52.0 release includes all changes up to 1.51.1, but changes in 1.51.2 and later 1.51.x releases are not included.
 
 ## Added
 
@@ -485,6 +489,8 @@ This release reverts the LIFO slot stealing change introduced in 1.51.0
 
 # 1.48.0 (October 14th, 2025)
 
+The 1.48.0 release includes all changes up to 1.47.2, but changes in 1.47.3 and later 1.47.x releases are not included.
+
 The MSRV is increased to 1.71.
 
 ### Added
@@ -510,11 +516,7 @@ The MSRV is increased to 1.71.
 
 ### Fixed
 
-- macros: fix hygiene issue in `join!` and `try_join!` ([#7638])
 - net: fix copy/paste errors in udp peek methods ([#7604])
-- process: fix error when runtime is shut down on nightly-2025-10-12 ([#7672])
-- runtime: use release ordering in `wake_by_ref()` even if already woken ([#7622])
-- sync: close the `broadcast::Sender` in `broadcast::Sender::new()` ([#7629])
 - sync: fix implementation of unused `RwLock::try_*` methods ([#7587])
 
 ### Unstable
@@ -579,11 +581,8 @@ The MSRV is increased to 1.71.
 [#7611]: https://github.com/tokio-rs/tokio/pull/7611
 [#7617]: https://github.com/tokio-rs/tokio/pull/7617
 [#7621]: https://github.com/tokio-rs/tokio/pull/7621
-[#7622]: https://github.com/tokio-rs/tokio/pull/7622
 [#7628]: https://github.com/tokio-rs/tokio/pull/7628
-[#7629]: https://github.com/tokio-rs/tokio/pull/7629
 [#7635]: https://github.com/tokio-rs/tokio/pull/7635
-[#7638]: https://github.com/tokio-rs/tokio/pull/7638
 [#7641]: https://github.com/tokio-rs/tokio/pull/7641
 [#7645]: https://github.com/tokio-rs/tokio/pull/7645
 [#7651]: https://github.com/tokio-rs/tokio/pull/7651
@@ -593,7 +592,6 @@ The MSRV is increased to 1.71.
 [#7665]: https://github.com/tokio-rs/tokio/pull/7665
 [#7666]: https://github.com/tokio-rs/tokio/pull/7666
 [#7669]: https://github.com/tokio-rs/tokio/pull/7669
-[#7672]: https://github.com/tokio-rs/tokio/pull/7672
 [#7675]: https://github.com/tokio-rs/tokio/pull/7675
 
 # 1.47.5 (May 7th, 2026)
@@ -649,6 +647,8 @@ The MSRV is increased to 1.71.
 
 # 1.47.0 (July 25th, 2025)
 
+The 1.47.0 release includes all changes up to 1.46.1.
+
 This release adds `poll_proceed` and `cooperative` to the `coop` module for
 cooperative scheduling, adds `SetOnce` to the `sync` module which provides
 similar functionality to [`std::sync::OnceLock`], and adds a new method
@@ -696,6 +696,8 @@ locations in Tracing events.
 [#7440]: https://github.com/tokio-rs/tokio/pull/7440
 
 # 1.46.0 (July 2nd, 2025)
+
+The 1.46.0 release includes all changes up to 1.45.1.
 
 ## Fixed
 
@@ -765,6 +767,8 @@ is due to the stabilization of the first time-based metric.
 
 # 1.45.0 (May 5th, 2025)
 
+The 1.45.0 release includes all changes up to 1.44.2.
+
 ### Added
 
 - metrics: stabilize `worker_total_busy_duration`, `worker_park_count`, and
@@ -813,6 +817,8 @@ reporting the issue).
 [#7216]: https://github.com/tokio-rs/tokio/pull/7216
 
 # 1.44.0 (March 7th, 2025)
+
+The 1.44.0 release includes all changes up to 1.43.0, but changes in 1.43.1 and later 1.43.x releases are not included.
 
 This release changes the `from_std` method on sockets to panic if a blocking
 socket is provided. We determined this change is not a breaking change as Tokio is not
@@ -935,6 +941,8 @@ reporting the issue).
 
 # 1.43.0 (Jan 8th, 2025)
 
+The 1.43.0 release includes all changes up to 1.42.0, but changes in 1.42.1 are not included.
+
 ### Added
 
 - net: add `UdpSocket::peek` methods ([#7068])
@@ -1002,6 +1010,8 @@ reporting the issue).
 [#7232]: https://github.com/tokio-rs/tokio/pull/7232
 
 # 1.42.0 (Dec 3rd, 2024)
+
+The 1.42.0 release includes all changes up to 1.41.1.
 
 ### Added
 
@@ -1104,6 +1114,8 @@ reporting the issue).
 
 # 1.40.0 (August 30th, 2024)
 
+The 1.40.0 release includes all changes up to 1.39.3.
+
 ### Added
 
 - io: add `util::SimplexStream` ([#6589])
@@ -1173,6 +1185,8 @@ because it contains a bug. ([#6715])
 [#6715]: https://github.com/tokio-rs/tokio/pull/6715
 
 # 1.39.0 (July 23rd, 2024)
+
+The 1.39.0 release includes all changes up to 1.38.1, but changes in 1.38.2 are not included.
 
 Yanked. Please use 1.39.1 instead.
 
@@ -1448,6 +1462,8 @@ stabilize more metrics.
 
 # 1.36.0 (February 2nd, 2024)
 
+The 1.36.0 release includes all changes up to 1.35.1.
+
 ### Added
 
 - io: add `tokio::io::Join` ([#6220])
@@ -1585,6 +1601,8 @@ This is a forward part of a change that was backported to 1.25.3.
 
 # 1.33.0 (October 9, 2023)
 
+The 1.33.0 release includes all changes up to 1.32.0, but changes in 1.32.1 are not included.
+
 ### Fixed
 
 - io: mark `Interest::add` with `#[must_use]` ([#6037])
@@ -1711,6 +1729,8 @@ This is a forward part of a change that was backported to 1.25.3.
 
 # 1.30.0 (August 9, 2023)
 
+The 1.30.0 release includes all changes up to 1.29.1.
+
 This release bumps the MSRV of Tokio to 1.63. ([#5887])
 
 ### Changed
@@ -1776,6 +1796,8 @@ This release bumps the MSRV of Tokio to 1.63. ([#5887])
 [#5837]: https://github.com/tokio-rs/tokio/pull/5837
 
 # 1.29.0 (June 27, 2023)
+
+The 1.29.0 release includes all changes up to 1.28.2.
 
 Technically a breaking change, the `Send` implementation is removed from
 `runtime::EnterGuard`. This change fixes a bug and should not impact most users.
@@ -1955,6 +1977,8 @@ This release bumps the MSRV of Tokio to 1.56. ([#5559])
 
 # 1.26.0 (March 1st, 2023)
 
+The 1.26.0 release includes all changes up to 1.25.0, but changes in 1.25.1 and later 1.25.x releases are not included.
+
 ### Fixed
 
 - macros: fix empty `join!` and `try_join!` ([#5504])
@@ -2065,6 +2089,8 @@ Forward ports 1.18.6 changes.
 
 # 1.25.0 (January 28, 2023)
 
+The 1.25.0 release includes all changes up to 1.24.2.
+
 ### Fixed
 
 - rt: fix runtime metrics reporting ([#5330])
@@ -2098,6 +2124,8 @@ This release fixes a compilation failure on targets without `AtomicU64` when usi
 [#5356]: https://github.com/tokio-rs/tokio/pull/5356
 
 # 1.24.0 (January 5, 2022)
+
+The 1.24.0 release includes all changes up to 1.23.1.
 
 ### Fixed
  - rt: improve native `AtomicU64` support detection ([#5284])
@@ -2156,6 +2184,8 @@ This release forward ports changes from 1.18.4.
  [#5231]: https://github.com/tokio-rs/tokio/pull/5231
 
 # 1.22.0 (November 17, 2022)
+
+The 1.22.0 release includes all changes up to 1.21.2.
 
 ### Added
  - runtime: add `Handle::runtime_flavor` ([#5138])
@@ -2305,6 +2335,8 @@ of 1.21.x, which is the latest minor version at the time of release. ([#5048])
 [#5000]: https://github.com/tokio-rs/tokio/pull/5000
 
 # 1.21.0 (September 2, 2022)
+
+The 1.21.0 release includes all changes up to 1.20.1, but changes in 1.20.2 and later 1.20.x releases are not included.
 
 This release is the first release of Tokio to intentionally support WASM. The
 `sync,macros,io-util,rt,time` features are stabilized on WASM. Additionally the
@@ -2457,6 +2489,8 @@ of the 1.20.x LTS release. ([#5048])
 
 # 1.20.0 (July 12, 2022)
 
+The 1.20.0 release includes all changes up to 1.19.2.
+
 ### Added
 - tokio: add `track_caller` to public APIs ([#4772], [#4791], [#4793], [#4806], [#4808])
 - sync: Add `has_changed` method to `watch::Ref` ([#4758])
@@ -2514,6 +2548,8 @@ This release fixes a bug in `Notified::enable`. ([#4747])
 [#4747]: https://github.com/tokio-rs/tokio/pull/4747
 
 # 1.19.0 (June 3, 2022)
+
+The 1.19.0 release includes all changes up to 1.18.2, but changes in 1.18.3 and later 1.18.x releases are not included.
 
 ### Added
 
@@ -2694,6 +2730,8 @@ The following changes only apply when building with `--cfg tokio_unstable`:
 
 # 1.17.0 (February 16, 2022)
 
+The 1.17.0 release includes all changes up to 1.16.1.
+
 This release updates the minimum supported Rust version (MSRV) to 1.49, the
 `mio` dependency to v0.8, and the (optional) `parking_lot` dependency to v0.12.
 Additionally, it contains several bug fixes, as well as internal refactoring and
@@ -2851,6 +2889,8 @@ The following changes only apply when building with `--cfg tokio_unstable`
 
 # 1.14.0 (November 15, 2021)
 
+The 1.14.0 release includes all changes up to 1.13.1.
+
 ### Fixed
 
 - macros: fix compiler errors when using `mut` patterns in `select!` ([#4211])
@@ -2990,6 +3030,8 @@ The following changes only apply when building with `--cfg tokio_unstable`
 
 # 1.11.0 (August 31, 2021)
 
+The 1.11.0 release includes all changes up to 1.10.1.
+
 ### Fixed
 
  - time: don't panic when Instant is not monotonic ([#4044])
@@ -3072,6 +3114,8 @@ The following changes only apply when building with `--cfg tokio_unstable`
 
 # 1.9.0 (July 22, 2021)
 
+The 1.9.0 release includes all changes up to 1.8.3.
+
 ### Added
 
  - net: allow customized I/O operations for `TcpStream` ([#3888])
@@ -3137,6 +3181,8 @@ Forward ports 1.5.1 fixes.
 
 # 1.8.0 (July 2, 2021)
 
+The 1.8.0 release includes all changes up to 1.7.1, but changes in 1.7.2 are not included.
+
 ### Added
 
 - io: add `get_{ref,mut}` methods to `AsyncFdReadyGuard` and `AsyncFdReadyMutGuard` ([#3807])
@@ -3192,6 +3238,8 @@ Forward ports 1.5.1 fixes.
 [#3870]: https://github.com/tokio-rs/tokio/pull/3870
 
 # 1.7.0 (June 15, 2021)
+
+The 1.7.0 release includes all changes up to 1.6.2, but changes in 1.6.3 are not included.
 
 ### Added
 
@@ -3252,6 +3300,8 @@ a kernel bug. ([#3803])
 [#3803]: https://github.com/tokio-rs/tokio/issues/3803
 
 # 1.6.0 (May 14, 2021)
+
+The 1.6.0 release includes all changes up to 1.5.0, but changes in 1.5.1 are not included.
 
 ### Added
 
@@ -3438,6 +3488,8 @@ a kernel bug. ([#3803])
 
 # 1.2.0 (February 5, 2021)
 
+The 1.2.0 release includes all changes up to 1.1.1.
+
 ### Added
 
 - signal: make `Signal::poll_recv` method public ([#3383])
@@ -3462,6 +3514,8 @@ Forward ports 1.0.3 fix.
 - io: memory leak during shutdown ([#3477]).
 
 # 1.1.0 (January 22, 2021)
+
+The 1.1.0 release includes all changes up to 1.0.2, but changes in 1.0.3 are not included.
 
 ### Added
 

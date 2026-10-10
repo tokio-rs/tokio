@@ -579,7 +579,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// // Drop the guard after the spawned task finishes.
     /// drop(n);
-    ///}
+    /// # }
     /// ```
     pub async fn read_owned(self: Arc<Self>) -> OwnedRwLockReadGuard<T> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
@@ -911,7 +911,7 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// let mut n = lock.write_owned().await;
     /// *n = 2;
-    ///}
+    /// # }
     /// ```
     pub async fn write_owned(self: Arc<Self>) -> OwnedRwLockWriteGuard<T> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
