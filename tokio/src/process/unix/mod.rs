@@ -38,7 +38,7 @@ use crate::runtime::signal::Handle as SignalHandle;
 use crate::signal::unix::{signal, Signal, SignalKind};
 
 use mio::event::Source;
-use mio::unix::pipe::{Receiver, Sender};
+use mio::unix::pipe;
 use std::fmt;
 use std::fs::File;
 use std::future::Future;
@@ -195,7 +195,7 @@ pub(crate) struct ChildStdin {
 
 #[derive(Debug)]
 pub(crate) struct ChildStdout {
-    inner: PollEvented<Receiver>,
+    inner: PollEvented<pipe::Receiver>,
 }
 
 pub(crate) type ChildStderr = ChildStdout;
@@ -204,7 +204,7 @@ impl TryFrom<StdChildStdin> for ChildStdin {
     type Error = io::Error;
 
     fn try_from(io: StdChildStdin) -> io::Result<Self> {
-        let mut pipe = Sender::from(io);
+        let mut pipe = pipe::Sender::from(io);
         set_nonblocking(&mut pipe, true)?;
         PollEvented::new_with_interest(pipe, Interest::WRITABLE).map(|inner| Self { inner })
     }
@@ -214,7 +214,7 @@ impl TryFrom<StdChildStdout> for ChildStdout {
     type Error = io::Error;
 
     fn try_from(io: StdChildStdout) -> io::Result<Self> {
-        let mut pipe = Receiver::from(io);
+        let mut pipe = pipe::Receiver::from(io);
         set_nonblocking(&mut pipe, true)?;
         PollEvented::new_with_interest(pipe, Interest::READABLE).map(|inner| Self { inner })
     }
@@ -224,7 +224,7 @@ impl TryFrom<StdChildStderr> for ChildStdout {
     type Error = io::Error;
 
     fn try_from(io: StdChildStderr) -> io::Result<Self> {
-        let mut pipe = Receiver::from(io);
+        let mut pipe = pipe::Receiver::from(io);
         set_nonblocking(&mut pipe, true)?;
         PollEvented::new_with_interest(pipe, Interest::READABLE).map(|inner| Self { inner })
     }
