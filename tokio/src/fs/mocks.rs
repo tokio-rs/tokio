@@ -58,6 +58,12 @@ mock! {
     impl std::os::unix::io::FromRawFd for File {
         unsafe fn from_raw_fd(h: std::os::unix::io::RawFd) -> Self;
     }
+
+    #[cfg(unix)]
+    impl std::os::unix::fs::FileExt for File {
+        fn read_at(&self, buf: &mut [u8], offset: u64) -> io::Result<usize>;
+        fn write_at(&self, buf: &[u8], offset: u64) -> io::Result<usize>;
+    }
 }
 
 impl Read for MockFile {
