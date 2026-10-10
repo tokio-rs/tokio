@@ -182,7 +182,14 @@ cfg_not_wasi! {
         async_assert_fn!(tokio::fs::rename(&str, &str): Send & Sync & !Unpin);
         async_assert_fn!(tokio::fs::set_permissions(&str, std::fs::Permissions): Send & Sync & !Unpin);
         async_assert_fn!(tokio::fs::symlink_metadata(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::try_exists(&str): Send & Sync & !Unpin);
         async_assert_fn!(tokio::fs::write(&str, Vec<u8>): Send & Sync & !Unpin);
+        #[cfg(unix)]
+        async_assert_fn!(tokio::fs::symlink(&str, &str): Send & Sync & !Unpin);
+        #[cfg(windows)]
+        async_assert_fn!(tokio::fs::symlink_dir(&str, &str): Send & Sync & !Unpin);
+        #[cfg(windows)]
+        async_assert_fn!(tokio::fs::symlink_file(&str, &str): Send & Sync & !Unpin);
         async_assert_fn!(tokio::fs::ReadDir::next_entry(_): Send & Sync & !Unpin);
         async_assert_fn!(tokio::fs::OpenOptions::open(_, &str): Send & Sync & !Unpin);
         async_assert_fn!(tokio::fs::DirBuilder::create(_, &str): Send & Sync & !Unpin);
@@ -190,6 +197,7 @@ cfg_not_wasi! {
         async_assert_fn!(tokio::fs::DirEntry::file_type(_): Send & Sync & !Unpin);
         async_assert_fn!(tokio::fs::File::open(&str): Send & Sync & !Unpin);
         async_assert_fn!(tokio::fs::File::create(&str): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::fs::File::create_new(&str): Send & Sync & !Unpin);
         async_assert_fn!(tokio::fs::File::sync_all(_): Send & Sync & !Unpin);
         async_assert_fn!(tokio::fs::File::sync_data(_): Send & Sync & !Unpin);
         async_assert_fn!(tokio::fs::File::set_len(_, u64): Send & Sync & !Unpin);
