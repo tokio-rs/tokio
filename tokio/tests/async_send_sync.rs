@@ -373,8 +373,14 @@ mod windows_signal {
     use super::*;
     assert_value!(tokio::signal::windows::CtrlC: Send & Sync & Unpin);
     assert_value!(tokio::signal::windows::CtrlBreak: Send & Sync & Unpin);
+    assert_value!(tokio::signal::windows::CtrlClose: Send & Sync & Unpin);
+    assert_value!(tokio::signal::windows::CtrlLogoff: Send & Sync & Unpin);
+    assert_value!(tokio::signal::windows::CtrlShutdown: Send & Sync & Unpin);
     async_assert_fn!(tokio::signal::windows::CtrlC::recv(_): Send & Sync & !Unpin);
     async_assert_fn!(tokio::signal::windows::CtrlBreak::recv(_): Send & Sync & !Unpin);
+    async_assert_fn!(tokio::signal::windows::CtrlClose::recv(_): Send & Sync & !Unpin);
+    async_assert_fn!(tokio::signal::windows::CtrlLogoff::recv(_): Send & Sync & !Unpin);
+    async_assert_fn!(tokio::signal::windows::CtrlShutdown::recv(_): Send & Sync & !Unpin);
 }
 
 assert_value!(tokio::sync::AcquireError: Send & Sync & Unpin);
