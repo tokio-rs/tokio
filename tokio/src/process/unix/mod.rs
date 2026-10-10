@@ -190,7 +190,7 @@ impl Future for Child {
 
 #[derive(Debug)]
 pub(crate) struct ChildStdin {
-    inner: PollEvented<Sender>,
+    inner: PollEvented<pipe::Sender>,
 }
 
 #[derive(Debug)]
