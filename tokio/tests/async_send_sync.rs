@@ -213,6 +213,7 @@ cfg_not_wasi! {
 cfg_not_wasi! {
     assert_value!(tokio::net::TcpSocket: Send & Sync & Unpin);
     async_assert_fn!(tokio::net::TcpListener::bind(SocketAddr): Send & Sync & !Unpin);
+    async_assert_fn!(tokio::net::TcpSocket::connect(_, SocketAddr): Send & Sync & !Unpin);
     async_assert_fn!(tokio::net::TcpStream::connect(SocketAddr): Send & Sync & !Unpin);
 }
 
@@ -224,6 +225,7 @@ assert_value!(tokio::net::tcp::ReadHalf<'_>: Send & Sync & Unpin);
 assert_value!(tokio::net::tcp::ReuniteError: Send & Sync & Unpin);
 assert_value!(tokio::net::tcp::WriteHalf<'_>: Send & Sync & Unpin);
 async_assert_fn!(tokio::net::TcpListener::accept(_): Send & Sync & !Unpin);
+async_assert_fn!(tokio::net::TcpStream::async_io(_, tokio::io::Interest, fn() -> std::io::Result<()>): Send & Sync & !Unpin);
 async_assert_fn!(tokio::net::TcpStream::peek(_, &mut [u8]): Send & Sync & !Unpin);
 async_assert_fn!(tokio::net::TcpStream::readable(_): Send & Sync & !Unpin);
 async_assert_fn!(tokio::net::TcpStream::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
@@ -234,12 +236,17 @@ cfg_not_wasi! {
     mod udp_socket {
         use super::*;
         assert_value!(tokio::net::UdpSocket: Send & Sync & Unpin);
+        async_assert_fn!(tokio::net::UdpSocket::async_io(_, tokio::io::Interest, fn() -> std::io::Result<()>): Send & Sync & !Unpin);
         async_assert_fn!(tokio::net::UdpSocket::bind(SocketAddr): Send & Sync & !Unpin);
         async_assert_fn!(tokio::net::UdpSocket::connect(_, SocketAddr): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::net::UdpSocket::peek(_, &mut [u8]): Send & Sync & !Unpin);
         async_assert_fn!(tokio::net::UdpSocket::peek_from(_, &mut [u8]): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::net::UdpSocket::peek_sender(_): Send & Sync & !Unpin);
         async_assert_fn!(tokio::net::UdpSocket::readable(_): Send & Sync & !Unpin);
         async_assert_fn!(tokio::net::UdpSocket::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
         async_assert_fn!(tokio::net::UdpSocket::recv(_, &mut [u8]): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::net::UdpSocket::recv_buf(_, &mut Vec<u8>): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::net::UdpSocket::recv_buf_from(_, &mut Vec<u8>): Send & Sync & !Unpin);
         async_assert_fn!(tokio::net::UdpSocket::recv_from(_, &mut [u8]): Send & Sync & !Unpin);
         async_assert_fn!(tokio::net::UdpSocket::send(_, &[u8]): Send & Sync & !Unpin);
         async_assert_fn!(tokio::net::UdpSocket::send_to(_, &[u8], SocketAddr): Send & Sync & !Unpin);
@@ -247,7 +254,16 @@ cfg_not_wasi! {
     }
 }
 async_assert_fn!(tokio::net::lookup_host(SocketAddr): Send & Sync & !Unpin);
+async_assert_fn!(tokio::net::tcp::OwnedReadHalf::peek(_, &mut [u8]): Send & Sync & !Unpin);
+async_assert_fn!(tokio::net::tcp::OwnedReadHalf::readable(_): Send & Sync & !Unpin);
+async_assert_fn!(tokio::net::tcp::OwnedReadHalf::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
+async_assert_fn!(tokio::net::tcp::OwnedWriteHalf::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
+async_assert_fn!(tokio::net::tcp::OwnedWriteHalf::writable(_): Send & Sync & !Unpin);
 async_assert_fn!(tokio::net::tcp::ReadHalf::peek(_, &mut [u8]): Send & Sync & !Unpin);
+async_assert_fn!(tokio::net::tcp::ReadHalf::readable(_): Send & Sync & !Unpin);
+async_assert_fn!(tokio::net::tcp::ReadHalf::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
+async_assert_fn!(tokio::net::tcp::WriteHalf::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
+async_assert_fn!(tokio::net::tcp::WriteHalf::writable(_): Send & Sync & !Unpin);
 
 #[cfg(unix)]
 mod unix_datagram {
@@ -255,6 +271,7 @@ mod unix_datagram {
     use tokio::net::*;
     assert_value!(UnixDatagram: Send & Sync & Unpin);
     assert_value!(UnixListener: Send & Sync & Unpin);
+    assert_value!(UnixSocket: Send & Sync & Unpin);
     assert_value!(UnixStream: Send & Sync & Unpin);
     assert_value!(unix::OwnedReadHalf: Send & Sync & Unpin);
     assert_value!(unix::OwnedWriteHalf: Send & Sync & Unpin);
@@ -263,18 +280,32 @@ mod unix_datagram {
     assert_value!(unix::SocketAddr: Send & Sync & Unpin);
     assert_value!(unix::UCred: Send & Sync & Unpin);
     assert_value!(unix::WriteHalf<'_>: Send & Sync & Unpin);
+    async_assert_fn!(UnixDatagram::async_io(_, tokio::io::Interest, fn() -> std::io::Result<()>): Send & Sync & !Unpin);
     async_assert_fn!(UnixDatagram::readable(_): Send & Sync & !Unpin);
     async_assert_fn!(UnixDatagram::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
     async_assert_fn!(UnixDatagram::recv(_, &mut [u8]): Send & Sync & !Unpin);
+    async_assert_fn!(UnixDatagram::recv_buf(_, &mut Vec<u8>): Send & Sync & !Unpin);
+    async_assert_fn!(UnixDatagram::recv_buf_from(_, &mut Vec<u8>): Send & Sync & !Unpin);
     async_assert_fn!(UnixDatagram::recv_from(_, &mut [u8]): Send & Sync & !Unpin);
     async_assert_fn!(UnixDatagram::send(_, &[u8]): Send & Sync & !Unpin);
     async_assert_fn!(UnixDatagram::send_to(_, &[u8], &str): Send & Sync & !Unpin);
     async_assert_fn!(UnixDatagram::writable(_): Send & Sync & !Unpin);
     async_assert_fn!(UnixListener::accept(_): Send & Sync & !Unpin);
+    async_assert_fn!(UnixSocket::connect(_, &str): Send & Sync & !Unpin);
+    async_assert_fn!(UnixStream::async_io(_, tokio::io::Interest, fn() -> std::io::Result<()>): Send & Sync & !Unpin);
     async_assert_fn!(UnixStream::connect(&str): Send & Sync & !Unpin);
+    async_assert_fn!(UnixStream::connect_addr(&unix::SocketAddr): Send & Sync & !Unpin);
     async_assert_fn!(UnixStream::readable(_): Send & Sync & !Unpin);
     async_assert_fn!(UnixStream::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
     async_assert_fn!(UnixStream::writable(_): Send & Sync & !Unpin);
+    async_assert_fn!(unix::OwnedReadHalf::readable(_): Send & Sync & !Unpin);
+    async_assert_fn!(unix::OwnedReadHalf::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
+    async_assert_fn!(unix::OwnedWriteHalf::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
+    async_assert_fn!(unix::OwnedWriteHalf::writable(_): Send & Sync & !Unpin);
+    async_assert_fn!(unix::ReadHalf::readable(_): Send & Sync & !Unpin);
+    async_assert_fn!(unix::ReadHalf::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
+    async_assert_fn!(unix::WriteHalf::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
+    async_assert_fn!(unix::WriteHalf::writable(_): Send & Sync & !Unpin);
 }
 
 #[cfg(unix)]
@@ -301,9 +332,11 @@ mod windows_named_pipe {
     assert_value!(PipeInfo: Send & Sync & Unpin);
     assert_value!(PipeMode: Send & Sync & Unpin);
     assert_value!(ServerOptions: Send & Sync & Unpin);
+    async_assert_fn!(NamedPipeClient::async_io(_, tokio::io::Interest, fn() -> std::io::Result<()>): Send & Sync & !Unpin);
     async_assert_fn!(NamedPipeClient::readable(_): Send & Sync & !Unpin);
     async_assert_fn!(NamedPipeClient::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
     async_assert_fn!(NamedPipeClient::writable(_): Send & Sync & !Unpin);
+    async_assert_fn!(NamedPipeServer::async_io(_, tokio::io::Interest, fn() -> std::io::Result<()>): Send & Sync & !Unpin);
     async_assert_fn!(NamedPipeServer::connect(_): Send & Sync & !Unpin);
     async_assert_fn!(NamedPipeServer::readable(_): Send & Sync & !Unpin);
     async_assert_fn!(NamedPipeServer::ready(_, tokio::io::Interest): Send & Sync & !Unpin);
