@@ -278,9 +278,9 @@ pub struct Command {
 
 pub(crate) struct SpawnedChild {
     child: imp::Child,
-    stdin: Option<imp::ChildStdio>,
-    stdout: Option<imp::ChildStdio>,
-    stderr: Option<imp::ChildStdio>,
+    stdin: Option<imp::ChildStdin>,
+    stdout: Option<imp::ChildStdout>,
+    stderr: Option<imp::ChildStderr>,
 }
 
 impl Command {
@@ -1480,7 +1480,7 @@ impl Child {
 /// handle of a child process asynchronously.
 #[derive(Debug)]
 pub struct ChildStdin {
-    inner: imp::ChildStdio,
+    inner: imp::ChildStdin,
 }
 
 /// The standard output stream for spawned children.
@@ -1489,7 +1489,7 @@ pub struct ChildStdin {
 /// handle of a child process asynchronously.
 #[derive(Debug)]
 pub struct ChildStdout {
-    inner: imp::ChildStdio,
+    inner: imp::ChildStdout,
 }
 
 /// The standard error stream for spawned children.
@@ -1498,7 +1498,7 @@ pub struct ChildStdout {
 /// handle of a child process asynchronously.
 #[derive(Debug)]
 pub struct ChildStderr {
-    inner: imp::ChildStdio,
+    inner: imp::ChildStderr,
 }
 
 impl ChildStdin {
@@ -1600,7 +1600,7 @@ impl TryInto<Stdio> for ChildStdin {
     type Error = io::Error;
 
     fn try_into(self) -> Result<Stdio, Self::Error> {
-        imp::convert_to_stdio(self.inner)
+        self.inner.into_stdio()
     }
 }
 
@@ -1608,7 +1608,7 @@ impl TryInto<Stdio> for ChildStdout {
     type Error = io::Error;
 
     fn try_into(self) -> Result<Stdio, Self::Error> {
-        imp::convert_to_stdio(self.inner)
+        self.inner.into_stdio()
     }
 }
 
@@ -1616,7 +1616,7 @@ impl TryInto<Stdio> for ChildStderr {
     type Error = io::Error;
 
     fn try_into(self) -> Result<Stdio, Self::Error> {
-        imp::convert_to_stdio(self.inner)
+        self.inner.into_stdio()
     }
 }
 

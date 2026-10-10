@@ -37,14 +37,18 @@ use crate::process::SpawnedChild;
 use crate::runtime::signal::Handle as SignalHandle;
 use crate::signal::unix::{signal, Signal, SignalKind};
 
+use mio::event::Source;
 use mio::unix::pipe::{Receiver, Sender};
 use std::fmt;
 use std::fs::File;
 use std::future::Future;
 use std::io;
-use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd};
+use std::os::unix::io::{AsRawFd, OwnedFd, RawFd};
 use std::pin::Pin;
-use std::process::{Child as StdChild, ChildStderr, ChildStdin, ChildStdout, ExitStatus, Stdio};
+use std::process::{
+    Child as StdChild, ChildStderr as StdChildStderr, ChildStdin as StdChildStdin,
+    ChildStdout as StdChildStdout, ExitStatus, Stdio,
+};
 use std::task::Context;
 use std::task::Poll;
 
@@ -185,46 +189,52 @@ impl Future for Child {
 }
 
 #[derive(Debug)]
-pub(crate) enum ChildStdio {
-    Read(PollEvented<Receiver>),
-    Write(PollEvented<Sender>),
+pub(crate) struct ChildStdin {
+    inner: PollEvented<Sender>,
 }
 
-impl TryFrom<ChildStdin> for ChildStdio {
+#[derive(Debug)]
+pub(crate) struct ChildStdout {
+    inner: PollEvented<Receiver>,
+}
+
+pub(crate) type ChildStderr = ChildStdout;
+
+impl TryFrom<StdChildStdin> for ChildStdin {
     type Error = io::Error;
 
-    fn try_from(io: ChildStdin) -> io::Result<Self> {
+    fn try_from(io: StdChildStdin) -> io::Result<Self> {
         let mut pipe = Sender::from(io);
         set_nonblocking(&mut pipe, true)?;
-        PollEvented::new_with_interest(pipe, Interest::WRITABLE).map(Self::Write)
+        PollEvented::new_with_interest(pipe, Interest::WRITABLE).map(|inner| Self { inner })
     }
 }
 
-impl TryFrom<ChildStdout> for ChildStdio {
+impl TryFrom<StdChildStdout> for ChildStdout {
     type Error = io::Error;
 
-    fn try_from(io: ChildStdout) -> io::Result<Self> {
+    fn try_from(io: StdChildStdout) -> io::Result<Self> {
         let mut pipe = Receiver::from(io);
         set_nonblocking(&mut pipe, true)?;
-        PollEvented::new_with_interest(pipe, Interest::READABLE).map(Self::Read)
+        PollEvented::new_with_interest(pipe, Interest::READABLE).map(|inner| Self { inner })
     }
 }
 
-impl TryFrom<ChildStderr> for ChildStdio {
+impl TryFrom<StdChildStderr> for ChildStdout {
     type Error = io::Error;
 
-    fn try_from(io: ChildStderr) -> io::Result<Self> {
+    fn try_from(io: StdChildStderr) -> io::Result<Self> {
         let mut pipe = Receiver::from(io);
         set_nonblocking(&mut pipe, true)?;
-        PollEvented::new_with_interest(pipe, Interest::READABLE).map(Self::Read)
+        PollEvented::new_with_interest(pipe, Interest::READABLE).map(|inner| Self { inner })
     }
 }
 
-fn convert_to_blocking_file(io: ChildStdio) -> io::Result<File> {
-    let fd: OwnedFd = match io {
-        ChildStdio::Read(io) => io.into_inner()?.into(),
-        ChildStdio::Write(io) => io.into_inner()?.into(),
-    };
+fn convert_to_blocking_file<T>(io: PollEvented<T>) -> io::Result<File>
+where
+    T: Source + Into<OwnedFd>,
+{
+    let fd: OwnedFd = io.into_inner()?.into();
     let mut fd = File::from(fd);
 
     // Ensure that the fd to be inherited is set to *blocking* mode, as this
@@ -236,41 +246,45 @@ fn convert_to_blocking_file(io: ChildStdio) -> io::Result<File> {
     Ok(fd)
 }
 
-pub(crate) fn convert_to_stdio(io: ChildStdio) -> io::Result<Stdio> {
-    convert_to_blocking_file(io).map(Stdio::from)
-}
-
-impl ChildStdio {
+impl ChildStdin {
     pub(super) fn into_owned_fd(self) -> io::Result<OwnedFd> {
-        convert_to_blocking_file(self).map(OwnedFd::from)
+        convert_to_blocking_file(self.inner).map(OwnedFd::from)
+    }
+
+    pub(super) fn into_stdio(self) -> io::Result<Stdio> {
+        convert_to_blocking_file(self.inner).map(Stdio::from)
     }
 }
 
-impl AsRawFd for ChildStdio {
+impl ChildStdout {
+    pub(super) fn into_owned_fd(self) -> io::Result<OwnedFd> {
+        convert_to_blocking_file(self.inner).map(OwnedFd::from)
+    }
+
+    pub(super) fn into_stdio(self) -> io::Result<Stdio> {
+        convert_to_blocking_file(self.inner).map(Stdio::from)
+    }
+}
+
+impl AsRawFd for ChildStdin {
     fn as_raw_fd(&self) -> RawFd {
-        self.as_fd().as_raw_fd()
+        self.inner.as_raw_fd()
     }
 }
 
-impl AsFd for ChildStdio {
-    fn as_fd(&self) -> BorrowedFd<'_> {
-        match self {
-            Self::Read(io) => io.as_fd(),
-            Self::Write(io) => io.as_fd(),
-        }
+impl AsRawFd for ChildStdout {
+    fn as_raw_fd(&self) -> RawFd {
+        self.inner.as_raw_fd()
     }
 }
 
-impl AsyncWrite for ChildStdio {
+impl AsyncWrite for ChildStdin {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        match &*self {
-            Self::Write(io) => io.poll_write(cx, buf),
-            Self::Read(_) => Poll::Ready(Err(io::Error::from_raw_os_error(libc::EBADF))),
-        }
+        self.inner.poll_write(cx, buf)
     }
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -286,10 +300,7 @@ impl AsyncWrite for ChildStdio {
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<Result<usize, io::Error>> {
-        match &*self {
-            Self::Write(io) => io.poll_write_vectored(cx, bufs),
-            Self::Read(_) => Poll::Ready(Err(io::Error::from_raw_os_error(libc::EBADF))),
-        }
+        self.inner.poll_write_vectored(cx, bufs)
     }
 
     fn is_write_vectored(&self) -> bool {
@@ -297,17 +308,14 @@ impl AsyncWrite for ChildStdio {
     }
 }
 
-impl AsyncRead for ChildStdio {
+impl AsyncRead for ChildStdout {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        match &*self {
-            // SAFETY: Receiver reads into the buffer without inspecting uninitialized bytes.
-            Self::Read(io) => unsafe { io.poll_read(cx, buf) },
-            Self::Write(_) => Poll::Ready(Err(io::Error::from_raw_os_error(libc::EBADF))),
-        }
+        // SAFETY: Receiver reads into the buffer without inspecting uninitialized bytes.
+        unsafe { self.inner.poll_read(cx, buf) }
     }
 }
 
@@ -334,9 +342,9 @@ fn set_nonblocking<T: AsRawFd>(fd: &mut T, nonblocking: bool) -> io::Result<()> 
     Ok(())
 }
 
-pub(super) fn stdio<T>(io: T) -> io::Result<ChildStdio>
+pub(super) fn stdio<T, U>(io: T) -> io::Result<U>
 where
-    ChildStdio: TryFrom<T, Error = io::Error>,
+    U: TryFrom<T, Error = io::Error>,
 {
-    ChildStdio::try_from(io)
+    U::try_from(io)
 }
