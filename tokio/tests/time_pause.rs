@@ -339,3 +339,44 @@ fn poll_next(interval: &mut task::Spawn<time::Interval>) -> Poll<Instant> {
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
+
+#[cfg(all(feature = "full", unix))]
+#[tokio::test(start_paused = true)]
+async fn paused_time_join_unix_datagram_and_sleep() {
+    use tokio::net::UnixDatagram;
+
+    let time = Instant::now();
+    let (sock1, sock2) = UnixDatagram::pair().unwrap();
+    let mut buf = [0u8; 1];
+    tokio::join!(
+        async {
+            sock1.send(&[1u8]).await.unwrap();
+            time::sleep(Duration::from_millis(100)).await;
+        },
+        async {
+            sock2.recv(&mut buf).await.unwrap();
+            assert_eq!(time.elapsed(), Duration::ZERO);
+        },
+    );
+}
+
+#[cfg(all(feature = "full", unix))]
+#[tokio::test(start_paused = true)]
+async fn paused_time_spawn_unix_datagram_and_sleep() {
+    use tokio::net::UnixDatagram;
+
+    let time = Instant::now();
+    let (sock1, sock2) = UnixDatagram::pair().unwrap();
+
+    sock1.send(&[1u8]).await.unwrap();
+
+    let h = tokio::spawn(async move {
+        let mut buf = [0u8; 1];
+        sock2.recv(&mut buf).await.unwrap();
+        assert_eq!(time.elapsed(), Duration::ZERO);
+    });
+
+    time::sleep(Duration::from_millis(100)).await;
+    h.await.unwrap();
+    assert_eq!(time.elapsed(), Duration::from_millis(100));
+}
