@@ -754,6 +754,9 @@ mod unix_asyncfd {
     assert_value!(AsyncFdReadyMutGuard<'_, ImplsFd<YY>>: Send & Sync & Unpin);
     assert_value!(AsyncFdReadyMutGuard<'_, ImplsFd<YN>>: Send & !Sync & Unpin);
     assert_value!(AsyncFdReadyMutGuard<'_, ImplsFd<NN>>: !Send & !Sync & Unpin);
+    assert_value!(AsyncFdRegisterError<ImplsFd<YY>>: Send & Sync & Unpin);
+    assert_value!(AsyncFdRegisterError<ImplsFd<YN>>: Send & !Sync & Unpin);
+    assert_value!(AsyncFdRegisterError<ImplsFd<NN>>: !Send & !Sync & Unpin);
     assert_value!(TryIoError: Send & Sync & Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<YY>>::readable(_): Send & Sync & !Unpin);
     async_assert_fn!(AsyncFd<ImplsFd<YY>>::readable_mut(_): Send & Sync & !Unpin);
