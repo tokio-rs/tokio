@@ -956,3 +956,57 @@ mod local_runtime {
     assert_value!(tokio::runtime::LocalRuntime: !Send & !Sync & Unpin);
     assert_value!(tokio::runtime::LocalOptions: !Send & !Sync & Unpin);
 }
+
+#[cfg(tokio_unstable)]
+mod unstable {
+    use super::*;
+
+    assert_value!(tokio::runtime::HistogramConfiguration: Send & Sync & Unpin);
+    assert_value!(tokio::runtime::HistogramScale: Send & Sync & Unpin);
+    assert_value!(tokio::runtime::InvalidHistogramConfiguration: Send & Sync & Unpin);
+    assert_value!(tokio::runtime::LogHistogram: Send & Sync & Unpin);
+    assert_value!(tokio::runtime::LogHistogramBuilder: Send & Sync & Unpin);
+    assert_value!(tokio::runtime::RngSeed: Send & Sync & Unpin);
+    assert_value!(tokio::runtime::TaskMeta<'_>: Send & Sync & Unpin);
+    assert_value!(tokio::runtime::UnhandledPanic: Send & Sync & Unpin);
+
+    #[cfg(all(
+        feature = "taskdump",
+        target_os = "linux",
+        any(
+            target_arch = "aarch64",
+            target_arch = "x86",
+            target_arch = "x86_64",
+            target_arch = "s390x"
+        )
+    ))]
+    mod taskdump {
+        use super::*;
+
+        assert_value!(tokio::runtime::Dump: Send & Sync & Unpin);
+        assert_value!(tokio::runtime::dump::Backtrace: Send & Sync & Unpin);
+        assert_value!(tokio::runtime::dump::BacktraceFrame: Send & Sync & Unpin);
+        assert_value!(tokio::runtime::dump::BacktraceSymbol: Send & Sync & Unpin);
+        assert_value!(tokio::runtime::dump::Root<BoxFuture<()>>: !Send & !Sync & Unpin);
+        assert_value!(tokio::runtime::dump::Root<BoxFutureSend<()>>: Send & !Sync & Unpin);
+        assert_value!(tokio::runtime::dump::Root<BoxFutureSync<()>>: Send & Sync & Unpin);
+        assert_value!(tokio::runtime::dump::Task: Send & Sync & Unpin);
+        assert_value!(tokio::runtime::dump::Tasks: Send & Sync & Unpin);
+        assert_value!(tokio::runtime::dump::Trace: Send & Sync & Unpin);
+        assert_value!(tokio::runtime::dump::TraceMeta: !Send & !Sync & Unpin);
+        async_assert_fn!(tokio::runtime::Handle::dump(_): Send & Sync & !Unpin);
+        async_assert_fn!(tokio::runtime::dump::Trace::root(BoxFuture<()>): !Send & !Sync & Unpin);
+        async_assert_fn!(tokio::runtime::dump::Trace::root(BoxFutureSend<()>): Send & !Sync & Unpin);
+        async_assert_fn!(tokio::runtime::dump::Trace::root(BoxFutureSync<()>): Send & Sync & Unpin);
+    }
+
+    #[cfg(feature = "tracing")]
+    mod tracing {
+        use super::*;
+
+        assert_value!(tokio::task::Builder<'_>: Send & Sync & Unpin);
+        assert_value!(tokio::task::join_set::Builder<'_, NN>: !Send & !Sync & Unpin);
+        assert_value!(tokio::task::join_set::Builder<'_, YN>: Send & Sync & Unpin);
+        assert_value!(tokio::task::join_set::Builder<'_, YY>: Send & Sync & Unpin);
+    }
+}
