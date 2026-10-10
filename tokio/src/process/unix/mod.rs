@@ -30,21 +30,21 @@ use reap::Reaper;
 #[cfg(all(target_os = "linux", feature = "rt"))]
 mod pidfd_reaper;
 
+use crate::io::interest::Interest;
 use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
 use crate::process::kill::Kill;
 use crate::process::SpawnedChild;
 use crate::runtime::signal::Handle as SignalHandle;
 use crate::signal::unix::{signal, Signal, SignalKind};
 
-use mio::event::Source;
-use mio::unix::SourceFd;
+use mio::unix::pipe::{Receiver, Sender};
 use std::fmt;
 use std::fs::File;
 use std::future::Future;
 use std::io;
-use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
+use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd};
 use std::pin::Pin;
-use std::process::{Child as StdChild, ExitStatus, Stdio};
+use std::process::{Child as StdChild, ChildStderr, ChildStdin, ChildStdout, ExitStatus, Stdio};
 use std::task::Context;
 use std::task::Poll;
 
@@ -185,53 +185,47 @@ impl Future for Child {
 }
 
 #[derive(Debug)]
-pub(crate) struct Pipe {
-    // Actually a pipe is not a File. However, we are reusing `File` to get
-    // close on drop. This is a similar trick as `mio`.
-    fd: File,
+pub(crate) enum ChildStdio {
+    Read(PollEvented<Receiver>),
+    Write(PollEvented<Sender>),
 }
 
-impl<T: IntoRawFd> From<T> for Pipe {
-    fn from(fd: T) -> Self {
-        let fd = unsafe { File::from_raw_fd(fd.into_raw_fd()) };
-        Self { fd }
-    }
-}
+impl TryFrom<ChildStdin> for ChildStdio {
+    type Error = io::Error;
 
-impl io::Read for &Pipe {
-    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
-        (&self.fd).read(bytes)
+    fn try_from(io: ChildStdin) -> io::Result<Self> {
+        let mut pipe = Sender::from(io);
+        set_nonblocking(&mut pipe, true)?;
+        PollEvented::new_with_interest(pipe, Interest::WRITABLE).map(Self::Write)
     }
 }
 
-impl io::Write for &Pipe {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        (&self.fd).write(bytes)
-    }
+impl TryFrom<ChildStdout> for ChildStdio {
+    type Error = io::Error;
 
-    fn flush(&mut self) -> io::Result<()> {
-        (&self.fd).flush()
-    }
-
-    fn write_vectored(&mut self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
-        (&self.fd).write_vectored(bufs)
+    fn try_from(io: ChildStdout) -> io::Result<Self> {
+        let mut pipe = Receiver::from(io);
+        set_nonblocking(&mut pipe, true)?;
+        PollEvented::new_with_interest(pipe, Interest::READABLE).map(Self::Read)
     }
 }
 
-impl AsRawFd for Pipe {
-    fn as_raw_fd(&self) -> RawFd {
-        self.fd.as_raw_fd()
-    }
-}
+impl TryFrom<ChildStderr> for ChildStdio {
+    type Error = io::Error;
 
-impl AsFd for Pipe {
-    fn as_fd(&self) -> BorrowedFd<'_> {
-        unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+    fn try_from(io: ChildStderr) -> io::Result<Self> {
+        let mut pipe = Receiver::from(io);
+        set_nonblocking(&mut pipe, true)?;
+        PollEvented::new_with_interest(pipe, Interest::READABLE).map(Self::Read)
     }
 }
 
 fn convert_to_blocking_file(io: ChildStdio) -> io::Result<File> {
-    let mut fd = io.inner.into_inner()?.fd;
+    let fd: OwnedFd = match io {
+        ChildStdio::Read(io) => io.into_inner()?.into(),
+        ChildStdio::Write(io) => io.into_inner()?.into(),
+    };
+    let mut fd = File::from(fd);
 
     // Ensure that the fd to be inherited is set to *blocking* mode, as this
     // is the default that virtually all programs expect to have. Those
@@ -246,55 +240,24 @@ pub(crate) fn convert_to_stdio(io: ChildStdio) -> io::Result<Stdio> {
     convert_to_blocking_file(io).map(Stdio::from)
 }
 
-impl Source for Pipe {
-    fn register(
-        &mut self,
-        registry: &mio::Registry,
-        token: mio::Token,
-        interest: mio::Interest,
-    ) -> io::Result<()> {
-        SourceFd(&self.as_raw_fd()).register(registry, token, interest)
-    }
-
-    fn reregister(
-        &mut self,
-        registry: &mio::Registry,
-        token: mio::Token,
-        interest: mio::Interest,
-    ) -> io::Result<()> {
-        SourceFd(&self.as_raw_fd()).reregister(registry, token, interest)
-    }
-
-    fn deregister(&mut self, registry: &mio::Registry) -> io::Result<()> {
-        SourceFd(&self.as_raw_fd()).deregister(registry)
-    }
-}
-
-pub(crate) struct ChildStdio {
-    inner: PollEvented<Pipe>,
-}
-
 impl ChildStdio {
     pub(super) fn into_owned_fd(self) -> io::Result<OwnedFd> {
         convert_to_blocking_file(self).map(OwnedFd::from)
     }
 }
 
-impl fmt::Debug for ChildStdio {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(fmt)
-    }
-}
-
 impl AsRawFd for ChildStdio {
     fn as_raw_fd(&self) -> RawFd {
-        self.inner.as_raw_fd()
+        self.as_fd().as_raw_fd()
     }
 }
 
 impl AsFd for ChildStdio {
     fn as_fd(&self) -> BorrowedFd<'_> {
-        unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+        match self {
+            Self::Read(io) => io.as_fd(),
+            Self::Write(io) => io.as_fd(),
+        }
     }
 }
 
@@ -304,7 +267,10 @@ impl AsyncWrite for ChildStdio {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.inner.poll_write(cx, buf)
+        match &*self {
+            Self::Write(io) => io.poll_write(cx, buf),
+            Self::Read(_) => Poll::Ready(Err(io::Error::from_raw_os_error(libc::EBADF))),
+        }
     }
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -320,7 +286,10 @@ impl AsyncWrite for ChildStdio {
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<Result<usize, io::Error>> {
-        self.inner.poll_write_vectored(cx, bufs)
+        match &*self {
+            Self::Write(io) => io.poll_write_vectored(cx, bufs),
+            Self::Read(_) => Poll::Ready(Err(io::Error::from_raw_os_error(libc::EBADF))),
+        }
     }
 
     fn is_write_vectored(&self) -> bool {
@@ -334,8 +303,11 @@ impl AsyncRead for ChildStdio {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        // Safety: pipes support reading into uninitialized memory
-        unsafe { self.inner.poll_read(cx, buf) }
+        match &*self {
+            // SAFETY: Receiver reads into the buffer without inspecting uninitialized bytes.
+            Self::Read(io) => unsafe { io.poll_read(cx, buf) },
+            Self::Write(_) => Poll::Ready(Err(io::Error::from_raw_os_error(libc::EBADF))),
+        }
     }
 }
 
@@ -364,11 +336,7 @@ fn set_nonblocking<T: AsRawFd>(fd: &mut T, nonblocking: bool) -> io::Result<()> 
 
 pub(super) fn stdio<T>(io: T) -> io::Result<ChildStdio>
 where
-    T: IntoRawFd,
+    ChildStdio: TryFrom<T, Error = io::Error>,
 {
-    // Set the fd to nonblocking before we pass it to the event loop
-    let mut pipe = Pipe::from(io);
-    set_nonblocking(&mut pipe, true)?;
-
-    PollEvented::new(pipe).map(|inner| ChildStdio { inner })
+    ChildStdio::try_from(io)
 }

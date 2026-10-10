@@ -57,22 +57,12 @@ async fn child_stdout_receives_second_chunk_before_exit() {
 
     let mut stdin = child.stdin.take().unwrap();
     let mut stdout = child.stdout.take().unwrap();
-    let result = timeout(
+    timeout(
         Duration::from_secs(5),
         read_chunks(&mut stdout, &mut stdin, b"chunk1\n", b"chunk2\n"),
     )
-    .await;
-
-    // The current SourceFd implementation misses rearming on poll selectors.
-    if cfg!(any(
-        mio_unsupported_force_poll_poll,
-        target_os = "cygwin",
-        target_os = "solaris",
-    )) {
-        assert!(result.is_err(), "expected the existing stdout poll stall");
-        return;
-    }
-    result.expect("stdout stalled while the child was still alive");
+    .await
+    .expect("stdout stalled while the child was still alive");
 
     let status = timeout(Duration::from_secs(5), child.wait())
         .await
@@ -97,22 +87,12 @@ async fn child_stderr_receives_second_chunk_before_exit() {
 
     let mut stdin = child.stdin.take().unwrap();
     let mut stderr = child.stderr.take().unwrap();
-    let result = timeout(
+    timeout(
         Duration::from_secs(5),
         read_chunks(&mut stderr, &mut stdin, b"err1\n", b"err2\n"),
     )
-    .await;
-
-    // The current SourceFd implementation misses rearming on poll selectors.
-    if cfg!(any(
-        mio_unsupported_force_poll_poll,
-        target_os = "cygwin",
-        target_os = "solaris",
-    )) {
-        assert!(result.is_err(), "expected the existing stderr poll stall");
-        return;
-    }
-    result.expect("stderr stalled while the child was still alive");
+    .await
+    .expect("stderr stalled while the child was still alive");
 
     let status = timeout(Duration::from_secs(5), child.wait())
         .await
@@ -138,7 +118,7 @@ async fn child_stdin_rearms_after_pipe_is_full() {
     let mut stdin = child.stdin.take().unwrap();
     let mut stdout = child.stdout.take().unwrap();
     let mut written = 0;
-    let result = timeout(Duration::from_secs(5), async {
+    timeout(Duration::from_secs(5), async {
         // The child waits on a separate socket while we fill its stdin pipe.
         // Disable cooperative yielding so Pending means the pipe is full.
         tokio::task::coop::unconstrained(poll_fn(|cx| loop {
@@ -163,16 +143,6 @@ async fn child_stdin_rearms_after_pipe_is_full() {
         assert_eq!(output.trim().parse::<usize>().unwrap(), written + 1);
         assert!(child.wait().await.unwrap().success());
     })
-    .await;
-
-    // The current SourceFd implementation misses rearming on poll selectors.
-    if cfg!(any(
-        mio_unsupported_force_poll_poll,
-        target_os = "cygwin",
-        target_os = "solaris",
-    )) {
-        assert!(result.is_err(), "expected the existing stdin poll stall");
-        return;
-    }
-    result.expect("stdin stalled after the child started reading");
+    .await
+    .expect("stdin stalled after the child started reading");
 }
