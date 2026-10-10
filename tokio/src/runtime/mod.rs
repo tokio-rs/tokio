@@ -166,8 +166,11 @@
 //!
 //! The multi-thread scheduler executes futures on a _thread pool_, using a
 //! work-stealing strategy. By default, it will start a worker thread for each
-//! CPU core available on the system. This tends to be the ideal configuration
-//! for most applications. The multi-thread scheduler requires the `rt-multi-thread`
+//! CPU core available on the system, calculated via [`std::thread::available_parallelism`] (consult its
+//! documentation regarding runtime caveats).
+//! You can override this default by setting the `TOKIO_WORKER_THREADS` environment variable
+//! or calling [`Builder::worker_threads`].
+//! This tends to be the ideal configuration for most applications. The multi-thread scheduler requires the `rt-multi-thread`
 //! feature flag, and is selected by default:
 //! ```
 //! # #[cfg(not(target_family = "wasm"))]

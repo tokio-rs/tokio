@@ -537,11 +537,13 @@ impl Builder {
     ///
     /// # Default
     ///
-    /// The default value is the number of cores available to the system.
+    /// The default value relies on [`std::thread::available_parallelism`] to determine
+    /// the number of available cores. Please refer to its documentation for specific platform caveats.
     ///
-    /// When using the `current_thread` runtime this method has no effect.
+    /// You can override this default using the `TOKIO_WORKER_THREADS` environment variable
+    /// or calling [`Builder::worker_threads`]
     ///
-    /// # Examples
+    /// /// # Examples
     ///
     /// ## Multi threaded runtime with 4 threads
     ///
