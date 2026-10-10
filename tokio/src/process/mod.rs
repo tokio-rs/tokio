@@ -1478,6 +1478,10 @@ impl Child {
 ///
 /// This type implements the `AsyncWrite` trait to pass data to the stdin
 /// handle of a child process asynchronously.
+///
+/// On Unix, shutting down this stream closes its pipe. Further writes and
+/// conversions to [`Stdio`] or an owned file descriptor return an error.
+/// Accessing the file descriptor with `as_raw_fd` or `as_fd` after shutdown panics.
 #[derive(Debug)]
 pub struct ChildStdin {
     inner: imp::ChildStdin,
