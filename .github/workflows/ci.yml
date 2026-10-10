@@ -18,7 +18,7 @@ env:
   rust_stable: 1.94
   rust_nightly: nightly-2025-10-12
   # Pin a specific miri version
-  rust_miri_nightly: nightly-2025-11-13
+  rust_miri_nightly: nightly-2026-08-17
   rust_clippy: '1.88'
   # When updating this, also update:
   # - README.md
@@ -822,12 +822,12 @@ jobs:
           cargo clippy --workspace --tests --no-deps --features $TOKIO_STABLE_FEATURES
           # Removing the tokio workspace patch to check without path dependencies
           # (if not specified differently in the crate)
+          cp Cargo.lock Cargo.lock.bak
           perl -0 -i.bak -pe 's/\[patch\.crates-io\].+\n\[/[/s' Cargo.toml
           cargo clippy --workspace --exclude tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
       - name: "clippy --workspace --all-features --unstable"
         run: |
-          # Forcing the cargo lock regeneration to apply the tokio patch
-          rm Cargo.lock
+          mv Cargo.lock.bak Cargo.lock
           mv Cargo.toml Cargo.toml.nopatch
           mv Cargo.toml.bak Cargo.toml
           cargo clippy --workspace --tests --no-deps --all-features
