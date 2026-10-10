@@ -3,8 +3,10 @@
 //! Tasks live in `NUM_SHARDS` queues, each with its own mutex. Spawners push
 //! to a shard chosen via the thread-local RNG; workers pop by scanning the
 //! shards, initially starting from one derived from their worker id. Workers
-//! take at most `TASKS_PER_SHARD` tasks from each shard before moving on. A mask
-//! tracks which shards have tasks so scans rarely lock empty shards.
+//! take at most `TASKS_PER_SHARD` tasks from each shard before moving on. At a
+//! batch boundary, workers try the candidate lock and skip it if another
+//! worker got there first. A mask tracks which shards have tasks so scans
+//! rarely lock empty shards.
 //!
 //! Worker lifecycle (thread spawning, parking/waking, timeouts, shutdown) is
 //! coordinated by the `coord` mutex + `condvar`, using the same claim
@@ -158,7 +160,22 @@ impl ShardedImpl {
             // NUM_SHARDS divides the word size, this also wraps their index.
             let index = (start + mask.trailing_zeros() as usize) % NUM_SHARDS;
 
-            let mut shard = self.shards[index].lock();
+            // Only the first task of a batch uses a non-blocking lock. If
+            // workers have synchronized cursors, one of them will skip this
+            // shard and continue scanning instead of waiting on its peer;
+            // after a shard is selected, the rest of the bounded batch keeps
+            // the usual lock path and locality.
+            let mut shard = if cursor.remaining == TASKS_PER_SHARD {
+                match self.shards[index].try_lock() {
+                    Some(shard) => shard,
+                    None => {
+                        mask &= mask - 1;
+                        continue;
+                    }
+                }
+            } else {
+                self.shards[index].lock()
+            };
             match shard.queue.pop_front() {
                 Some(task) => {
                     if shard.queue.is_empty() {
@@ -617,5 +634,35 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn pop_skips_contended_shard_at_batch_boundary() {
+        let rt = Builder::new_current_thread().build().unwrap();
+        let queue = ShardedImpl::new(ThreadManagementState {
+            shutdown: false,
+            shutdown_tx: None,
+            last_exiting_thread: None,
+            worker_threads: HashMap::new(),
+            worker_thread_index: 0,
+        });
+        let (tx, rx) = mpsc::channel();
+
+        for index in 0..2 {
+            let tx = tx.clone();
+            let task = blocking_task_for_test(rt.handle(), move || {
+                tx.send(index).unwrap();
+            });
+            queue.shards[index].lock().queue.push_back(task);
+            queue.non_empty_mask.fetch_or(1 << index, Ordering::Relaxed);
+        }
+        drop(tx);
+
+        // The first pop is at a batch boundary. Holding shard 0 models a
+        // synchronized worker that got there first; shard 1 must be tried.
+        let _guard = queue.shards[0].lock();
+        let mut cursor = PopCursor::new(0);
+        queue.pop(&mut cursor).unwrap().run();
+        assert_eq!(rx.recv().unwrap(), 1);
     }
 }
