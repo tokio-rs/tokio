@@ -21,23 +21,31 @@ impl std::fmt::Debug for Timer {
 impl Timer {
     #[track_caller]
     pub(crate) fn new(handle: &scheduler::Handle, deadline: u64) -> Self {
-        let entry = with_current_temp_local_context(handle, |ctx| match ctx {
-            Some(TempLocalContext::Running { registration_queue }) => {
-                let entry = EntryHandle::new(deadline);
-                unsafe { registration_queue.push_front(entry.clone()) }
-                entry
-            }
+        Self::register(handle, EntryHandle::new(deadline))
+    }
+
+    #[track_caller]
+    fn register(handle: &scheduler::Handle, entry: EntryHandle) -> Self {
+        with_current_temp_local_context(handle, |ctx| match ctx {
+            Some(TempLocalContext::Running { registration_queue }) => unsafe {
+                registration_queue.push_front(entry.clone())
+            },
             #[cfg(feature = "rt-multi-thread")]
             Some(TempLocalContext::Shutdown) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
 
             _ => {
-                let entry = EntryHandle::new(deadline);
                 push_from_remote(handle, entry.clone());
-                entry
             }
         });
 
         Timer { entry }
+    }
+
+    pub(crate) fn reset(&mut self, handle: &scheduler::Handle, deadline: u64) {
+        let waker = self.entry.cancel_and_take_waker();
+        // Install the waker before registration so an already-expired deadline
+        // cannot fire before the new entry knows which task to wake.
+        *self = Self::register(handle, EntryHandle::new_with_waker(deadline, waker));
     }
 
     pub(crate) fn cancel(&self) {

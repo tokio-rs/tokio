@@ -518,13 +518,8 @@ cfg_time! {
                 Timer::Traditional(entry) => unsafe {
                     Pin::new_unchecked(entry).reset(handle, deadline);
                 }
-                // Safety: we never move the inner entries.
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                Timer::Alternative(entry) => unsafe {
-                    let mut entry = Pin::new_unchecked(entry);
-                    entry.cancel();
-                    entry.set(time_alt::Timer::new(handle, deadline));
-                },
+                Timer::Alternative(entry) => entry.reset(handle, deadline),
             }
         }
 
