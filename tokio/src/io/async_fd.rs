@@ -30,11 +30,11 @@ use std::task::{ready, Context, Poll};
 /// drop.
 ///
 /// The inner object is required to implement [`AsRawFd`]. This file descriptor
-/// must not change while [`AsyncFd`] owns the inner object, i.e. the
-/// [`AsRawFd::as_raw_fd`] method on the inner type must always return the same
-/// file descriptor when called multiple times. Failure to uphold this results
-/// in unspecified behavior in the IO driver, which may include breaking
-/// notifications for other sockets/etc.
+/// must remain open and must not change while [`AsyncFd`] owns the inner
+/// object, i.e. the [`AsRawFd::as_raw_fd`] method on the inner type must always
+/// return the same valid file descriptor referring to the same underlying file
+/// description when called multiple times. Violating this requirement leads to
+/// undefined behavior.
 ///
 /// Polling for readiness is done by calling the async functions [`readable`]
 /// and [`writable`]. These functions complete when the associated readiness
@@ -87,8 +87,10 @@ use std::task::{ready, Context, Poll};
 /// impl AsyncTcpStream {
 ///     pub fn new(tcp: TcpStream) -> io::Result<Self> {
 ///         tcp.set_nonblocking(true)?;
+///         // SAFETY: `TcpStream` owns a valid file descriptor and we do not
+///         // replace or close it while owned by `AsyncFd`.
 ///         Ok(Self {
-///             inner: AsyncFd::new(tcp)?,
+///             inner: unsafe { AsyncFd::register(tcp)? },
 ///         })
 ///     }
 ///
@@ -208,31 +210,25 @@ pub struct AsyncFdReadyMutGuard<'a, T: AsRawFd> {
 }
 
 impl<T: AsRawFd> AsyncFd<T> {
-    /// Creates an [`AsyncFd`] backed by (and taking ownership of) an object
-    /// implementing [`AsRawFd`]. The backing file descriptor is cached at the
-    /// time of creation.
+    /// Creates an `AsyncFd` backed by (and taking ownership of) an object
+    /// implementing [`AsRawFd`].
     ///
     /// Only configures the [`Interest::READABLE`] and [`Interest::WRITABLE`] interests. For more
-    /// control, use [`AsyncFd::with_interest`].
+    /// control, use [`AsyncFd::register_with_interest`].
     ///
     /// This method must be called in the context of a tokio runtime.
     ///
-    /// # Panics
+    /// In the case of failure, it returns an [`AsyncFdRegisterError`] that contains the original
+    /// object passed to this function.
     ///
-    /// This function panics if there is no current reactor set, or if the `rt`
-    /// feature flag is not enabled.
-    #[inline]
-    #[track_caller]
-    pub fn new(inner: T) -> io::Result<Self>
-    where
-        T: AsRawFd,
-    {
-        Self::with_interest(inner, Interest::READABLE | Interest::WRITABLE)
-    }
-
-    /// Creates an [`AsyncFd`] backed by (and taking ownership of) an object
-    /// implementing [`AsRawFd`], with a specific [`Interest`]. The backing
-    /// file descriptor is cached at the time of creation.
+    /// # Safety
+    ///
+    /// The file descriptor returned by [`inner.as_raw_fd()`](AsRawFd::as_raw_fd) must be a valid,
+    /// open file descriptor, and it must remain open and refer to the same underlying file
+    /// description for the entire lifetime of the `AsyncFd` (i.e., until the `AsyncFd` is
+    /// dropped, or [`AsyncFd::into_inner`] is called, or the `AsyncFd` is
+    /// [forgotten](std::mem::forget)). While owned by this `AsyncFd`, every call to
+    /// [`inner.as_raw_fd()`](AsRawFd::as_raw_fd) must return that same file descriptor.
     ///
     /// # Panics
     ///
@@ -240,33 +236,27 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// feature flag is not enabled.
     #[inline]
     #[track_caller]
-    pub fn with_interest(inner: T, interest: Interest) -> io::Result<Self>
-    where
-        T: AsRawFd,
-    {
-        Self::new_with_handle_and_interest(inner, scheduler::Handle::current(), interest)
+    pub unsafe fn register(inner: T) -> Result<Self, AsyncFdRegisterError<T>> {
+        // SAFETY: Upheld by the caller.
+        unsafe { Self::register_with_interest(inner, Interest::READABLE | Interest::WRITABLE) }
     }
 
-    #[track_caller]
-    pub(crate) fn new_with_handle_and_interest(
-        inner: T,
-        handle: scheduler::Handle,
-        interest: Interest,
-    ) -> io::Result<Self> {
-        Self::try_new_with_handle_and_interest(inner, handle, interest).map_err(Into::into)
-    }
-
-    /// Creates an [`AsyncFd`] backed by (and taking ownership of) an object
-    /// implementing [`AsRawFd`]. The backing file descriptor is cached at the
-    /// time of creation.
-    ///
-    /// Only configures the [`Interest::READABLE`] and [`Interest::WRITABLE`] interests. For more
-    /// control, use [`AsyncFd::try_with_interest`].
+    /// Creates an `AsyncFd` backed by (and taking ownership of) an object
+    /// implementing [`AsRawFd`], with a specific [`Interest`].
     ///
     /// This method must be called in the context of a tokio runtime.
     ///
-    /// In the case of failure, it returns [`AsyncFdTryNewError`] that contains the original object
-    /// passed to this function.
+    /// In the case of failure, it returns an [`AsyncFdRegisterError`] that contains the original
+    /// object passed to this function.
+    ///
+    /// # Safety
+    ///
+    /// The file descriptor returned by [`inner.as_raw_fd()`](AsRawFd::as_raw_fd) must be a valid,
+    /// open file descriptor, and it must remain open and refer to the same underlying file
+    /// description for the entire lifetime of the `AsyncFd` (i.e., until the `AsyncFd` is
+    /// dropped, or [`AsyncFd::into_inner`] is called, or the `AsyncFd` is
+    /// [forgotten](std::mem::forget)). While owned by this `AsyncFd`, every call to
+    /// [`inner.as_raw_fd()`](AsRawFd::as_raw_fd) must return that same file descriptor.
     ///
     /// # Panics
     ///
@@ -274,47 +264,22 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// feature flag is not enabled.
     #[inline]
     #[track_caller]
-    pub fn try_new(inner: T) -> Result<Self, AsyncFdTryNewError<T>>
-    where
-        T: AsRawFd,
-    {
-        Self::try_with_interest(inner, Interest::READABLE | Interest::WRITABLE)
-    }
-
-    /// Creates an [`AsyncFd`] backed by (and taking ownership of) an object
-    /// implementing [`AsRawFd`], with a specific [`Interest`]. The backing
-    /// file descriptor is cached at the time of creation.
-    ///
-    /// In the case of failure, it returns [`AsyncFdTryNewError`] that contains the original object
-    /// passed to this function.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if there is no current reactor set, or if the `rt`
-    /// feature flag is not enabled.
-    #[inline]
-    #[track_caller]
-    pub fn try_with_interest(inner: T, interest: Interest) -> Result<Self, AsyncFdTryNewError<T>>
-    where
-        T: AsRawFd,
-    {
-        Self::try_new_with_handle_and_interest(inner, scheduler::Handle::current(), interest)
-    }
-
-    #[track_caller]
-    pub(crate) fn try_new_with_handle_and_interest(
+    pub unsafe fn register_with_interest(
         inner: T,
-        handle: scheduler::Handle,
         interest: Interest,
-    ) -> Result<Self, AsyncFdTryNewError<T>> {
+    ) -> Result<Self, AsyncFdRegisterError<T>> {
         let fd = inner.as_raw_fd();
 
-        match Registration::new_with_interest_and_handle(&mut SourceFd(&fd), interest, handle) {
+        match Registration::new_with_interest_and_handle(
+            &mut SourceFd(&fd),
+            interest,
+            scheduler::Handle::current(),
+        ) {
             Ok(registration) => Ok(AsyncFd {
                 registration,
                 inner: Some(inner),
             }),
-            Err(cause) => Err(AsyncFdTryNewError { inner, cause }),
+            Err(cause) => Err(AsyncFdRegisterError { inner, cause }),
         }
     }
 
@@ -324,7 +289,13 @@ impl<T: AsRawFd> AsyncFd<T> {
         self.inner.as_ref().unwrap()
     }
 
-    /// Returns a mutable reference to the backing object of this [`AsyncFd`].
+    /// Returns a mutable reference to the backing object of this `AsyncFd`.
+    ///
+    /// This may be used to bypass the readiness of the IO resource, so that you
+    /// can read or write to it even if the fd is not ready. Be aware that this
+    /// method must not be used to exchange the underlying IO resource for a
+    /// different one. Doing so is a violation of the safety requirements on
+    /// [`AsyncFd::register`].
     #[inline]
     pub fn get_mut(&mut self) -> &mut T {
         self.inner.as_mut().unwrap()
@@ -538,7 +509,9 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let stream = TcpStream::connect("127.0.0.1:8080")?;
     ///     stream.set_nonblocking(true)?;
-    ///     let stream = AsyncFd::new(stream)?;
+    ///     // SAFETY: `TcpStream` owns a valid file descriptor and we do not
+    ///     // replace or close it while owned by `AsyncFd`.
+    ///     let stream = unsafe { AsyncFd::register(stream)? };
     ///
     ///     loop {
     ///         let mut guard = stream
@@ -634,7 +607,9 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let stream = TcpStream::connect("127.0.0.1:8080")?;
     ///     stream.set_nonblocking(true)?;
-    ///     let mut stream = AsyncFd::new(stream)?;
+    ///     // SAFETY: `TcpStream` owns a valid file descriptor and we do not
+    ///     // replace or close it while owned by `AsyncFd`.
+    ///     let mut stream = unsafe { AsyncFd::register(stream)? };
     ///
     ///     loop {
     ///         let mut guard = stream
@@ -833,7 +808,9 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// async fn main() -> io::Result<()> {
     ///     let socket = UdpSocket::bind("0.0.0.0:8080")?;
     ///     socket.set_nonblocking(true)?;
-    ///     let async_fd = AsyncFd::new(socket)?;
+    ///     // SAFETY: `UdpSocket` owns a valid file descriptor and we do not
+    ///     // replace or close it while owned by `AsyncFd`.
+    ///     let async_fd = unsafe { AsyncFd::register(socket)? };
     ///
     ///     let written = async_fd
     ///         .async_io(Interest::WRITABLE, |inner| inner.send(&[1, 2]))
@@ -922,6 +899,57 @@ impl<T: AsRawFd> AsyncFd<T> {
         self.registration
             .try_io(interest, || f(self.inner.as_mut().unwrap()))
     }
+
+    /// Deprecated. Use [`AsyncFd::register`] instead. See [#8587] for more information.
+    ///
+    /// [#8587]: https://github.com/tokio-rs/tokio/pull/8587
+    #[inline]
+    #[track_caller]
+    #[deprecated(
+        note = "unsound due to lack of I/O safety; use `AsyncFd::register` instead (see https://github.com/tokio-rs/tokio/pull/8587)"
+    )]
+    pub fn new(inner: T) -> io::Result<Self> {
+        unsafe { Ok(Self::register(inner)?) }
+    }
+
+    /// Deprecated. Use [`AsyncFd::register_with_interest`] instead. See [#8587] for more information.
+    ///
+    /// [#8587]: https://github.com/tokio-rs/tokio/pull/8587
+    #[inline]
+    #[track_caller]
+    #[deprecated(
+        note = "unsound due to lack of I/O safety; use `AsyncFd::register_with_interest` instead (see https://github.com/tokio-rs/tokio/pull/8587)"
+    )]
+    pub fn with_interest(inner: T, interest: Interest) -> io::Result<Self> {
+        unsafe { Ok(Self::register_with_interest(inner, interest)?) }
+    }
+
+    /// Deprecated. Use [`AsyncFd::register`] instead. See [#8587] for more information.
+    ///
+    /// [#8587]: https://github.com/tokio-rs/tokio/pull/8587
+    #[inline]
+    #[track_caller]
+    #[deprecated(
+        note = "unsound due to lack of I/O safety; use `AsyncFd::register` instead (see https://github.com/tokio-rs/tokio/pull/8587)"
+    )]
+    pub fn try_new(inner: T) -> Result<Self, AsyncFdRegisterError<T>> {
+        unsafe { Self::register(inner) }
+    }
+
+    /// Deprecated. Use [`AsyncFd::register_with_interest`] instead. See [#8587] for more information.
+    ///
+    /// [#8587]: https://github.com/tokio-rs/tokio/pull/8587
+    #[inline]
+    #[track_caller]
+    #[deprecated(
+        note = "unsound due to lack of I/O safety; use `AsyncFd::register_with_interest` instead (see https://github.com/tokio-rs/tokio/pull/8587)"
+    )]
+    pub fn try_with_interest(
+        inner: T,
+        interest: Interest,
+    ) -> Result<Self, AsyncFdRegisterError<T>> {
+        unsafe { Self::register_with_interest(inner, interest) }
+    }
 }
 
 impl<T: AsRawFd> AsRawFd for AsyncFd<T> {
@@ -932,6 +960,9 @@ impl<T: AsRawFd> AsRawFd for AsyncFd<T> {
 
 impl<T: AsRawFd> std::os::unix::io::AsFd for AsyncFd<T> {
     fn as_fd(&self) -> std::os::unix::io::BorrowedFd<'_> {
+        // SAFETY: By the safety requirements of `AsyncFd::register` and
+        // `AsyncFd::register_with_interest`, the file descriptor returned by
+        // `as_raw_fd()` is valid and remains open for the lifetime of `self`.
         unsafe { std::os::unix::io::BorrowedFd::borrow_raw(self.as_raw_fd()) }
     }
 }
@@ -1007,7 +1038,9 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let stream = TcpStream::connect("127.0.0.1:8080")?;
     ///     stream.set_nonblocking(true)?;
-    ///     let stream = AsyncFd::new(stream)?;
+    ///     // SAFETY: `TcpStream` owns a valid file descriptor and we do not
+    ///     // replace or close it while owned by `AsyncFd`.
+    ///     let stream = unsafe { AsyncFd::register(stream)? };
     ///
     ///     loop {
     ///         let mut guard = stream
@@ -1124,7 +1157,9 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// async fn main() -> io::Result<()> {
     ///     let socket = UdpSocket::bind("0.0.0.0:8080")?;
     ///     socket.set_nonblocking(true)?;
-    ///     let async_fd = AsyncFd::new(socket)?;
+    ///     // SAFETY: `UdpSocket` owns a valid file descriptor and we do not
+    ///     // replace or close it while owned by `AsyncFd`.
+    ///     let async_fd = unsafe { AsyncFd::register(socket)? };
     ///
     ///     let written = loop {
     ///         let mut guard = async_fd.writable().await?;
@@ -1231,7 +1266,9 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// async fn main() -> Result<(), Box<dyn Error>> {
     ///     let stream = TcpStream::connect("127.0.0.1:8080")?;
     ///     stream.set_nonblocking(true)?;
-    ///     let mut stream = AsyncFd::new(stream)?;
+    ///     // SAFETY: `TcpStream` owns a valid file descriptor and we do not
+    ///     // replace or close it while owned by `AsyncFd`.
+    ///     let mut stream = unsafe { AsyncFd::register(stream)? };
     ///
     ///     loop {
     ///         let mut guard = stream
@@ -1364,6 +1401,11 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     }
 
     /// Returns a mutable reference to the backing object of the inner [`AsyncFd`].
+    ///
+    /// This may be used to interact with the underlying file. Be aware that this
+    /// method must not be used to exchange the underlying IO resource for a
+    /// different one. Doing so is a violation of the safety requirements on
+    /// [`AsyncFd::register`].
     pub fn get_inner_mut(&mut self) -> &mut Inner {
         self.get_mut().get_mut()
     }
@@ -1394,46 +1436,51 @@ impl<'a, T: std::fmt::Debug + AsRawFd> std::fmt::Debug for AsyncFdReadyMutGuard<
 #[derive(Debug)]
 pub struct TryIoError(());
 
-/// Error returned by [`try_new`] or [`try_with_interest`].
+/// Error returned by [`register`] or [`register_with_interest`].
 ///
-/// [`try_new`]: AsyncFd::try_new
-/// [`try_with_interest`]: AsyncFd::try_with_interest
-pub struct AsyncFdTryNewError<T> {
+/// [`register`]: AsyncFd::register
+/// [`register_with_interest`]: AsyncFd::register_with_interest
+pub struct AsyncFdRegisterError<T> {
     inner: T,
     cause: io::Error,
 }
 
-impl<T> AsyncFdTryNewError<T> {
-    /// Returns the original object passed to [`try_new`] or [`try_with_interest`]
+/// Deprecated. Use [`AsyncFdRegisterError`] instead.
+#[doc(hidden)]
+#[deprecated(note = "use `AsyncFdRegisterError` instead")]
+pub type AsyncFdTryNewError<T> = AsyncFdRegisterError<T>;
+
+impl<T> AsyncFdRegisterError<T> {
+    /// Returns the original object passed to [`register`] or [`register_with_interest`]
     /// alongside the error that caused these functions to fail.
     ///
-    /// [`try_new`]: AsyncFd::try_new
-    /// [`try_with_interest`]: AsyncFd::try_with_interest
+    /// [`register`]: AsyncFd::register
+    /// [`register_with_interest`]: AsyncFd::register_with_interest
     pub fn into_parts(self) -> (T, io::Error) {
         (self.inner, self.cause)
     }
 }
 
-impl<T> fmt::Display for AsyncFdTryNewError<T> {
+impl<T> fmt::Display for AsyncFdRegisterError<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(&self.cause, f)
     }
 }
 
-impl<T> fmt::Debug for AsyncFdTryNewError<T> {
+impl<T> fmt::Debug for AsyncFdRegisterError<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.cause, f)
     }
 }
 
-impl<T> Error for AsyncFdTryNewError<T> {
+impl<T> Error for AsyncFdRegisterError<T> {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         Some(&self.cause)
     }
 }
 
-impl<T> From<AsyncFdTryNewError<T>> for io::Error {
-    fn from(value: AsyncFdTryNewError<T>) -> Self {
+impl<T> From<AsyncFdRegisterError<T>> for io::Error {
+    fn from(value: AsyncFdRegisterError<T>) -> Self {
         value.cause
     }
 }
