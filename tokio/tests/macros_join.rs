@@ -254,3 +254,29 @@ async fn caller_names_const_count() {
     // not shadowing the caller-specified COUNT value
     assert_eq!(2, res);
 }
+
+// Regression test for: https://github.com/tokio-rs/tokio/issues/7031
+// An uninhabited output type must not trigger `unreachable_code` in the caller.
+#[deny(unreachable_code)]
+#[maybe_tokio_test]
+async fn uninhabited_output_type() {
+    use std::convert::Infallible;
+    use std::future::pending;
+
+    let mut join = task::spawn(async { tokio::join!(pending::<Infallible>(), async { 1 }) });
+    assert_pending!(join.poll());
+
+    let mut join =
+        task::spawn(async { tokio::join!(biased; pending::<Infallible>(), async { 1 }) });
+    assert_pending!(join.poll());
+
+    let mut join = task::spawn(async { tokio::join!(async { 1 }, pending::<Infallible>()) });
+    assert_pending!(join.poll());
+
+    let mut join =
+        task::spawn(async { tokio::join!(biased; async { 1 }, pending::<Infallible>()) });
+    assert_pending!(join.poll());
+
+    let mut join = task::spawn(async { tokio::join!(pending::<Infallible>()) });
+    assert_pending!(join.poll());
+}
