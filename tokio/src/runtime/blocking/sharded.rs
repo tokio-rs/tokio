@@ -2,11 +2,11 @@
 //!
 //! Tasks live in `NUM_SHARDS` queues, each with its own mutex. Spawners push
 //! to a shard chosen via the thread-local RNG; workers pop by scanning the
-//! shards, initially starting from one derived from their worker id. Workers
-//! take at most `TASKS_PER_SHARD` tasks from each shard before moving on. At a
-//! batch boundary, workers try the candidate lock and skip it if another
-//! worker got there first. A mask tracks which shards have tasks so scans
-//! rarely lock empty shards.
+//! shards in a per-worker pseudo-random permutation. Workers take at most
+//! `TASKS_PER_SHARD` tasks from each shard before moving on. At a batch
+//! boundary, workers try the candidate lock and skip it if another worker got
+//! there first. A mask tracks which shards have tasks so scans rarely lock
+//! empty shards.
 //!
 //! Worker lifecycle (thread spawning, parking/waking, timeouts, shutdown) is
 //! coordinated by the `coord` mutex + `condvar`, using the same claim
@@ -39,14 +39,96 @@ const TASKS_PER_SHARD: usize = 8;
 
 struct PopCursor {
     next_shard: usize,
+    cycle_start: usize,
+    stride: usize,
     remaining: usize,
+    rng_state: u64,
+    randomize: bool,
 }
 
 impl PopCursor {
     fn new(worker_thread_id: usize) -> Self {
-        Self {
+        #[cfg(not(loom))]
+        let seed = crate::runtime::context::thread_rng_n(u32::MAX) as u64;
+        #[cfg(loom)]
+        let seed = (worker_thread_id as u64 + 1).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+
+        let mut cursor = Self {
             next_shard: worker_thread_id % NUM_SHARDS,
+            cycle_start: worker_thread_id % NUM_SHARDS,
+            stride: 1,
             remaining: TASKS_PER_SHARD,
+            rng_state: seed | 1,
+            randomize: true,
+        };
+        cursor.reshuffle();
+        cursor
+    }
+
+    #[cfg(test)]
+    fn new_for_test(next_shard: usize) -> Self {
+        Self {
+            next_shard: next_shard % NUM_SHARDS,
+            cycle_start: next_shard % NUM_SHARDS,
+            stride: 1,
+            remaining: TASKS_PER_SHARD,
+            rng_state: 1,
+            randomize: false,
+        }
+    }
+
+    #[cfg(test)]
+    fn new_with_seed(seed: u64) -> Self {
+        let mut cursor = Self {
+            next_shard: 0,
+            cycle_start: 0,
+            stride: 1,
+            remaining: TASKS_PER_SHARD,
+            rng_state: seed | 1,
+            randomize: true,
+        };
+        cursor.reshuffle();
+        cursor
+    }
+
+    fn next_random(&mut self) -> usize {
+        // xorshift64 is sufficient here: this is only a contention-breaking
+        // permutation, not a source of security-sensitive randomness.
+        let mut value = self.rng_state;
+        value ^= value << 13;
+        value ^= value >> 7;
+        value ^= value << 17;
+        self.rng_state = value;
+        value as usize
+    }
+
+    fn reshuffle(&mut self) {
+        self.cycle_start = self.next_random() % NUM_SHARDS;
+        // NUM_SHARDS is a power of two, so every odd stride visits every
+        // shard exactly once before repeating.
+        self.stride = 1 + 2 * (self.next_random() % (NUM_SHARDS / 2));
+        self.next_shard = self.cycle_start;
+    }
+
+    fn advance_after_batch(&mut self, index: usize) {
+        let next = (index + self.stride) % NUM_SHARDS;
+        if next == self.cycle_start && self.randomize {
+            self.reshuffle();
+        } else {
+            self.next_shard = next;
+        }
+    }
+
+    fn took_task(&mut self, start: usize, index: usize) {
+        if index != start {
+            self.remaining = TASKS_PER_SHARD;
+        }
+        self.remaining -= 1;
+        if self.remaining == 0 {
+            self.advance_after_batch(index);
+            self.remaining = TASKS_PER_SHARD;
+        } else {
+            self.next_shard = index;
         }
     }
 }
@@ -155,6 +237,7 @@ impl ShardedImpl {
             .non_empty_mask
             .load(Ordering::Relaxed)
             .rotate_right(start as u32);
+        let mut contended: usize = 0;
         while mask != 0 {
             // Bits below `start` wrap to the high end of the word. Since
             // NUM_SHARDS divides the word size, this also wraps their index.
@@ -169,6 +252,7 @@ impl ShardedImpl {
                 match self.shards[index].try_lock() {
                     Some(shard) => shard,
                     None => {
+                        contended |= 1 << index;
                         mask &= mask - 1;
                         continue;
                     }
@@ -182,22 +266,39 @@ impl ShardedImpl {
                         self.non_empty_mask
                             .fetch_and(!(1 << index), Ordering::Relaxed);
                     }
-                    if index != start {
-                        cursor.remaining = TASKS_PER_SHARD;
-                    }
-                    cursor.remaining -= 1;
-                    if cursor.remaining == 0 {
-                        cursor.next_shard = (index + 1) % NUM_SHARDS;
-                        cursor.remaining = TASKS_PER_SHARD;
-                    } else {
-                        cursor.next_shard = index;
-                    }
+                    cursor.took_task(start, index);
                     return Some(task);
                 }
                 None => {
                     // The shard was emptied (and its bit cleared) after the
                     // mask was loaded; move on to the next candidate.
                     mask &= mask - 1;
+                }
+            }
+        }
+
+        // A failed try_lock is not evidence that the queue is empty. Before
+        // reporting None (which may transition the worker to idle), acquire
+        // every skipped candidate with the blocking path. This preserves the
+        // lifecycle's no-false-empty invariant while still avoiding waits
+        // when another occupied shard is immediately available.
+        while contended != 0 {
+            let bit = contended.trailing_zeros() as usize;
+            let index = bit;
+            contended &= contended - 1;
+            let mut shard = self.shards[index].lock();
+            match shard.queue.pop_front() {
+                Some(task) => {
+                    if shard.queue.is_empty() {
+                        self.non_empty_mask
+                            .fetch_and(!(1 << index), Ordering::Relaxed);
+                    }
+                    cursor.took_task(start, index);
+                    return Some(task);
+                }
+                None => {
+                    self.non_empty_mask
+                        .fetch_and(!(1 << index), Ordering::Relaxed);
                 }
             }
         }
@@ -591,7 +692,7 @@ mod tests {
         }
         drop(tx);
 
-        let mut cursor = PopCursor::new(next_shard);
+        let mut cursor = PopCursor::new_for_test(next_shard);
         while let Some(task) = queue.pop(&mut cursor) {
             task.run();
         }
@@ -619,6 +720,29 @@ mod tests {
                 .collect();
             assert_eq!(drain_order(&shards, start), expected_order(&shards));
         }
+    }
+
+    #[test]
+    fn pop_cursor_randomizes_complete_scan_order() {
+        fn scan_order(cursor: &mut PopCursor) -> Vec<usize> {
+            (0..NUM_SHARDS)
+                .map(|_| {
+                    let index = cursor.next_shard;
+                    cursor.advance_after_batch(index);
+                    index
+                })
+                .collect()
+        }
+
+        let mut first = PopCursor::new_with_seed(1);
+        let mut second = PopCursor::new_with_seed(2);
+        let first_order = scan_order(&mut first);
+        let second_order = scan_order(&mut second);
+
+        let mut sorted = first_order.clone();
+        sorted.sort_unstable();
+        assert_eq!(sorted, (0..NUM_SHARDS).collect::<Vec<_>>());
+        assert_ne!(first_order, second_order);
     }
 
     #[test]
@@ -661,7 +785,7 @@ mod tests {
         // The first pop is at a batch boundary. Holding shard 0 models a
         // synchronized worker that got there first; shard 1 must be tried.
         let _guard = queue.shards[0].lock();
-        let mut cursor = PopCursor::new(0);
+        let mut cursor = PopCursor::new_for_test(0);
         queue.pop(&mut cursor).unwrap().run();
         assert_eq!(rx.recv().unwrap(), 1);
     }
