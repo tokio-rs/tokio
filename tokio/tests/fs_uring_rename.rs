@@ -8,10 +8,9 @@
     target_os = "linux"
 ))]
 
-use futures::future::Future;
 use futures::future::FutureExt;
 use libc::PATH_MAX;
-use std::future::poll_fn;
+use std::future::{pending, poll_fn};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -23,7 +22,7 @@ use tokio::runtime::{Builder, Runtime};
 use tokio_test::assert_pending;
 use tokio_util::task::TaskTracker;
 
-use crate::support::io_uring::io_uring_supported;
+use crate::support::io_uring::{io_uring_supported, uring_op_supported};
 
 mod support {
     pub(crate) mod io_uring;
@@ -56,7 +55,7 @@ fn rt_combinations() -> Vec<Box<dyn Fn() -> Runtime>> {
 
 #[test]
 fn shutdown_runtime_while_performing_io_uring_ops() {
-    if !io_uring_supported() {
+    if !uring_op_supported(io_uring::opcode::RenameAt::CODE) {
         return;
     }
 
@@ -65,7 +64,7 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
         let (_tmp, path) = create_tmp_files(1);
         // keep 100 permits
         const N: i32 = 100;
-        rt.spawn(async move {
+        rt.block_on(async move {
             let path = path[0].clone();
             let dst = path.with_extension("renamed");
 
@@ -76,16 +75,15 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
             for _ in 0..N {
                 let mut fut = Box::pin(rename(path.clone(), dst.clone()));
 
-                poll_fn(|cx| {
-                    assert_pending!(fut.as_mut().poll(cx));
-                    Poll::<()>::Pending
-                })
-                .await;
+                assert_pending!(futures::poll!(fut.as_mut()));
 
                 futs.push(fut);
             }
 
-            tokio::task::yield_now().await;
+            tokio::spawn(async move {
+                let _futs = futs;
+                pending::<()>().await;
+            });
         });
 
         std::thread::spawn(move || {
@@ -93,7 +91,7 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
             done_tx.send(()).unwrap();
         });
 
-        done_rx.recv().unwrap();
+        done_rx.recv_timeout(Duration::from_secs(5)).unwrap();
     }
 
     for rt in rt_combinations() {
