@@ -135,17 +135,20 @@ async fn op_read(
     loop {
         let (res, r_fd, r_buf) = Op::read_at(fd, buf, read_len as usize, *offset).await;
 
-        match res {
-            Err(e) if e.kind() == ErrorKind::Interrupted => {
+        match (res, r_fd, r_buf) {
+            // Retry an interrupted read with the buffer the op handed back. A
+            // cancelled op returns no buffer, so it falls through as terminal.
+            (Err(e), Some(r_fd), Some(r_buf)) if e.kind() == ErrorKind::Interrupted => {
                 buf = r_buf;
                 fd = r_fd;
             }
-            Err(e) => return Err(e),
-            Ok(size_read) => {
+            (Err(e), ..) => return Err(e),
+            (Ok(size_read), Some(r_fd), Some(r_buf)) => {
                 *offset += size_read as u64;
 
                 return Ok((r_fd, r_buf, size_read == 0));
             }
+            (Ok(_), ..) => unreachable!("a successful read returns its fd and buffer"),
         }
     }
 }
