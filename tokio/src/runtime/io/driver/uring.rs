@@ -125,13 +125,16 @@ impl UringContext {
             // Errors from io_uring_enter: https://man7.org/linux/man-pages/man2/io_uring_enter.2.html#ERRORS
             match self.ring().submit() {
                 Ok(_) => {
-                    return Ok(());
+                    if self.ring_mut().submission().is_empty() {
+                        return Ok(());
+                    }
                 }
 
                 // If the submission queue is full, we dispatch completions and try again.
                 Err(ref e) if e.raw_os_error() == Some(libc::EBUSY) => {
                     self.dispatch_completions();
                 }
+                Err(ref e) if e.raw_os_error() == Some(libc::EINTR) => {}
                 // For other errors, we currently return the error as is.
                 Err(e) => {
                     return Err(e);
@@ -154,7 +157,7 @@ impl Drop for UringContext {
         }
 
         // Make sure we flush the submission queue before dropping the driver.
-        while !self.ring_mut().submission().is_empty() {
+        if !self.ring_mut().submission().is_empty() {
             self.submit().expect("Internal error when dropping driver");
         }
 
