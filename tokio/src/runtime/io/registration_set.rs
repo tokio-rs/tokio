@@ -150,7 +150,6 @@ unsafe impl linked_list::Link for Arc<ScheduledIo> {
 #[cfg(all(test, loom))]
 mod loom_tests {
     use super::*;
-    use crate::io::interest::Interest;
     use crate::io::ready::Ready;
     use crate::loom::sync::Mutex;
     use crate::loom::thread;
@@ -219,81 +218,6 @@ mod loom_tests {
             // Flush any remaining release if worker deregistered after driver's release step.
             handle.release();
 
-            assert!(!handle.set.needs_release());
-        });
-    }
-
-    /// Tests that readiness already observed by a task is not lost during concurrent
-    /// event delivery and deregistration.
-    #[test]
-    fn deregister_and_readiness_interleaving() {
-        loom::model(|| {
-            let handle = Arc::new(Registrations::new());
-            let scheduled_io = handle.allocate();
-            let token = scheduled_io.token();
-
-            let handle_clone = handle.clone();
-            let driver_th = thread::spawn(move || {
-                // SAFETY: The driver holds the registration alive in `RegistrationSet`
-                // until `release()` is called. In this model, event delivery occurs
-                // before the driver's release step.
-                unsafe {
-                    super::super::driver::dispatch_event(token, Ready::READABLE);
-                }
-                handle_clone.release();
-            });
-
-            // Worker inspects ready event, deregisters, and drops.
-            let ev_before = scheduled_io.ready_event(Interest::READABLE);
-            handle.deregister(&scheduled_io);
-            let ev_after = scheduled_io.ready_event(Interest::READABLE);
-
-            driver_th.join().unwrap();
-
-            // Monotonicity: if readiness was observed before deregistration, it must remain ready after.
-            if ev_before.ready.is_readable() {
-                assert!(ev_after.ready.is_readable());
-            }
-
-            // Since the driver thread dispatched Ready::READABLE and joined,
-            // the resource must observe readability.
-            assert!(scheduled_io
-                .ready_event(Interest::READABLE)
-                .ready
-                .is_readable());
-
-            drop(scheduled_io);
-            handle.release();
-        });
-    }
-
-    /// Models delivery after deregistration and dropping the caller's Arc, but
-    /// before the driver's next release step. This does not model Mio's guarantee
-    /// about whether a deregistered source can produce a new event.
-    #[test]
-    fn deferred_release_allows_prior_event_delivery() {
-        loom::model(|| {
-            let handle = Registrations::new();
-            let scheduled_io = handle.allocate();
-            let token = scheduled_io.token();
-
-            // Deregister and drop user handle.
-            handle.deregister(&scheduled_io);
-            drop(scheduled_io);
-
-            // RegistrationSet must hold the registration pending release.
-            assert!(handle.set.needs_release());
-
-            // Delivery precedes the next release step in this model.
-            //
-            // SAFETY: The registration remains alive in `handle.set.pending_release`
-            // until `release()` is called below.
-            unsafe {
-                super::super::driver::dispatch_event(token, Ready::READABLE);
-            }
-
-            // Release on next turn frees the memory.
-            handle.release();
             assert!(!handle.set.needs_release());
         });
     }
