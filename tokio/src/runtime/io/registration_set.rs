@@ -2,10 +2,10 @@ use crate::loom::sync::atomic::AtomicUsize;
 use crate::runtime::io::ScheduledIo;
 use crate::util::linked_list::{self, LinkedList};
 
+use crate::loom::sync::Arc;
 use std::io;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{Acquire, Release};
-use std::sync::Arc;
 
 // Kind of arbitrary, but buffering 16 `ScheduledIo`s doesn't seem like much
 const NOTIFY_AFTER: usize = 16;
@@ -144,5 +144,157 @@ unsafe impl linked_list::Link for Arc<ScheduledIo> {
         // safety: `target.as_ref().linked_list_pointers` is a `UnsafeCell` that
         // always returns a non-null pointer.
         unsafe { NonNull::new_unchecked(target.as_ref().linked_list_pointers.get()) }
+    }
+}
+
+#[cfg(all(test, loom))]
+mod loom_tests {
+    use super::*;
+    use crate::io::interest::Interest;
+    use crate::io::ready::Ready;
+    use crate::loom::sync::Mutex;
+    use crate::loom::thread;
+
+    // Models only Tokio's registration lifetime. Mio polling and OS deregistration
+    // are outside the model; the production Handle remains unchanged under Loom.
+    struct Registrations {
+        set: RegistrationSet,
+        synced: Mutex<Synced>,
+    }
+
+    impl Registrations {
+        fn new() -> Self {
+            let (set, synced) = RegistrationSet::new();
+            Self {
+                set,
+                synced: Mutex::new(synced),
+            }
+        }
+
+        fn allocate(&self) -> Arc<ScheduledIo> {
+            self.set.allocate(&mut self.synced.lock()).unwrap()
+        }
+
+        fn deregister(&self, io: &Arc<ScheduledIo>) {
+            self.set.deregister(&mut self.synced.lock(), io);
+        }
+
+        fn release(&self) {
+            if self.set.needs_release() {
+                self.set.release(&mut self.synced.lock());
+            }
+        }
+    }
+
+    /// Models deregistration racing with delivery of an event already returned by
+    /// the poller. The driver completes delivery before its next release step.
+    #[test]
+    fn deregister_races_with_prior_event_delivery() {
+        loom::model(|| {
+            let handle = Arc::new(Registrations::new());
+            let scheduled_io = handle.allocate();
+            let token = scheduled_io.token();
+
+            let handle_clone = handle.clone();
+            let driver_th = thread::spawn(move || {
+                // Driver thread: has already obtained an event from poll() for `token`.
+                // Delivers event to ScheduledIo via its exposed raw pointer token.
+                //
+                // SAFETY: The driver holds the registration alive in `RegistrationSet`
+                // until `release()` is called. In this model, event delivery occurs
+                // before the driver's release step.
+                unsafe {
+                    super::super::driver::dispatch_event(token, Ready::READABLE);
+                }
+                // Simulates deferred release performed at the start of the next turn/poll.
+                handle_clone.release();
+            });
+
+            // Worker thread: deregisters the resource and drops its Arc handle.
+            handle.deregister(&scheduled_io);
+            drop(scheduled_io);
+
+            driver_th.join().unwrap();
+
+            // Flush any remaining release if worker deregistered after driver's release step.
+            handle.release();
+
+            assert!(!handle.set.needs_release());
+        });
+    }
+
+    /// Tests that readiness already observed by a task is not lost during concurrent
+    /// event delivery and deregistration.
+    #[test]
+    fn deregister_and_readiness_interleaving() {
+        loom::model(|| {
+            let handle = Arc::new(Registrations::new());
+            let scheduled_io = handle.allocate();
+            let token = scheduled_io.token();
+
+            let handle_clone = handle.clone();
+            let driver_th = thread::spawn(move || {
+                // SAFETY: The driver holds the registration alive in `RegistrationSet`
+                // until `release()` is called. In this model, event delivery occurs
+                // before the driver's release step.
+                unsafe {
+                    super::super::driver::dispatch_event(token, Ready::READABLE);
+                }
+                handle_clone.release();
+            });
+
+            // Worker inspects ready event, deregisters, and drops.
+            let ev_before = scheduled_io.ready_event(Interest::READABLE);
+            handle.deregister(&scheduled_io);
+            let ev_after = scheduled_io.ready_event(Interest::READABLE);
+
+            driver_th.join().unwrap();
+
+            // Monotonicity: if readiness was observed before deregistration, it must remain ready after.
+            if ev_before.ready.is_readable() {
+                assert!(ev_after.ready.is_readable());
+            }
+
+            // Since the driver thread dispatched Ready::READABLE and joined,
+            // the resource must observe readability.
+            assert!(scheduled_io
+                .ready_event(Interest::READABLE)
+                .ready
+                .is_readable());
+
+            drop(scheduled_io);
+            handle.release();
+        });
+    }
+
+    /// Models delivery after deregistration and dropping the caller's Arc, but
+    /// before the driver's next release step. This does not model Mio's guarantee
+    /// about whether a deregistered source can produce a new event.
+    #[test]
+    fn deferred_release_allows_prior_event_delivery() {
+        loom::model(|| {
+            let handle = Registrations::new();
+            let scheduled_io = handle.allocate();
+            let token = scheduled_io.token();
+
+            // Deregister and drop user handle.
+            handle.deregister(&scheduled_io);
+            drop(scheduled_io);
+
+            // RegistrationSet must hold the registration pending release.
+            assert!(handle.set.needs_release());
+
+            // Delivery precedes the next release step in this model.
+            //
+            // SAFETY: The registration remains alive in `handle.set.pending_release`
+            // until `release()` is called below.
+            unsafe {
+                super::super::driver::dispatch_event(token, Ready::READABLE);
+            }
+
+            // Release on next turn frees the memory.
+            handle.release();
+            assert!(!handle.set.needs_release());
+        });
     }
 }
