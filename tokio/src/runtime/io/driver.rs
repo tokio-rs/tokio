@@ -15,10 +15,10 @@ use crate::runtime::driver;
 use crate::runtime::io::registration_set;
 use crate::runtime::io::{IoDriverMetrics, RegistrationSet, ScheduledIo};
 
+use crate::loom::sync::Arc;
 use mio::event::Source;
 use std::fmt;
 use std::io;
-use std::sync::Arc;
 use std::time::Duration;
 
 /// I/O driver, backed by Mio.
@@ -279,16 +279,12 @@ impl Driver {
                 self.signal_ready = true;
             } else {
                 let ready = Ready::from_mio(event);
-                let ptr = super::EXPOSE_IO.from_exposed_addr(token.0);
 
                 // Safety: we ensure that the pointers used as tokens are not freed
                 // until they are both deregistered from mio **and** we know the I/O
                 // driver is not concurrently polling. The I/O driver holds ownership of
                 // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
-                let io: &ScheduledIo = unsafe { &*ptr };
-
-                io.set_readiness(Tick::Set, |curr| curr | ready);
-                io.wake(ready);
+                unsafe { dispatch_event(token, ready) };
 
                 ready_count += 1;
             }
@@ -481,6 +477,23 @@ impl Shard {
             self.registrations.release(&mut self.synced.lock());
         }
     }
+}
+
+/// Dispatches an event received from the poller to the corresponding `ScheduledIo`.
+///
+/// # Safety
+///
+/// `token` must have been obtained from `ScheduledIo::token()`, and that
+/// `ScheduledIo` must remain alive throughout this call. The I/O driver ensures
+/// that pending registrations are not freed until after event dispatch completes.
+pub(super) unsafe fn dispatch_event(token: mio::Token, ready: Ready) {
+    let ptr = super::EXPOSE_IO.from_exposed_addr(token.0);
+
+    // SAFETY: the caller guarantees that the token refers to a live `ScheduledIo`.
+    let io: &ScheduledIo = unsafe { &*ptr };
+
+    io.set_readiness(Tick::Set, |curr| curr | ready);
+    io.wake(ready);
 }
 
 impl fmt::Debug for Handle {

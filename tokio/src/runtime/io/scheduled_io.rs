@@ -659,4 +659,31 @@ mod loom_tests {
             });
         }
     }
+
+    /// Tests that delivering an event via raw pointer correctly wakes a pending task waiting
+    /// on readiness via `poll_readiness`.
+    #[test]
+    fn event_delivery_wakes_waiter() {
+        loom::model(|| {
+            let io = Arc::new(ScheduledIo::new(0));
+            let token = io.token();
+
+            let waiter_io = io.clone();
+            let waiter = thread::spawn(move || {
+                let event = block_on(std::future::poll_fn(|cx| {
+                    waiter_io.poll_readiness(cx, Direction::Read)
+                }));
+                assert!(event.ready.is_readable());
+            });
+
+            // Driver delivers event and wakes the waiter.
+            //
+            // SAFETY: `io` remains alive for the duration of this model.
+            unsafe {
+                super::super::driver::dispatch_event(token, Ready::READABLE);
+            }
+
+            waiter.join().unwrap();
+        });
+    }
 }
