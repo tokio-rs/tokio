@@ -20,10 +20,27 @@ type Promise = *mut c_void;
 
 const EM_PROMISE_FULFILL: i32 = 0;
 
+/// Minimum Emscripten version required for JSPI (`emscripten#27720` fixed
+/// `emscripten_clear_timeout` and `emscripten_clear_immediate` keepalive
+/// handling in 6.0.10).
+const MIN_EMSCRIPTEN_VERSION: (u32, u32, u32) = (6, 0, 10);
+
+#[repr(C)]
+struct UtsName {
+    sysname: [u8; 65],
+    nodename: [u8; 65],
+    release: [u8; 65],
+    version: [u8; 65],
+    machine: [u8; 65],
+    domainname: [u8; 65],
+}
+
 extern "C" {
     /// Reports the `ASYNCIFY` build mode: 0 = none, 1 = legacy `Asyncify`,
     /// 2 = JSPI. Only mode 2 supports suspension.
     fn emscripten_has_asyncify() -> i32;
+
+    fn uname(buf: *mut UtsName) -> i32;
 
     fn emscripten_promise_create() -> Promise;
     fn emscripten_promise_destroy(promise: Promise);
@@ -62,11 +79,69 @@ extern "C-unwind" {
     fn emscripten_promise_await(promise: Promise) -> SettledResult;
 }
 
+#[derive(Copy, Clone)]
+enum JspiState {
+    Disabled,
+    Enabled,
+    UnsupportedVersion(u32, u32, u32),
+}
+
+fn emscripten_version() -> Option<(u32, u32, u32)> {
+    let mut uts = UtsName {
+        sysname: [0; 65],
+        nodename: [0; 65],
+        release: [0; 65],
+        version: [0; 65],
+        machine: [0; 65],
+        domainname: [0; 65],
+    };
+    // SAFETY: `uts` is a valid `struct utsname` buffer. Emscripten's `uname`
+    // populates `uts.release` with `"__EMSCRIPTEN_MAJOR__.__EMSCRIPTEN_MINOR__.__EMSCRIPTEN_TINY__"`.
+    if unsafe { uname(&mut uts) } != 0 {
+        return None;
+    }
+    let len = uts
+        .release
+        .iter()
+        .position(|&b| b == 0)
+        .unwrap_or(uts.release.len());
+    let release = std::str::from_utf8(&uts.release[..len]).ok()?;
+    let mut parts = release.split('.');
+    let major = parts.next()?.parse().ok()?;
+    let minor = parts.next()?.parse().ok()?;
+    let tiny = parts.next()?.parse().ok()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some((major, minor, tiny))
+}
+
+fn detect_jspi() -> JspiState {
+    // SAFETY: an Emscripten libc query with no arguments and no side effects.
+    if unsafe { emscripten_has_asyncify() } != 2 {
+        return JspiState::Disabled;
+    }
+    match emscripten_version() {
+        Some((major, minor, tiny)) if (major, minor, tiny) < MIN_EMSCRIPTEN_VERSION => {
+            JspiState::UnsupportedVersion(major, minor, tiny)
+        }
+        // All existing versions use `major.minor.tiny`, so an unrecognised
+        // format is assumed to be a newer version.
+        _ => JspiState::Enabled,
+    }
+}
+
 /// Whether JSPI suspension is available: linked with `-sJSPI`.
 pub(crate) fn jspi_enabled() -> bool {
-    static ENABLED: OnceLock<bool> = OnceLock::new();
-    // SAFETY: an Emscripten libc query with no arguments and no side effects.
-    *ENABLED.get_or_init(|| unsafe { emscripten_has_asyncify() == 2 })
+    static STATE: OnceLock<JspiState> = OnceLock::new();
+    match *STATE.get_or_init(detect_jspi) {
+        JspiState::Disabled => false,
+        JspiState::Enabled => true,
+        JspiState::UnsupportedVersion(major, minor, tiny) => panic!(
+            "cannot use JSPI on wasm32-unknown-emscripten with Emscripten \
+             {major}.{minor}.{tiny}: Emscripten 6.0.10 or later is required"
+        ),
+    }
 }
 
 /// The promise a parked activation is suspended on, null while not parked.
