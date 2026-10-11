@@ -247,15 +247,19 @@ impl Handle {
         let mut lock = self.entry.state.lock();
         if !lock.cancelled {
             lock.cancelled = true;
-            if let Some(cancel_tx) = lock.cancel_tx.take() {
-                drop(lock);
+            let waker = lock.waker.take();
+            let cancel_tx = lock.cancel_tx.take();
+            drop(lock);
 
+            if let Some(cancel_tx) = cancel_tx {
                 // Safety: we can guarantee that `self` is not in any cancellation queue
                 // because the `self.cancelled` was just set to `true`.
                 unsafe {
                     cancel_tx.send(self.clone());
                 }
             }
+
+            drop(waker);
         }
     }
 

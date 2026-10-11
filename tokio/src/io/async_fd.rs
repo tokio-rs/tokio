@@ -174,7 +174,7 @@ use std::task::{ready, Context, Poll};
 /// [`readable`]: method@Self::readable
 /// [`writable`]: method@Self::writable
 /// [`AsyncFdReadyGuard`]: struct@self::AsyncFdReadyGuard
-/// [`TcpStream::poll_read_ready`]: struct@crate::net::TcpStream
+/// [`TcpStream::poll_read_ready`]: method@crate::net::TcpStream::poll_read_ready
 /// [`AsyncRead`]: trait@crate::io::AsyncRead
 /// [`AsyncWrite`]: trait@crate::io::AsyncWrite
 /// [`OwnedFd`]: struct@std::os::fd::OwnedFd
@@ -444,7 +444,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// [`poll_read_ready`]: method@Self::poll_read_ready
     /// [`poll_write_ready`]: method@Self::poll_write_ready
     /// [`poll_write_ready_mut`]: method@Self::poll_write_ready_mut
-    /// [`writable`]: method@Self::readable
+    /// [`writable`]: method@Self::writable
     /// [`Context`]: struct@std::task::Context
     /// [`Waker`]: struct@std::task::Waker
     /// [`Waker::wake`]: method@std::task::Waker::wake
@@ -481,7 +481,7 @@ impl<T: AsRawFd> AsyncFd<T> {
     /// [`poll_read_ready`]: method@Self::poll_read_ready
     /// [`poll_write_ready`]: method@Self::poll_write_ready
     /// [`poll_write_ready_mut`]: method@Self::poll_write_ready_mut
-    /// [`writable`]: method@Self::readable
+    /// [`writable`]: method@Self::writable
     /// [`Context`]: struct@std::task::Context
     /// [`Waker`]: struct@std::task::Waker
     /// [`Waker::wake`]: method@std::task::Waker::wake

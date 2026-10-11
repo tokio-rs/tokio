@@ -64,7 +64,7 @@ impl UringContext {
 
     pub(crate) fn dispatch_completions(&mut self) {
         let ops = &mut self.ops;
-        let Some(mut uring) = self.uring.take() else {
+        let Some(uring) = self.uring.as_mut() else {
             // Uring is not initialized yet.
             return;
         };
@@ -75,9 +75,13 @@ impl UringContext {
             let idx = cqe.user_data() as usize;
 
             match ops.get_mut(idx) {
-                Some(Lifecycle::Waiting(waker)) => {
+                Some(lifecycle @ Lifecycle::Waiting(_)) => {
+                    let Lifecycle::Waiting(waker) =
+                        mem::replace(lifecycle, Lifecycle::Completed(cqe))
+                    else {
+                        unreachable!()
+                    };
                     waker.wake_by_ref();
-                    *ops.get_mut(idx).unwrap() = Lifecycle::Completed(cqe);
                 }
                 Some(Lifecycle::Cancelled(cancel_data)) => {
                     if let CancelData::Open(_) = cancel_data {
@@ -99,8 +103,6 @@ impl UringContext {
                 }
             }
         }
-
-        self.uring.replace(uring);
 
         // `cq`'s drop gets called here, updating the latest head pointer
     }

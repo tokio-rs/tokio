@@ -317,7 +317,8 @@ notes about [commit squashing](#commit-squashing)).
 
 #### Commit message guidelines
 
-A good commit message should describe what changed and why.
+A good commit message (and Pull Request description) should concisely describe
+why the change is needed and what it does at a high level.
 
 1. The first line should:
 
@@ -336,9 +337,29 @@ Examples:
 * codec: export `Encoder`, `Decoder`, `Framed*`
 * ci: fix the FreeBSD ci configuration
 
-2. Keep the second line blank.
-3. Wrap all other lines at 72 columns (except for long URLs).
-4. If your patch fixes an open issue, you can add a reference to it at the end
+2. Keep the second line blank. If the first line is self-explanatory (such as
+   for simple CI updates or typo fixes), the body can be omitted entirely.
+3. Keep the body short. Most commit messages and PR descriptions should be no
+   longer than 3 sentences, unless the change genuinely requires additional
+   context.
+4. Focus on high-level intent rather than low-level code mechanics:
+   * State what the code currently assumes or does, what goes wrong as a result
+     (e.g., deadlock, panic, incorrect behavior), and the conceptual fix.
+   * Avoid explaining the nitty-gritty details of what was changed in the diff.
+     For example, write *"drop the waker outside the lock"* instead of
+     *"declare a variable before the lock guard and store the waker in the lock
+     guard"*.
+   * Describe the current behavior in the present tense, followed by the fix in
+     the imperative mood (e.g., *"When X happens, Y does Z. This leads to a
+     panic. Thus, do W."*).
+   * Write in plain prose and avoid bulleted lists of modified files or
+     functions.
+   * Do not mention testing (such as noting that a regression test was added, or
+     listing which `cargo test`, `rustfmt`, or `git diff --check` commands
+     passed) unless a really special test was carried out.
+5. Wrap body lines at 72 columns in commit messages (except for long URLs). In
+   GitHub PR descriptions, do not hard-wrap lines.
+6. If your patch fixes an open issue, you can add a reference to it at the end
    of the log. Use the `Fixes: #` prefix and the issue number. For other
    references use `Refs: #`. `Refs` may include multiple issues, separated by a
    comma.
@@ -351,19 +372,14 @@ Examples:
 Sample complete commit message:
 
 ```txt
-module: explain the commit in one line
+fs: clamp io_uring read length to u32::MAX
 
-Body of commit message is a few lines of text, explaining things
-in more detail, possibly giving some background about the issue
-being fixed, etc.
+When reading from a File with io-uring, the length of a read is cast to
+u32 without bounds checking. This leads to incorrect behavior,
+especially if the length truncates to 0. Thus, when reading into a
+buffer larger than u32::MAX, clamp the length to u32::MAX.
 
-The body of the commit message can be several paragraphs, and
-please do proper word-wrap and keep columns shorter than about
-72 characters or so. That way, `git log` will show things
-nicely even when it is indented.
-
-Fixes: #1337
-Refs: #453, #154
+Fixes: #8571
 ```
 
 ### Opening the Pull Request

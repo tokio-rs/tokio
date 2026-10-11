@@ -317,9 +317,15 @@ impl Handle {
         registration: &Arc<ScheduledIo>,
         source: &mut impl Source,
     ) -> io::Result<()> {
-        // Deregister the source with the OS poller **first**
-        // Cleanup ALWAYS happens
-        let os_result = self.registry.deregister(source);
+        // Deregister the source with the OS poller **first**.
+        //
+        // If `deregister` fails (for example, because the caller closed the raw
+        // file descriptor before dropping `AsyncFd`), we must NOT release the
+        // `ScheduledIo` registration. On Linux, if the file descriptor was
+        // duplicated before the original fd number was closed, the open file
+        // description remains registered in epoll with the `ScheduledIo` token
+        // pointer even though `EPOLL_CTL_DEL` fails with `EBADF`.
+        self.registry.deregister(source)?;
 
         if self
             .registrations
@@ -330,7 +336,7 @@ impl Handle {
 
         self.metrics.dec_fd_count();
 
-        os_result // Return error after cleanup
+        Ok(())
     }
 
     fn release_pending_registrations(&self) {

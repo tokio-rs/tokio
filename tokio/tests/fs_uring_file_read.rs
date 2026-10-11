@@ -8,9 +8,11 @@
     target_os = "linux"
 ))]
 
+use std::future::pending;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc;
+use std::task::Poll;
 use std::time::Duration;
 use tempfile::NamedTempFile;
 use tokio::fs::File;
@@ -297,21 +299,31 @@ fn shutdown_runtime_with_pending_reads() {
         let data: Vec<u8> = (0..10_000).map(|i| (i % 256) as u8).collect();
         let (_tmp, path) = create_temp_file(&data);
 
-        for _ in 0..50 {
-            let path = path.clone();
-            rt.spawn(async move {
+        rt.block_on(async move {
+            let mut futs = vec![];
+            for _ in 0..50 {
                 let mut file = File::open(&path).await.unwrap();
-                let mut buf = Vec::new();
-                let _ = file.read_to_end(&mut buf).await;
+                let mut fut = Box::pin(async move {
+                    let mut buf = Vec::new();
+                    file.read_to_end(&mut buf).await
+                });
+                if let Poll::Ready(result) = futures::poll!(fut.as_mut()) {
+                    result.unwrap();
+                }
+                futs.push(fut);
+            }
+            tokio::spawn(async move {
+                let _futs = futs;
+                pending::<()>().await;
             });
-        }
+        });
 
         std::thread::spawn(move || {
             rt.shutdown_timeout(Duration::from_millis(500));
             done_tx.send(()).unwrap();
         });
 
-        done_rx.recv().unwrap();
+        done_rx.recv_timeout(Duration::from_secs(5)).unwrap();
     }
 }
 
@@ -468,4 +480,28 @@ async fn test_file_partial_read_then_write() {
     assert_eq!(&result[..13], b"abcdefghijklm");
     assert_eq!(&result[13..16], b"NOP");
     assert_eq!(&result[16..], &data[16..]);
+}
+
+#[cfg(target_pointer_width = "64")]
+#[tokio::test]
+async fn test_file_read_4gib_buf_size() {
+    let data = b"nonempty file content for 4 GiB buffer test";
+    let (_tmp, path) = create_temp_file(data);
+
+    // Ensure the system can reserve two 4 GiB buffers (caller ReadBuf + File's internal Buf)
+    // before running the test, as `File::poll_read` uses `Vec::reserve` internally.
+    let mut dst = Vec::<u8>::new();
+    let mut reserve_check = Vec::<u8>::new();
+    if dst.try_reserve_exact(1usize << 32).is_err()
+        || reserve_check.try_reserve_exact(1usize << 32).is_err()
+    {
+        return;
+    }
+    drop(reserve_check);
+
+    let mut file = File::open(&path).await.unwrap();
+    file.set_max_buf_size(1usize << 32);
+    file.read_buf(&mut dst).await.unwrap();
+
+    assert_eq!(dst, data);
 }

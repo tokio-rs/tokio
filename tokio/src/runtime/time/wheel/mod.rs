@@ -80,8 +80,6 @@ impl Wheel {
     /// already passed. In this case, the caller should fire the timeout
     /// immediately.
     ///
-    /// `Err(Invalid)` indicates an invalid `when` argument as been supplied.
-    ///
     /// # Safety
     ///
     /// This function registers item into an intrusive linked list. The caller
@@ -147,9 +145,16 @@ impl Wheel {
 
             match self.next_expiration() {
                 Some(ref expiration) if expiration.deadline <= now => {
-                    self.process_expiration(expiration);
+                    self.process_expiration(expiration, now);
 
-                    self.set_elapsed(expiration.deadline);
+                    // During shutdown (`now == u64::MAX`), slots are drained
+                    // directly without cascading entries across levels. Keep
+                    // `self.elapsed` unchanged until all slots are empty so
+                    // `level_for` remains valid if the lock is temporarily
+                    // dropped to wake a batch of wakers.
+                    if now != u64::MAX {
+                        self.set_elapsed(expiration.deadline);
+                    }
                 }
                 _ => {
                     // in this case the poll did not indicate an expiration
@@ -215,7 +220,7 @@ impl Wheel {
     /// time and the expiration time.  for each in that population either
     /// queue it for notification (in the case of the last level) or tier
     /// it down to the next level (in all other cases).
-    pub(crate) fn process_expiration(&mut self, expiration: &Expiration) {
+    pub(crate) fn process_expiration(&mut self, expiration: &Expiration, now: u64) {
         // Note that we need to take _all_ of the entries off the list before
         // processing any of them. This is important because it's possible that
         // those entries might need to be reinserted into the same slot.
@@ -227,15 +232,20 @@ impl Wheel {
         // back into the same position; we must make sure we don't then process
         // those entries again or we'll end up in an infinite loop.
         let mut entries = self.take_entries(expiration);
+        let deadline = if now == u64::MAX {
+            now
+        } else {
+            expiration.deadline
+        };
 
         while let Some(item) = entries.pop_back() {
-            if expiration.level == 0 {
+            if expiration.level == 0 && now != u64::MAX {
                 debug_assert_eq!(unsafe { item.registered_when() }, expiration.deadline);
             }
 
             // Try to expire the entry; this is cheap (doesn't synchronize) if
             // the timer is not expired, and updates registered_when.
-            match unsafe { item.mark_pending(expiration.deadline) } {
+            match unsafe { item.mark_pending(deadline) } {
                 Ok(()) => {
                     // Item was expired
                     self.pending.push_front(item);

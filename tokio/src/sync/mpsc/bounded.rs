@@ -1721,10 +1721,12 @@ impl<T> Permit<'_, T> {
     pub fn send(self, value: T) {
         use std::mem;
 
-        self.chan.send(value);
+        let chan = self.chan;
 
         // Avoid the drop logic
         mem::forget(self);
+
+        chan.send(value);
     }
 }
 

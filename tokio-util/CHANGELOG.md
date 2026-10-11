@@ -1,3 +1,44 @@
+# 0.7.20 (October 9th, 2026)
+
+The MSRV is increased to 1.85.
+
+### Added
+
+- codec: support byte slices in `LengthDelimitedCodec` ([#8355])
+- io: add `get_ref`, `get_mut`, and `get_pin_mut` to `InspectReader` and `InspectWriter` ([#8486])
+
+### Changed
+
+- codec: optimize buffer reserve for `LengthDelimitedCodec::encode` ([#8333])
+- task: use `LocalRuntime` in `LocalPoolHandle` ([#7852])
+
+### Fixed
+
+- codec: clamp runtime frame length to field width ([#8275])
+- io: handle empty vectored writes in `simplex` ([#8353])
+- io: retry on `Interrupted` in `read_exact_arc` and `write_all_vectored` ([#8460])
+- io: stop polling `StreamReader` after EOF ([#8332])
+- sync: notify `CancellationToken` descendants after releasing locks ([#8556])
+- time: return the earliest key from `DelayQueue::peek` ([#8402])
+- time: wake `DelayQueue` when cleared ([#8320])
+
+### Documented
+
+- codec: fix broken `length_delimited` builder doc examples ([#8350])
+
+[#7852]: https://github.com/tokio-rs/tokio/pull/7852
+[#8275]: https://github.com/tokio-rs/tokio/pull/8275
+[#8320]: https://github.com/tokio-rs/tokio/pull/8320
+[#8332]: https://github.com/tokio-rs/tokio/pull/8332
+[#8333]: https://github.com/tokio-rs/tokio/pull/8333
+[#8350]: https://github.com/tokio-rs/tokio/pull/8350
+[#8353]: https://github.com/tokio-rs/tokio/pull/8353
+[#8355]: https://github.com/tokio-rs/tokio/pull/8355
+[#8402]: https://github.com/tokio-rs/tokio/pull/8402
+[#8460]: https://github.com/tokio-rs/tokio/pull/8460
+[#8486]: https://github.com/tokio-rs/tokio/pull/8486
+[#8556]: https://github.com/tokio-rs/tokio/pull/8556
+
 # 0.7.19 (July 21st, 2026)
 
 ### Added

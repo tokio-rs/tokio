@@ -48,35 +48,48 @@ fn rt_combinations() -> Vec<Box<dyn Fn() -> Runtime>> {
 #[test]
 fn shutdown_runtime_while_performing_io_uring_ops() {
     fn run(rt: Runtime) {
-        let (tx, rx) = mpsc::channel();
         let (done_tx, done_rx) = mpsc::channel();
 
         let (_tmp, path) = create_tmp_files(1);
-        rt.spawn(async move {
+        rt.block_on(async move {
             let path = path[0].clone();
+            let mut futs = vec![];
 
             // spawning a bunch of uring operations.
-            loop {
+            for _ in 0..100 {
                 let path = path.clone();
-                tokio::spawn(async move {
+                let mut fut = Box::pin(async move {
                     let mut opt = OpenOptions::new();
                     opt.read(true);
-                    opt.open(&path).await.unwrap();
+                    opt.open(&path).await
                 });
-
-                // Avoid busy looping.
-                tokio::task::yield_now().await;
+                if let Poll::Ready(result) = futures::poll!(fut.as_mut()) {
+                    result.unwrap();
+                }
+                futs.push(fut);
             }
+            tokio::spawn(async move {
+                let _futs = futs;
+                loop {
+                    let path = path.clone();
+                    tokio::spawn(async move {
+                        let mut opt = OpenOptions::new();
+                        opt.read(true);
+                        opt.open(&path).await.unwrap();
+                    });
+
+                    // Avoid busy looping.
+                    tokio::task::yield_now().await;
+                }
+            });
         });
 
         std::thread::spawn(move || {
-            let rt: Runtime = rx.recv().unwrap();
             rt.shutdown_timeout(Duration::from_millis(300));
             done_tx.send(()).unwrap();
         });
 
-        tx.send(rt).unwrap();
-        done_rx.recv().unwrap();
+        done_rx.recv_timeout(Duration::from_secs(5)).unwrap();
     }
 
     for rt in rt_combinations() {
@@ -143,6 +156,53 @@ async fn cancel_op_future() {
 
     let res = handle.await.unwrap_err();
     assert!(res.is_cancelled());
+}
+
+#[cfg(panic = "unwind")]
+#[test]
+fn completion_waker_panic_preserves_uring() {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+    use std::sync::Arc;
+    use std::task::{Context, Wake, Waker};
+
+    struct PanicWaker;
+    impl Wake for PanicWaker {
+        fn wake(self: Arc<Self>) {
+            panic!("completion waker panic");
+        }
+    }
+
+    if io_uring::IoUring::new(2).is_err() {
+        return;
+    }
+
+    let rt = Builder::new_current_thread().enable_all().build().unwrap();
+
+    // Initialize io_uring on the runtime.
+    rt.block_on(tokio::fs::File::open("/dev/null")).unwrap();
+
+    let mut open_fut = Box::pin(tokio::fs::File::open("/dev/null"));
+    {
+        let _enter = rt.enter();
+        let waker = Waker::from(Arc::new(PanicWaker));
+        let mut cx = Context::from_waker(&waker);
+        tokio_test::assert_pending!(open_fut.as_mut().poll_unpin(&mut cx));
+    }
+
+    let res = catch_unwind(AssertUnwindSafe(|| {
+        rt.block_on(std::future::pending::<()>());
+    }));
+    assert!(res.is_err());
+
+    // The completed operation recorded its CQE before waking, and the ring is still intact.
+    {
+        let _enter = rt.enter();
+        open_fut.now_or_never().unwrap().unwrap();
+
+        let mut next_open = Box::pin(tokio::fs::File::open("/dev/null"));
+        let mut cx = Context::from_waker(Waker::noop());
+        tokio_test::assert_pending!(next_open.as_mut().poll_unpin(&mut cx));
+    }
 }
 
 fn create_tmp_files(num_files: usize) -> (Vec<NamedTempFile>, Vec<PathBuf>) {

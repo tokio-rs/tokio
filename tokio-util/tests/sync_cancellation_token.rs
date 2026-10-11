@@ -613,3 +613,42 @@ fn different_cancellation_tokens_have_different_hash() {
     token2.hash(&mut state2);
     assert_ne!(state1.finish(), state2.finish());
 }
+
+#[test]
+fn cancel_descendant_waker_can_access_ancestor() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    use std::task::{Wake, Waker};
+
+    struct ReenterLockOnWake {
+        token: CancellationToken,
+        woken: AtomicBool,
+    }
+
+    impl Wake for ReenterLockOnWake {
+        fn wake(self: Arc<Self>) {
+            assert!(self.token.child_token().is_cancelled());
+            self.woken.store(true, Ordering::SeqCst);
+        }
+    }
+
+    let root = CancellationToken::new();
+    let child = root.child_token();
+
+    let fut = child.cancelled();
+    pin!(fut);
+
+    let state = Arc::new(ReenterLockOnWake {
+        token: root.clone(),
+        woken: AtomicBool::new(false),
+    });
+    let waker = Waker::from(state.clone());
+    assert_eq!(
+        Poll::Pending,
+        fut.as_mut().poll(&mut Context::from_waker(&waker))
+    );
+    drop(waker);
+
+    root.cancel();
+    assert!(state.woken.load(Ordering::SeqCst));
+}

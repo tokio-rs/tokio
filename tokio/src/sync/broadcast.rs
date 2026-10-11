@@ -1584,6 +1584,19 @@ impl<T: Clone> Receiver<T> {
 
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
+        struct NotifyGuard<'a, T> {
+            rx: &'a mut Receiver<T>,
+            notify: bool,
+        }
+
+        impl<T> Drop for NotifyGuard<'_, T> {
+            fn drop(&mut self) {
+                if self.notify {
+                    self.rx.shared.notify_last_rx_drop.notify_waiters();
+                }
+            }
+        }
+
         let mut tail = self.shared.tail.lock();
 
         tail.rx_cnt -= 1;
@@ -1591,14 +1604,18 @@ impl<T> Drop for Receiver<T> {
         let remaining_rx = tail.rx_cnt;
 
         if remaining_rx == 0 {
-            self.shared.notify_last_rx_drop.notify_waiters();
             tail.closed = true;
         }
 
         drop(tail);
 
-        while self.next < until {
-            match self.recv_ref(None) {
+        let guard = NotifyGuard {
+            rx: self,
+            notify: remaining_rx == 0,
+        };
+
+        while guard.rx.next < until {
+            match guard.rx.recv_ref(None) {
                 Ok(_) => {}
                 // The channel is closed
                 Err(TryRecvError::Closed) => break,
@@ -1644,7 +1661,7 @@ where
     type Output = Result<T, RecvError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
 
         let (receiver, waiter) = self.project();
 
