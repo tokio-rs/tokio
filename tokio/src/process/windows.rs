@@ -197,7 +197,15 @@ pub(crate) struct ChildStdio {
     io: Blocking<ArcFile>,
 }
 
+pub(crate) type ChildStdin = ChildStdio;
+pub(crate) type ChildStdout = ChildStdio;
+pub(crate) type ChildStderr = ChildStdio;
+
 impl ChildStdio {
+    pub(super) fn into_stdio(self) -> io::Result<Stdio> {
+        convert_to_file(self).map(Stdio::from)
+    }
+
     pub(super) fn into_owned_handle(self) -> io::Result<OwnedHandle> {
         convert_to_file(self).map(OwnedHandle::from)
     }
@@ -257,10 +265,6 @@ fn convert_to_file(child_stdio: ChildStdio) -> io::Result<StdFile> {
     drop(io); // Try to drop the Arc count here
 
     Arc::try_unwrap(raw).or_else(|raw| duplicate_handle(&*raw))
-}
-
-pub(crate) fn convert_to_stdio(child_stdio: ChildStdio) -> io::Result<Stdio> {
-    convert_to_file(child_stdio).map(Stdio::from)
 }
 
 fn duplicate_handle<T: AsRawHandle>(io: &T) -> io::Result<StdFile> {
