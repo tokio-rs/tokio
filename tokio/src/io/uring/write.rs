@@ -12,13 +12,19 @@ pub(crate) struct Write {
 }
 
 impl Completable for Write {
-    type Output = (io::Result<u32>, OwnedBuf, OwnedFd);
+    // The buffer and fd are `None` only when the op was cancelled and they were
+    // kept in the driver; otherwise they are returned to the caller.
+    type Output = (io::Result<u32>, Option<OwnedBuf>, Option<OwnedFd>);
     fn complete(self, cqe: CqeResult) -> Self::Output {
-        (cqe.result, self.buf, self.fd)
+        (cqe.result, Some(self.buf), Some(self.fd))
     }
 
     fn complete_with_error(self, err: Error) -> Self::Output {
-        (Err(err), self.buf, self.fd)
+        (Err(err), Some(self.buf), Some(self.fd))
+    }
+
+    fn complete_after_cancel(err: Error) -> Self::Output {
+        (Err(err), None, None)
     }
 }
 
