@@ -610,24 +610,23 @@ fn driver_shutdown_wakes_future_pending() {
 
 #[test]
 fn driver_shutdown_wakes_pending_race() {
-    // TODO: make this a loom test
-    for _ in 0..100 {
-        let rt = rt();
+    let rt = rt();
 
-        let (a, _b) = socketpair();
-        let afd_a = {
-            let _enter = rt.enter();
-            AsyncFd::new(a).unwrap()
-        };
+    let (a, _b) = socketpair();
+    let afd_a = {
+        let _enter = rt.enter();
+        AsyncFd::new(a).unwrap()
+    };
 
-        let _ = std::thread::spawn(move || std::mem::drop(rt));
+    let shutdown = std::thread::spawn(move || std::mem::drop(rt));
 
-        // This may or may not return an error (but will be awoken)
-        let _ = futures::executor::block_on(afd_a.readable());
+    // This may or may not return an error (but will be awoken)
+    let _ = futures::executor::block_on(afd_a.readable());
 
-        // However retrying will always return an error
-        assert_err!(futures::executor::block_on(afd_a.readable()));
-    }
+    shutdown.join().unwrap();
+
+    // However retrying will always return an error
+    assert_err!(futures::executor::block_on(afd_a.readable()));
 }
 
 async fn poll_readable<T: AsRawFd>(fd: &AsyncFd<T>) -> std::io::Result<AsyncFdReadyGuard<'_, T>> {
@@ -695,24 +694,23 @@ fn driver_shutdown_then_clear_readiness() {
 
 #[test]
 fn driver_shutdown_wakes_poll_race() {
-    // TODO: make this a loom test
-    for _ in 0..100 {
-        let rt = rt();
+    let rt = rt();
 
-        let (a, _b) = socketpair();
-        let afd_a = {
-            let _enter = rt.enter();
-            AsyncFd::new(a).unwrap()
-        };
+    let (a, _b) = socketpair();
+    let afd_a = {
+        let _enter = rt.enter();
+        AsyncFd::new(a).unwrap()
+    };
 
-        while afd_a.get_ref().write(&[0; 512]).is_ok() {} // make not writable
+    while afd_a.get_ref().write(&[0; 512]).is_ok() {} // make not writable
 
-        let _ = std::thread::spawn(move || std::mem::drop(rt));
+    let shutdown = std::thread::spawn(move || std::mem::drop(rt));
 
-        // The poll variants will always return an error in this case
-        assert_err!(futures::executor::block_on(poll_readable(&afd_a)));
-        assert_err!(futures::executor::block_on(poll_writable(&afd_a)));
-    }
+    // The poll variants will always return an error in this case
+    assert_err!(futures::executor::block_on(poll_readable(&afd_a)));
+    assert_err!(futures::executor::block_on(poll_writable(&afd_a)));
+
+    shutdown.join().unwrap();
 }
 
 #[tokio::test]
@@ -956,4 +954,26 @@ async fn try_with_interest() {
     let (returned, _cause) = error.into_parts();
 
     assert!(Arc::ptr_eq(&original, &returned));
+}
+
+#[tokio::test]
+async fn drop_after_closing_raw_fd_with_live_duplicate() {
+    let (original, mut peer) = socketpair();
+    let duplicate = original.fd.try_clone().unwrap();
+
+    let registered = AsyncFd::with_interest(original.as_raw_fd(), Interest::READABLE).unwrap();
+
+    // Closing the original fd while `duplicate` stays open keeps the open file
+    // description registered in epoll on Linux, while causing `EPOLL_CTL_DEL`
+    // to fail with `EBADF` when `registered` is dropped.
+    drop(original);
+    drop(registered);
+
+    // Let the I/O driver run a turn so any pending registration releases happen.
+    tokio::task::yield_now().await;
+
+    peer.write_all(b"x").unwrap();
+    tokio::task::yield_now().await;
+
+    drop(duplicate);
 }

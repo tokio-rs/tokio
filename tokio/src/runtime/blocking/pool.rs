@@ -612,6 +612,8 @@ impl LockedImpl {
         let mut locked = self.mutex.lock();
 
         if locked.thread_mgmt_state.shutdown {
+            drop(locked);
+
             // Shutdown the task: it's fine to shutdown this task
             // (even if mandatory) because it was scheduled after the
             // shutdown of the runtime began.

@@ -80,6 +80,50 @@ fn sleep() {
 }
 
 #[test]
+fn cancelled_timer_waker_drop_can_register_timer() {
+    use futures::FutureExt;
+    use std::future::Future;
+    use std::sync::Arc;
+    use std::task::{Context, Wake, Waker};
+    use tokio_test::assert_pending;
+
+    struct ReenterOnDrop;
+
+    #[allow(unknown_lints, clippy::manual_noop_waker)]
+    impl Wake for ReenterOnDrop {
+        fn wake(self: Arc<Self>) {}
+    }
+
+    impl Drop for ReenterOnDrop {
+        fn drop(&mut self) {
+            let _ = tokio::time::sleep(Duration::from_secs(5)).now_or_never();
+        }
+    }
+
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_alt_timer()
+        .enable_time()
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        tokio::spawn(async {
+            let mut timer = Box::pin(tokio::time::sleep(Duration::from_secs(10)));
+            let waker = Waker::from(Arc::new(ReenterOnDrop));
+            assert_pending!(timer.as_mut().poll(&mut Context::from_waker(&waker)));
+            drop(waker);
+
+            tokio::task::yield_now().await;
+            drop(timer);
+            tokio::task::yield_now().await;
+        })
+        .await
+        .unwrap();
+    });
+}
+
+#[test]
 fn timeout() {
     const N: u32 = 512;
 
