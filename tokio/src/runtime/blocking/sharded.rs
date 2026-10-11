@@ -112,6 +112,16 @@ impl PopCursor {
             self.move_to_next_shard();
         }
     }
+
+    fn record_pop_at(&mut self, index: usize) {
+        self.pos = self
+            .order
+            .iter()
+            .position(|&shard| shard as usize == index)
+            .unwrap();
+        self.remaining = TASKS_PER_SHARD;
+        self.record_pop();
+    }
 }
 
 struct Shard {
@@ -211,19 +221,35 @@ impl ShardedImpl {
     /// Pop a task, advancing the worker's cursor after a bounded number of
     /// tasks from one shard so busy shards cannot starve later ones.
     fn pop(&self, cursor: &mut PopCursor) -> Option<Task> {
-        let mask = self.non_empty_mask.load(Ordering::Relaxed);
+        let mut mask = self.non_empty_mask.load(Ordering::Relaxed);
         if mask == 0 {
             return None;
         }
+        let mut contended = 0usize;
 
         for _ in 0..NUM_SHARDS {
             let index = cursor.current_shard();
+            let bit = 1 << index;
             if mask & (1 << index) == 0 {
                 cursor.move_to_next_shard();
                 continue;
             }
+            mask &= !bit;
 
-            let mut shard = self.shards[index].lock();
+            // At a batch boundary, skip a shard another worker is already
+            // using when an alternative occupied shard is available.
+            let mut shard = if cursor.remaining == TASKS_PER_SHARD {
+                match self.shards[index].try_lock() {
+                    Some(shard) => shard,
+                    None => {
+                        contended |= bit;
+                        cursor.move_to_next_shard();
+                        continue;
+                    }
+                }
+            } else {
+                self.shards[index].lock()
+            };
             match shard.queue.pop_front() {
                 Some(task) => {
                     if shard.queue.is_empty() {
@@ -235,6 +261,25 @@ impl ShardedImpl {
                 }
                 None => cursor.move_to_next_shard(),
             }
+        }
+
+        // A failed try_lock does not prove that the shard is empty. Check
+        // deferred shards before reporting None so a worker cannot transition
+        // to idle while work is still queued.
+        while contended != 0 {
+            let index = contended.trailing_zeros() as usize;
+            contended &= contended - 1;
+            let mut shard = self.shards[index].lock();
+            if let Some(task) = shard.queue.pop_front() {
+                if shard.queue.is_empty() {
+                    self.non_empty_mask
+                        .fetch_and(!(1 << index), Ordering::Relaxed);
+                }
+                cursor.record_pop_at(index);
+                return Some(task);
+            }
+            self.non_empty_mask
+                .fetch_and(!(1 << index), Ordering::Relaxed);
         }
 
         None
@@ -694,5 +739,33 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn pop_skips_contended_shard_at_batch_boundary() {
+        let rt = Builder::new_current_thread().build().unwrap();
+        let queue = ShardedImpl::new(ThreadManagementState {
+            shutdown: false,
+            shutdown_tx: None,
+            last_exiting_thread: None,
+            worker_threads: HashMap::new(),
+            worker_thread_index: 0,
+        });
+        let (tx, rx) = mpsc::channel();
+
+        for index in 0..2 {
+            let tx = tx.clone();
+            let task = blocking_task_for_test(rt.handle(), move || {
+                tx.send(index).unwrap();
+            });
+            queue.shards[index].lock().queue.push_back(task);
+            queue.non_empty_mask.fetch_or(1 << index, Ordering::Relaxed);
+        }
+        drop(tx);
+
+        let _guard = queue.shards[0].lock();
+        let mut cursor = PopCursor::new_for_test(0);
+        queue.pop(&mut cursor).unwrap().run();
+        assert_eq!(rx.recv().unwrap(), 1);
     }
 }
