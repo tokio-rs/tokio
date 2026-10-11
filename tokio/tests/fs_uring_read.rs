@@ -9,7 +9,7 @@
 ))]
 
 use futures::future::Future;
-use std::future::poll_fn;
+use std::future::{pending, poll_fn};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -63,7 +63,7 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
         let (_tmp, path) = create_tmp_files(1);
         // keep 100 permits
         const N: i32 = 100;
-        rt.spawn(async move {
+        rt.block_on(async move {
             let path = path[0].clone();
 
             // spawning a bunch of uring operations.
@@ -74,16 +74,16 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
                 let path = path.clone();
                 let mut fut = Box::pin(read(path));
 
-                poll_fn(|cx| {
-                    assert_pending!(fut.as_mut().poll(cx));
-                    Poll::<()>::Pending
-                })
-                .await;
+                // the first poll starts the open stage of fs::read
+                assert_pending!(futures::poll!(fut.as_mut()));
 
                 futs.push(fut);
             }
 
-            tokio::task::yield_now().await;
+            tokio::spawn(async move {
+                let _futs = futs;
+                pending::<()>().await;
+            });
         });
 
         std::thread::spawn(move || {
@@ -91,7 +91,7 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
             done_tx.send(()).unwrap();
         });
 
-        done_rx.recv().unwrap();
+        done_rx.recv_timeout(Duration::from_secs(5)).unwrap();
     }
 
     for rt in rt_combinations() {
