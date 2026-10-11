@@ -327,6 +327,7 @@ fn read_max_frame_len() {
     assert_next_err!(io);
 }
 
+// Once https://github.com/tokio-rs/tokio/issues/4815 is fixed this test can be removed.
 #[test]
 fn read_max_frame_len_with_positive_adjustment() {
     let io = length_delimited::Builder::new()
