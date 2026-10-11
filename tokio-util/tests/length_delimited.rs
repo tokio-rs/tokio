@@ -301,6 +301,21 @@ fn read_incomplete_payload() {
 }
 
 #[test]
+fn read_head_then_eof() {
+    let io = FramedRead::new(
+        mock! {
+            data(b"\x00\x00\x00\x09"),
+            Poll::Pending,
+        },
+        LengthDelimitedCodec::new(),
+    );
+    pin_mut!(io);
+
+    assert_next_pending!(io);
+    assert_next_err!(io);
+}
+
+#[test]
 fn read_max_frame_len() {
     let io = length_delimited::Builder::new()
         .max_frame_length(5)

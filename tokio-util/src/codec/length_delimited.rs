@@ -601,6 +601,16 @@ impl Decoder for LengthDelimitedCodec {
             None => Ok(None),
         }
     }
+
+    fn decode_eof(&mut self, src: &mut BytesMut) -> io::Result<Option<BytesMut>> {
+        match self.decode(src)? {
+            Some(frame) => Ok(Some(frame)),
+            // The head has been consumed, so an empty buffer does not mean the
+            // stream ended on a frame boundary: the payload is still missing.
+            None if src.is_empty() && matches!(self.state, DecodeState::Head) => Ok(None),
+            None => Err(io::Error::other("bytes remaining on stream")),
+        }
+    }
 }
 
 impl Encoder<&[u8]> for LengthDelimitedCodec {
