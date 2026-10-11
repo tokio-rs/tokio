@@ -2,12 +2,11 @@
 //!
 //! [`File`]: File
 
-use crate::fs::{asyncify, OpenOptions};
+use crate::fs::{asyncify, FileTimes, OpenOptions};
 use crate::io::blocking::{Buf, DEFAULT_MAX_BUF_SIZE};
 use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use crate::sync::Mutex;
 
-use super::file_times::FileTimes;
 use std::cmp;
 use std::fmt;
 use std::fs::{Metadata, Permissions};
@@ -590,9 +589,20 @@ impl File {
     /// # }
     /// ```
     pub async fn set_times(&self, times: FileTimes) -> io::Result<()> {
+        // Wait for in-flight reads/writes like `sync_all` does, so they
+        // cannot complete after us and overwrite the timestamps.
+        self.inner.lock().await.complete_inflight().await;
+
         let std = self.std.clone();
         let std_times = times.into_std();
         asyncify(move || std.set_times(std_times)).await
+    }
+
+    /// Changes the modification timestamp on the underlying file.
+    ///
+    /// This is equivalent to `set_times` with only the modification time set.
+    pub async fn set_modified(&self, time: std::time::SystemTime) -> io::Result<()> {
+        self.set_times(FileTimes::new().set_modified(time)).await
     }
 
     /// Set the maximum buffer size for the underlying [`AsyncRead`] / [`AsyncWrite`] operation.

@@ -1,11 +1,17 @@
 use std::time::SystemTime;
 
+#[cfg(target_vendor = "apple")]
+use std::os::darwin::fs::FileTimesExt;
+#[cfg(windows)]
+use std::os::windows::fs::FileTimesExt;
+
 /// Timestamps for a file.
 ///
 /// This is a specialized version of [`std::fs::FileTimes`] for usage with
 /// [`File::set_times`](crate::fs::File::set_times). Unlike the standard library version,
-/// the timestamps set here are kept so that future backends such as `io-uring` can read them
-/// without going through the standard library type.
+/// this type records the timestamps itself, so a future `io-uring` file
+/// implementation can consume them without converting through the standard
+/// library type.
 ///
 /// # Examples
 ///
@@ -20,9 +26,12 @@ use std::time::SystemTime;
 /// # }
 /// ```
 #[derive(Debug, Clone, Default)]
+#[must_use = "must be applied to a file via `File::set_times` to have any effect"]
 pub struct FileTimes {
     accessed: Option<SystemTime>,
     modified: Option<SystemTime>,
+    #[cfg(any(windows, target_vendor = "apple"))]
+    created: Option<SystemTime>,
 }
 
 impl FileTimes {
@@ -45,6 +54,14 @@ impl FileTimes {
         self
     }
 
+    /// Sets the creation time.
+    #[cfg(any(all(doc, docsrs), windows, target_vendor = "apple"))]
+    #[cfg_attr(docsrs, doc(cfg(any(windows, target_vendor = "apple"))))]
+    pub fn set_created(mut self, t: SystemTime) -> Self {
+        self.created = Some(t);
+        self
+    }
+
     pub(crate) fn into_std(self) -> std::fs::FileTimes {
         let mut std_times = std::fs::FileTimes::new();
         if let Some(accessed) = self.accessed {
@@ -52,6 +69,10 @@ impl FileTimes {
         }
         if let Some(modified) = self.modified {
             std_times = std_times.set_modified(modified);
+        }
+        #[cfg(any(windows, target_vendor = "apple"))]
+        if let Some(created) = self.created {
+            std_times = std_times.set_created(created);
         }
         std_times
     }

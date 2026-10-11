@@ -203,6 +203,9 @@ cfg_not_wasi! {
         async_assert_fn!(
             tokio::fs::File::set_times(_, tokio::fs::FileTimes): Send & Sync & !Unpin
         );
+        async_assert_fn!(
+            tokio::fs::File::set_modified(_, std::time::SystemTime): Send & Sync & !Unpin
+        );
     }
 }
 
