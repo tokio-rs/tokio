@@ -21,7 +21,7 @@ type Promise = *mut c_void;
 const EM_PROMISE_FULFILL: i32 = 0;
 
 /// Minimum Emscripten version required for JSPI (`emscripten#27720` fixed
-/// `emscripten_clear_timeout` and `emscripten_clear_immediate` keepalive
+/// `emscripten_clear_timeout` and `emscripten_clear_immediate` keep-alive
 /// handling in 6.0.10).
 const MIN_EMSCRIPTEN_VERSION: (u32, u32, u32) = (6, 0, 10);
 
