@@ -439,7 +439,7 @@ impl Handle {
                             .is_none_or(|next_wake| when < next_wake.get())
                             && !driver_held_by_current_thread(driver)
                         {
-                            driver.io.unpark();
+                            driver.unpark_io();
                         }
 
                         None
