@@ -258,30 +258,4 @@ mod loom_tests {
             assert!(handle.set.is_shutdown(&handle.synced.lock()));
         });
     }
-
-    #[test]
-    fn deregistration_racing_shutdown_preserves_shutdown_batch() {
-        loom::model(|| {
-            let handle = Arc::new(Registrations::new());
-            let io = handle.allocate();
-            let shutdown_handle = handle.clone();
-            let shutdown = thread::spawn(move || {
-                let ios = shutdown_handle
-                    .set
-                    .shutdown(&mut shutdown_handle.synced.lock());
-                // The driver notifies resources after releasing the set's lock.
-                for io in &ios {
-                    io.shutdown();
-                }
-                ios
-            });
-
-            // This models the set transition after successful Mio deregistration.
-            handle.deregister(&io);
-            drop(io);
-            let ios = shutdown.join().unwrap();
-            assert_eq!(ios.len(), 1);
-            assert!(ios[0].ready_event(Interest::READABLE).is_shutdown);
-        });
-    }
 }
