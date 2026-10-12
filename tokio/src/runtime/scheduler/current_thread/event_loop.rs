@@ -41,6 +41,12 @@ impl Handle {
     pub(crate) fn has_injected_work(&self) -> bool {
         !self.shared.inject.is_empty()
     }
+
+    /// The builder's `event_interval`: tasks per batch.
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    pub(crate) fn event_interval(&self) -> usize {
+        self.shared.config.event_interval as usize
+    }
 }
 
 /// A task panicked and the runtime is configured to shut down.

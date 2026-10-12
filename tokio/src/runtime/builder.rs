@@ -1271,6 +1271,44 @@ impl Builder {
             Ok(crate::runtime::LocalEventLoop::new(runtime))
         }
 
+        /// Creates the configured runtime as a [`LocalEventLoop`] driven by
+        /// the JavaScript host event loop itself: the runtime registers its
+        /// descriptor and deadline with the host, so the program spawns and
+        /// returns to the host, and the tasks run from there. The event loop
+        /// keeps the Emscripten runtime alive while it has tasks.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the runtime is configured with
+        /// [`new_multi_thread()`], if the I/O driver is not enabled, or if OS
+        /// resources required by the runtime cannot be initialized.
+        ///
+        /// [`new_multi_thread()`]: Builder::new_multi_thread
+        /// [`LocalEventLoop`]: crate::runtime::LocalEventLoop
+        #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+        pub fn build_hosted_local_event_loop(
+            &mut self,
+            _options: LocalOptions,
+        ) -> io::Result<crate::runtime::LocalEventLoop> {
+            let mut cfg = self.event_loop_cfg()?;
+            // The loop holds the Emscripten runtime from the first wakeup
+            // while idle, ahead of the host's callback into it.
+            let hold = std::sync::Arc::new(crate::runtime::event_loop::emscripten::Hold::default());
+            let signal = cfg.event_loop.as_mut().expect("an event loop cfg");
+            let on_work_available = signal.on_work_available.take();
+            signal.on_work_available = Some(std::sync::Arc::new({
+                let hold = hold.clone();
+                move || {
+                    hold.acquire();
+                    if let Some(f) = &on_work_available {
+                        f();
+                    }
+                }
+            }));
+            let runtime = self.build_current_thread_local_runtime(cfg)?;
+            crate::runtime::LocalEventLoop::hosted(runtime, hold)
+        }
+
         /// Sets a callback for when an event loop built from this builder has
         /// work for the host to tick.
         ///

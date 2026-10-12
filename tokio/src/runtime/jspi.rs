@@ -15,6 +15,72 @@ use std::sync::atomic::{AtomicPtr, Ordering::SeqCst};
 use std::sync::OnceLock;
 use std::time::Duration;
 
+#[cfg(all(tokio_unstable, feature = "rt"))]
+use std::cell::Cell;
+
+#[cfg(all(tokio_unstable, feature = "rt"))]
+thread_local! {
+    /// An event loop's driver turn is on the stack: a zero-duration park or
+    /// `epoll_wait` from a host callback, which already has the host turn
+    /// and has no stack to hold a suspension. Such a park returns at once.
+    static HOST_TURN: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Runs `f` as an event loop's driver turn.
+#[cfg(all(tokio_unstable, feature = "rt"))]
+pub(crate) fn host_turn<R>(f: impl FnOnce() -> R) -> R {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            HOST_TURN.with(|t| t.set(false));
+        }
+    }
+    let _reset = Reset;
+    HOST_TURN.with(|t| t.set(true));
+    f()
+}
+
+pub(crate) fn in_host_turn() -> bool {
+    #[cfg(all(tokio_unstable, feature = "rt"))]
+    return HOST_TURN.with(Cell::get);
+    #[cfg(not(all(tokio_unstable, feature = "rt")))]
+    return false;
+}
+
+#[cfg(all(tokio_unstable, feature = "rt"))]
+thread_local! {
+    /// Work for the moment no runtime is entered on this thread. A hosted
+    /// event loop's callback arriving while a `block_on` is suspended through
+    /// JSPI waits here rather than polling for the exit.
+    static AFTER_EXIT: std::cell::RefCell<Vec<Box<dyn FnOnce()>>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// If a runtime is entered on this thread, queues `f` to run once it exits
+/// and returns `true`; otherwise returns `false` without running it.
+#[cfg(all(tokio_unstable, feature = "rt"))]
+pub(crate) fn defer_after_runtime_exit(f: impl FnOnce() + 'static) -> bool {
+    let entered = crate::runtime::context::is_entered();
+    if entered {
+        AFTER_EXIT.with(|q| q.borrow_mut().push(Box::new(f)));
+    }
+    entered
+}
+
+/// Held by the runtime's enter guard; its drop runs the deferred work, after
+/// the guard has cleared the entered state and the current handle.
+#[cfg(all(tokio_unstable, feature = "rt"))]
+pub(crate) struct RuntimeExit;
+
+#[cfg(all(tokio_unstable, feature = "rt"))]
+impl Drop for RuntimeExit {
+    fn drop(&mut self) {
+        for f in AFTER_EXIT.take() {
+            f();
+        }
+    }
+}
+
 /// `em_promise_t`: an index into the host's promise table, never null.
 type Promise = *mut c_void;
 
@@ -209,7 +275,10 @@ pub(crate) fn sleep(dur: Duration) {
 #[cfg(all(feature = "rt", feature = "net"))]
 pub(crate) fn io_wait<R>(max_wait: Option<Duration>, wait: impl FnOnce() -> R) -> R {
     let immediate = max_wait == Some(Duration::ZERO);
-    if jspi_enabled() {
+    if in_host_turn() {
+        assert!(immediate, "an event loop's driver turn cannot wait");
+        wait()
+    } else if jspi_enabled() {
         if immediate {
             sleep(Duration::ZERO);
             return wait();

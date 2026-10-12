@@ -15,8 +15,15 @@
 //! the driver's waker, which is registered in the same set, and through the
 //! [`on_work_available`] callback. Nothing is polled and no thread is owned.
 //!
+//! On `wasm32-unknown-emscripten` without threads the JavaScript host loop
+//! can be the host itself: a *hosted* event loop (`emscripten.rs`) registers
+//! the descriptor and the timeout with it, so the program spawns and returns
+//! to the host.
+//!
 //! [`on_work_available`]: crate::runtime::Builder::on_work_available
 
+#[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+pub(crate) mod emscripten;
 mod signal;
 pub(crate) use signal::{Signal, SignalCfg};
 
@@ -26,9 +33,11 @@ use crate::runtime::{context, EnterGuard, Handle, Runtime};
 use crate::task::JoinHandle;
 use crate::util::trace::SpawnMeta;
 
+use std::cell::{Ref, RefCell, RefMut};
 use std::future::Future;
 #[cfg(unix)]
 use std::os::fd::BorrowedFd;
+use std::rc::Rc;
 use std::time::Duration;
 
 /// A runtime driven by a host event loop instead of by parking a thread.
@@ -168,10 +177,25 @@ pub struct EventLoop {
 /// futures; like `LocalRuntime` it is `!Send`, so the host drives it on the
 /// thread that built it.
 ///
+/// On `wasm32-unknown-emscripten` without threads, a *hosted* event loop
+/// (`Builder::build_hosted_local_event_loop`) is driven by the JavaScript
+/// host loop itself: the program spawns and returns to the host. Such a loop
+/// keeps the Emscripten runtime alive while it has tasks. A
+/// [`Handle::block_on`] suspended through JSPI on the same thread defers
+/// hosted ticks until it returns.
+///
 /// [`Builder::build_local_event_loop`]: crate::runtime::Builder::build_local_event_loop
+/// [`Handle::block_on`]: crate::runtime::Handle::block_on
 #[derive(Debug)]
 pub struct LocalEventLoop {
-    core: Core<LocalRuntime>,
+    handle: Handle,
+    /// Detaches from the host before the runtime, and its descriptor, drop.
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    hosted: Option<Rc<emscripten::Hosted>>,
+    /// Shared weakly with the host's callbacks on a hosted loop, which tick
+    /// between the program's own calls; never while one is in progress, as
+    /// a tick does not yield to the host.
+    core: Rc<RefCell<Core<LocalRuntime>>>,
 }
 
 /// What both event loops share.
@@ -221,11 +245,19 @@ impl<R: Scheduler> Core<R> {
 
     fn tick(&mut self, max_tasks: usize) -> usize {
         let handle = self.runtime.handle();
-        let (ran, local_ready) = context::enter_runtime(&handle.inner, false, |_| {
-            self.runtime
-                .current_thread()
-                .tick(handle.inner.as_current_thread(), max_tasks)
-        });
+        let tick = || {
+            context::enter_runtime(&handle.inner, false, |_| {
+                self.runtime
+                    .current_thread()
+                    .tick(handle.inner.as_current_thread(), max_tasks)
+            })
+        };
+        // The driver's turn must neither yield to nor suspend on the host
+        // loop: a host callback already has the turn.
+        #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+        let (ran, local_ready) = crate::runtime::jspi::host_turn(tick);
+        #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
+        let (ran, local_ready) = tick();
         self.local_ready = local_ready;
         ran
     }
@@ -255,11 +287,6 @@ impl<R: Scheduler> Core<R> {
             None
         }
     }
-
-    #[cfg(unix)]
-    fn event_fd(&self) -> Option<BorrowedFd<'_>> {
-        self.handle().inner.driver().event_fd()
-    }
 }
 
 /// Wakes a parked [`EventLoop`] or [`LocalEventLoop`] from any thread.
@@ -288,13 +315,13 @@ macro_rules! event_loop_methods {
     () => {
         /// Returns a handle to the runtime, for spawning from any thread.
         pub fn handle(&self) -> &Handle {
-            self.core.handle()
+            self.handle_ref()
         }
 
         /// Enters the runtime context, so that `tokio::spawn` and runtime
         /// aware types resolve to this event loop.
         pub fn enter(&self) -> EnterGuard<'_> {
-            self.core.handle().enter()
+            self.handle_ref().enter()
         }
 
         /// Polls the I/O driver without blocking, then polls up to
@@ -316,7 +343,9 @@ macro_rules! event_loop_methods {
         ///
         /// [shut down on unhandled panics]: crate::runtime::Builder::unhandled_panic
         pub fn tick(&mut self, max_tasks: usize) -> usize {
-            self.core.tick(max_tasks)
+            let ran = self.core_mut().tick(max_tasks);
+            self.after_turn();
+            ran
         }
 
         /// How long the host may sleep before calling [`tick`](Self::tick)
@@ -338,7 +367,7 @@ macro_rules! event_loop_methods {
         ///
         /// [`on_work_available`]: crate::runtime::Builder::on_work_available
         pub fn next_sleep(&self) -> Option<Duration> {
-            self.core.next_sleep()
+            self.core_ref().next_sleep()
         }
 
         /// A descriptor that becomes readable whenever the loop has work
@@ -360,7 +389,7 @@ macro_rules! event_loop_methods {
         #[cfg(unix)]
         #[cfg_attr(docsrs, doc(cfg(unix)))]
         pub fn event_fd(&self) -> Option<BorrowedFd<'_>> {
-            self.core.event_fd()
+            self.handle_ref().inner.driver().event_fd()
         }
 
         /// Blocks until the loop has work, a timer expires, `timeout`
@@ -383,13 +412,14 @@ macro_rules! event_loop_methods {
         /// Panics if called from within a runtime, including from one of this
         /// loop's own tasks.
         pub fn park(&mut self, timeout: Option<Duration>) {
-            self.core.park(timeout);
+            self.core_mut().park(timeout);
+            self.after_turn();
         }
 
         /// Returns an [`Unparker`] that wakes this loop from any thread.
         pub fn unparker(&self) -> Unparker {
             Unparker {
-                handle: self.core.handle().clone(),
+                handle: self.handle_ref().clone(),
             }
         }
 
@@ -400,7 +430,7 @@ macro_rules! event_loop_methods {
         ///
         /// [`Runtime::shutdown_timeout`]: crate::runtime::Runtime::shutdown_timeout
         pub fn shutdown_timeout(self, duration: Duration) {
-            self.core.runtime.shutdown_timeout(duration);
+            self.into_runtime().shutdown_timeout(duration);
         }
 
         /// Shuts down the runtime, without waiting for any spawned work to
@@ -410,7 +440,7 @@ macro_rules! event_loop_methods {
         ///
         /// [`Runtime::shutdown_background`]: crate::runtime::Runtime::shutdown_background
         pub fn shutdown_background(self) {
-            self.core.runtime.shutdown_background();
+            self.into_runtime().shutdown_background();
         }
     };
 }
@@ -422,13 +452,76 @@ impl EventLoop {
         }
     }
 
+    fn handle_ref(&self) -> &Handle {
+        self.core.handle()
+    }
+
+    fn core_ref(&self) -> &Core<Runtime> {
+        &self.core
+    }
+
+    fn core_mut(&mut self) -> &mut Core<Runtime> {
+        &mut self.core
+    }
+
+    fn after_turn(&self) {}
+
+    fn into_runtime(self) -> Runtime {
+        self.core.runtime
+    }
+
     event_loop_methods!();
 }
 
 impl LocalEventLoop {
     pub(crate) fn new(runtime: LocalRuntime) -> LocalEventLoop {
         LocalEventLoop {
-            core: Core::new(runtime),
+            handle: runtime.handle().clone(),
+            #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+            hosted: None,
+            core: Rc::new(RefCell::new(Core::new(runtime))),
+        }
+    }
+
+    /// Attaches the loop to the ambient JavaScript host loop. `hold` is the
+    /// loop's hold on the Emscripten runtime, already wired to the driver's
+    /// host signal.
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    pub(crate) fn hosted(
+        runtime: LocalRuntime,
+        hold: std::sync::Arc<emscripten::Hold>,
+    ) -> std::io::Result<LocalEventLoop> {
+        let mut el = LocalEventLoop::new(runtime);
+        el.hosted = Some(emscripten::Hosted::attach(&el.core, hold)?);
+        Ok(el)
+    }
+
+    fn handle_ref(&self) -> &Handle {
+        &self.handle
+    }
+
+    fn core_ref(&self) -> Ref<'_, Core<LocalRuntime>> {
+        self.core.borrow()
+    }
+
+    fn core_mut(&self) -> RefMut<'_, Core<LocalRuntime>> {
+        self.core.borrow_mut()
+    }
+
+    /// A hosted loop re-arms the host after a turn taken by the program.
+    fn after_turn(&self) {
+        #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+        if let Some(hosted) = &self.hosted {
+            hosted.after_turn();
+        }
+    }
+
+    fn into_runtime(self) -> LocalRuntime {
+        #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+        drop(self.hosted);
+        match Rc::try_unwrap(self.core) {
+            Ok(core) => core.into_inner().runtime,
+            Err(_) => unreachable!("only the host's callbacks share the core, weakly"),
         }
     }
 
@@ -446,7 +539,7 @@ impl LocalEventLoop {
         let meta = SpawnMeta::new_unnamed(std::mem::size_of::<F>());
         // SAFETY: `LocalEventLoop` is `!Send`, so this is the thread that
         // built the runtime, and `tick` polls only on that thread.
-        unsafe { self.core.handle().spawn_local_named(future, meta) }
+        unsafe { self.handle.spawn_local_named(future, meta) }
     }
 
     event_loop_methods!();
