@@ -1,17 +1,15 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 
-use futures::task::{noop_waker_ref, ArcWake};
-use futures::FutureExt;
+use futures::task::noop_waker_ref;
+use std::future::Future;
 use std::io::IoSlice;
-use std::pin::Pin;
+use std::pin::{pin, Pin};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::task::{Context, Waker};
-use tokio::io::{
-    duplex, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadBuf,
-};
-use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok};
+use std::task::{Context, Wake, Waker};
+use tokio::io::{duplex, AsyncReadExt, AsyncWriteExt, DuplexStream};
+use tokio_test::{assert_pending, assert_ready};
 
 #[tokio::test]
 async fn ping_pong() {
@@ -130,136 +128,146 @@ async fn duplex_is_cooperative() {
     }
 }
 
-/// Returns a waker that calls `f` when woken, like an executor that polls the
-/// woken task right away.
-fn waker_fn(f: impl Fn() + Send + Sync + 'static) -> Waker {
-    struct WakeFn<F>(F);
+/// Polls `fut` once (expecting `Pending`) with a waker that polls `fut` to
+/// completion when woken.
+fn poll_on_wake(fut: impl Future<Output = ()> + Send + 'static) -> Arc<AtomicBool> {
+    struct PollOnWake<F> {
+        fut: Mutex<Pin<Box<F>>>,
+        woken: Arc<AtomicBool>,
+    }
 
-    impl<F: Fn() + Send + Sync + 'static> ArcWake for WakeFn<F> {
-        fn wake_by_ref(arc_self: &Arc<Self>) {
-            (arc_self.0)();
+    impl<F: Future<Output = ()> + Send> Wake for PollOnWake<F> {
+        fn wake(self: Arc<Self>) {
+            let mut cx = Context::from_waker(noop_waker_ref());
+            assert_ready!(self.fut.lock().unwrap().as_mut().poll(&mut cx));
+            self.woken.store(true, Ordering::SeqCst);
         }
     }
 
-    futures::task::waker(Arc::new(WakeFn(f)))
+    let woken = Arc::new(AtomicBool::new(false));
+    let task = Arc::new(PollOnWake {
+        fut: Mutex::new(Box::pin(fut)),
+        woken: woken.clone(),
+    });
+    let waker = Waker::from(task.clone());
+    let mut cx = Context::from_waker(&waker);
+    assert_pending!(task.fut.lock().unwrap().as_mut().poll(&mut cx));
+    woken
+}
+
+#[tokio::test]
+async fn wake_reader_on_write_outside_lock() {
+    let (mut writer, mut reader) = duplex(1);
+    let woken = poll_on_wake(async move {
+        assert_eq!(reader.read(&mut [0; 1]).await.unwrap(), 1);
+    });
+
+    assert_eq!(writer.write(b"x").await.unwrap(), 1);
+    assert!(woken.load(Ordering::SeqCst));
+}
+
+#[tokio::test]
+async fn wake_reader_on_write_vectored_outside_lock() {
+    let (mut writer, mut reader) = duplex(1);
+    let woken = poll_on_wake(async move {
+        assert_eq!(reader.read(&mut [0; 1]).await.unwrap(), 1);
+    });
+
+    assert_eq!(
+        writer.write_vectored(&[IoSlice::new(b"x")]).await.unwrap(),
+        1
+    );
+    assert!(woken.load(Ordering::SeqCst));
+}
+
+#[tokio::test]
+async fn wake_reader_on_shutdown_outside_lock() {
+    let (mut writer, mut reader) = duplex(1);
+    let woken = poll_on_wake(async move {
+        assert_eq!(reader.read(&mut [0; 1]).await.unwrap(), 0);
+    });
+
+    writer.shutdown().await.unwrap();
+    assert!(woken.load(Ordering::SeqCst));
 }
 
 #[test]
-fn wake_reader_outside_lock() {
-    let ops: [fn(DuplexStream); 4] = [
-        |mut writer| assert_eq!(writer.write(b"x").now_or_never().unwrap().unwrap(), 1),
-        |mut writer| {
-            let bufs = [IoSlice::new(b"x")];
-            let n = writer
-                .write_vectored(&bufs)
-                .now_or_never()
-                .unwrap()
-                .unwrap();
-            assert_eq!(n, 1);
-        },
-        |mut writer| writer.shutdown().now_or_never().unwrap().unwrap(),
-        drop,
-    ];
+fn wake_reader_on_drop_outside_lock() {
+    let (writer, mut reader) = duplex(1);
+    let woken = poll_on_wake(async move {
+        assert_eq!(reader.read(&mut [0; 1]).await.unwrap(), 0);
+    });
 
-    for op in ops {
-        let (writer, reader) = duplex(1);
-        let reader = Arc::new(Mutex::new(reader));
-        let woken = Arc::new(AtomicBool::new(false));
+    drop(writer);
+    assert!(woken.load(Ordering::SeqCst));
+}
 
-        let waker = waker_fn({
-            let reader = reader.clone();
-            let woken = woken.clone();
-            move || {
-                let mut buf = [0; 1];
-                let mut reader = reader.lock().unwrap();
-                assert!(reader.read(&mut buf).now_or_never().is_some());
-                woken.store(true, Ordering::SeqCst);
-            }
-        });
+#[tokio::test]
+async fn wake_writer_on_read_outside_lock() {
+    let (mut writer, mut reader) = duplex(1);
+    let woken = poll_on_wake(async move {
+        writer.write_all(b"xy").await.unwrap();
+    });
 
-        let mut buf = [0; 1];
-        let mut buf = ReadBuf::new(&mut buf);
-        let mut cx = Context::from_waker(&waker);
-        assert_pending!(Pin::new(&mut *reader.lock().unwrap()).poll_read(&mut cx, &mut buf));
-
-        op(writer);
-        assert!(woken.load(Ordering::SeqCst));
-    }
+    assert_eq!(reader.read(&mut [0; 1]).await.unwrap(), 1);
+    assert!(woken.load(Ordering::SeqCst));
 }
 
 #[test]
-fn wake_writer_outside_lock() {
-    let ops: [fn(DuplexStream); 2] = [
-        |mut reader| assert_eq!(reader.read(&mut [0; 1]).now_or_never().unwrap().unwrap(), 1),
-        drop,
-    ];
+fn wake_writer_on_drop_outside_lock() {
+    let (mut writer, reader) = duplex(1);
+    let woken = poll_on_wake(async move {
+        writer.write_all(b"xy").await.unwrap_err();
+    });
 
-    for op in ops {
-        let (writer, reader) = duplex(1);
-        let writer = Arc::new(Mutex::new(writer));
-        let woken = Arc::new(AtomicBool::new(false));
-
-        let waker = waker_fn({
-            let writer = writer.clone();
-            let woken = woken.clone();
-            move || {
-                let mut writer = writer.lock().unwrap();
-                assert!(writer.write(b"y").now_or_never().is_some());
-                woken.store(true, Ordering::SeqCst);
-            }
-        });
-
-        let mut writer_guard = writer.lock().unwrap();
-        assert_eq!(writer_guard.write(b"x").now_or_never().unwrap().unwrap(), 1);
-        let mut cx = Context::from_waker(&waker);
-        assert_pending!(Pin::new(&mut *writer_guard).poll_write(&mut cx, b"y"));
-        drop(writer_guard);
-
-        op(reader);
-        assert!(woken.load(Ordering::SeqCst));
-    }
+    drop(reader);
+    assert!(woken.load(Ordering::SeqCst));
 }
 
-#[test]
-fn drop_replaced_waker_outside_lock() {
-    // A waker that owns the other end of the pipe.
+fn check_drop_replaced_waker(peer: DuplexStream, fut: impl Future<Output = ()>) {
     struct Owner {
         _peer: DuplexStream,
     }
 
-    impl ArcWake for Owner {
-        fn wake_by_ref(_: &Arc<Self>) {}
+    impl Wake for Owner {
+        fn wake(self: Arc<Self>) {}
     }
 
+    let mut fut = pin!(fut);
+    let waker = Waker::from(Arc::new(Owner { _peer: peer }));
+    assert_pending!(fut.as_mut().poll(&mut Context::from_waker(&waker)));
+    drop(waker);
+
     let mut cx = Context::from_waker(noop_waker_ref());
+    // Replacing the waker drops `peer`, which closes the pipe.
+    assert_pending!(fut.as_mut().poll(&mut cx));
+    assert_ready!(fut.as_mut().poll(&mut cx));
+}
 
+#[test]
+fn drop_replaced_read_waker_outside_lock() {
     let (mut reader, peer) = duplex(1);
-    let waker = futures::task::waker(Arc::new(Owner { _peer: peer }));
-    let mut buf = [0; 1];
-    let mut buf = ReadBuf::new(&mut buf);
-    assert_pending!(Pin::new(&mut reader).poll_read(&mut Context::from_waker(&waker), &mut buf));
-    drop(waker);
-    // Replacing the waker drops the other end, which closes the pipe.
-    assert_pending!(Pin::new(&mut reader).poll_read(&mut cx, &mut buf));
-    assert_ready_ok!(Pin::new(&mut reader).poll_read(&mut cx, &mut buf));
-    assert!(buf.filled().is_empty());
+    check_drop_replaced_waker(peer, async {
+        assert_eq!(reader.read(&mut [0; 1]).await.unwrap(), 0);
+    });
+}
 
+#[test]
+fn drop_replaced_write_waker_outside_lock() {
     let (mut writer, peer) = duplex(1);
-    assert_ready_ok!(Pin::new(&mut writer).poll_write(&mut cx, b"x"));
-    let waker = futures::task::waker(Arc::new(Owner { _peer: peer }));
-    assert_pending!(Pin::new(&mut writer).poll_write(&mut Context::from_waker(&waker), b"y"));
-    drop(waker);
-    assert_pending!(Pin::new(&mut writer).poll_write(&mut cx, b"y"));
-    assert_ready_err!(Pin::new(&mut writer).poll_write(&mut cx, b"y"));
+    check_drop_replaced_waker(peer, async {
+        writer.write_all(b"xy").await.unwrap_err();
+    });
+}
 
+#[test]
+fn drop_replaced_write_vectored_waker_outside_lock() {
     let (mut writer, peer) = duplex(1);
-    assert_ready_ok!(Pin::new(&mut writer).poll_write(&mut cx, b"x"));
-    let waker = futures::task::waker(Arc::new(Owner { _peer: peer }));
-    let bufs = [IoSlice::new(b"y")];
-    assert_pending!(
-        Pin::new(&mut writer).poll_write_vectored(&mut Context::from_waker(&waker), &bufs)
-    );
-    drop(waker);
-    assert_pending!(Pin::new(&mut writer).poll_write_vectored(&mut cx, &bufs));
-    assert_ready_err!(Pin::new(&mut writer).poll_write_vectored(&mut cx, &bufs));
+    check_drop_replaced_waker(peer, async {
+        assert_eq!(writer.write(b"x").await.unwrap(), 1);
+        writer
+            .write_vectored(&[IoSlice::new(b"y")])
+            .await
+            .unwrap_err();
+    });
 }
