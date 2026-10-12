@@ -288,7 +288,7 @@ cfg_io_driver! {
     impl Handle {
         cfg_event_loop! {
             #[cfg(unix)]
-            fn registry_fd(&self) -> Option<std::os::fd::BorrowedFd<'_>> {
+            pub(crate) fn registry_fd(&self) -> Option<std::os::fd::BorrowedFd<'_>> {
                 self.io.as_ref()?.registry_fd()
             }
         }
@@ -329,7 +329,7 @@ cfg_not_io_driver! {
     impl Handle {
         cfg_event_loop! {
             #[cfg(unix)]
-            fn registry_fd(&self) -> Option<std::os::fd::BorrowedFd<'_>> {
+            pub(crate) fn registry_fd(&self) -> Option<std::os::fd::BorrowedFd<'_>> {
                 None
             }
         }
