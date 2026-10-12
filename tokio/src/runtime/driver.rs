@@ -32,6 +32,10 @@ pub(crate) struct Handle {
     /// Source of `Instant::now()`
     #[cfg_attr(not(all(feature = "time", feature = "test-util")), allow(dead_code))]
     pub(crate) clock: Clock,
+
+    /// The host's notification of a wakeup, for an event loop.
+    #[cfg(all(tokio_unstable, feature = "rt"))]
+    pub(crate) event_loop: Option<crate::runtime::event_loop::Signal>,
 }
 
 pub(crate) struct Cfg {
@@ -42,6 +46,8 @@ pub(crate) struct Cfg {
     pub(crate) nevents: usize,
     pub(crate) nevents_busy: Option<usize>,
     pub(crate) timer_flavor: crate::runtime::TimerFlavor,
+    #[cfg(all(tokio_unstable, feature = "rt"))]
+    pub(crate) event_loop: Option<crate::runtime::event_loop::SignalCfg>,
 }
 
 impl Driver {
@@ -61,6 +67,11 @@ impl Driver {
                 signal: signal_handle,
                 time: time_handle,
                 clock,
+                #[cfg(all(tokio_unstable, feature = "rt"))]
+                event_loop: cfg
+                    .event_loop
+                    .map(|signal| crate::runtime::event_loop::Signal::new(signal, cfg.enable_io))
+                    .transpose()?,
             },
         ))
     }
@@ -85,7 +96,57 @@ impl Handle {
             handle.unpark();
         }
 
+        self.unpark_io();
+    }
+
+    /// Wakes the driver without recording a wake on the time driver, which
+    /// under `test-util` would hold back the paused clock's auto-advance.
+    pub(crate) fn unpark_io(&self) {
         self.io.unpark();
+
+        #[cfg(all(tokio_unstable, feature = "rt"))]
+        if let Some(signal) = &self.event_loop {
+            signal.wake();
+        }
+    }
+
+    cfg_event_loop! {
+        /// A descriptor readable whenever the loop has work other than a
+        /// timer: the reactor's own where it has one, else the standalone
+        /// wakeup descriptor if one was enabled.
+        #[cfg(unix)]
+        pub(crate) fn event_fd(&self) -> Option<std::os::fd::BorrowedFd<'_>> {
+            self.registry_fd()
+                .or_else(|| self.event_loop.as_ref()?.fd())
+        }
+
+        /// `Unparker::unpark`: wakes the driver, and the host even during a
+        /// tick. `unpark`'s body rather than a call, so the host is notified
+        /// once.
+        pub(crate) fn unpark_explicit(&self) {
+            #[cfg(feature = "time")]
+            if let Some(handle) = &self.time {
+                handle.unpark();
+            }
+            self.io.unpark();
+            if let Some(signal) = &self.event_loop {
+                signal.unpark();
+            }
+        }
+
+        /// A tick or park begins: the host's callback is held back until
+        /// `end_turn`.
+        pub(crate) fn begin_turn(&self) {
+            if let Some(signal) = &self.event_loop {
+                signal.begin();
+            }
+        }
+
+        pub(crate) fn end_turn(&self) {
+            if let Some(signal) = &self.event_loop {
+                signal.end();
+            }
+        }
     }
 
     cfg_io_driver! {
@@ -211,6 +272,15 @@ cfg_io_driver! {
             }
         }
     }
+
+    impl Handle {
+        cfg_event_loop! {
+            #[cfg(unix)]
+            fn registry_fd(&self) -> Option<std::os::fd::BorrowedFd<'_>> {
+                self.io.as_ref()?.registry_fd()
+            }
+        }
+    }
 }
 
 cfg_not_io_driver! {
@@ -241,6 +311,15 @@ cfg_not_io_driver! {
         /// This is not a "real" driver, so it is not considered enabled.
         pub(crate) fn is_enabled(&self) -> bool {
             false
+        }
+    }
+
+    impl Handle {
+        cfg_event_loop! {
+            #[cfg(unix)]
+            fn registry_fd(&self) -> Option<std::os::fd::BorrowedFd<'_>> {
+                None
+            }
         }
     }
 }

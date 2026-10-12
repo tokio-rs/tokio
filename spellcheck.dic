@@ -1,4 +1,4 @@
-338
+335
 &
 +
 <
@@ -88,7 +88,6 @@ decrement
 decrementing
 demangled
 dequeued
-dequeues
 dereferenced
 derefs
 deregister
@@ -132,6 +131,7 @@ FreeBSD
 frontend
 fs
 functionalities
+futex
 getters
 GID
 goroutines
@@ -170,7 +170,6 @@ latencies
 Lauck
 libc
 libuv
-libuv's
 lifecycle
 lifo
 LLVM
@@ -216,7 +215,6 @@ peekable
 PGID
 PID
 plaintext
-pollable
 poller
 POSIX
 proxied
@@ -325,7 +323,6 @@ versioned
 versioning
 visionOS
 vtable
-waitable
 waker
 wakers
 Wakers
