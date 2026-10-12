@@ -352,84 +352,37 @@ async fn throttle_terminated_after_inner_done() {
 
 // ── wrappers ─────────────────────────────────────────────────────────────────
 
-/// The wrapper streams are only available with the `sync` feature.
-#[cfg(feature = "sync")]
+/// `JoinSetStream` is only available with the `rt` feature.
+#[cfg(feature = "rt")]
 mod wrappers {
     use super::*;
 
-    use tokio::sync::{broadcast, watch};
-    use tokio_stream::wrappers::{BroadcastStream, WatchStream};
+    use tokio::task::JoinSet;
+    use tokio_stream::wrappers::JoinSetStream;
 
     #[tokio::test]
-    async fn watch_stream_not_terminated_while_sender_alive() {
-        let (tx, rx) = watch::channel(1);
-        let mut stream = WatchStream::new(rx);
+    async fn join_set_stream_is_terminated_when_empty() {
+        let mut stream = JoinSetStream::new(JoinSet::<i32>::new());
 
-        assert!(!stream.is_terminated());
-        assert_eq!(stream.next().await, Some(1));
-        assert!(!stream.is_terminated());
-
-        tx.send(2).unwrap();
-        assert_eq!(stream.next().await, Some(2));
-        assert!(!stream.is_terminated());
-    }
-
-    #[tokio::test]
-    async fn watch_stream_terminated_after_sender_dropped() {
-        let (tx, rx) = watch::channel(1);
-        let mut stream = WatchStream::new(rx);
-
-        assert_eq!(stream.next().await, Some(1));
-        drop(tx);
-
-        assert_eq!(stream.next().await, None);
+        // An empty `JoinSet` never yields another item, so the stream is
+        // already terminated before it is polled.
         assert!(stream.is_terminated());
-        assert_eq!(stream.next().await, None);
-    }
-
-    #[tokio::test]
-    async fn watch_stream_from_changes_terminated_after_sender_dropped() {
-        let (tx, rx) = watch::channel(1);
-        let mut stream = WatchStream::from_changes(rx);
-
-        assert!(!stream.is_terminated());
-        tx.send(2).unwrap();
-        assert_eq!(stream.next().await, Some(2));
-
-        drop(tx);
-        assert_eq!(stream.next().await, None);
+        assert!(stream.next().await.is_none());
         assert!(stream.is_terminated());
-        assert_eq!(stream.next().await, None);
     }
 
     #[tokio::test]
-    async fn broadcast_stream_not_terminated_while_senders_alive() {
-        let (tx, rx) = broadcast::channel(4);
-        let mut stream = BroadcastStream::new(rx);
+    async fn join_set_stream_terminated_after_tasks_are_joined() {
+        let mut set = JoinSet::new();
+        set.spawn(async { 1 });
+        let mut stream = JoinSetStream::new(set);
 
+        // The set still holds a task, so the stream is not terminated.
         assert!(!stream.is_terminated());
+        assert_eq!(stream.next().await.unwrap().unwrap(), 1);
 
-        tx.send(1).unwrap();
-        assert_eq!(stream.next().await, Some(Ok(1)));
-        assert!(!stream.is_terminated());
-    }
-
-    #[tokio::test]
-    async fn broadcast_stream_terminated_after_dropping_senders_and_draining() {
-        let (tx, rx) = broadcast::channel(4);
-        tx.send(1).unwrap();
-        tx.send(2).unwrap();
-
-        let mut stream = BroadcastStream::new(rx);
-        assert!(!stream.is_terminated());
-
-        assert_eq!(stream.next().await, Some(Ok(1)));
-        assert_eq!(stream.next().await, Some(Ok(2)));
-        assert!(!stream.is_terminated());
-
-        drop(tx);
-        assert_eq!(stream.next().await, None);
+        // Joining the last task empties the set, so the stream is terminated.
         assert!(stream.is_terminated());
-        assert_eq!(stream.next().await, None);
+        assert!(stream.next().await.is_none());
     }
 }

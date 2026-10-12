@@ -1,7 +1,7 @@
 use std::pin::Pin;
 use tokio::sync::watch::Receiver;
 
-use futures_core::{FusedStream, Stream};
+use futures_core::Stream;
 use tokio_util::sync::ReusableBoxFuture;
 
 use std::fmt;
@@ -73,7 +73,6 @@ use tokio::sync::watch::error::RecvError;
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub struct WatchStream<T> {
     inner: ReusableBoxFuture<'static, (Result<(), RecvError>, Receiver<T>)>,
-    terminated: bool,
 }
 
 async fn make_future<T: Clone + Send + Sync>(
@@ -88,7 +87,6 @@ impl<T: 'static + Clone + Send + Sync> WatchStream<T> {
     pub fn new(rx: Receiver<T>) -> Self {
         Self {
             inner: ReusableBoxFuture::new(async move { (Ok(()), rx) }),
-            terminated: false,
         }
     }
 
@@ -96,7 +94,6 @@ impl<T: 'static + Clone + Send + Sync> WatchStream<T> {
     pub fn from_changes(rx: Receiver<T>) -> Self {
         Self {
             inner: ReusableBoxFuture::new(make_future(rx)),
-            terminated: false,
         }
     }
 }
@@ -113,9 +110,7 @@ impl<T: Clone + 'static + Send + Sync> Stream for WatchStream<T> {
                 Poll::Ready(Some(received))
             }
             Err(_) => {
-                let me = self.get_mut();
-                me.terminated = true;
-                me.inner.set(make_future(rx));
+                self.inner.set(make_future(rx));
                 Poll::Ready(None)
             }
         }
@@ -123,12 +118,6 @@ impl<T: Clone + 'static + Send + Sync> Stream for WatchStream<T> {
 }
 
 impl<T> Unpin for WatchStream<T> {}
-
-impl<T: 'static + Clone + Send + Sync> FusedStream for WatchStream<T> {
-    fn is_terminated(&self) -> bool {
-        self.terminated
-    }
-}
 
 impl<T> fmt::Debug for WatchStream<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -2,7 +2,7 @@ use std::pin::Pin;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::broadcast::Receiver;
 
-use futures_core::{FusedStream, Stream};
+use futures_core::Stream;
 use tokio_util::sync::ReusableBoxFuture;
 
 use std::fmt;
@@ -38,7 +38,6 @@ use std::task::{ready, Context, Poll};
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub struct BroadcastStream<T> {
     inner: ReusableBoxFuture<'static, (Result<T, RecvError>, Receiver<T>)>,
-    terminated: bool,
 }
 
 /// An error returned from the inner stream of a [`BroadcastStream`].
@@ -71,7 +70,6 @@ impl<T: 'static + Clone + Send> BroadcastStream<T> {
     pub fn new(rx: Receiver<T>) -> Self {
         Self {
             inner: ReusableBoxFuture::new(make_future(rx)),
-            terminated: false,
         }
     }
 }
@@ -83,20 +81,11 @@ impl<T: 'static + Clone + Send> Stream for BroadcastStream<T> {
         self.inner.set(make_future(rx));
         match result {
             Ok(item) => Poll::Ready(Some(Ok(item))),
-            Err(RecvError::Closed) => {
-                self.get_mut().terminated = true;
-                Poll::Ready(None)
-            }
+            Err(RecvError::Closed) => Poll::Ready(None),
             Err(RecvError::Lagged(n)) => {
                 Poll::Ready(Some(Err(BroadcastStreamRecvError::Lagged(n))))
             }
         }
-    }
-}
-
-impl<T: 'static + Clone + Send> FusedStream for BroadcastStream<T> {
-    fn is_terminated(&self) -> bool {
-        self.terminated
     }
 }
 
