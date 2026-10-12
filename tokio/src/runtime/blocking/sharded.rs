@@ -3,10 +3,8 @@
 //! Tasks live in `NUM_SHARDS` queues, each with its own mutex. Spawners push
 //! to a shard chosen via the thread-local RNG; workers pop by scanning the
 //! shards in a per-worker pseudo-random permutation. Workers take at most
-//! `TASKS_PER_SHARD` tasks from each shard before moving on. At a batch
-//! boundary, workers try the candidate lock and skip it if another worker got
-//! there first. A mask tracks which shards have tasks so scans rarely lock
-//! empty shards.
+//! `TASKS_PER_SHARD` tasks from each shard before moving on. A mask tracks
+//! which shards have tasks so scans rarely lock empty shards.
 //!
 //! Worker lifecycle (thread spawning, parking/waking, timeouts, shutdown) is
 //! coordinated by the `coord` mutex + `condvar`, using the same claim
@@ -18,6 +16,7 @@
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
 use crate::loom::sync::{Condvar, Mutex};
 use crate::loom::thread;
+use crate::util::rand::{FastRand, RngSeed};
 
 use std::collections::VecDeque;
 use std::sync::atomic::Ordering;
@@ -44,27 +43,19 @@ struct PopCursor {
 }
 
 impl PopCursor {
-    fn new(_worker_thread_id: usize) -> Self {
+    fn new(worker_thread_id: usize) -> Self {
         let mut cursor = Self {
             order: std::array::from_fn(|i| i as u8),
             pos: 0,
             remaining: TASKS_PER_SHARD,
         };
-        #[cfg(loom)]
-        let rng = {
-            let mut rng = crate::util::rand::FastRand::new();
-            for _ in 0.._worker_thread_id {
-                rng.fastrand_n(u32::MAX);
-            }
-            rng
-        };
-        #[cfg(not(loom))]
-        let rng = crate::util::rand::FastRand::new();
-        cursor.shuffle(rng);
+        cursor.shuffle(FastRand::from_seed(RngSeed::from_bytes(
+            &worker_thread_id.to_ne_bytes(),
+        )));
         cursor
     }
 
-    fn shuffle(&mut self, mut rng: crate::util::rand::FastRand) {
+    fn shuffle(&mut self, mut rng: FastRand) {
         for i in (1..NUM_SHARDS).rev() {
             let j = rng.fastrand_n((i + 1) as u32) as usize;
             self.order.swap(i, j);
@@ -87,13 +78,7 @@ impl PopCursor {
             pos: 0,
             remaining: TASKS_PER_SHARD,
         };
-        let mut state = seed | 1;
-        for i in (1..NUM_SHARDS).rev() {
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            cursor.order.swap(i, (state as usize) % (i + 1));
-        }
+        cursor.shuffle(FastRand::from_seed(RngSeed::from_bytes(&seed.to_ne_bytes())));
         cursor
     }
 
@@ -679,6 +664,12 @@ mod tests {
         sorted.sort_unstable();
         assert_eq!(sorted, (0..NUM_SHARDS).collect::<Vec<_>>());
         assert_ne!(first_order, second_order);
+        assert_eq!(first_order, scan_order(&mut PopCursor::new_with_seed(1)));
+
+        let mut worker = PopCursor::new(1);
+        let worker_order = scan_order(&mut worker);
+        assert_eq!(worker_order, scan_order(&mut worker));
+        assert_eq!(worker_order, scan_order(&mut PopCursor::new(1)));
     }
 
     #[test]
