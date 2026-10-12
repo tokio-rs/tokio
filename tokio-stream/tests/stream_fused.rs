@@ -349,3 +349,87 @@ async fn throttle_terminated_after_inner_done() {
     assert!(stream.as_ref().get_ref().is_terminated());
     assert_eq!(stream.next().await, None);
 }
+
+// ── wrappers ─────────────────────────────────────────────────────────────────
+
+/// The wrapper streams are only available with the `sync` feature.
+#[cfg(feature = "sync")]
+mod wrappers {
+    use super::*;
+
+    use tokio::sync::{broadcast, watch};
+    use tokio_stream::wrappers::{BroadcastStream, WatchStream};
+
+    #[tokio::test]
+    async fn watch_stream_not_terminated_while_sender_alive() {
+        let (tx, rx) = watch::channel(1);
+        let mut stream = WatchStream::new(rx);
+
+        assert!(!stream.is_terminated());
+        assert_eq!(stream.next().await, Some(1));
+        assert!(!stream.is_terminated());
+
+        tx.send(2).unwrap();
+        assert_eq!(stream.next().await, Some(2));
+        assert!(!stream.is_terminated());
+    }
+
+    #[tokio::test]
+    async fn watch_stream_terminated_after_sender_dropped() {
+        let (tx, rx) = watch::channel(1);
+        let mut stream = WatchStream::new(rx);
+
+        assert_eq!(stream.next().await, Some(1));
+        drop(tx);
+
+        assert_eq!(stream.next().await, None);
+        assert!(stream.is_terminated());
+        assert_eq!(stream.next().await, None);
+    }
+
+    #[tokio::test]
+    async fn watch_stream_from_changes_terminated_after_sender_dropped() {
+        let (tx, rx) = watch::channel(1);
+        let mut stream = WatchStream::from_changes(rx);
+
+        assert!(!stream.is_terminated());
+        tx.send(2).unwrap();
+        assert_eq!(stream.next().await, Some(2));
+
+        drop(tx);
+        assert_eq!(stream.next().await, None);
+        assert!(stream.is_terminated());
+        assert_eq!(stream.next().await, None);
+    }
+
+    #[tokio::test]
+    async fn broadcast_stream_not_terminated_while_senders_alive() {
+        let (tx, rx) = broadcast::channel(4);
+        let mut stream = BroadcastStream::new(rx);
+
+        assert!(!stream.is_terminated());
+
+        tx.send(1).unwrap();
+        assert_eq!(stream.next().await, Some(Ok(1)));
+        assert!(!stream.is_terminated());
+    }
+
+    #[tokio::test]
+    async fn broadcast_stream_terminated_after_dropping_senders_and_draining() {
+        let (tx, rx) = broadcast::channel(4);
+        tx.send(1).unwrap();
+        tx.send(2).unwrap();
+
+        let mut stream = BroadcastStream::new(rx);
+        assert!(!stream.is_terminated());
+
+        assert_eq!(stream.next().await, Some(Ok(1)));
+        assert_eq!(stream.next().await, Some(Ok(2)));
+        assert!(!stream.is_terminated());
+
+        drop(tx);
+        assert_eq!(stream.next().await, None);
+        assert!(stream.is_terminated());
+        assert_eq!(stream.next().await, None);
+    }
+}
