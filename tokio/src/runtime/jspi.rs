@@ -9,6 +9,7 @@
 //! another activation on the thread during the park panics as a nested
 //! runtime.
 
+use std::cell::Cell;
 use std::ffi::c_void;
 use std::ptr;
 use std::sync::atomic::{AtomicPtr, Ordering::SeqCst};
@@ -92,57 +93,71 @@ impl Slot {
 /// timers could never fire and a self-waking task would starve them. Timeouts
 /// above the host's 32-bit millisecond limit would be clamped to one, so they
 /// are capped; a spurious resume at the cap re-parks.
+#[derive(Copy, Clone)]
 enum Timer {
     Timeout(i32),
     Immediate(i32),
 }
 
-impl Timer {
-    fn set(promise: Promise, dur: Duration) -> Self {
-        // SAFETY: the callback outlives the timer, which `Drop` clears
-        // before the promise it resolves is destroyed.
-        unsafe {
+struct TimerState {
+    timer: Cell<Timer>,
+    promise: Promise,
+    fired: Cell<bool>,
+}
+
+impl TimerState {
+    fn set(promise: Promise, dur: Duration) -> Box<Self> {
+        let state = Box::new(TimerState {
+            timer: Cell::new(Timer::Immediate(0)),
+            promise,
+            fired: Cell::new(false),
+        });
+        let user_data = (&*state as *const TimerState).cast_mut().cast::<c_void>();
+        // SAFETY: the state outlives the timer, which `Park`'s drop clears if
+        // it has not fired before freeing it and destroying the promise.
+        state.timer.set(unsafe {
             if dur.is_zero() {
-                Timer::Immediate(emscripten_set_immediate(resolve, promise))
+                Timer::Immediate(emscripten_set_immediate(resolve, user_data))
             } else {
                 let ms = (dur.as_secs_f64() * 1000.0).min(0x7fff_ffff as f64);
-                Timer::Timeout(emscripten_set_timeout(resolve, ms, promise))
+                Timer::Timeout(emscripten_set_timeout(resolve, ms, user_data))
             }
-        }
+        });
+        state
     }
 }
 
-impl Drop for Timer {
-    fn drop(&mut self) {
-        // SAFETY: ids come from the matching `set` call. Clearing a fired
-        // timer is a no-op.
-        unsafe {
-            match *self {
-                Timer::Timeout(id) => emscripten_clear_timeout(id),
-                Timer::Immediate(id) => emscripten_clear_immediate(id),
-            }
-        }
+extern "C" fn resolve(state: *mut c_void) {
+    // SAFETY: a pending timer's state is live.
+    unsafe {
+        let state = &*state.cast::<TimerState>();
+        state.fired.set(true);
+        emscripten_promise_resolve(state.promise, EM_PROMISE_FULFILL, ptr::null_mut());
     }
-}
-
-extern "C" fn resolve(promise: *mut c_void) {
-    // SAFETY: the timer holding this pointer is cleared before the promise
-    // is destroyed, so it is live.
-    unsafe { emscripten_promise_resolve(promise, EM_PROMISE_FULFILL, ptr::null_mut()) }
 }
 
 struct Park<'a> {
     slot: &'a Slot,
     promise: Promise,
-    timer: Option<Timer>,
+    timer: Option<Box<TimerState>>,
 }
 
 impl Drop for Park<'_> {
     fn drop(&mut self) {
         self.slot.0.store(ptr::null_mut(), SeqCst);
-        drop(self.timer.take());
+        if let Some(state) = self.timer.take() {
+            if !state.fired.get() {
+                // SAFETY: the id came from the matching `set` call.
+                unsafe {
+                    match state.timer.get() {
+                        Timer::Timeout(id) => emscripten_clear_timeout(id),
+                        Timer::Immediate(id) => emscripten_clear_immediate(id),
+                    }
+                }
+            }
+        }
         // SAFETY: created by `park` and not yet destroyed; the timer that
-        // could resolve it has been cleared.
+        // could resolve it has fired or been cleared.
         unsafe { emscripten_promise_destroy(self.promise) }
     }
 }
@@ -162,7 +177,7 @@ pub(crate) fn park(slot: &Slot, dur: Option<Duration>) {
     let park = Park {
         slot,
         promise,
-        timer: dur.map(|dur| Timer::set(promise, dur)),
+        timer: dur.map(|dur| TimerState::set(promise, dur)),
     };
     let prev = slot.0.swap(promise, SeqCst);
     debug_assert!(prev.is_null(), "parker already parked");
