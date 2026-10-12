@@ -184,49 +184,53 @@ impl Driver {
     fn turn(&mut self, handle: &Handle, max_wait: Option<Duration>) {
         debug_assert!(!handle.registrations.is_shutdown(&handle.synced.lock()));
 
-        handle.release_pending_registrations();
-
-        // A poll that does not wait takes the busy batch. Events it leaves
-        // behind stay queued in the kernel, so the next poll returns them.
-        let events = match (&mut self.events_busy, max_wait) {
-            (Some(busy), Some(wait)) if wait.is_zero() => busy,
-            _ => &mut self.events,
-        };
-
-        // Block waiting for an event to happen, peeling out how many events
-        // happened.
-        match self.poll.poll(events, max_wait) {
-            Ok(()) => {}
-            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
-            #[cfg(target_os = "wasi")]
-            Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
-                // In case of wasm32_wasi this error happens, when trying to poll without subscriptions
-                // just return from the park, as there would be nothing, which wakes us up.
-            }
-            Err(e) => panic!("unexpected error when polling the I/O driver: {e:?}"),
-        }
-
-        // Process all the events that came in, dispatching appropriately
         let mut ready_count = 0;
-        for event in events.iter() {
-            let token = event.token();
+        poll_and_dispatch(
+            &handle.registrations,
+            &handle.synced,
+            || {
+                // A poll that does not wait takes the busy batch. Events it leaves
+                // behind stay queued in the kernel, so the next poll returns them.
+                let events = match (&mut self.events_busy, max_wait) {
+                    (Some(busy), Some(wait)) if wait.is_zero() => busy,
+                    _ => &mut self.events,
+                };
 
-            if token == TOKEN_WAKEUP {
-                // Nothing to do, the event is used to unblock the I/O driver
-            } else if token == TOKEN_SIGNAL {
-                self.signal_ready = true;
-            } else {
-                let ready = Ready::from_mio(event);
+                // Block waiting for an event to happen, peeling out how many events
+                // happened.
+                match self.poll.poll(events, max_wait) {
+                    Ok(()) => {}
+                    Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+                    #[cfg(target_os = "wasi")]
+                    Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
+                        // In case of wasm32_wasi this error happens, when trying to poll without subscriptions
+                        // just return from the park, as there would be nothing, which wakes us up.
+                    }
+                    Err(e) => panic!("unexpected error when polling the I/O driver: {e:?}"),
+                }
 
-                // Safety: we ensure that the pointers used as tokens are not freed
-                // until they are both deregistered from mio **and** we know the I/O
-                // driver is not concurrently polling. The I/O driver holds ownership of
-                // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
-                unsafe { dispatch_event(token, ready) };
+                events.iter()
+            },
+            |event| {
+                let token = event.token();
 
-                ready_count += 1;
-            }
-        }
+                if token == TOKEN_WAKEUP {
+                    // Nothing to do, the event is used to unblock the I/O driver
+                } else if token == TOKEN_SIGNAL {
+                    self.signal_ready = true;
+                } else {
+                    let ready = Ready::from_mio(event);
+
+                    // Safety: we ensure that the pointers used as tokens are not freed
+                    // until they are both deregistered from mio **and** we know the I/O
+                    // driver is not concurrently polling. The I/O driver holds ownership of
+                    // an `Arc<ScheduledIo>` so we can safely cast this to a ref.
+                    unsafe { dispatch_event(token, ready) };
+
+                    ready_count += 1;
+                }
+            },
+        );
 
         #[cfg(all(
             tokio_unstable,
@@ -334,11 +338,22 @@ impl Handle {
 
         Ok(())
     }
+}
 
-    fn release_pending_registrations(&self) {
-        if self.registrations.needs_release() {
-            self.registrations.release(&mut self.synced.lock());
-        }
+fn poll_and_dispatch<I: IntoIterator>(
+    registrations: &RegistrationSet,
+    synced: &Mutex<registration_set::Synced>,
+    poll: impl FnOnce() -> I,
+    mut dispatch: impl FnMut(I::Item),
+) {
+    // The caller owns the driver, so its previous batch is fully dispatched.
+    // Locking the set orders the released deregistrations before the next poll.
+    if registrations.needs_release() {
+        registrations.release(&mut synced.lock());
+    }
+
+    for event in poll() {
+        dispatch(event);
     }
 }
 
@@ -401,6 +416,6 @@ mod tests {
         for (mut rx, _tx, reg) in sources {
             handle.deregister_source(&reg, &mut rx).unwrap();
         }
-        handle.release_pending_registrations();
+        handle.registrations.release(&mut handle.synced.lock());
     }
 }
