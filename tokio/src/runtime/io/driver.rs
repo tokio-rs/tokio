@@ -419,3 +419,86 @@ mod tests {
         handle.registrations.release(&mut handle.synced.lock());
     }
 }
+
+#[cfg(all(test, loom))]
+mod loom_tests {
+    use super::*;
+    use crate::loom::thread;
+
+    #[test]
+    fn deregistered_registrations_survive_the_polled_batch() {
+        loom::model(|| {
+            let (registrations, synced) = RegistrationSet::new();
+            let registrations = Arc::new(registrations);
+            let synced = Arc::new(Mutex::new(synced));
+            let first = registrations.allocate(&mut synced.lock()).unwrap();
+            let second = registrations.allocate(&mut synced.lock()).unwrap();
+            let ios = [first, second];
+            let tokens = ios.each_ref().map(|io| io.token());
+            let observers = ios.clone();
+            let registered = Arc::new(Mutex::new([true; 2]));
+
+            let worker_registrations = registrations.clone();
+            let worker_synced = synced.clone();
+            let worker_registered = registered.clone();
+            let worker = thread::spawn(move || {
+                for (index, io) in ios.into_iter().enumerate() {
+                    // Successful OS deregistration stops future polls, but does
+                    // not invalidate events already selected by a poll.
+                    worker_registered.lock()[index] = false;
+                    worker_registrations.deregister(&mut worker_synced.lock(), &io);
+                    drop(io);
+                }
+            });
+
+            let mut expected = [0; 2];
+            let mut dispatched = [0; 2];
+            let mut polls = 0;
+            poll_and_dispatch(
+                &registrations,
+                &synced,
+                || {
+                    polls += 1;
+                    let registered = *registered.lock();
+                    expected = registered.map(usize::from);
+                    tokens
+                        .into_iter()
+                        .zip(registered)
+                        .filter_map(|(token, registered)| registered.then_some(token))
+                },
+                |token| {
+                    let index = tokens.iter().position(|&t| t == token).unwrap();
+                    dispatched[index] += 1;
+
+                    // SAFETY: The observer keeps this token alive independently
+                    // of the registration set, including during mutation checks.
+                    unsafe { dispatch_event(token, Ready::READABLE) };
+                    assert!(
+                        Arc::strong_count(&observers[index]) > 1,
+                        "registration released while dispatching its event"
+                    );
+                },
+            );
+            worker.join().unwrap();
+            assert_eq!(dispatched, expected, "poll batch was not fully dispatched");
+
+            poll_and_dispatch(
+                &registrations,
+                &synced,
+                || {
+                    polls += 1;
+                    for io in &observers {
+                        assert_eq!(
+                            Arc::strong_count(io),
+                            1,
+                            "pending registration was not released before the next poll"
+                        );
+                    }
+                    std::iter::empty::<mio::Token>()
+                },
+                |_| unreachable!(),
+            );
+            assert_eq!(polls, 2);
+        });
+    }
+}
