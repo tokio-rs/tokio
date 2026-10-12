@@ -23,7 +23,7 @@ use super::time_alt;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::Mutex;
-use crate::runtime::driver::{self, IoHandle, IoStack};
+use crate::runtime::driver::{self, IoStack};
 use crate::time::error::Error;
 use crate::time::{Clock, Duration};
 use crate::util::WakeList;
@@ -399,7 +399,7 @@ impl Handle {
     /// the `TimerEntry`)
     pub(self) unsafe fn reregister(
         &self,
-        unpark: &IoHandle,
+        driver: &driver::Handle,
         new_tick: u64,
         entry: NonNull<TimerShared>,
     ) {
@@ -428,8 +428,9 @@ impl Handle {
                         if lock
                             .next_wake
                             .is_none_or(|next_wake| when < next_wake.get())
+                            && !driver_held_by_current_thread(driver)
                         {
-                            unpark.unpark();
+                            driver.io.unpark();
                         }
 
                         None
@@ -459,6 +460,26 @@ impl Handle {
                 Inner::Alternative { did_wake, .. } => did_wake.swap(false, Ordering::SeqCst),
             }
         }
+    }
+}
+
+/// Whether the current thread holds `driver` in a `current_thread`
+/// scheduler. It cannot be parked while registering, and its park reads the
+/// wheel's next expiration under the lock, so a nearer timer registered here
+/// needs no unpark.
+fn driver_held_by_current_thread(driver: &driver::Handle) -> bool {
+    #[cfg(feature = "rt")]
+    {
+        use crate::runtime::{context, scheduler};
+        context::with_scheduler(|cx| match cx {
+            Some(scheduler::Context::CurrentThread(cx)) => cx.owns_driver(driver),
+            _ => false,
+        })
+    }
+    #[cfg(not(feature = "rt"))]
+    {
+        let _ = driver;
+        false
     }
 }
 

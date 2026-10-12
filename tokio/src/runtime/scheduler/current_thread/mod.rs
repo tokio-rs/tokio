@@ -493,6 +493,12 @@ impl Context {
     pub(crate) fn defer(&self, waker: &Waker) {
         self.defer.defer(waker);
     }
+
+    /// Whether this context's scheduler owns `driver`.
+    #[cfg(feature = "time")]
+    pub(crate) fn owns_driver(&self, driver: &driver::Handle) -> bool {
+        std::ptr::eq(&self.handle.driver, driver)
+    }
 }
 
 // ===== impl Handle =====
