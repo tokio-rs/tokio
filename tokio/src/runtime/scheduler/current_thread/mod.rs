@@ -16,6 +16,7 @@ use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::future::{poll_fn, Future};
+use std::pin::Pin;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
@@ -811,12 +812,10 @@ struct CoreGuard<'a> {
 
 impl CoreGuard<'_> {
     #[track_caller]
-    fn block_on<F: Future>(self, future: F) -> F::Output {
+    fn block_on<F: Future>(self, mut future: Pin<&mut F>) -> F::Output {
         let ret = self.enter(|mut core, context| {
             let waker = Handle::waker_ref(&context.handle);
             let mut cx = std::task::Context::from_waker(&waker);
-
-            pin!(future);
 
             core.metrics.start_processing_scheduled_tasks();
 
