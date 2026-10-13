@@ -472,7 +472,7 @@ impl TimerEntry {
             handle
                 .driver()
                 .time()
-                .reregister(&handle.driver().io, deadline, (&self.inner).into());
+                .reregister(handle.driver(), deadline, (&self.inner).into());
         }
     }
 
@@ -517,7 +517,7 @@ impl TimerEntry {
             handle
                 .driver()
                 .time()
-                .reregister(&handle.driver().io, deadline, (&self.inner).into());
+                .reregister(handle.driver(), deadline, (&self.inner).into());
         }
     }
 
