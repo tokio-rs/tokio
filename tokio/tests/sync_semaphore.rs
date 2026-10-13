@@ -368,3 +368,92 @@ fn merge_many_permits() {
     drop(a);
     assert_eq!(sem.available_permits(), 6_000_000_000);
 }
+
+#[test]
+fn close_waker_drops_acquire_no_deadlock() {
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::sync::Mutex;
+    use std::task::{Context, RawWaker, RawWakerVTable, Waker};
+
+    type PinnedAcquireFut = Pin<
+        Box<
+            dyn Future<
+                    Output = Result<tokio::sync::OwnedSemaphorePermit, tokio::sync::AcquireError>,
+                > + Send,
+        >,
+    >;
+
+    #[allow(clippy::type_complexity)]
+    struct ReentrantSlot {
+        fut: Mutex<Option<PinnedAcquireFut>>,
+    }
+
+    let sem = Arc::new(Semaphore::new(0));
+    let sem_clone = sem.clone();
+
+    let slot = Arc::new(ReentrantSlot {
+        fut: Mutex::new(None),
+    });
+
+    let fut = Box::pin(sem_clone.acquire_owned());
+    *slot.fut.lock().unwrap() = Some(fut);
+
+    unsafe fn clone_waker(ptr: *const ()) -> RawWaker {
+        Arc::increment_strong_count(ptr as *const ReentrantSlot);
+        RawWaker::new(ptr, &VTABLE)
+    }
+    unsafe fn wake_waker(ptr: *const ()) {
+        let slot = Arc::from_raw(ptr as *const ReentrantSlot);
+        let _ = slot.fut.lock().unwrap().take();
+    }
+    unsafe fn wake_by_ref_waker(ptr: *const ()) {
+        let slot = &*(ptr as *const ReentrantSlot);
+        let _ = slot.fut.lock().unwrap().take();
+    }
+    unsafe fn drop_waker(ptr: *const ()) {
+        drop(Arc::from_raw(ptr as *const ReentrantSlot));
+    }
+
+    static VTABLE: RawWakerVTable =
+        RawWakerVTable::new(clone_waker, wake_waker, wake_by_ref_waker, drop_waker);
+
+    let raw_ptr = Arc::into_raw(slot.clone()) as *const ();
+    let waker = unsafe { Waker::from_raw(RawWaker::new(raw_ptr, &VTABLE)) };
+    let mut cx = Context::from_waker(&waker);
+
+    // Poll the future once to register the waiter in the semaphore's queue.
+    {
+        let mut guard = slot.fut.lock().unwrap();
+        let res = guard.as_mut().unwrap().as_mut().poll(&mut cx);
+        assert!(res.is_pending());
+    }
+
+    // Close the semaphore. If close() invokes waker.wake() while holding the
+    // waiters lock, this will deadlock because dropping the Acquire future
+    // in wake() re-acquires the same lock.
+    sem.close();
+    assert!(sem.is_closed());
+}
+
+#[tokio::test]
+#[cfg(feature = "full")]
+async fn close_many_waiters() {
+    let sem = Arc::new(Semaphore::new(0));
+    let mut handles = Vec::new();
+
+    for _ in 0..50 {
+        let sem_clone = sem.clone();
+        handles.push(tokio::spawn(async move { sem_clone.acquire_owned().await }));
+    }
+
+    for _ in 0..5 {
+        tokio::task::yield_now().await;
+    }
+
+    sem.close();
+
+    for handle in handles {
+        assert!(handle.await.unwrap().is_err());
+    }
+}
