@@ -19,8 +19,8 @@ use std::time::Duration;
 use tempfile::{tempdir, NamedTempFile};
 use tokio::fs::{rename, try_exists};
 use tokio::runtime::{Builder, Runtime};
+use tokio::task::JoinSet;
 use tokio_test::assert_pending;
-use tokio_util::task::TaskTracker;
 
 use crate::support::io_uring::{io_uring_supported, uring_op_supported};
 
@@ -107,22 +107,21 @@ fn rename_many_files() {
         let dir = tempdir().unwrap();
 
         rt.block_on(async move {
-            let tracker = TaskTracker::new();
+            let mut tasks = JoinSet::new();
 
             for i in 0..NUM_FILES {
                 let src = dir.path().join(format!("src-{i}"));
                 let dst = dir.path().join(format!("dst-{i}"));
                 tokio::fs::write(&src, b"contents").await.unwrap();
 
-                tracker.spawn(async move {
+                tasks.spawn(async move {
                     rename(&src, &dst).await.unwrap();
 
                     assert!(!try_exists(&src).await.unwrap());
                     assert!(try_exists(&dst).await.unwrap());
                 });
             }
-            tracker.close();
-            tracker.wait().await;
+            tasks.join_all().await;
         });
     }
 
