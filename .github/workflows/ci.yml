@@ -1285,7 +1285,8 @@ jobs:
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
-          RUSTFLAGS: "--cfg tokio_unstable -Dwarnings -Adeprecated -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sJSPI -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sNODERAWSOCKETS -Clink-args=-sNODERAWFS -Clink-args=--pre-js=tokio/tests/rt_emscripten_pre.js"
+          # The pre-js fails a hosted event loop that drains without exiting; rustc runs from the workspace root.
+          RUSTFLAGS: "--cfg tokio_unstable -Dwarnings -Adeprecated -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sJSPI -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sNODERAWSOCKETS -Clink-args=-sNODERAWFS -Clink-args=-sMODULARIZE=instance -Clink-args=-sAUTO_INIT -Clink-args=-Wno-experimental -Clink-args=--pre-js=tokio/tests/rt_emscripten_pre.js"
 
       # Without `-sJSPI` any stack suspension traps: the hosted ticks must
       # complete the roots without one.

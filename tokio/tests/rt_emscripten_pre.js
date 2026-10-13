@@ -16,10 +16,9 @@ if (globalThis.setImmediate) {
     return setImmediateHost(...args);
   };
 }
-var tokioRuntimeExited = false;
-Module['onExit'] = () => { tokioRuntimeExited = true; };
 process.on('exit', (code) => {
-  if (code === 0 && !tokioRuntimeExited) {
+  // A runtime exit sets `process.exitCode`; a drained loop leaves it unset.
+  if (code === 0 && process.exitCode === undefined) {
     console.error('rt_emscripten_pre.js: event loop drained before the runtime exited');
     process.exitCode = 1;
   }
