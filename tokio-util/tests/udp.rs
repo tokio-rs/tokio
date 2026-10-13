@@ -148,3 +148,31 @@ async fn framed_half() -> std::io::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn udp_framed_recovers_after_malformed_datagram() -> std::io::Result<()> {
+    use tokio_util::codec::LengthDelimitedCodec;
+
+    let sender = UdpSocket::bind("127.0.0.1:0").await?;
+    let receiver = UdpSocket::bind("127.0.0.1:0").await?;
+    let sender_addr = sender.local_addr()?;
+    let receiver_addr = receiver.local_addr()?;
+
+    let mut framed = UdpFramed::new(receiver, LengthDelimitedCodec::new());
+
+    // Send a truncated frame declaring 16 bytes of payload with 0 payload bytes
+    sender.send_to(b"\x00\x00\x00\x10", receiver_addr).await?;
+    // Follow up with a valid length-delimited datagram
+    sender
+        .send_to(b"\x00\x00\x00\x05hello", receiver_addr)
+        .await?;
+
+    let first = framed.next().await.unwrap();
+    assert!(first.is_err());
+
+    let (second, peer) = framed.next().await.unwrap()?;
+    assert_eq!(&second[..], b"hello");
+    assert_eq!(peer, sender_addr);
+
+    Ok(())
+}

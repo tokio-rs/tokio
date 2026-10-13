@@ -862,6 +862,40 @@ fn max_allowed_length_field() {
     assert_eq!(codec.max_frame_length(), usize::MAX);
 }
 
+#[test]
+fn decode_eof_resets_state_after_truncated_frame() {
+    let mut codec = LengthDelimitedCodec::new();
+
+    // First frame declares 10 bytes, but only 2 payload bytes arrive before EOF.
+    let mut truncated = BytesMut::from(&b"\x00\x00\x00\x0aab"[..]);
+    let err = codec.decode_eof(&mut truncated).unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::Other);
+    assert!(truncated.is_empty());
+
+    // Subsequent valid frame must decode cleanly from Head state.
+    let mut valid = BytesMut::from(&b"\x00\x00\x00\x05hello"[..]);
+    let frame = codec.decode_eof(&mut valid).unwrap().unwrap();
+    assert_eq!(&frame[..], b"hello");
+}
+
+#[test]
+fn num_skip_zero_rejects_non_advancing_frame() {
+    let mut codec = LengthDelimitedCodec::builder().num_skip(0).new_codec();
+    let mut buf = BytesMut::from(&0u32.to_be_bytes()[..]);
+
+    let err = codec.decode(&mut buf).unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+}
+
+#[test]
+fn header_only_caps_initial_buffer_reservation() {
+    let mut codec = LengthDelimitedCodec::new();
+    let mut buf = BytesMut::from(&0x0080_0000u32.to_be_bytes()[..]);
+
+    assert_eq!(codec.decode(&mut buf).unwrap(), None);
+    assert!(buf.capacity() <= 64 * 1024);
+}
+
 // ===== Test utils =====
 
 struct Mock {

@@ -537,7 +537,7 @@ impl LengthDelimitedCodec {
             let n = n.checked_add_signed(self.builder.length_adjustment);
 
             // Error handling
-            match n {
+            let n = match n {
                 Some(n) => n,
                 None => {
                     return Err(io::Error::new(
@@ -545,22 +545,35 @@ impl LengthDelimitedCodec {
                         "provided length would overflow after adjustment",
                     ));
                 }
+            };
+
+            let num_skip = self.builder.get_num_skip();
+            if num_skip.saturating_add(n) < head_len {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "frame length and num_skip do not advance past frame header",
+                ));
             }
+
+            n
         };
 
         src.advance(self.builder.get_num_skip());
 
-        // Ensure that the buffer has enough space to read the incoming
-        // payload
-        src.reserve(n.saturating_sub(src.len()));
+        // Reserve capacity incrementally (capped at 64 KiB per read step) to prevent
+        // a 4-byte untrusted length header from immediately allocating `max_frame_len` bytes.
+        const MAX_STEP_RESERVE: usize = 64 * 1024;
+        let needed = n.saturating_sub(src.len());
+        src.reserve(cmp::min(needed, MAX_STEP_RESERVE));
 
         Ok(Some(n))
     }
 
     fn decode_data(&self, n: usize, src: &mut BytesMut) -> Option<BytesMut> {
-        // At this point, the buffer has already had the required capacity
-        // reserved. All there is to do is read.
         if src.len() < n {
+            const MAX_STEP_RESERVE: usize = 64 * 1024;
+            let needed = n - src.len();
+            src.reserve(cmp::min(needed, MAX_STEP_RESERVE));
             return None;
         }
 
@@ -599,12 +612,20 @@ impl Decoder for LengthDelimitedCodec {
     }
 
     fn decode_eof(&mut self, src: &mut BytesMut) -> io::Result<Option<BytesMut>> {
-        match self.decode(src)? {
-            Some(frame) => Ok(Some(frame)),
+        match self.decode(src) {
+            Ok(Some(frame)) => Ok(Some(frame)),
             // The head has been consumed, so an empty buffer does not mean the
             // stream ended on a frame boundary: the payload is still missing.
-            None if src.is_empty() && matches!(self.state, DecodeState::Head) => Ok(None),
-            None => Err(io::Error::other("bytes remaining on stream")),
+            Ok(None) if src.is_empty() && matches!(self.state, DecodeState::Head) => Ok(None),
+            Ok(None) => {
+                self.state = DecodeState::Head;
+                src.clear();
+                Err(io::Error::other("bytes remaining on stream"))
+            }
+            Err(err) => {
+                self.state = DecodeState::Head;
+                Err(err)
+            }
         }
     }
 }
@@ -637,7 +658,7 @@ impl Encoder<&[u8]> for LengthDelimitedCodec {
 
         // Reserve capacity in the destination buffer to fit the frame and
         // length field.
-        dst.reserve(self.builder.length_field_len + data.len());
+        dst.reserve(self.builder.length_field_len.saturating_add(data.len()));
 
         if self.builder.length_field_is_big_endian {
             dst.put_uint(n as u64, self.builder.length_field_len);
@@ -1068,13 +1089,17 @@ impl Builder {
     }
 
     fn num_head_bytes(&self) -> usize {
-        let num = self.length_field_offset + self.length_field_len;
+        let num = self
+            .length_field_offset
+            .saturating_add(self.length_field_len);
         cmp::max(num, self.num_skip.unwrap_or_default())
     }
 
     fn get_num_skip(&self) -> usize {
-        self.num_skip
-            .unwrap_or(self.length_field_offset + self.length_field_len)
+        self.num_skip.unwrap_or_else(|| {
+            self.length_field_offset
+                .saturating_add(self.length_field_len)
+        })
     }
 
     fn adjust_max_frame_len(&mut self) {

@@ -72,17 +72,24 @@ where
         loop {
             // Are there still bytes left in the read buffer to decode?
             if pin.is_readable {
-                if let Some(frame) = pin.codec.decode_eof(&mut pin.rd)? {
-                    let current_addr = pin
-                        .current_addr
-                        .expect("will always be set before this line is called");
+                match pin.codec.decode_eof(&mut pin.rd) {
+                    Ok(Some(frame)) => {
+                        let current_addr = pin
+                            .current_addr
+                            .expect("will always be set before this line is called");
 
-                    return Poll::Ready(Some(Ok((frame, current_addr))));
+                        return Poll::Ready(Some(Ok((frame, current_addr))));
+                    }
+                    Ok(None) => {
+                        pin.is_readable = false;
+                        pin.rd.clear();
+                    }
+                    Err(err) => {
+                        pin.is_readable = false;
+                        pin.rd.clear();
+                        return Poll::Ready(Some(Err(err)));
+                    }
                 }
-
-                // if this line has been reached then decode has returned `None`.
-                pin.is_readable = false;
-                pin.rd.clear();
             }
 
             // We're out of data. Try and fetch more data to decode
@@ -153,11 +160,13 @@ where
             ..
         } = *self;
 
-        let n = ready!(socket.borrow().poll_send_to(cx, wr, *out_addr))?;
-
-        let wrote_all = n == self.wr.len();
+        let send_res = ready!(socket.borrow().poll_send_to(cx, wr, *out_addr));
+        let wr_len = self.wr.len();
         self.wr.clear();
         self.flushed = true;
+
+        let n = send_res?;
+        let wrote_all = n == wr_len;
 
         let res = if wrote_all {
             Ok(())
