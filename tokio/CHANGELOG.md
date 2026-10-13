@@ -1,3 +1,30 @@
+# 1.51.6 (October 13th, 2026)
+
+### Added
+
+- io: add `AsyncFd::register` and `AsyncFd::register_with_interest` ([#8587])
+
+### Changed
+
+- io: deprecate `AsyncFd::{new, with_interest, try_new, try_with_interest}` ([#8587])
+
+### Fixed
+
+- io: wake and drop `DuplexStream` wakers outside the lock ([#8618])
+- macros: avoid `unreachable_code` in `join!` and `try_join!` for `Infallible` ([#8518])
+- runtime: fix paused time auto-advancing when I/O wakes a task on `current_thread` ([#8595])
+- sync: wake waiters outside the lock when closing a semaphore ([#8529])
+- test: fix several flaky tests ([#8196], [#8427], [#8609])
+
+[#8196]: https://github.com/tokio-rs/tokio/pull/8196
+[#8427]: https://github.com/tokio-rs/tokio/pull/8427
+[#8518]: https://github.com/tokio-rs/tokio/pull/8518
+[#8529]: https://github.com/tokio-rs/tokio/pull/8529
+[#8587]: https://github.com/tokio-rs/tokio/pull/8587
+[#8595]: https://github.com/tokio-rs/tokio/pull/8595
+[#8609]: https://github.com/tokio-rs/tokio/pull/8609
+[#8618]: https://github.com/tokio-rs/tokio/pull/8618
+
 # 1.51.5 (October 3rd, 2026)
 
 ### Fixed
