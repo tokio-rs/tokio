@@ -1232,8 +1232,8 @@ jobs:
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
-          # The pre-js fails a binary whose main never returns; rustc runs from the workspace root.
-          RUSTFLAGS: "-Dwarnings -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sJSPI -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sNODERAWSOCKETS -Clink-args=-sNODERAWFS -Clink-args=--pre-js=tokio/tests/rt_emscripten_pre.js"
+          # As an auto-initialized ES module, a binary whose main never returns leaves the top-level await unsettled and Node exits 13.
+          RUSTFLAGS: "-Dwarnings -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sJSPI -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sNODERAWSOCKETS -Clink-args=-sNODERAWFS -Clink-args=-sMODULARIZE=instance -Clink-args=-sAUTO_INIT -Clink-args=-Wno-experimental"
 
       - name: Test tokio for emscripten (non-JSPI)
         run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,fs,io-util,io-std,test-util" --test rt_emscripten_block_on --test sync_emscripten_blocking
@@ -1286,7 +1286,8 @@ jobs:
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
-          RUSTFLAGS: "--cfg tokio_unstable -Dwarnings -Adeprecated -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sJSPI -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sNODERAWSOCKETS -Clink-args=-sNODERAWFS -Clink-args=--pre-js=tokio/tests/rt_emscripten_pre.js"
+          # The pre-js fails a hosted event loop that drains without exiting; rustc runs from the workspace root.
+          RUSTFLAGS: "--cfg tokio_unstable -Dwarnings -Adeprecated -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sJSPI -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sNODERAWSOCKETS -Clink-args=-sNODERAWFS -Clink-args=-sMODULARIZE=instance -Clink-args=-sAUTO_INIT -Clink-args=-Wno-experimental -Clink-args=--pre-js=tokio/tests/rt_emscripten_pre.js"
 
       # Without `-sJSPI` any stack suspension traps: the hosted ticks must
       # complete the roots without one.
