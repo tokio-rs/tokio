@@ -169,6 +169,13 @@ impl Handle {
         pub(crate) fn io_shard_request_full(&self, _shard: usize) {}
     }
 
+    pub(crate) fn unpark_self(&self) {
+        #[cfg(feature = "time")]
+        if let Some(handle) = &self.time {
+            handle.unpark();
+        }
+    }
+
     cfg_io_driver! {
         #[track_caller]
         pub(crate) fn io(&self) -> &crate::runtime::io::Handle {

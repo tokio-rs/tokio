@@ -68,6 +68,10 @@ impl Completable for Statx {
     fn complete_with_error(self, error: io::Error) -> Self::Output {
         Err(error)
     }
+
+    fn complete_after_cancel(error: io::Error) -> Self::Output {
+        Err(error)
+    }
 }
 
 impl Cancellable for Statx {
