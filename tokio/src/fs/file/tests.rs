@@ -4,7 +4,7 @@ use crate::{
     io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
 };
 use mockall::{predicate::eq, Sequence};
-use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok, task};
+use tokio_test::{assert_pending, assert_ready, assert_ready_err, assert_ready_ok, task};
 
 const HELLO: &[u8] = b"hello world...";
 const FOO: &[u8] = b"foo bar baz...";
@@ -736,6 +736,82 @@ fn write_seek_flush_err() {
 
     let mut t = task::spawn(file.flush());
     assert_ready_err!(t.poll());
+}
+
+#[test]
+fn write_err_incomplete_read_followed_by_set_len() {
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Err(io::ErrorKind::Other.into()));
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Ok(0));
+    file.expect_set_len()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(123))
+        .returning(|_| Ok(()));
+
+    let mut file = File::from_std(file);
+
+    let mut t = task::spawn(file.write(HELLO));
+    assert_ready_ok!(t.poll());
+
+    pool::run_one();
+
+    let mut buf = [0; 32];
+    {
+        let mut t = task::spawn(file.read(&mut buf));
+        assert_pending!(t.poll());
+    }
+
+    pool::run_one();
+
+    {
+        let mut t = task::spawn(file.set_len(123));
+        assert_pending!(t.poll());
+        pool::run_one();
+        assert_ready_ok!(t.poll());
+    }
+
+    let mut t = task::spawn(file.flush());
+    assert_ready_err!(t.poll());
+}
+
+#[test]
+fn write_err_incomplete_seek_followed_by_into_std() {
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|_| Err(io::ErrorKind::Other.into()));
+    file.expect_inner_seek()
+        .once()
+        .with(eq(SeekFrom::Start(0)))
+        .in_sequence(&mut seq)
+        .returning(|_| Ok(0));
+
+    let mut file = File::from_std(file);
+
+    let mut t = task::spawn(file.write(HELLO));
+    assert_ready_ok!(t.poll());
+
+    pool::run_one();
+
+    {
+        let mut t = task::spawn(file.seek(SeekFrom::Start(0)));
+        assert_pending!(t.poll());
+    }
+
+    let mut t = task::spawn(file.into_std());
+    assert_pending!(t.poll());
+    pool::run_one();
+    assert_ready!(t.poll());
 }
 
 #[test]

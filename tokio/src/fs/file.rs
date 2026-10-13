@@ -1197,12 +1197,13 @@ impl Inner {
     }
 
     fn poll_flush(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        if let Some(e) = self.last_write_err.take() {
-            return Poll::Ready(Err(e.into()));
-        }
-
         let (op, buf) = match self.state {
-            State::Idle(_) => return Poll::Ready(Ok(())),
+            State::Idle(_) => {
+                return match self.last_write_err.take() {
+                    Some(e) => Poll::Ready(Err(e.into())),
+                    None => Poll::Ready(Ok(())),
+                };
+            }
             State::Busy(ref mut rx) => {
                 let res = ready!(Pin::new(rx).poll(cx));
                 if res.is_err() {
@@ -1215,6 +1216,12 @@ impl Inner {
 
         // The buffer is not used here
         self.state = State::Idle(Some(buf));
+
+        // A write error may have been saved while this operation was in
+        // flight. Only report it once the operation has completed.
+        if let Some(e) = self.last_write_err.take() {
+            return Poll::Ready(Err(e.into()));
+        }
 
         match op {
             Operation::Read(_) => Poll::Ready(Ok(())),
