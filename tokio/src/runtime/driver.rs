@@ -147,6 +147,11 @@ impl Handle {
                 signal.end();
             }
         }
+
+        /// Whether a wakeup has arrived since the last tick or park.
+        pub(crate) fn has_pending_wakeup(&self) -> bool {
+            self.event_loop.as_ref().is_some_and(|s| s.is_pending())
+        }
     }
 
     pub(crate) fn unpark_self(&self) {

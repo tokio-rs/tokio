@@ -2,15 +2,15 @@
 //! a native runtime's thread (a spawn, a wake from another thread, a nearer
 //! timer, an `Unparker`) also goes through here.
 //!
-//! The protocol's correctness does not rest on the atomics' orderings. The
-//! case to exclude is a wakeup whose work the host never learns of: the
+//! The case to exclude is a wakeup whose work the host never learns of: the
 //! waking thread reads a stale `busy = true` and skips the callback, while
-//! the host, after `end`, reads the inject queue as empty. Both sides take
-//! the inject queue's lock, the waking thread to push before `wake`, the
-//! host in `next_sleep` after `end`, and that lock's total order makes one
-//! of them see the other side's write: the push precedes the host's check,
-//! or `end` precedes the `busy` load. `loom_current_thread::event_loop`
-//! models this.
+//! the host, after `end`, reads the inject queue as empty. `next_sleep`
+//! checks the queue without its lock, so the order comes from `pending`
+//! instead: every write to it is a swap, so the swaps in `wake` and `end`
+//! are totally ordered and one reads what the other wrote. If `end` reads
+//! the `true` of a wakeup, the host sees the push made before it; if `wake`
+//! reads the `false` of `end`, it sees `busy = false` and calls back.
+//! `loom_current_thread::event_loop` models this.
 
 use crate::loom::sync::atomic::AtomicBool;
 use crate::runtime::Callback;
@@ -81,8 +81,8 @@ impl Signal {
         }
     }
 
-    /// An explicit `Unparker::unpark`, which may carry no work for
-    /// `next_sleep` to report: the callback always runs, busy or not.
+    /// An explicit `Unparker::unpark`: the callback always runs, busy or
+    /// not, as a tick consumes it without leaving work behind.
     pub(crate) fn unpark(&self) {
         let first = !self.pending.swap(true, AcqRel);
         #[cfg(unix)]
@@ -110,14 +110,25 @@ impl Signal {
         if let Some(fd) = &self.event_fd {
             fd.drain();
         }
-        self.pending.store(false, Release);
+        // A swap rather than a store so that every write to `pending` is an
+        // RMW: loom only tracks a total modification order between RMWs
+        // (tokio-rs/loom#282), and the model relies on that order.
+        self.pending.swap(false, AcqRel);
     }
 
     /// The host is idle again: the next wakeup is its to be told of, even if
-    /// one during the tick already made the descriptor readable.
+    /// one during the tick already made the descriptor readable. `busy` is
+    /// cleared first, so a wakeup coalesced before the swap is never left
+    /// holding `pending` without having seen the host idle.
     pub(crate) fn end(&self) {
-        self.pending.store(false, Release);
         self.busy.store(false, Release);
+        self.pending.swap(false, AcqRel);
+    }
+
+    /// Whether a wakeup has arrived since the last tick or park. For an
+    /// `unpark` this is the only trace it leaves for `next_sleep`.
+    pub(crate) fn is_pending(&self) -> bool {
+        self.pending.load(Acquire)
     }
 
     #[cfg(unix)]

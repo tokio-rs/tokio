@@ -1283,8 +1283,8 @@ impl Builder {
         /// returns; a wakeup during a tick is reported by [`next_sleep`]
         /// instead, so a host that ticks until that is not `Some(ZERO)` sees
         /// each transition from idle to having work once. An
-        /// [`Unparker::unpark`] always reaches it, during a tick too, as it
-        /// may carry no work for `next_sleep` to report.
+        /// [`Unparker::unpark`] always reaches it, during a tick too, as that
+        /// tick consumes it without leaving work for `next_sleep` to show.
         ///
         /// It may be invoked from any thread, from within the runtime's
         /// scheduling and timer internals, and must not call into the runtime

@@ -241,10 +241,13 @@ impl<R: Scheduler> Core<R> {
 
     fn next_sleep(&self) -> Option<Duration> {
         let handle = self.handle();
-        if self.local_ready || handle.inner.as_current_thread().has_injected_work() {
+        let driver = handle.inner.driver();
+        if self.local_ready
+            || handle.inner.as_current_thread().has_injected_work()
+            || driver.has_pending_wakeup()
+        {
             return Some(Duration::ZERO);
         }
-        let driver = handle.inner.driver();
         #[cfg(feature = "time")]
         {
             driver.time.as_ref()?.next_timeout(&driver.clock)
@@ -266,10 +269,11 @@ impl<R: Scheduler> Core<R> {
 ///
 /// Obtained from [`EventLoop::unparker`]. An `unpark` makes the current or
 /// next [`park`](EventLoop::park) return, and notifies the host through
-/// [`event_fd`](EventLoop::event_fd) and [`on_work_available`]. Unlike a
-/// wakeup that carries work, it always reaches the callback, during a tick
-/// too, since [`next_sleep`](EventLoop::next_sleep) has nothing to report
-/// for it.
+/// [`event_fd`](EventLoop::event_fd), [`on_work_available`] and
+/// [`next_sleep`](EventLoop::next_sleep), which reports `Some(ZERO)` until
+/// a tick or park consumes it. Unlike a wakeup that carries work, it
+/// always reaches the callback, during a tick too: that tick consumes it
+/// without leaving anything for `next_sleep` to show after.
 ///
 /// [`on_work_available`]: crate::runtime::Builder::on_work_available
 #[derive(Clone, Debug)]
@@ -322,7 +326,8 @@ macro_rules! event_loop_methods {
         /// How long the host may sleep before calling [`tick`](Self::tick)
         /// again.
         ///
-        /// * `Some(ZERO)`: work is ready now; tick again.
+        /// * `Some(ZERO)`: work is ready now, or an [`Unparker`] woke the
+        ///   loop since the last tick or park; tick again.
         /// * `Some(d)`: nothing until a timer fires in `d`, unless woken.
         /// * `None`: nothing scheduled; wait for a wakeup.
         ///

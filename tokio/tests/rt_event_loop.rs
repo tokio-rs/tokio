@@ -258,6 +258,49 @@ fn nearer_timer_from_another_thread_is_readable() {
     t.join().unwrap();
 }
 
+/// The driver only announces a remote timer nearer than the wheel's next
+/// expiration as of the last park. A timer cancelled since then moves the
+/// host's `next_sleep` later than that, and a remote timer in between must
+/// still wake the host.
+#[cfg(unix)]
+#[test]
+fn nearer_timer_after_a_cancel_is_readable() {
+    let mut el = event_loop();
+    let (release, released) = oneshot::channel::<()>();
+    el.handle().spawn(async move {
+        let sleep = tokio::time::sleep(Duration::from_millis(50));
+        tokio::pin!(sleep);
+        // Registers the timer, then holds it until released.
+        std::future::poll_fn(|cx| {
+            let _ = sleep.as_mut().poll(cx);
+            std::task::Poll::Ready(())
+        })
+        .await;
+        released.await.unwrap();
+    });
+    el.drain();
+    // A park with the timer registered: the driver records it as its next
+    // expiration.
+    el.tick(0);
+    assert!(el.next_sleep().unwrap() <= Duration::from_millis(60));
+
+    // The task drops the timer; the host now sees nothing to wait for.
+    release.send(()).unwrap();
+    el.drain();
+    assert_eq!(el.next_sleep(), None);
+
+    let handle = el.handle().clone();
+    let t = std::thread::spawn(move || {
+        handle.block_on(async { tokio::time::sleep(Duration::from_millis(75)).await });
+    });
+    assert!(
+        el.readable(Duration::from_secs(1)),
+        "a timer nearer than the host's wait wakes the host"
+    );
+    el.pump_fd(|| t.is_finished());
+    t.join().unwrap();
+}
+
 #[cfg(unix)]
 #[test]
 fn cancelled_timer_disarms() {
@@ -639,6 +682,26 @@ fn park_returns_on_unpark_from_another_thread() {
     let start = Instant::now();
     el.park(None);
     assert!(start.elapsed() < Duration::from_millis(100));
+}
+
+/// An unpark carries no task or timer, but it is work for the host: the
+/// contract that `next_sleep` is `Some(ZERO)` whenever the host should tick
+/// holds for it too, until a tick or park consumes it.
+#[test]
+fn unpark_is_reported_by_next_sleep() {
+    let mut el = event_loop();
+    el.drain();
+    assert_eq!(el.next_sleep(), None);
+
+    el.unparker().unpark();
+    assert_eq!(el.next_sleep(), ZERO);
+    el.tick(0);
+    assert_eq!(el.next_sleep(), None);
+
+    el.unparker().unpark();
+    assert_eq!(el.next_sleep(), ZERO);
+    el.park(None);
+    assert_eq!(el.next_sleep(), None);
 }
 
 #[test]
