@@ -23,6 +23,8 @@ use std::task::{ready, Context, Poll};
     target_os = "nto",
     target_os = "nuttx",
     target_os = "vita",
+    target_os = "wasi",
+    target_os = "horizon",
 ))]
 fn rearm_source(registration: &Registration, fd: RawFd, interest: Interest) {
     let _ = registration.reregister(&mut SourceFd(&fd), interest);
@@ -40,6 +42,8 @@ fn rearm_source(registration: &Registration, fd: RawFd, interest: Interest) {
     target_os = "nto",
     target_os = "nuttx",
     target_os = "vita",
+    target_os = "wasi",
+    target_os = "horizon",
 )))]
 fn rearm_source(_: &Registration, _: RawFd, _: Interest) {}
 
