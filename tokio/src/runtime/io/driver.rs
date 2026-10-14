@@ -308,7 +308,22 @@ impl Handle {
         Ok(scheduled_io)
     }
 
-    #[cfg(unix)]
+    #[cfg(all(
+        unix,
+        any(
+            mio_unsupported_force_poll_poll,
+            target_os = "aix",
+            target_os = "cygwin",
+            target_os = "espidf",
+            target_os = "fuchsia",
+            target_os = "haiku",
+            target_os = "hermit",
+            target_os = "hurd",
+            target_os = "nto",
+            target_os = "nuttx",
+            target_os = "vita",
+        )
+    ))]
     pub(super) fn reregister_source(
         &self,
         registration: &Arc<ScheduledIo>,
