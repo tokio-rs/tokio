@@ -482,7 +482,7 @@ impl LengthDelimitedCodec {
         LengthDelimitedCodecSlice { codec: self }
     }
 
-    /// Encodes a borrowed byte slice into `dst` using this codec's framing
+    /// Encodes a borrowed byte slice into `dst` using the codec framing
     /// configuration.
     pub fn encode_slice(&mut self, data: &[u8], dst: &mut BytesMut) -> io::Result<()> {
         let n = data.len();
