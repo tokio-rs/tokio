@@ -267,6 +267,65 @@ fn poll_process_levels_targeted() {
     e1.cancel(&handle.inner);
 }
 
+// With I/O shards, several drivers process one wheel. `process_at_time`
+// releases the lock to wake a full batch, so another driver can advance the
+// wheel past this call's `now` before the lock is retaken. A waker that
+// re-enters `process_at_time` stands in for that second driver.
+#[test]
+#[cfg(not(loom))]
+fn wheel_advanced_while_waking_a_batch() {
+    use std::task::{Wake, Waker};
+
+    struct SecondDriver {
+        handle: crate::runtime::Handle,
+        at: u64,
+        ran: AtomicBool,
+    }
+
+    impl Wake for SecondDriver {
+        fn wake(self: Arc<Self>) {
+            if !self.ran.swap(true, Ordering::Relaxed) {
+                self.handle.inner.driver().time().process_at_time(self.at);
+            }
+        }
+    }
+
+    let rt = rt(true);
+    let handle = rt.handle();
+    let start = handle.inner.driver().now();
+
+    let waker = Waker::from(Arc::new(SecondDriver {
+        handle: handle.clone(),
+        at: start + 200,
+        ran: AtomicBool::new(false),
+    }));
+
+    // Two full wake batches, all due at the same tick.
+    let mut entries = vec![];
+    for _ in 0..64 {
+        let mut entry = Box::pin(TimerEntry::new());
+        entry.as_mut().init(&handle.inner, start + 100);
+
+        let _ = entry
+            .as_mut()
+            .poll_elapsed(&mut Context::from_waker(&waker), &handle.inner);
+
+        entries.push(entry);
+    }
+
+    let time = handle.inner.driver().time();
+    time.process_at_time(start + 100);
+
+    assert_eq!(time.inner.lock().wheel.elapsed(), start + 200);
+
+    for entry in entries.iter_mut() {
+        assert!(entry
+            .as_mut()
+            .poll_elapsed(&mut Context::from_waker(noop_waker_ref()), &handle.inner)
+            .is_ready());
+    }
+}
+
 #[test]
 #[cfg(not(loom))]
 fn instant_to_tick_max() {
