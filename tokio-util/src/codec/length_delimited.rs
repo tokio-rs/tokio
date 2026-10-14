@@ -473,6 +473,51 @@ impl LengthDelimitedCodec {
         }
     }
 
+    /// Converts this codec into one that encodes borrowed byte slices.
+    ///
+    /// `LengthDelimitedCodec` implements [`Encoder<Bytes>`] by default so
+    /// that item-independent sink combinators can infer a single sink item
+    /// type. Use this method when frames should be sent from borrowed slices.
+    pub fn into_slice_encoder(self) -> LengthDelimitedCodecSlice {
+        LengthDelimitedCodecSlice { codec: self }
+    }
+
+    /// Encodes a borrowed byte slice into `dst` using this codec's framing
+    /// configuration.
+    pub fn encode_slice(&mut self, data: &[u8], dst: &mut BytesMut) -> io::Result<()> {
+        let n = data.len();
+
+        if n > self.builder.max_frame_len {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                LengthDelimitedCodecError { _priv: () },
+            ));
+        }
+
+        let n = match self.builder.length_adjustment.checked_neg() {
+            Some(adjustment) => n.checked_add_signed(adjustment),
+            None => n.checked_add(isize::MIN.unsigned_abs()),
+        };
+
+        let n = n.ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "provided length would overflow after adjustment",
+            )
+        })?;
+
+        dst.reserve(self.builder.length_field_len + data.len());
+
+        if self.builder.length_field_is_big_endian {
+            dst.put_uint(n as u64, self.builder.length_field_len);
+        } else {
+            dst.put_uint_le(n as u64, self.builder.length_field_len);
+        }
+
+        dst.extend_from_slice(data);
+        Ok(())
+    }
+
     /// Creates a new length delimited codec builder with default configuration
     /// values.
     pub fn builder() -> Builder {
@@ -568,6 +613,37 @@ impl LengthDelimitedCodec {
     }
 }
 
+/// A [`LengthDelimitedCodec`] configured to encode borrowed byte slices.
+///
+/// This wrapper keeps `LengthDelimitedCodec`'s default sink item type as
+/// [`Bytes`], avoiding type inference ambiguity in item-independent sink
+/// combinators such as `SinkExt::flush` and `SinkExt::sink_map_err`.
+#[derive(Debug)]
+pub struct LengthDelimitedCodecSlice {
+    codec: LengthDelimitedCodec,
+}
+
+impl Decoder for LengthDelimitedCodecSlice {
+    type Item = BytesMut;
+    type Error = io::Error;
+
+    fn decode(&mut self, src: &mut BytesMut) -> io::Result<Option<BytesMut>> {
+        self.codec.decode(src)
+    }
+
+    fn decode_eof(&mut self, src: &mut BytesMut) -> io::Result<Option<BytesMut>> {
+        self.codec.decode_eof(src)
+    }
+}
+
+impl Encoder<&[u8]> for LengthDelimitedCodecSlice {
+    type Error = io::Error;
+
+    fn encode(&mut self, data: &[u8], dst: &mut BytesMut) -> io::Result<()> {
+        self.codec.encode_slice(data, dst)
+    }
+}
+
 impl Decoder for LengthDelimitedCodec {
     type Item = BytesMut;
     type Error = io::Error;
@@ -609,54 +685,11 @@ impl Decoder for LengthDelimitedCodec {
     }
 }
 
-impl Encoder<&[u8]> for LengthDelimitedCodec {
-    type Error = io::Error;
-
-    fn encode(&mut self, data: &[u8], dst: &mut BytesMut) -> Result<(), io::Error> {
-        let n = data.len();
-
-        if n > self.builder.max_frame_len {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                LengthDelimitedCodecError { _priv: () },
-            ));
-        }
-
-        // Adjust `n` with bounds checking
-        let n = match self.builder.length_adjustment.checked_neg() {
-            Some(adjustment) => n.checked_add_signed(adjustment),
-            None => n.checked_add(isize::MIN.unsigned_abs()),
-        };
-
-        let n = n.ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "provided length would overflow after adjustment",
-            )
-        })?;
-
-        // Reserve capacity in the destination buffer to fit the frame and
-        // length field.
-        dst.reserve(self.builder.length_field_len + data.len());
-
-        if self.builder.length_field_is_big_endian {
-            dst.put_uint(n as u64, self.builder.length_field_len);
-        } else {
-            dst.put_uint_le(n as u64, self.builder.length_field_len);
-        }
-
-        // Write the frame to the buffer
-        dst.extend_from_slice(data);
-
-        Ok(())
-    }
-}
-
 impl Encoder<Bytes> for LengthDelimitedCodec {
     type Error = io::Error;
 
     fn encode(&mut self, data: Bytes, dst: &mut BytesMut) -> Result<(), io::Error> {
-        Encoder::<&[u8]>::encode(self, data.as_ref(), dst)
+        self.encode_slice(data.as_ref(), dst)
     }
 }
 

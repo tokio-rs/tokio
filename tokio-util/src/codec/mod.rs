@@ -347,7 +347,9 @@ mod framed_write;
 pub use self::framed_write::FramedWrite;
 
 pub mod length_delimited;
-pub use self::length_delimited::{LengthDelimitedCodec, LengthDelimitedCodecError};
+pub use self::length_delimited::{
+    LengthDelimitedCodec, LengthDelimitedCodecError, LengthDelimitedCodecSlice,
+};
 
 mod lines_codec;
 pub use self::lines_codec::{LinesCodec, LinesCodecError};

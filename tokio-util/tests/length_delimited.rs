@@ -8,7 +8,7 @@ use tokio_test::{
 use tokio_util::codec::*;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use futures::{pin_mut, Sink, Stream};
+use futures::{pin_mut, Sink, SinkExt, Stream};
 use std::collections::VecDeque;
 use std::io;
 use std::pin::Pin;
@@ -503,7 +503,7 @@ fn write_single_frame_from_slice() {
             data(b"abcdefghi"),
             flush(),
         },
-        LengthDelimitedCodec::new(),
+        LengthDelimitedCodec::new().into_slice_encoder(),
     );
     pin_mut!(io);
 
@@ -515,6 +515,13 @@ fn write_single_frame_from_slice() {
         assert_ready_ok!(Sink::<&[u8]>::poll_flush(io.as_mut(), cx));
         assert!(io.get_ref().calls.is_empty());
     });
+}
+
+#[test]
+fn framed_sink_ext_infers_bytes_item() {
+    let (io, _) = tokio::io::duplex(32);
+    let _sink =
+        Framed::new(io, LengthDelimitedCodec::new()).sink_map_err::<io::Error, _>(|err| err);
 }
 
 #[test]
