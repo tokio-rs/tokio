@@ -876,7 +876,10 @@ impl<T: AsRawFd> AsyncFd<T> {
         self.registration
             .async_io(interest, || {
                 let result = f(self.get_ref());
-                if result.as_ref().is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock) {
+                if result
+                    .as_ref()
+                    .is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock)
+                {
                     self.rearm();
                 }
                 result
@@ -900,7 +903,10 @@ impl<T: AsRawFd> AsyncFd<T> {
         self.registration
             .async_io(interest, || {
                 let result = f(self.inner.as_mut().unwrap());
-                if result.as_ref().is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock) {
+                if result
+                    .as_ref()
+                    .is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock)
+                {
                     rearm_source(&self.registration, fd, registered_interest);
                 }
                 result
@@ -941,7 +947,10 @@ impl<T: AsRawFd> AsyncFd<T> {
     ) -> io::Result<R> {
         self.registration.try_io(interest, || {
             let result = f(self.inner.as_ref().unwrap());
-            if result.as_ref().is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock) {
+            if result
+                .as_ref()
+                .is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock)
+            {
                 self.rearm();
             }
             result
@@ -963,7 +972,10 @@ impl<T: AsRawFd> AsyncFd<T> {
         let registered_interest = self.interest;
         self.registration.try_io(interest, || {
             let result = f(self.inner.as_mut().unwrap());
-            if result.as_ref().is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock) {
+            if result
+                .as_ref()
+                .is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock)
+            {
                 rearm_source(&self.registration, fd, registered_interest);
             }
             result
