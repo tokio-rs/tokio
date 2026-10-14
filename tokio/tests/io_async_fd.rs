@@ -167,6 +167,40 @@ async fn initially_writable() {
 }
 
 #[tokio::test]
+async fn readable_after_would_block_with_poll() {
+    use std::os::unix::net::UnixStream;
+
+    let (reader, mut writer) = UnixStream::pair().unwrap();
+    reader.set_nonblocking(true).unwrap();
+    let reader = unsafe { AsyncFd::register(reader) }.unwrap();
+
+    writer.write_all(b"a").unwrap();
+    let mut ready = tokio::time::timeout(Duration::from_secs(5), reader.readable())
+        .await
+        .expect("initial readiness timed out")
+        .unwrap();
+
+    let mut buf = [0; 1];
+    assert_eq!(
+        ready
+            .try_io(|fd| fd.get_ref().read(&mut buf))
+            .unwrap()
+            .unwrap(),
+        1
+    );
+    assert_eq!(buf, *b"a");
+    assert!(ready.try_io(|fd| fd.get_ref().read(&mut buf)).is_err());
+    drop(ready);
+
+    writer.write_all(b"b").unwrap();
+    let result = tokio::time::timeout(Duration::from_secs(5), reader.readable()).await;
+    drop(writer);
+
+    assert!(result.is_ok(), "renewed read readiness timed out");
+    let _ready = result.unwrap().unwrap();
+}
+
+#[tokio::test]
 async fn reset_readable() {
     let (a, mut b) = socketpair();
 
