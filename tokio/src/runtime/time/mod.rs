@@ -289,10 +289,21 @@ impl Driver {
 impl Handle {
     cfg_event_loop! {
         /// Time until the wheel's next expiration, if any timer is registered.
+        ///
+        /// This is the host's wait, so it becomes `next_wake`, the bound a
+        /// timer registered from another thread is compared against to
+        /// decide on an unpark. A cancel since the last park may have moved
+        /// the wheel's next expiration past the `next_wake` that park
+        /// recorded, and a native runtime's thread wakes by it anyway; the
+        /// host only wakes by what it is told here.
         pub(crate) fn next_timeout(&self, clock: &Clock) -> Option<Duration> {
-            let tick = self.inner.lock().wheel.next_expiration_time()?;
+            let mut lock = self.inner.lock();
+            let next = lock.wheel.next_expiration_time();
+            lock.next_wake =
+                next.map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
+            drop(lock);
             let now = self.time_source().now(clock);
-            Some(self.time_source().tick_to_duration(tick.saturating_sub(now)))
+            Some(self.time_source().tick_to_duration(next?.saturating_sub(now)))
         }
     }
 
