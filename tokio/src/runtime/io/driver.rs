@@ -308,6 +308,17 @@ impl Handle {
         Ok(scheduled_io)
     }
 
+    #[cfg(unix)]
+    pub(super) fn reregister_source(
+        &self,
+        registration: &Arc<ScheduledIo>,
+        source: &mut impl Source,
+        interest: Interest,
+    ) -> io::Result<()> {
+        self.registry
+            .reregister(source, registration.token(), interest.to_mio())
+    }
+
     /// Deregisters an I/O resource from the reactor.
     pub(super) fn deregister_source(
         &self,
