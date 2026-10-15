@@ -119,6 +119,7 @@ impl UringContext {
                 Err(ref e) if e.raw_os_error() == Some(libc::EBUSY) => {
                     self.dispatch_completions();
                 }
+                Err(ref e) if e.raw_os_error() == Some(libc::EINTR) => {}
                 // For other errors, we currently return the error as is.
                 Err(e) => {
                     return Err(e);
@@ -142,7 +143,11 @@ impl Drop for UringContext {
 
         // Make sure we flush the submission queue before dropping the driver.
         while !self.ring_mut().submission().is_empty() {
-            self.submit().expect("Internal error when dropping driver");
+            if let Err(error) = self.submit() {
+                // The kernel may still be using resources from previously submitted operations.
+                mem::forget(mem::take(&mut self.ops));
+                panic!("Internal error when dropping driver: {error:?}");
+            }
         }
 
         let mut ops = std::mem::take(&mut self.ops);
@@ -152,9 +157,21 @@ impl Drop for UringContext {
 
         while !ops.is_empty() {
             // Wait until at least one completion is available.
-            self.ring_mut()
-                .submit_and_wait(1)
-                .expect("Internal error when dropping driver");
+            match self.ring_mut().submit_and_wait(1) {
+                Ok(_) => {}
+                // A failed wait can still leave completions available. Drain them below
+                // before retrying, retaining resources for operations that remain pending.
+                Err(error)
+                    if matches!(
+                        error.raw_os_error(),
+                        Some(libc::EINTR | libc::EBUSY | libc::EAGAIN)
+                    ) => {}
+                Err(error) => {
+                    // The kernel may still be using the resources held by pending operations.
+                    mem::forget(ops);
+                    panic!("Internal error when dropping driver: {error:?}");
+                }
+            }
 
             for cqe in self.ring_mut().completion() {
                 let idx = cqe.user_data() as usize;
