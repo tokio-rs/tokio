@@ -249,6 +249,21 @@ async fn merge_terminated_only_after_both_done() {
     assert_eq!(collected.len(), 2);
 }
 
+#[tokio::test(start_paused = true)]
+async fn chunks_timeout_not_terminated_before_done() {
+    let stream = fused_iter(vec![1, 2]).chunks_timeout(3, std::time::Duration::from_secs(1));
+    assert!(!stream.is_terminated());
+}
+
+#[tokio::test(start_paused = true)]
+async fn chunks_timeout_terminated_after_inner_done() {
+    let stream = fused_iter(vec![1, 2]).chunks_timeout(3, std::time::Duration::from_secs(1));
+    tokio::pin!(stream);
+    assert_eq!(stream.next().await, Some(vec![1, 2]));
+    assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
+}
+
 #[tokio::test]
 async fn stream_notify_close_is_terminated_after_close_notification() {
     let mut stream = StreamNotifyClose::new(tokio_stream::iter(vec![1]));
@@ -269,6 +284,53 @@ async fn stream_notify_close_does_not_poll_inner_after_close_notification() {
     assert_eq!(stream.next().await, None);
 }
 
+#[tokio::test]
+async fn peekable_not_terminated_before_done() {
+    let mut stream = fused_iter(vec![1, 2]).peekable();
+    assert!(!stream.is_terminated());
+    assert_eq!(stream.peek().await, Some(&1));
+    assert!(!stream.is_terminated());
+}
+
+#[tokio::test]
+async fn peekable_terminated_after_inner_done() {
+    let mut stream = fused_iter(vec![1]).peekable();
+    assert_eq!(stream.next().await, Some(1));
+    assert!(!stream.is_terminated());
+    assert_eq!(stream.next().await, None);
+    assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
+}
+
+// ── timeout ──────────────────────────────────────────────────────────────────
+
+#[tokio::test(start_paused = true)]
+async fn timeout_terminated_after_inner_done() {
+    let stream = fused_iter(vec![1]).timeout(std::time::Duration::from_secs(1));
+    tokio::pin!(stream);
+
+    assert!(!stream.as_ref().get_ref().is_terminated());
+    assert_eq!(stream.next().await, Some(Ok(1)));
+    assert!(!stream.as_ref().get_ref().is_terminated());
+    assert_eq!(stream.next().await, None);
+    assert!(stream.as_ref().get_ref().is_terminated());
+    assert_eq!(stream.next().await, None);
+}
+
+#[tokio::test(start_paused = true)]
+async fn timeout_repeating_terminated_after_inner_done() {
+    let interval = tokio::time::interval(std::time::Duration::from_secs(1));
+    let stream = fused_iter(vec![1]).timeout_repeating(interval);
+    tokio::pin!(stream);
+
+    assert!(!stream.as_ref().get_ref().is_terminated());
+    assert_eq!(stream.next().await, Some(Ok(1)));
+    assert!(!stream.as_ref().get_ref().is_terminated());
+    assert_eq!(stream.next().await, None);
+    assert!(stream.as_ref().get_ref().is_terminated());
+    assert_eq!(stream.next().await, None);
+}
+
 // ── throttle ─────────────────────────────────────────────────────────────────
 
 #[tokio::test(start_paused = true)]
@@ -286,4 +348,41 @@ async fn throttle_terminated_after_inner_done() {
     assert_eq!(stream.next().await, None);
     assert!(stream.as_ref().get_ref().is_terminated());
     assert_eq!(stream.next().await, None);
+}
+
+// ── wrappers ─────────────────────────────────────────────────────────────────
+
+/// `JoinSetStream` is only available with the `rt` feature.
+#[cfg(feature = "rt")]
+mod wrappers {
+    use super::*;
+
+    use tokio::task::JoinSet;
+    use tokio_stream::wrappers::JoinSetStream;
+
+    #[tokio::test]
+    async fn join_set_stream_is_terminated_when_empty() {
+        let mut stream = JoinSetStream::new(JoinSet::<i32>::new());
+
+        // An empty `JoinSet` never yields another item, so the stream is
+        // already terminated before it is polled.
+        assert!(stream.is_terminated());
+        assert!(stream.next().await.is_none());
+        assert!(stream.is_terminated());
+    }
+
+    #[tokio::test]
+    async fn join_set_stream_terminated_after_tasks_are_joined() {
+        let mut set = JoinSet::new();
+        set.spawn(async { 1 });
+        let mut stream = JoinSetStream::new(set);
+
+        // The set still holds a task, so the stream is not terminated.
+        assert!(!stream.is_terminated());
+        assert_eq!(stream.next().await.unwrap().unwrap(), 1);
+
+        // Joining the last task empties the set, so the stream is terminated.
+        assert!(stream.is_terminated());
+        assert!(stream.next().await.is_none());
+    }
 }

@@ -178,7 +178,8 @@ impl UnixSocket {
             ));
         }
 
-        self.inner.listen(backlog as i32)?;
+        self.inner
+            .listen(i32::try_from(backlog).unwrap_or(i32::MAX))?;
         let mio = {
             use std::os::unix::io::{FromRawFd, IntoRawFd};
 
