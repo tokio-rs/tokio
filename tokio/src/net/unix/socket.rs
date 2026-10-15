@@ -264,7 +264,7 @@ impl UnixSocket {
         }
 
         // Safety: calling `fchmod` on an open fd is safe
-        let ret = unsafe { libc::fchmod(self.as_raw_fd(), perm.mode() as libc::mode_t) };
+        let ret = unsafe { libc::fchmod(self.as_raw_fd(), perm.mode()) };
 
         if ret == -1 {
             return Err(io::Error::last_os_error());

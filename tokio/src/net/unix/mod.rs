@@ -43,4 +43,4 @@ pub type pid_t = i32;
 
 /// A type representing file mode bits.
 #[allow(non_camel_case_types)]
-pub type mode_t = u32;
+pub type mode_t = libc::mode_t;
