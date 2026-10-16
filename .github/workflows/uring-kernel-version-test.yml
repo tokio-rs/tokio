@@ -80,6 +80,8 @@ jobs:
           mount -t proc proc /proc
           mount -t sysfs sysfs /sys
           mkdir -p /tmp && mount -t tmpfs -o mode=1777 tmpfs /tmp
+          # The stress tests can open 10,000 files concurrently.
+          ulimit -n 65536
           for f in /bin/tests/*; do RUST_BACKTRACE=1 "$f" ; done
           echo "ALL_TESTS_COMPLETED"
           EOF
