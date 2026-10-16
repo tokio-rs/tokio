@@ -637,7 +637,12 @@ mod tests {
 
     #[test]
     fn pop_rotates_through_busy_shards() {
-        for start in (0..NUM_SHARDS).chain([usize::MAX]) {
+        let starts: Vec<_> = if cfg!(miri) {
+            vec![0, usize::MAX]
+        } else {
+            (0..NUM_SHARDS).chain([usize::MAX]).collect()
+        };
+        for start in starts {
             let shards: Vec<_> = (0..NUM_SHARDS)
                 .map(|i| (start % NUM_SHARDS + i) % NUM_SHARDS)
                 .collect();
@@ -676,11 +681,16 @@ mod tests {
 
     #[test]
     fn pop_rotates_past_empty_shards() {
-        for start in 0..NUM_SHARDS {
+        let indices: Vec<_> = if cfg!(miri) {
+            vec![0, NUM_SHARDS / 2, NUM_SHARDS - 1]
+        } else {
+            (0..NUM_SHARDS).collect()
+        };
+        for &start in &indices {
             assert!(drain_order(&[], start).is_empty());
-            for first in 0..NUM_SHARDS {
+            for (i, &first) in indices.iter().enumerate() {
                 assert_eq!(drain_order(&[first], start), expected_order(&[first]));
-                for second in first + 1..NUM_SHARDS {
+                for &second in &indices[i + 1..] {
                     let mut shards = [first, second];
                     shards.sort_by_key(|&index| (index + NUM_SHARDS - start) % NUM_SHARDS);
                     assert_eq!(drain_order(&shards, start), expected_order(&shards));
