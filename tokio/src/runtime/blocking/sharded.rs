@@ -591,7 +591,8 @@ mod tests {
     }
 
     // Control shard placement so fairness does not depend on the RNG or timing.
-    fn drain_order(handle: &Handle, shards: &[usize], next_shard: usize) -> Vec<(usize, usize)> {
+    fn drain_order(shards: &[usize], next_shard: usize) -> Vec<(usize, usize)> {
+        let rt = Builder::new_current_thread().build().unwrap();
         let queue = ShardedImpl::new(ThreadManagementState {
             shutdown: false,
             shutdown_tx: None,
@@ -605,8 +606,9 @@ mod tests {
             // Leave each shard non-empty across two complete batches.
             for sequence in 0..TASKS_PER_SHARD * 2 + 1 {
                 let tx = tx.clone();
-                let task =
-                    blocking_task_for_test(handle, move || tx.send((index, sequence)).unwrap());
+                let task = blocking_task_for_test(rt.handle(), move || {
+                    tx.send((index, sequence)).unwrap()
+                });
                 queue.shards[index].lock().queue.push_back(task);
                 queue.non_empty_mask.fetch_or(1 << index, Ordering::Relaxed);
             }
@@ -635,7 +637,6 @@ mod tests {
 
     #[test]
     fn pop_rotates_through_busy_shards() {
-        let rt = Builder::new_current_thread().build().unwrap();
         let starts: Vec<_> = if cfg!(miri) {
             vec![0, usize::MAX]
         } else {
@@ -645,10 +646,7 @@ mod tests {
             let shards: Vec<_> = (0..NUM_SHARDS)
                 .map(|i| (start % NUM_SHARDS + i) % NUM_SHARDS)
                 .collect();
-            assert_eq!(
-                drain_order(rt.handle(), &shards, start),
-                expected_order(&shards)
-            );
+            assert_eq!(drain_order(&shards, start), expected_order(&shards));
         }
     }
 
@@ -683,26 +681,19 @@ mod tests {
 
     #[test]
     fn pop_rotates_past_empty_shards() {
-        let rt = Builder::new_current_thread().build().unwrap();
         let indices: Vec<_> = if cfg!(miri) {
             vec![0, NUM_SHARDS / 2, NUM_SHARDS - 1]
         } else {
             (0..NUM_SHARDS).collect()
         };
         for &start in &indices {
-            assert!(drain_order(rt.handle(), &[], start).is_empty());
+            assert!(drain_order(&[], start).is_empty());
             for (i, &first) in indices.iter().enumerate() {
-                assert_eq!(
-                    drain_order(rt.handle(), &[first], start),
-                    expected_order(&[first])
-                );
+                assert_eq!(drain_order(&[first], start), expected_order(&[first]));
                 for &second in &indices[i + 1..] {
                     let mut shards = [first, second];
                     shards.sort_by_key(|&index| (index + NUM_SHARDS - start) % NUM_SHARDS);
-                    assert_eq!(
-                        drain_order(rt.handle(), &shards, start),
-                        expected_order(&shards)
-                    );
+                    assert_eq!(drain_order(&shards, start), expected_order(&shards));
                 }
             }
         }
