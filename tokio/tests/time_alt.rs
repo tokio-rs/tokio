@@ -80,6 +80,48 @@ fn sleep() {
 }
 
 #[test]
+fn reset_preserves_waker() {
+    use std::sync::Arc;
+    use std::task::{Context, Wake, Waker};
+    use tokio::sync::Notify;
+    use tokio_test::assert_ready;
+
+    struct NotifyOnWake(Notify);
+
+    impl Wake for NotifyOnWake {
+        fn wake(self: Arc<Self>) {
+            self.0.notify_one();
+        }
+    }
+
+    async fn check() {
+        let mut timer = Box::pin(tokio::time::sleep(Duration::from_secs(3600)));
+        let notification = Arc::new(NotifyOnWake(Notify::new()));
+        let waker = Waker::from(notification.clone());
+        assert_pending!(timer.as_mut().poll(&mut Context::from_waker(&waker)));
+
+        // Both resets must preserve the registered waker without another poll.
+        timer
+            .as_mut()
+            .reset(Instant::now() + Duration::from_secs(7200));
+        timer.as_mut().reset(Instant::now());
+
+        tokio::time::timeout(Duration::from_secs(1), notification.0.notified())
+            .await
+            .expect("reset timer did not wake its task");
+        assert_ready!(timer.as_mut().poll(&mut Context::from_waker(&waker)));
+    }
+
+    for rt in rt_combinations() {
+        rt.block_on(async {
+            // Exercise remote registration and registration on a worker thread.
+            check().await;
+            tokio::spawn(check()).await.unwrap();
+        });
+    }
+}
+
+#[test]
 fn cancelled_timer_waker_drop_can_register_timer() {
     use futures::FutureExt;
     use std::future::Future;
