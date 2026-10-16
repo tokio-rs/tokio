@@ -78,7 +78,9 @@ impl PopCursor {
             pos: 0,
             remaining: TASKS_PER_SHARD,
         };
-        cursor.shuffle(FastRand::from_seed(RngSeed::from_bytes(&seed.to_ne_bytes())));
+        cursor.shuffle(FastRand::from_seed(RngSeed::from_bytes(
+            &seed.to_ne_bytes(),
+        )));
         cursor
     }
 
