@@ -90,6 +90,13 @@ jobs:
           cargo test --doc --features full
         working-directory: tokio
 
+      - name: test AsyncFd rearming with Mio poll
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo test --features full --test io_async_fd readable_after_would_block_with_poll -- --exact
+        working-directory: tokio
+        env:
+          RUSTFLAGS: --cfg mio_unsupported_force_poll_poll
+
   test-workspace-all-features:
     needs: basics
     name: test all crates in the workspace with all features

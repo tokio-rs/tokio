@@ -9,6 +9,44 @@ use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::task::{ready, Context, Poll};
 
+// Keep this target list in sync with Mio's selector/poll.rs selection. Poll's
+// selector requires readiness interests to be re-registered after WouldBlock.
+#[cfg(any(
+    mio_unsupported_force_poll_poll,
+    target_os = "aix",
+    target_os = "cygwin",
+    target_os = "espidf",
+    target_os = "fuchsia",
+    target_os = "haiku",
+    target_os = "hermit",
+    target_os = "hurd",
+    target_os = "nto",
+    target_os = "nuttx",
+    target_os = "vita",
+    target_os = "wasi",
+    target_os = "horizon",
+))]
+fn rearm_source(registration: &Registration, fd: RawFd, interest: Interest) {
+    let _ = registration.reregister(&mut SourceFd(&fd), interest);
+}
+
+#[cfg(not(any(
+    mio_unsupported_force_poll_poll,
+    target_os = "aix",
+    target_os = "cygwin",
+    target_os = "espidf",
+    target_os = "fuchsia",
+    target_os = "haiku",
+    target_os = "hermit",
+    target_os = "hurd",
+    target_os = "nto",
+    target_os = "nuttx",
+    target_os = "vita",
+    target_os = "wasi",
+    target_os = "horizon",
+)))]
+fn rearm_source(_: &Registration, _: RawFd, _: Interest) {}
+
 /// Associates an IO object backed by a Unix file descriptor with the tokio
 /// reactor, allowing for readiness to be polled. The file descriptor must be of
 /// a type that can be used with the OS polling facilities (ie, `poll`, `epoll`,
@@ -182,6 +220,7 @@ use std::task::{ready, Context, Poll};
 /// [`OwnedFd`]: struct@std::os::fd::OwnedFd
 pub struct AsyncFd<T: AsRawFd> {
     registration: Registration,
+    interest: Interest,
     // The inner value is always present. the Option is required for `drop` and `into_inner`.
     // In all other methods `unwrap` is valid, and will never panic.
     inner: Option<T>,
@@ -277,6 +316,7 @@ impl<T: AsRawFd> AsyncFd<T> {
         ) {
             Ok(registration) => Ok(AsyncFd {
                 registration,
+                interest,
                 inner: Some(inner),
             }),
             Err(cause) => Err(AsyncFdRegisterError { inner, cause }),
@@ -299,6 +339,10 @@ impl<T: AsRawFd> AsyncFd<T> {
     #[inline]
     pub fn get_mut(&mut self) -> &mut T {
         self.inner.as_mut().unwrap()
+    }
+
+    fn rearm(&self) {
+        rearm_source(&self.registration, self.as_raw_fd(), self.interest);
     }
 
     fn take_inner(&mut self) -> Option<T> {
@@ -830,7 +874,16 @@ impl<T: AsRawFd> AsyncFd<T> {
         mut f: impl FnMut(&T) -> io::Result<R>,
     ) -> io::Result<R> {
         self.registration
-            .async_io(interest, || f(self.get_ref()))
+            .async_io(interest, || {
+                let result = f(self.get_ref());
+                if result
+                    .as_ref()
+                    .is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock)
+                {
+                    self.rearm();
+                }
+                result
+            })
             .await
     }
 
@@ -845,8 +898,19 @@ impl<T: AsRawFd> AsyncFd<T> {
         interest: Interest,
         mut f: impl FnMut(&mut T) -> io::Result<R>,
     ) -> io::Result<R> {
+        let fd = self.as_raw_fd();
+        let registered_interest = self.interest;
         self.registration
-            .async_io(interest, || f(self.inner.as_mut().unwrap()))
+            .async_io(interest, || {
+                let result = f(self.inner.as_mut().unwrap());
+                if result
+                    .as_ref()
+                    .is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock)
+                {
+                    rearm_source(&self.registration, fd, registered_interest);
+                }
+                result
+            })
             .await
     }
 
@@ -881,8 +945,16 @@ impl<T: AsRawFd> AsyncFd<T> {
         interest: Interest,
         f: impl FnOnce(&T) -> io::Result<R>,
     ) -> io::Result<R> {
-        self.registration
-            .try_io(interest, || f(self.inner.as_ref().unwrap()))
+        self.registration.try_io(interest, || {
+            let result = f(self.inner.as_ref().unwrap());
+            if result
+                .as_ref()
+                .is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock)
+            {
+                self.rearm();
+            }
+            result
+        })
     }
 
     /// Tries to read or write from the file descriptor using a user-provided IO operation.
@@ -896,8 +968,18 @@ impl<T: AsRawFd> AsyncFd<T> {
         interest: Interest,
         f: impl FnOnce(&mut T) -> io::Result<R>,
     ) -> io::Result<R> {
-        self.registration
-            .try_io(interest, || f(self.inner.as_mut().unwrap()))
+        let fd = self.as_raw_fd();
+        let registered_interest = self.interest;
+        self.registration.try_io(interest, || {
+            let result = f(self.inner.as_mut().unwrap());
+            if result
+                .as_ref()
+                .is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock)
+            {
+                rearm_source(&self.registration, fd, registered_interest);
+            }
+            result
+        })
     }
 
     /// Deprecated. Use [`AsyncFd::register`] instead. See [#8587] for more information.
@@ -999,6 +1081,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// this call to `clear_ready`, then the readiness is not actually cleared.
     pub fn clear_ready(&mut self) {
         if let Some(event) = self.event.take() {
+            self.async_fd.rearm();
             self.async_fd.registration.clear_readiness(event);
         }
     }
@@ -1090,6 +1173,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// ```
     pub fn clear_ready_matching(&mut self, ready: Ready) {
         if let Some(mut event) = self.event.take() {
+            self.async_fd.rearm();
             self.async_fd
                 .registration
                 .clear_readiness(event.with_ready(ready));
@@ -1227,6 +1311,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// this call to `clear_ready`, then the readiness is not actually cleared.
     pub fn clear_ready(&mut self) {
         if let Some(event) = self.event.take() {
+            self.async_fd.rearm();
             self.async_fd.registration.clear_readiness(event);
         }
     }
@@ -1318,6 +1403,7 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// ```
     pub fn clear_ready_matching(&mut self, ready: Ready) {
         if let Some(mut event) = self.event.take() {
+            self.async_fd.rearm();
             self.async_fd
                 .registration
                 .clear_readiness(event.with_ready(ready));
