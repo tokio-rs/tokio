@@ -13,6 +13,8 @@ mod split;
 pub use split::{ReadHalf, WriteHalf};
 
 mod split_owned;
+#[cfg(feature = "io-util")]
+pub use split_owned::BufReuniteError;
 pub use split_owned::{OwnedReadHalf, OwnedWriteHalf, ReuniteError};
 
 mod socketaddr;
