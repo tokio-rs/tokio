@@ -174,7 +174,6 @@ impl Barrier {
                 // woken, and unwinding with `arrived == n` and a stale
                 // generation would let every later `wait` pass the barrier
                 // immediately.
-                let generation = state.generation;
                 state.arrived = 0;
                 state.generation += 1;
                 state
