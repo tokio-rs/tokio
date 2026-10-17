@@ -43,7 +43,9 @@ cfg_io_util! {
     pub use lines::Lines;
 
     mod mem;
-    pub use mem::{duplex, simplex, DuplexStream, SimplexStream};
+    pub use mem::{duplex, DuplexStream, SimplexStream};
+    #[allow(deprecated)]
+    pub use mem::simplex;
 
     mod read;
     mod read_buf;
