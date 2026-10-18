@@ -415,11 +415,9 @@ pub(crate) mod impl_noproc {
     use std::io;
 
     pub(crate) fn get_peer_cred(_sock: &UnixStream) -> io::Result<super::UCred> {
-        Ok(super::UCred {
-            uid: 0,
-            gid: 0,
-            pid: None,
-        })
+        // These targets have no API for querying the credentials of the peer,
+        // so report that rather than fabricate a `UCred` for uid 0.
+        Err(io::Error::from(io::ErrorKind::Unsupported))
     }
 }
 
