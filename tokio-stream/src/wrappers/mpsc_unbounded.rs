@@ -1,7 +1,7 @@
 use crate::Stream;
 use futures_core::FusedStream;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 use tokio::sync::mpsc::UnboundedReceiver;
 
 /// A wrapper around [`tokio::sync::mpsc::UnboundedReceiver`] that implements [`Stream`].
@@ -68,15 +68,9 @@ impl<T> Stream for UnboundedReceiverStream<T> {
     type Item = T;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.done {
-            return Poll::Ready(None);
-        }
-
-        let result = self.inner.poll_recv(cx);
-        if let Poll::Ready(None) = result {
-            self.done = true;
-        }
-        result
+        let result = ready!(self.inner.poll_recv(cx));
+        self.done = result.is_none();
+        Poll::Ready(result)
     }
 
     /// Returns the bounds of the stream based on the underlying receiver.
