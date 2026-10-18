@@ -1,6 +1,8 @@
 #![warn(rust_2018_idioms)]
 
 use bytes::Bytes;
+use futures::stream::{self, FusedStream};
+use futures::{Stream, StreamExt};
 use futures_util::SinkExt;
 use std::io::{self, Error, ErrorKind};
 use tokio::io::AsyncWriteExt;
@@ -69,4 +71,25 @@ async fn test_direct_sink_writer() -> Result<(), Error> {
     );
 
     Ok(())
+}
+
+#[tokio::test]
+async fn test_sink_adapters_forward_stream_metadata() {
+    let mut copied = CopyToBytes::new(stream::iter([1, 2]));
+    assert_eq!(copied.size_hint(), (2, Some(2)));
+    assert!(!copied.is_terminated());
+    assert_eq!(copied.next().await, Some(1));
+    assert_eq!(copied.size_hint(), (1, Some(1)));
+    assert_eq!(copied.next().await, Some(2));
+    assert_eq!(copied.next().await, None);
+    assert!(copied.is_terminated());
+
+    let mut writer = SinkWriter::new(stream::iter([3, 4]));
+    assert_eq!(writer.size_hint(), (2, Some(2)));
+    assert!(!writer.is_terminated());
+    assert_eq!(writer.next().await, Some(3));
+    assert_eq!(writer.size_hint(), (1, Some(1)));
+    assert_eq!(writer.next().await, Some(4));
+    assert_eq!(writer.next().await, None);
+    assert!(writer.is_terminated());
 }
