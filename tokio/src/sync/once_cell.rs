@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "sync"), allow(unreachable_pub, dead_code))]
+
 use super::{Semaphore, SemaphorePermit, TryAcquireError};
 use crate::loom::cell::UnsafeCell;
 use std::error::Error;

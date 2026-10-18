@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "sync"), allow(unreachable_pub, dead_code))]
+
 use super::batch_semaphore as ll; // low level implementation
 use super::{AcquireError, TryAcquireError};
 #[cfg(all(tokio_unstable, feature = "tracing"))]
