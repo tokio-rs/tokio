@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use futures_core::stream::Stream;
+use futures_core::stream::{FusedStream, Stream};
 use futures_sink::Sink;
 use pin_project_lite::pin_project;
 use std::pin::Pin;
@@ -70,7 +70,18 @@ where
 
 impl<S: Stream> Stream for CopyToBytes<S> {
     type Item = S::Item;
+
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.project().inner.poll_next(cx)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
+}
+
+impl<S: FusedStream> FusedStream for CopyToBytes<S> {
+    fn is_terminated(&self) -> bool {
+        self.inner.is_terminated()
     }
 }
