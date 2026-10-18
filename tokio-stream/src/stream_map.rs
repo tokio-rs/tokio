@@ -25,11 +25,17 @@ use std::task::{ready, Context, Poll};
 /// used to remove the stream from the `StreamMap` before the stream has
 /// completed streaming.
 ///
+/// # Known bug
+///
 /// [`Extend::extend`] appends entries without comparing keys, so multiple streams
-/// may have the same key. In that case, [`remove`](StreamMap::remove) removes
-/// only one of the streams with that key. To build a map with unique keys, use
-/// [`insert`](StreamMap::insert) for each key-stream pair or collect an iterator
-/// into a new `StreamMap`.
+/// may have the same key. This is a bug that is preserved for backwards
+/// compatibility: fixing it requires adding trait bounds to the `Extend`
+/// implementation. It will be fixed in the next major release of `tokio-stream`.
+///
+/// When duplicate keys are present, [`remove`](StreamMap::remove) removes only
+/// one of the streams with that key. To build a map with unique keys, start with
+/// an empty map and use [`insert`](StreamMap::insert) for each key-stream pair,
+/// or collect an iterator into a new `StreamMap`.
 ///
 /// # `Unpin`
 ///
@@ -726,9 +732,10 @@ where
 impl<K, V> Extend<(K, V)> for StreamMap<K, V> {
     /// Appends all key-stream pairs from an iterator.
     ///
-    /// Keys are not compared, so entries with the same key are retained. To
-    /// replace an existing stream with the same key, call [`StreamMap::insert`]
-    /// for each pair instead.
+    /// Due to a known bug, keys are not compared, so entries with the same key
+    /// are retained. This behavior is preserved for backwards compatibility
+    /// until the next major release of `tokio-stream`. To replace an existing
+    /// stream with the same key, call [`StreamMap::insert`] for each pair instead.
     ///
     /// # Examples
     ///
