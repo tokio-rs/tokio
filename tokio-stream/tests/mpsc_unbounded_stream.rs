@@ -3,6 +3,22 @@ use futures_core::FusedStream;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
+struct Invalid;
+
+#[allow(unused)]
+trait AmbiguousIfFused<A> {
+    fn some_item(&self) {}
+}
+impl<T: ?Sized> AmbiguousIfFused<()> for T {}
+impl<T: ?Sized + FusedStream> AmbiguousIfFused<Invalid> for T {}
+
+#[allow(unreachable_code)]
+#[allow(unused_variables)]
+const _: fn() = || {
+    let stream: UnboundedReceiverStream<()> = todo!();
+    AmbiguousIfFused::some_item(&stream);
+};
+
 #[tokio::test]
 async fn size_hint_stream_open() {
     let (tx, rx) = mpsc::unbounded_channel();
@@ -12,7 +28,6 @@ async fn size_hint_stream_open() {
 
     let mut stream = UnboundedReceiverStream::new(rx);
 
-    assert!(!stream.is_terminated());
     assert_eq!(stream.size_hint(), (2, None));
     stream.next().await;
     assert_eq!(stream.size_hint(), (1, None));
@@ -47,7 +62,6 @@ async fn size_hint_sender_dropped() {
     let mut stream = UnboundedReceiverStream::new(rx);
     drop(tx);
 
-    assert!(!stream.is_terminated());
     assert_eq!(stream.size_hint(), (2, Some(2)));
     stream.next().await;
     assert_eq!(stream.size_hint(), (1, Some(1)));
@@ -63,18 +77,4 @@ fn size_hint_stream_instantly_closed() {
     stream.close();
 
     assert_eq!(stream.size_hint(), (0, Some(0)));
-    assert!(stream.is_terminated());
-}
-
-#[tokio::test]
-async fn fused_stream_terminates_when_sender_is_dropped() {
-    let (tx, rx) = mpsc::unbounded_channel::<i32>();
-    let mut stream = UnboundedReceiverStream::new(rx);
-    assert!(!stream.is_terminated());
-    drop(tx);
-
-    assert!(stream.is_terminated());
-    assert_eq!(stream.next().await, None);
-    assert!(stream.is_terminated());
-    assert_eq!(stream.next().await, None);
 }
