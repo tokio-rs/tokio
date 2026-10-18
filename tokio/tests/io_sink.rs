@@ -47,7 +47,7 @@ async fn sink_poll_write_vectored_is_cooperative() {
         _ = async {
             let bufs = [IoSlice::new(b"hello"), IoSlice::new(b"world")];
             loop {
-                tokio::io::sink().write_vectored(&bufs).await.unwrap();
+                assert_eq!(tokio::io::sink().write_vectored(&bufs).await.unwrap(), 10);
             }
         } => {},
         _ = tokio::task::yield_now() => {}
