@@ -124,7 +124,13 @@ impl<T: Eq> Eq for SetOnce<T> {}
 
 impl<T> Drop for SetOnce<T> {
     fn drop(&mut self) {
-        if *self.value_set.get_mut() {
+        // Loom's AtomicBool does not provide get_mut().
+        #[cfg(all(test, loom))]
+        let value_set = self.value_set.load(Ordering::Relaxed);
+        #[cfg(not(all(test, loom)))]
+        let value_set = *self.value_set.get_mut();
+
+        if value_set {
             // SAFETY: If the value_set is true, then the value is initialized
             // then there is a value to be dropped and this is safe
             unsafe { self.value.with_mut(|ptr| ptr::drop_in_place(ptr as *mut T)) }
@@ -309,7 +315,13 @@ impl<T> SetOnce<T> {
     /// Returns `None` if the cell is empty.
     pub fn into_inner(mut self) -> Option<T> {
         // Prevent Drop from dropping the extracted value.
-        if std::mem::take(self.value_set.get_mut()) {
+        let flag = &mut self.value_set;
+        #[cfg(all(test, loom))]
+        let value_set = flag.swap(false, Ordering::Relaxed);
+        #[cfg(not(all(test, loom)))]
+        let value_set = std::mem::take(flag.get_mut());
+
+        if value_set {
             // SAFETY: A true flag guarantees the value is initialized.
             // Clearing it above prevents Drop from dropping the moved value.
             Some(unsafe { self.value.with_mut(|ptr| ptr::read(ptr).assume_init()) })
