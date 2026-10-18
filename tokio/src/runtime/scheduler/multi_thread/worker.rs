@@ -69,6 +69,7 @@ use crate::runtime::{
 use crate::runtime::{context, TaskHooks};
 use crate::task::coop;
 use crate::util::atomic_cell::AtomicCell;
+use crate::util::cacheline::CachePadded;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::RefCell;
@@ -175,10 +176,10 @@ pub(crate) struct Shared {
     /// Global task queue used for:
     ///  1. Submit work to the scheduler while **not** currently on a worker thread.
     ///  2. Submit work to the scheduler when a worker run queue is saturated
-    pub(super) inject: InjectQueue<Arc<Handle>>,
+    pub(super) inject: CachePadded<InjectQueue<Arc<Handle>>>,
 
     /// Coordinates idle workers
-    idle: Idle,
+    idle: CachePadded<Idle>,
 
     /// Collection of all active tasks spawned onto this executor.
     pub(crate) owned: OwnedTasks<Arc<Handle>>,
@@ -323,8 +324,8 @@ pub(super) fn create(
         task_hooks: TaskHooks::from_config(&config),
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
-            inject: InjectQueue::new(),
-            idle,
+            inject: CachePadded::new(InjectQueue::new()),
+            idle: CachePadded::new(idle),
             owned: OwnedTasks::new(size),
             synced: Mutex::new(Synced {
                 idle: idle_synced,

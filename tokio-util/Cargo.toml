@@ -4,7 +4,7 @@ name = "tokio-util"
 # - Remove path dependencies (if any)
 # - Update CHANGELOG.md.
 # - Create "tokio-util-0.7.x" git tag.
-version = "0.7.19"
+version = "0.7.20"
 edition = "2021"
 rust-version = "1.85"
 authors = ["Tokio Contributors <team@tokio.rs>"]
@@ -35,7 +35,7 @@ join-map = ["rt", "hashbrown"]
 __docs_rs = ["futures-util"]
 
 [dependencies]
-tokio = { version = "1.47.0", features = ["sync"] }
+tokio = { version = "1.51.0", features = ["sync"] }
 bytes = "1.5.0"
 futures-core = "0.3.0"
 futures-sink = "0.3.0"
@@ -47,7 +47,7 @@ tracing = { version = "0.1.29", default-features = false, features = ["std"], op
 hashbrown = { version = "0.15.0", default-features = false, optional = true }
 
 [target.'cfg(unix)'.dependencies]
-libc = { version = "0.2.168", optional = true } # Backs the LinesCodec delimiter scan via libc::memchr
+libc = { version = "0.2.168", optional = true } # Backs the LinesCodec and AnyDelimiterCodec delimiter scans via libc::memchr
 
 [dev-dependencies]
 tokio = { version = "1.0.0", features = ["full"] }

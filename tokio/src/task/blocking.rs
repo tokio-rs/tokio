@@ -166,7 +166,7 @@ cfg_rt! {
     /// [`thread::spawn`]: fn@std::thread::spawn
     /// [`shutdown_timeout`]: fn@crate::runtime::Runtime::shutdown_timeout
     /// [bridgesync]: https://tokio.rs/tokio/topics/bridging
-    /// [`AtomicBool`]: struct@std::sync::atomic::AtomicBool
+    /// [`AtomicBool`]: std::sync::atomic::AtomicBool
     /// [`abort`]: crate::task::JoinHandle::abort
     ///
     /// # Examples

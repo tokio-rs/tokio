@@ -167,8 +167,10 @@
 //! The multi-thread scheduler executes futures on a _thread pool_, using a
 //! work-stealing strategy. By default, it will start a worker thread for each
 //! CPU core available on the system. This tends to be the ideal configuration
-//! for most applications. The multi-thread scheduler requires the `rt-multi-thread`
-//! feature flag, and is selected by default:
+//! for most applications, but see the docs of
+//! [`std::thread::available_parallelism`] for caveats. The multi-thread
+//! scheduler requires the `rt-multi-thread` feature flag, and is selected by
+//! default:
 //! ```
 //! # #[cfg(not(target_family = "wasm"))]
 //! # {

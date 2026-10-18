@@ -14,11 +14,11 @@ use std::task::Poll;
 use std::time::Duration;
 use std::{future::poll_fn, path::PathBuf};
 use tempfile::NamedTempFile;
+use tokio::task::JoinSet;
 use tokio::{
     fs::OpenOptions,
     runtime::{Builder, Runtime},
 };
-use tokio_util::task::TaskTracker;
 
 fn multi_rt(n: usize) -> Box<dyn Fn() -> Runtime> {
     Box::new(move || {
@@ -48,35 +48,48 @@ fn rt_combinations() -> Vec<Box<dyn Fn() -> Runtime>> {
 #[test]
 fn shutdown_runtime_while_performing_io_uring_ops() {
     fn run(rt: Runtime) {
-        let (tx, rx) = mpsc::channel();
         let (done_tx, done_rx) = mpsc::channel();
 
         let (_tmp, path) = create_tmp_files(1);
-        rt.spawn(async move {
+        rt.block_on(async move {
             let path = path[0].clone();
+            let mut futs = vec![];
 
             // spawning a bunch of uring operations.
-            loop {
+            for _ in 0..100 {
                 let path = path.clone();
-                tokio::spawn(async move {
+                let mut fut = Box::pin(async move {
                     let mut opt = OpenOptions::new();
                     opt.read(true);
-                    opt.open(&path).await.unwrap();
+                    opt.open(&path).await
                 });
-
-                // Avoid busy looping.
-                tokio::task::yield_now().await;
+                if let Poll::Ready(result) = futures::poll!(fut.as_mut()) {
+                    result.unwrap();
+                }
+                futs.push(fut);
             }
+            tokio::spawn(async move {
+                let _futs = futs;
+                loop {
+                    let path = path.clone();
+                    tokio::spawn(async move {
+                        let mut opt = OpenOptions::new();
+                        opt.read(true);
+                        opt.open(&path).await.unwrap();
+                    });
+
+                    // Avoid busy looping.
+                    tokio::task::yield_now().await;
+                }
+            });
         });
 
         std::thread::spawn(move || {
-            let rt: Runtime = rx.recv().unwrap();
             rt.shutdown_timeout(Duration::from_millis(300));
             done_tx.send(()).unwrap();
         });
 
-        tx.send(rt).unwrap();
-        done_rx.recv().unwrap();
+        done_rx.recv_timeout(Duration::from_secs(5)).unwrap();
     }
 
     for rt in rt_combinations() {
@@ -92,16 +105,15 @@ fn open_many_files() {
         let (_tmp_files, paths): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(NUM_FILES);
 
         rt.block_on(async move {
-            let tracker = TaskTracker::new();
+            let mut tasks = JoinSet::new();
 
             for i in 0..10_000 {
                 let path = paths.get(i % NUM_FILES).unwrap().clone();
-                tracker.spawn(async move {
+                tasks.spawn(async move {
                     let _file = OpenOptions::new().read(true).open(path).await.unwrap();
                 });
             }
-            tracker.close();
-            tracker.wait().await;
+            tasks.join_all().await;
         });
     }
 

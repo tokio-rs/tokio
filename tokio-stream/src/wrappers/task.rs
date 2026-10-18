@@ -1,4 +1,5 @@
 use crate::Stream;
+use futures_core::FusedStream;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::task::{JoinError, JoinSet};
@@ -56,6 +57,12 @@ impl<T: 'static> Stream for JoinSetStream<T> {
     fn size_hint(&self) -> (usize, Option<usize>) {
         let size = self.inner.len();
         (size, Some(size))
+    }
+}
+
+impl<T: 'static> FusedStream for JoinSetStream<T> {
+    fn is_terminated(&self) -> bool {
+        self.inner.is_empty()
     }
 }
 

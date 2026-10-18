@@ -2,7 +2,7 @@
 //!
 //! [`File`]: File
 
-use crate::fs::{asyncify, OpenOptions};
+use crate::fs::{asyncify, FileTimes, OpenOptions};
 use crate::io::blocking::{Buf, DEFAULT_MAX_BUF_SIZE};
 use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use crate::sync::Mutex;
@@ -566,6 +566,45 @@ impl File {
         asyncify(move || std.set_permissions(perm)).await
     }
 
+    /// Changes the timestamps on the underlying file.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the user lacks permission to change
+    /// timestamps on the underlying file. It may also return an error in other
+    /// os-specific unspecified cases.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::{File, FileTimes};
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::open("foo.txt").await?;
+    /// let times = FileTimes::new()
+    ///     .set_accessed(std::time::SystemTime::now())
+    ///     .set_modified(std::time::SystemTime::now());
+    /// file.set_times(times).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn set_times(&self, times: FileTimes) -> io::Result<()> {
+        // Wait for in-flight reads/writes like `sync_all` does, so they
+        // cannot complete after us and overwrite the timestamps.
+        self.inner.lock().await.complete_inflight().await;
+
+        let std = self.std.clone();
+        let std_times = times.into_std();
+        asyncify(move || std.set_times(std_times)).await
+    }
+
+    /// Changes the modification timestamp on the underlying file.
+    ///
+    /// This is equivalent to `set_times` with only the modification time set.
+    pub async fn set_modified(&self, time: std::time::SystemTime) -> io::Result<()> {
+        self.set_times(FileTimes::new().set_modified(time)).await
+    }
+
     /// Set the maximum buffer size for the underlying [`AsyncRead`] / [`AsyncWrite`] operation.
     ///
     /// Although Tokio uses a sensible default value for this buffer size, this function would be
@@ -1078,14 +1117,21 @@ impl Inner {
             let (res, r_fd, r_buf) =
                 // u64::MAX to use and advance the file position
                 Op::read_at(fd, buf, max_buf_size, u64::MAX).await;
-            match res {
-                Err(e) if e.kind() == io::ErrorKind::Interrupted => {
+            match (res, r_fd, r_buf) {
+                // Retry an interrupted read with the resources the op handed back.
+                (Err(e), Some(r_fd), Some(r_buf)) if e.kind() == io::ErrorKind::Interrupted => {
                     buf = r_buf;
                     fd = r_fd;
                     continue;
                 }
-                Err(e) => break (Operation::Read(Err(e)), r_buf),
-                Ok(n) => break (Operation::Read(Ok(n as usize)), r_buf),
+                // A cancelled op keeps its buffer in the driver, so the idle slot
+                // gets a fresh empty `Buf` instead.
+                (Err(e), _, r_buf) => {
+                    let buf = r_buf.unwrap_or_else(|| Buf::with_capacity(0));
+                    break (Operation::Read(Err(e)), buf);
+                }
+                (Ok(n), _, Some(r_buf)) => break (Operation::Read(Ok(n as usize)), r_buf),
+                (Ok(_), ..) => unreachable!("a successful read returns its buffer"),
             }
         }
     }

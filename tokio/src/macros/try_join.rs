@@ -229,7 +229,16 @@ doc! {macro_rules! try_join {
                     if $crate::macros::support::Future::poll(fut.as_mut(), cx).is_pending() {
                         is_pending = true;
                     } else if fut.as_mut().output_mut().expect("expected completed future").is_err() {
-                        return $crate::macros::support::Poll::Ready($crate::macros::support::Result::Err(fut.take_output().expect("expected completed future").err().unwrap()))
+                        // The error type may be uninhabited (e.g. `Infallible`).
+                        // Mapping with `Err` avoids an expression of that type,
+                        // which would trigger `unreachable_code` in the caller.
+                        return $crate::macros::support::Poll::Ready(
+                            fut.take_output()
+                                .expect("expected completed future")
+                                .err()
+                                .map($crate::macros::support::Result::Err)
+                                .unwrap()
+                        )
                     }
                 } else {
                     // Future skipped, one less future to skip in the next iteration
@@ -241,20 +250,24 @@ doc! {macro_rules! try_join {
             if is_pending {
                 $crate::macros::support::Poll::Pending
             } else {
-                $crate::macros::support::Poll::Ready($crate::macros::support::Result::Ok(($({
-                    // Extract the future for this branch from the tuple.
-                    let ( $($skip,)* fut, .. ) = &mut futures;
+                // Unreachable if an output type is uninhabited (e.g. `Infallible`).
+                #[allow(unreachable_code)]
+                {
+                    $crate::macros::support::Poll::Ready($crate::macros::support::Result::Ok(($({
+                        // Extract the future for this branch from the tuple.
+                        let ( $($skip,)* fut, .. ) = &mut futures;
 
-                    // Safety: future is stored on the stack above
-                    // and never moved.
-                    let mut fut = unsafe { $crate::macros::support::Pin::new_unchecked(fut) };
+                        // Safety: future is stored on the stack above
+                        // and never moved.
+                        let mut fut = unsafe { $crate::macros::support::Pin::new_unchecked(fut) };
 
-                    fut
-                        .take_output()
-                        .expect("expected completed future")
-                        .ok()
-                        .expect("expected Ok(_)")
-                },)*)))
+                        fut
+                            .take_output()
+                            .expect("expected completed future")
+                            .ok()
+                            .expect("expected Ok(_)")
+                    },)*)))
+                }
             }
         }).await
     }};
