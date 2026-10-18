@@ -873,17 +873,15 @@ impl<T: AsRawFd> AsyncFd<T> {
         interest: Interest,
         mut f: impl FnMut(&T) -> io::Result<R>,
     ) -> io::Result<R> {
-        self.registration
-            .async_io(interest, || {
-                let result = f(self.get_ref());
-                if result
-                    .as_ref()
-                    .is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock)
-                {
-                    self.rearm();
-                }
-                result
-            })
+        let registration = &self.registration;
+        let fd = self.as_raw_fd();
+        let registered_interest = self.interest;
+        registration
+            .async_io_with(
+                interest,
+                || rearm_source(registration, fd, registered_interest),
+                || f(self.get_ref()),
+            )
             .await
     }
 
@@ -900,17 +898,13 @@ impl<T: AsRawFd> AsyncFd<T> {
     ) -> io::Result<R> {
         let fd = self.as_raw_fd();
         let registered_interest = self.interest;
-        self.registration
-            .async_io(interest, || {
-                let result = f(self.inner.as_mut().unwrap());
-                if result
-                    .as_ref()
-                    .is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock)
-                {
-                    rearm_source(&self.registration, fd, registered_interest);
-                }
-                result
-            })
+        let registration = &self.registration;
+        registration
+            .async_io_with(
+                interest,
+                || rearm_source(registration, fd, registered_interest),
+                || f(self.inner.as_mut().unwrap()),
+            )
             .await
     }
 
@@ -945,16 +939,14 @@ impl<T: AsRawFd> AsyncFd<T> {
         interest: Interest,
         f: impl FnOnce(&T) -> io::Result<R>,
     ) -> io::Result<R> {
-        self.registration.try_io(interest, || {
-            let result = f(self.inner.as_ref().unwrap());
-            if result
-                .as_ref()
-                .is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock)
-            {
-                self.rearm();
-            }
-            result
-        })
+        let registration = &self.registration;
+        let fd = self.as_raw_fd();
+        let registered_interest = self.interest;
+        registration.try_io_with(
+            interest,
+            || rearm_source(registration, fd, registered_interest),
+            || f(self.inner.as_ref().unwrap()),
+        )
     }
 
     /// Tries to read or write from the file descriptor using a user-provided IO operation.
@@ -970,16 +962,12 @@ impl<T: AsRawFd> AsyncFd<T> {
     ) -> io::Result<R> {
         let fd = self.as_raw_fd();
         let registered_interest = self.interest;
-        self.registration.try_io(interest, || {
-            let result = f(self.inner.as_mut().unwrap());
-            if result
-                .as_ref()
-                .is_err_and(|err| err.kind() == io::ErrorKind::WouldBlock)
-            {
-                rearm_source(&self.registration, fd, registered_interest);
-            }
-            result
-        })
+        let registration = &self.registration;
+        registration.try_io_with(
+            interest,
+            || rearm_source(registration, fd, registered_interest),
+            || f(self.inner.as_mut().unwrap()),
+        )
     }
 
     /// Deprecated. Use [`AsyncFd::register`] instead. See [#8587] for more information.
@@ -1081,8 +1069,8 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// this call to `clear_ready`, then the readiness is not actually cleared.
     pub fn clear_ready(&mut self) {
         if let Some(event) = self.event.take() {
-            self.async_fd.rearm();
             self.async_fd.registration.clear_readiness(event);
+            self.async_fd.rearm();
         }
     }
 
@@ -1173,10 +1161,10 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyGuard<'a, Inner> {
     /// ```
     pub fn clear_ready_matching(&mut self, ready: Ready) {
         if let Some(mut event) = self.event.take() {
-            self.async_fd.rearm();
             self.async_fd
                 .registration
                 .clear_readiness(event.with_ready(ready));
+            self.async_fd.rearm();
 
             // the event is no longer ready for the readiness that was just cleared
             event.ready = event.ready - ready;
@@ -1311,8 +1299,8 @@ impl<'a, Inner: AsRawFd> AsyncFdReadyMutGuard<'a, Inner> {
     /// this call to `clear_ready`, then the readiness is not actually cleared.
     pub fn clear_ready(&mut self) {
         if let Some(event) = self.event.take() {
-            self.async_fd.rearm();
             self.async_fd.registration.clear_readiness(event);
+            self.async_fd.rearm();
         }
     }
 

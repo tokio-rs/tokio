@@ -322,6 +322,8 @@ impl Handle {
             target_os = "nto",
             target_os = "nuttx",
             target_os = "vita",
+            target_os = "wasi",
+            target_os = "horizon",
         )
     ))]
     pub(super) fn reregister_source(

@@ -118,6 +118,8 @@ impl Registration {
             target_os = "nto",
             target_os = "nuttx",
             target_os = "vita",
+            target_os = "wasi",
+            target_os = "horizon",
         )
     ))]
     pub(crate) fn reregister(
@@ -223,6 +225,15 @@ impl Registration {
         interest: Interest,
         f: impl FnOnce() -> io::Result<R>,
     ) -> io::Result<R> {
+        self.try_io_with(interest, || {}, f)
+    }
+
+    pub(crate) fn try_io_with<R>(
+        &self,
+        interest: Interest,
+        on_would_block: impl FnOnce(),
+        f: impl FnOnce() -> io::Result<R>,
+    ) -> io::Result<R> {
         let ev = self.shared.ready_event(interest);
 
         // Don't attempt the operation if the resource is not ready.
@@ -233,6 +244,7 @@ impl Registration {
         match f() {
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 self.clear_readiness(ev);
+                on_would_block();
                 Err(io::ErrorKind::WouldBlock.into())
             }
             res => res,
@@ -252,6 +264,15 @@ impl Registration {
     pub(crate) async fn async_io<R>(
         &self,
         interest: Interest,
+        f: impl FnMut() -> io::Result<R>,
+    ) -> io::Result<R> {
+        self.async_io_with(interest, || {}, f).await
+    }
+
+    pub(crate) async fn async_io_with<R>(
+        &self,
+        interest: Interest,
+        mut on_would_block: impl FnMut(),
         mut f: impl FnMut() -> io::Result<R>,
     ) -> io::Result<R> {
         loop {
@@ -262,6 +283,7 @@ impl Registration {
             match f() {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     self.clear_readiness(event);
+                    on_would_block();
                 }
                 x => {
                     coop.made_progress();
