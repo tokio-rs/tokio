@@ -1,9 +1,26 @@
 #![cfg(feature = "rt")]
 
 use futures::{Stream, StreamExt};
+use futures_core::FusedStream;
 use std::collections::HashSet;
 use tokio::task::JoinSet;
 use tokio_stream::wrappers::JoinSetStream;
+
+struct Invalid;
+
+#[allow(unused)]
+trait AmbiguousIfFused<A> {
+    fn some_item(&self) {}
+}
+impl<T: ?Sized> AmbiguousIfFused<()> for T {}
+impl<T: ?Sized + FusedStream> AmbiguousIfFused<Invalid> for T {}
+
+#[allow(unreachable_code)]
+#[allow(unused_variables)]
+const _: fn() = || {
+    let stream: JoinSetStream<()> = todo!();
+    AmbiguousIfFused::some_item(&stream);
+};
 
 #[tokio::test]
 async fn size_hint_stream() {
