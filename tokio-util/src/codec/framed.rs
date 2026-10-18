@@ -214,7 +214,7 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Maps the codec `U` to `C`, preserving the read and write buffers
-    /// wrapped by `Framed`.
+    /// and framing state wrapped by `Framed`.
     ///
     /// Note that care should be taken to not tamper with the underlying codec
     /// as it may corrupt the stream of frames otherwise being worked with.
@@ -222,15 +222,22 @@ impl<T, U> Framed<T, U> {
     where
         F: FnOnce(U) -> C,
     {
-        // This could be potentially simplified once rust-lang/rust#86555 hits stable
-        let parts = self.into_parts();
-        Framed::from_parts(FramedParts {
-            io: parts.io,
-            codec: map(parts.codec),
-            read_buf: parts.read_buf,
-            write_buf: parts.write_buf,
-            _priv: (),
-        })
+        let FramedImpl {
+            inner,
+            mut state,
+            codec,
+        } = self.inner;
+
+        // The new codec may be able to decode bytes the previous codec could not.
+        state.read.is_readable |= !state.read.buffer.is_empty();
+
+        Framed {
+            inner: FramedImpl {
+                inner,
+                state,
+                codec: map(codec),
+            },
+        }
     }
 
     /// Returns a mutable reference to the underlying codec wrapped by

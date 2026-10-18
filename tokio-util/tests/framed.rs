@@ -1,10 +1,11 @@
 #![warn(rust_2018_idioms)]
 
 use tokio_stream::StreamExt;
-use tokio_test::assert_ok;
+use tokio_test::{assert_ok, assert_pending, assert_ready, task};
 use tokio_util::codec::{Decoder, Encoder, Framed, FramedParts};
 
 use bytes::{Buf, BufMut, BytesMut};
+use futures_sink::Sink;
 use std::io::{self, Read};
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -126,6 +127,85 @@ async fn can_read_from_existing_buf_after_codec_changed() {
 
     assert_eq!(num, 84);
     assert_eq!(framed.codec().read_bytes, 12);
+}
+
+#[test]
+fn can_read_incomplete_frame_after_codec_changed() {
+    let (io, _handle) = tokio_test::io::Builder::new()
+        .read(&[0, 0, 0, 42])
+        .build_with_handle();
+    let mut framed = task::spawn(Framed::new(io, U64Codec::default()));
+
+    // The old codec needs more bytes, but the new codec can decode the buffer.
+    assert_pending!(framed.poll_next());
+    let framed = framed.into_inner().map_codec(|_| U32Codec::default());
+    let mut framed = task::spawn(framed);
+    assert_eq!(assert_ok!(assert_ready!(framed.poll_next()).unwrap()), 42);
+}
+
+#[test]
+fn map_codec_preserves_backpressure() {
+    let (io, _reader) = tokio::io::duplex(1);
+    let mut framed = Framed::new(io, U32Codec::default());
+    framed.set_backpressure_boundary(1);
+
+    task::spawn(()).enter(|cx, _| {
+        assert_ok!(Pin::new(&mut framed).start_send(42));
+        assert_pending!(Pin::new(&mut framed).poll_ready(cx));
+
+        let mut framed = framed.map_codec(|codec| codec);
+        assert_pending!(Pin::new(&mut framed).poll_ready(cx));
+        assert_eq!(framed.backpressure_boundary(), 1);
+    });
+}
+
+#[tokio::test]
+async fn map_codec_preserves_eof() {
+    struct ReadEofOnce(bool);
+
+    impl tokio::io::AsyncRead for ReadEofOnce {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            _buf: &mut tokio::io::ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            assert!(!self.0, "read before finishing EOF frames");
+            self.0 = true;
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    struct ClosingFrames(u32);
+
+    impl Decoder for ClosingFrames {
+        type Item = u32;
+        type Error = io::Error;
+
+        fn decode(&mut self, _buf: &mut BytesMut) -> io::Result<Option<u32>> {
+            unreachable!()
+        }
+
+        fn decode_eof(&mut self, _buf: &mut BytesMut) -> io::Result<Option<u32>> {
+            self.0 += 1;
+            Ok((self.0 <= 2).then_some(self.0))
+        }
+    }
+
+    let mut framed = Framed::new(ReadEofOnce(false), ClosingFrames(0));
+    assert_eq!(assert_ok!(framed.next().await.unwrap()), 1);
+
+    let mut framed = framed.map_codec(|codec| codec);
+    assert_eq!(assert_ok!(framed.next().await.unwrap()), 2);
+    assert!(framed.next().await.is_none());
+}
+
+#[tokio::test]
+async fn map_codec_preserves_error_state() {
+    let mut framed = Framed::new(&[0][..], U32Codec::default());
+    assert!(framed.next().await.unwrap().is_err());
+
+    let mut framed = framed.map_codec(|codec| codec);
+    assert!(framed.next().await.is_none());
 }
 
 #[test]
