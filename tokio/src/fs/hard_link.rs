@@ -48,7 +48,6 @@ pub async fn hard_link(original: impl AsRef<Path>, link: impl AsRef<Path>) -> io
         target_os = "linux",
     ))]
     {
-        use crate::io::uring::link::Link;
         use crate::runtime::driver::op::Op;
 
         if let Ok(handle) = crate::runtime::Handle::try_current() {
@@ -57,7 +56,7 @@ pub async fn hard_link(original: impl AsRef<Path>, link: impl AsRef<Path>) -> io
                     .check_and_init(io_uring::opcode::LinkAt::CODE)
                     .await?
                 {
-                    return Op::<Link>::link(original, link)?.await;
+                    return Op::link(original, link)?.await;
                 }
             }
         }

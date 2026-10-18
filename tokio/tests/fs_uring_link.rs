@@ -8,12 +8,13 @@
     target_os = "linux"
 ))]
 
-use futures::future::FutureExt;
+use futures::future::Future;
+use libc::PATH_MAX;
 use std::future::{pending, poll_fn};
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::sync::mpsc;
-use std::task::Poll;
+use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 use tempfile::{tempdir, TempDir};
 use tokio::fs::hard_link;
@@ -21,7 +22,7 @@ use tokio::runtime::{Builder, Runtime};
 use tokio::task::JoinSet;
 use tokio_test::assert_pending;
 
-use crate::support::io_uring::{io_uring_supported, uring_op_supported};
+use crate::support::io_uring::uring_op_supported;
 
 mod support {
     pub(crate) mod io_uring;
@@ -181,37 +182,59 @@ async fn hard_link_does_not_follow_symlinks() {
 }
 
 #[tokio::test]
-async fn cancel_op_future() {
-    if !io_uring_supported() {
+async fn hard_link_path_name_too_long() {
+    let (dir, target) = create_tmp_dir();
+
+    // if the link name is above PATH_MAX (Linux is 4096 bytes), we should
+    // receive a `std::io::ErrorKind::InvalidFilename` error.
+    let long_link = dir.path().join("a".repeat(PATH_MAX as usize + 1));
+    let result = hard_link(&target, &long_link).await;
+    assert_eq!(
+        result.err().unwrap().kind(),
+        std::io::ErrorKind::InvalidFilename
+    );
+}
+
+#[test]
+fn cancel_op_future() {
+    if !uring_op_supported(io_uring::opcode::LinkAt::CODE) {
         return;
     }
 
     let (dir, target) = create_tmp_dir();
     let link = dir.path().join("link");
+    let rt = Builder::new_current_thread().enable_all().build().unwrap();
 
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    rt.block_on(async move {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
-    let handle = tokio::spawn(async move {
-        poll_fn(|cx| {
-            let fut = hard_link(&target, &link);
+        let handle = tokio::spawn(async move {
+            let fut = hard_link(target, link);
+            tokio::pin!(fut);
 
-            // the first poll should return Pending.
-            assert_pending!(Box::pin(fut).poll_unpin(cx));
-            tx.send(true).unwrap();
+            poll_fn(move |_| {
+                // the first poll should return Pending.
+                assert_pending!(fut.as_mut().poll(&mut Context::from_waker(Waker::noop())));
+                tx.send(true).unwrap();
 
-            Poll::<()>::Pending
-        })
-        .await;
+                Poll::<()>::Pending
+            })
+            .await;
+        });
+
+        // Wait for the first poll
+        let val = rx.recv().await;
+        assert!(val.unwrap());
+
+        handle.abort();
+
+        let res = handle.await.unwrap_err();
+        assert!(res.is_cancelled());
     });
 
-    // Wait for the first poll
-    let val = rx.recv().await;
-    assert!(val.unwrap());
-
-    handle.abort();
-
-    let res = handle.await.unwrap_err();
-    assert!(res.is_cancelled());
+    // The cancelled op may still be in the kernel. Dropping the runtime waits
+    // for it, so the `TempDir` can be removed afterwards.
+    drop(rt);
 }
 
 fn create_tmp_dir() -> (TempDir, PathBuf) {

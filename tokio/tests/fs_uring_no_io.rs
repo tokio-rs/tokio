@@ -10,6 +10,7 @@
 
 use std::future::poll_fn;
 use std::io::Write;
+use std::os::unix::fs::MetadataExt;
 use std::pin::Pin;
 
 use tempfile::{tempdir, NamedTempFile};
@@ -120,5 +121,6 @@ fn hard_link_should_fall_back_to_blocking_if_runtime_has_no_io_driver() {
         .block_on(tokio::fs::hard_link(&original_path, &link_path))
         .unwrap();
 
+    assert_eq!(std::fs::metadata(&original_path).unwrap().nlink(), 2);
     assert_eq!(std::fs::read(link_path).unwrap(), b"hello");
 }
