@@ -37,23 +37,36 @@ use std::path::Path;
 /// }
 /// ```
 pub async fn hard_link(original: impl AsRef<Path>, link: impl AsRef<Path>) -> io::Result<()> {
-    let original = original.as_ref().to_owned();
-    let link = link.as_ref().to_owned();
+    let original = original.as_ref();
+    let link = link.as_ref();
 
     #[cfg(all(
         tokio_unstable,
         feature = "io-uring",
         feature = "rt",
         feature = "fs",
-        target_os = "linux"
+        target_os = "linux",
     ))]
     {
-        let handle = crate::runtime::Handle::current();
-        let driver_handle = handle.inner.driver().io();
-        if driver_handle.check_and_init(io_uring::opcode::LinkAt::CODE).await? {
-            return crate::runtime::driver::op::Op::link(&original, &link)?.await;
+        use crate::io::uring::link::Link;
+        use crate::runtime::driver::op::Op;
+
+        if let Ok(handle) = crate::runtime::Handle::try_current() {
+            if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
+                if driver_handle
+                    .check_and_init(io_uring::opcode::LinkAt::CODE)
+                    .await?
+                {
+                    return Op::<Link>::link(original, link)?.await;
+                }
+            }
         }
     }
 
+    hard_link_blocking(original, link).await
+}
+
+async fn hard_link_blocking(original: &Path, link: &Path) -> io::Result<()> {
+    let [original, link] = [original, link].map(Path::to_owned);
     asyncify(move || std::fs::hard_link(original, link)).await
 }

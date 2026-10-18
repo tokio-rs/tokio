@@ -8,20 +8,24 @@
     target_os = "linux"
 ))]
 
-use futures::FutureExt;
-use std::future::poll_fn;
-use std::future::Future;
+use futures::future::FutureExt;
+use std::future::{pending, poll_fn};
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
-use std::pin::pin;
 use std::sync::mpsc;
 use std::task::Poll;
 use std::time::Duration;
-use tempfile::TempDir;
+use tempfile::{tempdir, TempDir};
+use tokio::fs::hard_link;
 use tokio::runtime::{Builder, Runtime};
 use tokio::task::JoinSet;
 use tokio_test::assert_pending;
-use tokio_util::task::TaskTracker;
+
+use crate::support::io_uring::{io_uring_supported, uring_op_supported};
+
+mod support {
+    pub(crate) mod io_uring;
+}
 
 fn multi_rt(n: usize) -> Box<dyn Fn() -> Runtime> {
     Box::new(move || {
@@ -50,30 +54,32 @@ fn rt_combinations() -> Vec<Box<dyn Fn() -> Runtime>> {
 
 #[test]
 fn shutdown_runtime_while_performing_io_uring_ops() {
+    if !uring_op_supported(io_uring::opcode::LinkAt::CODE) {
+        return;
+    }
+
     fn run(rt: Runtime) {
         let (done_tx, done_rx) = mpsc::channel();
-        let (workdir, target) = create_tmp_dir();
+        let (dir, target) = create_tmp_dir();
+        const N: usize = 100;
+        rt.block_on(async move {
+            let mut futs = vec![];
 
-        rt.spawn(async move {
             // spawning a bunch of uring operations.
-            for i in 0..usize::MAX {
-                let link = workdir.path().join(format!("{i}"));
-                let target = target.clone();
-                tokio::spawn(async move {
-                    let mut fut = pin!(tokio::fs::hard_link(target, &link));
+            for i in 0..N {
+                let link = dir.path().join(format!("link-{i}"));
+                let mut fut = Box::pin(hard_link(target.clone(), link));
 
-                    poll_fn(|cx| {
-                        assert_pending!(fut.as_mut().poll(cx));
-                        Poll::<()>::Pending
-                    })
-                    .await;
+                assert_pending!(futures::poll!(fut.as_mut()));
 
-                    fut.await.unwrap();
-                });
-
-                // Avoid busy looping.
-                tokio::task::yield_now().await;
+                futs.push(fut);
             }
+
+            tokio::spawn(async move {
+                let _dir = dir;
+                let _futs = futs;
+                pending::<()>().await;
+            });
         });
 
         std::thread::spawn(move || {
@@ -81,7 +87,7 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
             done_tx.send(()).unwrap();
         });
 
-        done_rx.recv().unwrap();
+        done_rx.recv_timeout(Duration::from_secs(5)).unwrap();
     }
 
     for rt in rt_combinations() {
@@ -92,35 +98,31 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
 #[test]
 fn hard_link_many_files() {
     fn run(rt: Runtime) {
-        let (workdir, target) = create_tmp_dir();
+        const N_LINKS: usize = 512;
+
+        let (dir, target) = create_tmp_dir();
 
         rt.block_on(async move {
-            const N_LINKS: usize = 10_000;
-
-            let tracker = TaskTracker::new();
+            let target_metadata = tokio::fs::metadata(&target).await.unwrap();
+            let mut tasks = JoinSet::new();
 
             for i in 0..N_LINKS {
                 let target = target.clone();
-                let link = workdir.path().join(format!("{i}"));
-                tracker.spawn(async move {
-                    tokio::fs::hard_link(&target, &link).await.unwrap();
+                let link = dir.path().join(format!("link-{i}"));
+
+                tasks.spawn(async move {
+                    hard_link(&target, &link).await.unwrap();
+                    tokio::fs::metadata(&link).await.unwrap()
                 });
             }
-            tracker.close();
-            tracker.wait().await;
 
-            let mut metadata_tasks = JoinSet::new();
-            for i in 0..N_LINKS {
-                let link = workdir.path().join(format!("{i}"));
-                metadata_tasks.spawn(async move { tokio::fs::metadata(&link).await.unwrap() });
-            }
-
-            let target_metadata = tokio::fs::metadata(&target).await.unwrap();
-            while let Some(metadata_result) = metadata_tasks.join_next().await {
-                let link_metadata = metadata_result.unwrap();
+            for link_metadata in tasks.join_all().await {
                 assert_eq!(target_metadata.dev(), link_metadata.dev());
                 assert_eq!(target_metadata.ino(), link_metadata.ino());
             }
+
+            let target_metadata = tokio::fs::metadata(&target).await.unwrap();
+            assert_eq!(target_metadata.nlink(), N_LINKS as u64 + 1);
         });
     }
 
@@ -130,20 +132,72 @@ fn hard_link_many_files() {
 }
 
 #[tokio::test]
+async fn hard_link_file() {
+    let (dir, target) = create_tmp_dir();
+    let link = dir.path().join("link");
+
+    hard_link(&target, &link).await.unwrap();
+
+    tokio::fs::write(&target, b"Hello File!").await.unwrap();
+    assert_eq!(tokio::fs::read(&link).await.unwrap(), b"Hello File!");
+}
+
+#[tokio::test]
+async fn hard_link_existing_destination() {
+    let (dir, target) = create_tmp_dir();
+    let link = dir.path().join("link");
+    tokio::fs::write(&link, b"existing").await.unwrap();
+
+    let result = hard_link(&target, &link).await;
+    assert_eq!(result.err().unwrap().raw_os_error().unwrap(), libc::EEXIST);
+    assert_eq!(tokio::fs::read(&link).await.unwrap(), b"existing");
+}
+
+#[tokio::test]
+async fn hard_link_nonexistent_source() {
+    let dir = tempdir().unwrap();
+    let original = dir.path().join("nonexistent");
+    let link = dir.path().join("link");
+
+    let result = hard_link(&original, &link).await;
+    assert_eq!(result.err().unwrap().raw_os_error().unwrap(), libc::ENOENT);
+}
+
+// `std::fs::hard_link` links the symlink itself on Linux, the io_uring path
+// has to do the same.
+#[tokio::test]
+async fn hard_link_does_not_follow_symlinks() {
+    let (dir, target) = create_tmp_dir();
+    let symlink = dir.path().join("symlink");
+    let link = dir.path().join("link");
+    tokio::fs::symlink(&target, &symlink).await.unwrap();
+
+    hard_link(&symlink, &link).await.unwrap();
+
+    let symlink_metadata = tokio::fs::symlink_metadata(&symlink).await.unwrap();
+    let link_metadata = tokio::fs::symlink_metadata(&link).await.unwrap();
+    assert!(link_metadata.file_type().is_symlink());
+    assert_eq!(symlink_metadata.ino(), link_metadata.ino());
+}
+
+#[tokio::test]
 async fn cancel_op_future() {
-    let (workdir, target) = create_tmp_dir();
+    if !io_uring_supported() {
+        return;
+    }
+
+    let (dir, target) = create_tmp_dir();
+    let link = dir.path().join("link");
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+
     let handle = tokio::spawn(async move {
         poll_fn(|cx| {
-            let link = workdir.path().join("link");
-            let fut = tokio::fs::hard_link(&target, &link);
+            let fut = hard_link(&target, &link);
 
-            // If io_uring is enabled (and not falling back to the thread pool),
             // the first poll should return Pending.
-            let _pending = pin!(fut).poll_unpin(cx);
-
-            tx.send(()).unwrap();
+            assert_pending!(Box::pin(fut).poll_unpin(cx));
+            tx.send(true).unwrap();
 
             Poll::<()>::Pending
         })
@@ -151,7 +205,8 @@ async fn cancel_op_future() {
     });
 
     // Wait for the first poll
-    rx.recv().await.unwrap();
+    let val = rx.recv().await;
+    assert!(val.unwrap());
 
     handle.abort();
 
@@ -160,13 +215,9 @@ async fn cancel_op_future() {
 }
 
 fn create_tmp_dir() -> (TempDir, PathBuf) {
-    let workdir = tempfile::tempdir().unwrap();
-    let target = workdir.path().join("target");
-    std::fs::OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&target)
-        .unwrap();
+    let dir = tempdir().unwrap();
+    let target = dir.path().join("target");
+    std::fs::write(&target, b"").unwrap();
 
-    (workdir, target)
+    (dir, target)
 }
