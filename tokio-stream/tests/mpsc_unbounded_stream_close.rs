@@ -4,6 +4,7 @@ use futures::{task::noop_waker_ref, Stream};
 use futures_core::FusedStream;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
+use std::mem::ManuallyDrop;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
@@ -12,13 +13,18 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 
 struct Allocator;
 
+type Callback = Box<dyn FnOnce()>;
+
 thread_local! {
-    static ON_ALLOC: Cell<Option<Box<dyn FnOnce()>>> = const { Cell::new(None) };
+    // The allocator must not register TLS destructors. The callback is taken
+    // when invoked, or explicitly cleared after the send below.
+    static ON_ALLOC: ManuallyDrop<Cell<Option<Callback>>> =
+        const { ManuallyDrop::new(Cell::new(None)) };
 }
 
 unsafe impl GlobalAlloc for Allocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        if let Some(callback) = ON_ALLOC.try_with(Cell::take).ok().flatten() {
+        if let Some(callback) = ON_ALLOC.try_with(|hook| hook.take()).ok().flatten() {
             // Unwinding from an allocator is undefined behavior, even if a library
             // operation in the callback unexpectedly panics.
             if std::panic::catch_unwind(std::panic::AssertUnwindSafe(callback)).is_err() {
@@ -66,7 +72,7 @@ fn close_during_send() {
     });
     ON_ALLOC.with(|hook| hook.set(Some(callback)));
     let sent = tx.send(block_capacity);
-    let unused_callback = ON_ALLOC.with(Cell::take);
+    let unused_callback = ON_ALLOC.with(|hook| hook.take());
 
     assert!(unused_callback.is_none(), "send did not allocate a block");
     sent.unwrap();
