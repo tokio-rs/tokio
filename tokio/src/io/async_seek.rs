@@ -78,11 +78,11 @@ where
     P::Target: AsyncSeek,
 {
     fn start_seek(self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
-        crate::util::pin_as_deref_mut(self).start_seek(pos)
+        self.as_deref_mut().start_seek(pos)
     }
 
     fn poll_complete(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        crate::util::pin_as_deref_mut(self).poll_complete(cx)
+        self.as_deref_mut().poll_complete(cx)
     }
 }
 

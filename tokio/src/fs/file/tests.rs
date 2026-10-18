@@ -965,7 +965,7 @@ fn busy_file_seek_error() {
         .in_sequence(&mut seq)
         .returning(|_| Err(io::ErrorKind::Other.into()));
 
-    let mut file = crate::io::BufReader::new(File::from_std(file));
+    let mut file = File::from_std(file);
     {
         let mut t = task::spawn(file.write(HELLO));
         assert_ready_ok!(t.poll());
@@ -973,8 +973,8 @@ fn busy_file_seek_error() {
 
     pool::run_one();
 
-    let mut t = task::spawn(file.seek(SeekFrom::Start(0)));
-    assert_ready_err!(t.poll());
+    // Call start_seek directly, without first completing the pending write.
+    assert!(Pin::new(&mut file).start_seek(SeekFrom::Start(0)).is_err());
 }
 
 #[test]

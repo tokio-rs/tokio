@@ -257,11 +257,32 @@ impl Semaphore {
         // permit counter is closed, but the wait list is not.
         self.permits.fetch_or(Self::CLOSED, Release);
         waiters.closed = true;
-        while let Some(mut waiter) = waiters.queue.pop_back() {
-            let waker = unsafe { waiter.as_mut().waker.with_mut(|waker| (*waker).take()) };
-            if let Some(waker) = waker {
-                waker.wake();
+
+        // Wake the waiters in batches, with the lock released, because a
+        // waker may call back into the semaphore when it is woken or dropped.
+        // No new waiters are queued once `closed` is set.
+        let mut wakers = WakeList::new();
+        loop {
+            while wakers.can_push() {
+                let Some(mut waiter) = waiters.queue.pop_back() else {
+                    break;
+                };
+                // Safety: we hold the lock, so we can access the waker.
+                let waker = unsafe { waiter.as_mut().waker.with_mut(|waker| (*waker).take()) };
+                if let Some(waker) = waker {
+                    wakers.push(waker);
+                }
             }
+
+            // If the batch has room left, the queue is empty.
+            let is_empty = wakers.can_push();
+            drop(waiters);
+            wakers.wake_all();
+
+            if is_empty {
+                return;
+            }
+            waiters = self.waiters.lock();
         }
     }
 
@@ -629,21 +650,21 @@ impl Future for Acquire<'_> {
 
         let (node, semaphore, needed, queued) = self.project();
 
-        // First, ensure the current task has enough budget to proceed.
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let coop = ready!(trace_poll_op!(
-            "poll_acquire",
-            crate::task::coop::poll_proceed(cx),
-        ));
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let coop = ready!(crate::task::coop::poll_proceed(cx));
-
         let result = match semaphore.poll_acquire(cx, needed, node, queued) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(r) => {
-                coop.made_progress();
                 r?;
+
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                let coop = ready!(trace_poll_op!(
+                    "poll_acquire",
+                    crate::task::coop::poll_proceed(cx),
+                ));
+
+                #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+                let coop = ready!(crate::task::coop::poll_proceed(cx));
+
+                coop.made_progress();
                 Poll::Ready(Ok(()))
             }
         };
