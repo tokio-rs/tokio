@@ -1,6 +1,6 @@
 use futures_sink::Sink;
 
-use futures_core::stream::Stream;
+use futures_core::stream::{FusedStream, Stream};
 use pin_project_lite::pin_project;
 use std::io;
 use std::pin::Pin;
@@ -118,8 +118,19 @@ where
 
 impl<S: Stream> Stream for SinkWriter<S> {
     type Item = S::Item;
+
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.project().inner.poll_next(cx)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
+}
+
+impl<S: FusedStream> FusedStream for SinkWriter<S> {
+    fn is_terminated(&self) -> bool {
+        self.inner.is_terminated()
     }
 }
 
