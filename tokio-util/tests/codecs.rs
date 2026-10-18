@@ -499,3 +499,36 @@ fn any_delimiter_encoder() {
     codec.encode("chunk 2", &mut buf).unwrap();
     assert_eq!("chunk 1;--;chunk 2;--;", buf);
 }
+
+#[test]
+fn codec_error_sources() {
+    use std::error::Error;
+    use std::io::{self, ErrorKind};
+    use tokio_util::codec::{AnyDelimiterCodecError, LinesCodecError};
+
+    let lines_error = LinesCodecError::from(io::Error::from(ErrorKind::BrokenPipe));
+    assert_eq!(
+        lines_error
+            .source()
+            .unwrap()
+            .downcast_ref::<io::Error>()
+            .unwrap()
+            .kind(),
+        ErrorKind::BrokenPipe
+    );
+    assert!(LinesCodecError::MaxLineLengthExceeded.source().is_none());
+
+    let delimiter_error = AnyDelimiterCodecError::from(io::Error::from(ErrorKind::TimedOut));
+    assert_eq!(
+        delimiter_error
+            .source()
+            .unwrap()
+            .downcast_ref::<io::Error>()
+            .unwrap()
+            .kind(),
+        ErrorKind::TimedOut
+    );
+    assert!(AnyDelimiterCodecError::MaxChunkLengthExceeded
+        .source()
+        .is_none());
+}
