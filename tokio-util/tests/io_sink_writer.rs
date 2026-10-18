@@ -75,7 +75,7 @@ async fn test_direct_sink_writer() -> Result<(), Error> {
 
 #[tokio::test]
 async fn test_sink_adapters_forward_stream_metadata() {
-    let mut copied = CopyToBytes::new(stream::iter([1, 2]));
+    let mut copied = CopyToBytes::new(stream::iter([1, 2]).fuse());
     assert_eq!(copied.size_hint(), (2, Some(2)));
     assert!(!copied.is_terminated());
     assert_eq!(copied.next().await, Some(1));
@@ -84,7 +84,7 @@ async fn test_sink_adapters_forward_stream_metadata() {
     assert_eq!(copied.next().await, None);
     assert!(copied.is_terminated());
 
-    let mut writer = SinkWriter::new(stream::iter([3, 4]));
+    let mut writer = SinkWriter::new(stream::iter([3, 4]).fuse());
     assert_eq!(writer.size_hint(), (2, Some(2)));
     assert!(!writer.is_terminated());
     assert_eq!(writer.next().await, Some(3));
