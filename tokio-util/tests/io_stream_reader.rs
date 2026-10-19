@@ -1,9 +1,7 @@
 #![warn(rust_2018_idioms)]
 
 use bytes::Bytes;
-use std::pin::Pin;
-use std::task::Context;
-use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt};
 use tokio_stream::iter;
 use tokio_util::io::StreamReader;
 
@@ -62,10 +60,14 @@ async fn test_stream_reader_yields_after_many_empty_chunks() -> std::io::Result<
     let stream = futures::stream::iter(empty.chain(data));
     let mut read = StreamReader::new(stream);
 
-    let waker = futures::task::noop_waker();
-    let mut cx = Context::from_waker(&waker);
-    assert!(Pin::new(&mut read).poll_fill_buf(&mut cx).is_pending());
+    let mut read_task = tokio_test::task::spawn(read.fill_buf());
 
-    assert_eq!(read.fill_buf().await?, b"x");
+    // Each poll consumes at most 128 empty chunks and must schedule another poll.
+    tokio_test::assert_pending!(read_task.poll());
+    assert!(read_task.is_woken());
+    tokio_test::assert_pending!(read_task.poll());
+    assert!(read_task.is_woken());
+
+    assert_eq!(tokio_test::assert_ready!(read_task.poll())?, b"x");
     Ok(())
 }
