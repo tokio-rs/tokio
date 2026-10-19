@@ -82,3 +82,21 @@ async fn real_time() {
     assert_eq!(chunk_stream.next().await, Some(vec![4]));
     assert_eq!(chunk_stream.next().await, Some(vec![5]));
 }
+
+#[tokio::test(start_paused = true)]
+async fn completed_chunk_cancels_timeout() {
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    let chunks = stream::wrappers::UnboundedReceiverStream::new(rx)
+        .chunks_timeout(2, Duration::from_secs(2));
+    let mut chunks = task::spawn(chunks);
+
+    tx.send(1).unwrap();
+    assert_pending!(chunks.poll_next());
+
+    tx.send(2).unwrap();
+    tokio_test::assert_ready_eq!(chunks.poll_next(), Some(vec![1, 2]));
+    assert_pending!(chunks.poll_next());
+
+    time::advance(Duration::from_secs(3)).await;
+    assert!(!chunks.is_woken(), "completed chunk left its timer registered");
+}
