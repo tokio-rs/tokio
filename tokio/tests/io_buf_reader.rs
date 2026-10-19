@@ -96,6 +96,33 @@ async fn zero_length_read_does_not_wait_for_data() {
     assert_eq!(assert_ready!(read.poll()).unwrap(), 0);
 }
 
+#[test]
+fn full_read_buf_preserves_buffered_data() {
+    let mut reader = BufReader::with_capacity(2, &b"abc"[..]);
+    let mut cx = Context::from_waker(noop_waker_ref());
+
+    // Fill the internal buffer, leaving one byte unread.
+    let mut first = [0; 1];
+    let mut first_buf = ReadBuf::new(&mut first);
+    assert!(matches!(
+        Pin::new(&mut reader).poll_read(&mut cx, &mut first_buf),
+        Poll::Ready(Ok(()))
+    ));
+    assert_eq!(first_buf.filled(), b"a");
+    assert_eq!(reader.buffer(), b"b");
+
+    // A full destination must not poll the inner reader or consume "b".
+    let mut full = [0; 1];
+    let mut full_buf = ReadBuf::new(&mut full);
+    full_buf.put_slice(b"z");
+    assert!(matches!(
+        Pin::new(&mut reader).poll_read(&mut cx, &mut full_buf),
+        Poll::Ready(Ok(()))
+    ));
+    assert_eq!(full_buf.filled(), b"z");
+    assert_eq!(reader.buffer(), b"b");
+}
+
 #[tokio::test]
 async fn test_buffered_reader() {
     let inner: &[u8] = &[5, 6, 7, 0, 1, 2, 3, 4];
