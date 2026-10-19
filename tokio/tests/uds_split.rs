@@ -2,6 +2,7 @@
 #![cfg(feature = "full")]
 #![cfg(unix)]
 #![cfg(not(miri))] // No Unix domain sockets in miri.
+#![cfg(not(target_os = "emscripten"))] // Relies on `socketpair(2)`, absent on emscripten.
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::UnixStream;
