@@ -6,6 +6,8 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncBufRead, AsyncRead, ReadBuf};
 
+const MAX_EMPTY_CHUNKS_PER_POLL: usize = 128;
+
 /// Convert a [`Stream`] of byte chunks into an [`AsyncRead`].
 ///
 /// This type performs the inverse operation of [`ReaderStream`].
@@ -274,6 +276,7 @@ where
     E: Into<std::io::Error>,
 {
     fn poll_fill_buf(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+        let mut empty_chunks = 0;
         loop {
             if self.as_mut().has_chunk() {
                 // This unwrap is very sad, but it can't be avoided.
@@ -285,7 +288,16 @@ where
                 match self.as_mut().project().inner.poll_next(cx) {
                     Poll::Ready(Some(Ok(chunk))) => {
                         // Go around the loop in case the chunk is empty.
+                        let is_empty = chunk.remaining() == 0;
                         *self.as_mut().project().chunk = Some(chunk);
+                        if is_empty {
+                            empty_chunks += 1;
+                            if empty_chunks == MAX_EMPTY_CHUNKS_PER_POLL {
+                                // Yield so a stream of empty chunks cannot starve other tasks.
+                                cx.waker().wake_by_ref();
+                                return Poll::Pending;
+                            }
+                        }
                     }
                     Poll::Ready(Some(Err(err))) => return Poll::Ready(Err(err.into())),
                     Poll::Ready(None) => {
