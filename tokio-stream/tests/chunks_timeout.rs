@@ -102,4 +102,10 @@ async fn completed_chunk_cancels_timeout() {
         !chunks.is_woken(),
         "completed chunk left its timer registered"
     );
+
+    // The next partial chunk must still start a fresh timeout.
+    tx.send(3).unwrap();
+    assert_pending!(chunks.poll_next());
+    time::sleep(Duration::from_secs(3)).await;
+    tokio_test::assert_ready_eq!(chunks.poll_next(), Some(vec![3]));
 }
