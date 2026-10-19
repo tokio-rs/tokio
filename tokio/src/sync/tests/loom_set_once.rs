@@ -70,18 +70,3 @@ fn set_once_wait_test() {
         thread.join().unwrap();
     });
 }
-
-#[test]
-fn set_once_into_inner_test() {
-    loom::model(|| {
-        assert!(SetOnce::<DropCounter>::new().into_inner().is_none());
-
-        let counter = DropCounter::new();
-        let drops = Arc::clone(&counter.drops);
-        let value = SetOnce::from(counter).into_inner().unwrap();
-
-        assert_eq!(drops.load(Ordering::Relaxed), 0);
-        drop(value);
-        assert_eq!(drops.load(Ordering::Relaxed), 1);
-    });
-}

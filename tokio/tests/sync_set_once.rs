@@ -88,6 +88,16 @@ fn drop_into_inner_new_with() {
 }
 
 #[test]
+fn drop_into_inner_from() {
+    let counter = DropCounter::new();
+    let value = SetOnce::from(counter.clone()).into_inner().unwrap();
+
+    counter.assert_num_drops(0);
+    drop(value);
+    counter.assert_num_drops(1);
+}
+
+#[test]
 fn from() {
     let cell = SetOnce::from(2);
     assert_eq!(*cell.get().unwrap(), 2);

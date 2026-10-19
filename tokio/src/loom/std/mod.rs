@@ -75,6 +75,16 @@ pub(crate) mod sync {
         pub(crate) use crate::loom::std::atomic_usize::AtomicUsize;
 
         pub(crate) use std::sync::atomic::{fence, AtomicBool, AtomicPtr, AtomicU8, Ordering};
+
+        #[inline]
+        pub(crate) fn load_bool_mut(value: &mut AtomicBool) -> bool {
+            *value.get_mut()
+        }
+
+        #[inline]
+        pub(crate) fn take_bool_mut(value: &mut AtomicBool) -> bool {
+            std::mem::take(value.get_mut())
+        }
     }
 
     pub(crate) use super::barrier::Barrier;

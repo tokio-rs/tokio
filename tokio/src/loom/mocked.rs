@@ -58,6 +58,21 @@ pub(crate) mod sync {
     }
 
     pub(crate) use loom::sync::*;
+
+    pub(crate) mod atomic {
+        pub(crate) use loom::sync::atomic::*;
+
+        // Loom's atomics do not provide get_mut().
+        #[inline]
+        pub(crate) fn load_bool_mut(value: &mut AtomicBool) -> bool {
+            value.load(Ordering::Relaxed)
+        }
+
+        #[inline]
+        pub(crate) fn take_bool_mut(value: &mut AtomicBool) -> bool {
+            value.swap(false, Ordering::Relaxed)
+        }
+    }
 }
 
 pub(crate) mod rand {
