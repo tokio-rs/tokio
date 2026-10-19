@@ -315,6 +315,57 @@ async fn downgrade_map() {
     assert_eq!(&*read_guard1 as *const _, &*read_guard2 as *const _);
 }
 
+// Blockingly acquire an owned read lock; it must block until an outstanding
+// write lock is released.
+#[cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support threads
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn blocking_read_owned() {
+    use std::sync::Arc;
+
+    let rwlock = Arc::new(RwLock::new(1));
+    let mut write_lock = rwlock.clone().write_owned().await;
+
+    let rwlock2 = rwlock.clone();
+    let blocking_task = tokio::task::spawn_blocking(move || {
+        // This shall block until the `write_lock` is released.
+        let read_lock = rwlock2.blocking_read_owned();
+        assert_eq!(*read_lock, 2);
+    });
+
+    *write_lock = 2;
+    drop(write_lock); // release the lock.
+
+    // Await the completion of the blocking task.
+    blocking_task.await.unwrap();
+}
+
+// Blockingly acquire an owned write lock; it must block until an
+// outstanding read lock is released.
+#[cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support threads
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn blocking_write_owned() {
+    use std::sync::Arc;
+
+    let rwlock = Arc::new(RwLock::new(1));
+    let read_lock = rwlock.clone().read_owned().await;
+
+    let rwlock2 = rwlock.clone();
+    let blocking_task = tokio::task::spawn_blocking(move || {
+        // This shall block until the `read_lock` is released.
+        let mut write_lock = rwlock2.blocking_write_owned();
+        *write_lock = 2;
+    });
+
+    assert_eq!(*read_lock, 1);
+    drop(read_lock); // release the lock.
+
+    // Await the completion of the blocking task.
+    blocking_task.await.unwrap();
+
+    // Assert uncontended.
+    assert_eq!(*rwlock.try_read().unwrap(), 2);
+}
+
 #[maybe_tokio_test]
 async fn try_downgrade_map() {
     let lock = RwLock::new(0);
