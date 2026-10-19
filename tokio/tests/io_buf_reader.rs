@@ -87,6 +87,16 @@ impl AsyncBufRead for MaybePending<'_> {
 }
 
 #[tokio::test]
+async fn zero_length_read_does_not_wait_for_data() {
+    let (_writer, reader) = tokio::io::duplex(8);
+    let mut reader = BufReader::new(reader);
+    let mut empty = [];
+
+    let mut read = spawn(reader.read(&mut empty));
+    assert_eq!(assert_ready!(read.poll()).unwrap(), 0);
+}
+
+#[tokio::test]
 async fn test_buffered_reader() {
     let inner: &[u8] = &[5, 6, 7, 0, 1, 2, 3, 4];
     let mut reader = BufReader::with_capacity(2, inner);
