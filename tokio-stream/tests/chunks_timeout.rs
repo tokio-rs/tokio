@@ -97,7 +97,7 @@ async fn completed_chunk_cancels_timeout() {
     tokio_test::assert_ready_eq!(chunks.poll_next(), Some(vec![1, 2]));
     assert_pending!(chunks.poll_next());
 
-    time::advance(Duration::from_secs(3)).await;
+    time::sleep(Duration::from_secs(3)).await;
     assert!(
         !chunks.is_woken(),
         "completed chunk left its timer registered"
