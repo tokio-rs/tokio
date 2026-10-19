@@ -57,6 +57,8 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
                     }
                     me.items.push(item);
                     if me.items.len() >= *me.cap {
+                        // The timer no longer applies to a completed chunk.
+                        me.deadline.set(None);
                         return Poll::Ready(Some(std::mem::take(me.items)));
                     }
                 }
