@@ -109,3 +109,25 @@ async fn completed_chunk_cancels_timeout() {
     time::sleep(Duration::from_secs(3)).await;
     tokio_test::assert_ready_eq!(chunks.poll_next(), Some(vec![3]));
 }
+
+#[tokio::test(start_paused = true)]
+async fn end_of_stream_cancels_timeout() {
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    let chunks = stream::wrappers::UnboundedReceiverStream::new(rx)
+        .chunks_timeout(2, Duration::from_secs(2));
+    let mut chunks = task::spawn(chunks);
+
+    tx.send(1).unwrap();
+    assert_pending!(chunks.poll_next());
+
+    // EOF flushes the partial chunk without leaving the registered timer alive.
+    drop(tx);
+    tokio_test::assert_ready_eq!(chunks.poll_next(), Some(vec![1]));
+
+    time::sleep(Duration::from_secs(3)).await;
+    assert!(
+        !chunks.is_woken(),
+        "end of stream left its timer registered"
+    );
+    tokio_test::assert_ready_eq!(chunks.poll_next(), None);
+}
