@@ -98,5 +98,8 @@ async fn completed_chunk_cancels_timeout() {
     assert_pending!(chunks.poll_next());
 
     time::advance(Duration::from_secs(3)).await;
-    assert!(!chunks.is_woken(), "completed chunk left its timer registered");
+    assert!(
+        !chunks.is_woken(),
+        "completed chunk left its timer registered"
+    );
 }
