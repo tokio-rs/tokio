@@ -81,7 +81,7 @@ impl<R: AsyncRead> AsyncRead for Take<R> {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<Result<(), io::Error>> {
-        if self.limit_ == 0 {
+        if self.limit_ == 0 || buf.remaining() == 0 {
             return Poll::Ready(Ok(()));
         }
 

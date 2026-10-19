@@ -19,6 +19,42 @@ mod support {
 }
 use support::leaked_buffers::LeakedBuffers;
 
+struct PendingReader;
+
+impl AsyncRead for PendingReader {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        _: &mut Context<'_>,
+        _: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        Poll::Pending
+    }
+}
+
+#[test]
+fn take_empty_read_does_not_poll_inner() {
+    let mut reader = PendingReader.take(4);
+    let mut empty = [];
+    let mut buf = ReadBuf::new(&mut empty);
+    let mut cx = Context::from_waker(std::task::Waker::noop());
+
+    assert!(matches!(
+        Pin::new(&mut reader).poll_read(&mut cx, &mut buf),
+        Poll::Ready(Ok(()))
+    ));
+    assert_eq!(reader.limit(), 4);
+
+    let mut full = [0];
+    let mut buf = ReadBuf::new(&mut full);
+    buf.put_slice(b"x");
+    assert!(matches!(
+        Pin::new(&mut reader).poll_read(&mut cx, &mut buf),
+        Poll::Ready(Ok(()))
+    ));
+    assert_eq!(buf.filled(), b"x");
+    assert_eq!(reader.limit(), 4);
+}
+
 #[tokio::test]
 async fn take() {
     let mut buf = [0; 6];
