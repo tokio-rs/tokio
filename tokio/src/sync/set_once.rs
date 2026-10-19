@@ -258,6 +258,15 @@ impl<T> SetOnce<T> {
         unsafe { &*self.value.with(|ptr| (*ptr).as_ptr()) }
     }
 
+    // SAFETY: The SetOnce must not be empty.
+    unsafe fn get_unchecked_mut(&mut self) -> &mut T {
+        // SAFETY:
+        //
+        // 1. The caller guarantees that the SetOnce is initialized.
+        // 2. The `&mut self` guarantees that there are no other references to the value.
+        unsafe { &mut *self.value.with_mut(|ptr| (*ptr).as_mut_ptr()) }
+    }
+
     /// Returns a reference to the value currently stored in the `SetOnce`, or
     /// `None` if the `SetOnce` is empty.
     pub fn get(&self) -> Option<&T> {
@@ -265,6 +274,38 @@ impl<T> SetOnce<T> {
             // SAFETY: the SetOnce is initialized, so we can safely
             // call get_unchecked and return the value
             Some(unsafe { self.get_unchecked() })
+        } else {
+            None
+        }
+    }
+
+    /// Returns a mutable reference to the value currently stored in the
+    /// `SetOnce`, or `None` if the `SetOnce` is empty.
+    ///
+    /// Since this call borrows the `SetOnce` mutably, it is safe to mutate the
+    /// value inside the `SetOnce` — the mutable borrow statically guarantees
+    /// no other references exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::SetOnce;
+    ///
+    /// let mut cell: SetOnce<u32> = SetOnce::new();
+    /// assert_eq!(cell.get_mut(), None);
+    ///
+    /// cell.set(5).unwrap();
+    /// *cell.get_mut().unwrap() += 1;
+    ///
+    /// assert_eq!(cell.get(), Some(&6));
+    /// ```
+    pub fn get_mut(&mut self) -> Option<&mut T> {
+        // Since we hold `&mut self`, no other thread can be reading or
+        // writing `value_set` concurrently, so any memory ordering is
+        // sufficient here.
+        if self.value_set.load(Ordering::Relaxed) {
+            // SAFETY: we just checked that the SetOnce is initialized.
+            Some(unsafe { self.get_unchecked_mut() })
         } else {
             None
         }
