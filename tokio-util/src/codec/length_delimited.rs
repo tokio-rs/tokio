@@ -609,10 +609,12 @@ impl Decoder for LengthDelimitedCodec {
     }
 }
 
-impl Encoder<&[u8]> for LengthDelimitedCodec {
-    type Error = io::Error;
-
-    fn encode(&mut self, data: &[u8], dst: &mut BytesMut) -> Result<(), io::Error> {
+impl LengthDelimitedCodec {
+    /// Encodes a frame from a byte slice into the destination buffer.
+    ///
+    /// This method allows encoding borrowed byte slices directly into the buffer without
+    /// allocating an intermediate [`Bytes`] object.
+    pub fn encode_slice(&mut self, data: &[u8], dst: &mut BytesMut) -> Result<(), io::Error> {
         let n = data.len();
 
         if n > self.builder.max_frame_len {
@@ -650,13 +652,75 @@ impl Encoder<&[u8]> for LengthDelimitedCodec {
 
         Ok(())
     }
+
+    /// Converts this codec into a [`LengthDelimitedSliceCodec`] that encodes borrowed byte slices.
+    pub fn into_slice_codec(self) -> LengthDelimitedSliceCodec {
+        LengthDelimitedSliceCodec { inner: self }
+    }
 }
 
 impl Encoder<Bytes> for LengthDelimitedCodec {
     type Error = io::Error;
 
     fn encode(&mut self, data: Bytes, dst: &mut BytesMut) -> Result<(), io::Error> {
-        Encoder::<&[u8]>::encode(self, data.as_ref(), dst)
+        self.encode_slice(data.as_ref(), dst)
+    }
+}
+
+/// A wrapper around [`LengthDelimitedCodec`] that implements [`Encoder<&[u8]>`].
+///
+/// This provides an opt-in encoder for borrowed byte slices (`&[u8]`) without introducing
+/// type inference ambiguity on [`LengthDelimitedCodec`].
+#[derive(Debug, Clone)]
+pub struct LengthDelimitedSliceCodec {
+    inner: LengthDelimitedCodec,
+}
+
+impl LengthDelimitedSliceCodec {
+    /// Returns the current max frame setting.
+    pub fn max_frame_length(&self) -> usize {
+        self.inner.max_frame_length()
+    }
+
+    /// Updates the max frame setting.
+    pub fn set_max_frame_length(&mut self, val: usize) {
+        self.inner.set_max_frame_length(val);
+    }
+
+    /// Returns a reference to the inner [`LengthDelimitedCodec`].
+    pub fn get_ref(&self) -> &LengthDelimitedCodec {
+        &self.inner
+    }
+
+    /// Returns a mutable reference to the inner [`LengthDelimitedCodec`].
+    pub fn get_mut(&mut self) -> &mut LengthDelimitedCodec {
+        &mut self.inner
+    }
+
+    /// Consumes the wrapper, returning the inner [`LengthDelimitedCodec`].
+    pub fn into_inner(self) -> LengthDelimitedCodec {
+        self.inner
+    }
+}
+
+impl Decoder for LengthDelimitedSliceCodec {
+    type Item = BytesMut;
+    type Error = io::Error;
+
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<BytesMut>, io::Error> {
+        self.inner.decode(src)
+    }
+
+    fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<BytesMut>, io::Error> {
+        self.inner.decode_eof(src)
+    }
+}
+
+impl Encoder<&[u8]> for LengthDelimitedSliceCodec {
+    type Error = io::Error;
+
+    fn encode(&mut self, data: &[u8], dst: &mut BytesMut) -> Result<(), io::Error> {
+        self.inner.encode_slice(data, dst)
     }
 }
 
@@ -1045,6 +1109,14 @@ impl Builder {
         FramedWrite::new(inner, self.new_codec())
     }
 
+    /// Create a configured length delimited `FramedWrite` for borrowed byte slices
+    pub fn new_slice_write<T>(&self, inner: T) -> FramedWrite<T, LengthDelimitedSliceCodec>
+    where
+        T: AsyncWrite,
+    {
+        FramedWrite::new(inner, self.new_codec().into_slice_codec())
+    }
+
     /// Create a configured length delimited `Framed`
     ///
     /// # Examples
@@ -1065,6 +1137,14 @@ impl Builder {
         T: AsyncRead + AsyncWrite,
     {
         Framed::new(inner, self.new_codec())
+    }
+
+    /// Create a configured length delimited `Framed` for borrowed byte slices
+    pub fn new_slice_framed<T>(&self, inner: T) -> Framed<T, LengthDelimitedSliceCodec>
+    where
+        T: AsyncRead + AsyncWrite,
+    {
+        Framed::new(inner, self.new_codec().into_slice_codec())
     }
 
     fn num_head_bytes(&self) -> usize {

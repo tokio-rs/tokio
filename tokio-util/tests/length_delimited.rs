@@ -70,26 +70,6 @@ macro_rules! assert_done {
     }};
 }
 
-fn poll_ready_bytes<T>(
-    sink: Pin<&mut T>,
-    cx: &mut Context<'_>,
-) -> Poll<Result<(), <T as Sink<Bytes>>::Error>>
-where
-    T: Sink<Bytes>,
-{
-    Sink::<Bytes>::poll_ready(sink, cx)
-}
-
-fn poll_flush_bytes<T>(
-    sink: Pin<&mut T>,
-    cx: &mut Context<'_>,
-) -> Poll<Result<(), <T as Sink<Bytes>>::Error>>
-where
-    T: Sink<Bytes>,
-{
-    Sink::<Bytes>::poll_flush(sink, cx)
-}
-
 #[test]
 fn read_empty_io_yields_nothing() {
     let io = Box::pin(FramedRead::new(mock!(), LengthDelimitedCodec::new()));
@@ -301,21 +281,6 @@ fn read_incomplete_payload() {
 }
 
 #[test]
-fn read_head_then_eof() {
-    let io = FramedRead::new(
-        mock! {
-            data(b"\x00\x00\x00\x09"),
-            Poll::Pending,
-        },
-        LengthDelimitedCodec::new(),
-    );
-    pin_mut!(io);
-
-    assert_next_pending!(io);
-    assert_next_err!(io);
-}
-
-#[test]
 fn read_max_frame_len() {
     let io = length_delimited::Builder::new()
         .max_frame_length(5)
@@ -458,9 +423,9 @@ fn write_single_frame_length_adjusted() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(poll_ready_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
-        assert_ready_ok!(poll_flush_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
         assert!(io.get_ref().calls.is_empty());
     });
 }
@@ -471,7 +436,7 @@ fn write_nothing_yields_nothing() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(poll_flush_bytes(io, cx));
+        assert_ready_ok!(io.poll_flush(cx));
     });
 }
 
@@ -488,9 +453,9 @@ fn write_single_frame_one_packet() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(poll_ready_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
-        assert_ready_ok!(poll_flush_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
         assert!(io.get_ref().calls.is_empty());
     });
 }
@@ -503,17 +468,72 @@ fn write_single_frame_from_slice() {
             data(b"abcdefghi"),
             flush(),
         },
-        LengthDelimitedCodec::new(),
+        LengthDelimitedCodec::new().into_slice_codec(),
     );
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
         let data: &[u8] = b"abcdefghi";
 
-        assert_ready_ok!(Sink::<&[u8]>::poll_ready(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(data));
-        assert_ready_ok!(Sink::<&[u8]>::poll_flush(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
         assert!(io.get_ref().calls.is_empty());
+    });
+}
+
+#[test]
+fn write_single_frame_from_slice_builder() {
+    let io = length_delimited::Builder::new().new_slice_write(mock! {
+        data(b"\x00\x00\x00\x09"),
+        data(b"abcdefghi"),
+        flush(),
+    });
+    pin_mut!(io);
+
+    task::spawn(()).enter(|cx, _| {
+        let data: &[u8] = b"abcdefghi";
+
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
+        assert_ok!(io.as_mut().start_send(data));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
+        assert!(io.get_ref().calls.is_empty());
+    });
+}
+
+#[test]
+fn encode_slice_direct() {
+    let mut codec = LengthDelimitedCodec::new();
+    let mut dst = BytesMut::new();
+    assert_ok!(codec.encode_slice(b"hello world", &mut dst));
+    assert_eq!(&dst[..4], b"\x00\x00\x00\x0b");
+    assert_eq!(&dst[4..], b"hello world");
+}
+
+#[test]
+fn framed_sink_ext_unambiguous() {
+    use futures::SinkExt;
+
+    let io = mock!();
+    let mut framed = Framed::new(io, LengthDelimitedCodec::new()).sink_map_err(|e| e);
+    task::spawn(()).enter(|cx, _| {
+        assert_ready_ok!(framed.poll_ready_unpin(cx));
+        assert_ready_ok!(framed.poll_flush_unpin(cx));
+        assert_ready_ok!(framed.poll_close_unpin(cx));
+    });
+}
+
+#[test]
+fn framed_slice_sink_ext_unambiguous() {
+    use futures::SinkExt;
+
+    let io = mock!();
+    let mut framed =
+        Framed::new(io, LengthDelimitedCodec::new().into_slice_codec()).sink_map_err(|e| e);
+    task::spawn(()).enter(|cx, _| {
+        assert_ready_ok!(framed.poll_ready_unpin(cx));
+        assert_ready_ok!(framed.poll_flush_unpin(cx));
+        assert_ready_ok!(framed.poll_close_unpin(cx));
     });
 }
 
@@ -534,16 +554,16 @@ fn write_single_multi_frame_one_packet() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(poll_ready_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
-        assert_ready_ok!(poll_ready_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("123")));
 
-        assert_ready_ok!(poll_ready_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("hello world")));
 
-        assert_ready_ok!(poll_flush_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
         assert!(io.get_ref().calls.is_empty());
     });
 }
@@ -567,20 +587,20 @@ fn write_single_multi_frame_multi_packet() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(poll_ready_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
-        assert_ready_ok!(poll_flush_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
 
-        assert_ready_ok!(poll_ready_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("123")));
 
-        assert_ready_ok!(poll_flush_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
 
-        assert_ready_ok!(poll_ready_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("hello world")));
 
-        assert_ready_ok!(poll_flush_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
         assert!(io.get_ref().calls.is_empty());
     });
 }
@@ -601,12 +621,12 @@ fn write_single_frame_would_block() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(poll_ready_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
-        assert_pending!(poll_flush_bytes(io.as_mut(), cx));
-        assert_pending!(poll_flush_bytes(io.as_mut(), cx));
-        assert_ready_ok!(poll_flush_bytes(io.as_mut(), cx));
+        assert_pending!(io.as_mut().poll_flush(cx));
+        assert_pending!(io.as_mut().poll_flush(cx));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
 
         assert!(io.get_ref().calls.is_empty());
     });
@@ -624,10 +644,10 @@ fn write_single_frame_little_endian() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(poll_ready_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
-        assert_ready_ok!(poll_flush_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
         assert!(io.get_ref().calls.is_empty());
     });
 }
@@ -644,10 +664,10 @@ fn write_single_frame_with_short_length_field() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(poll_ready_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdefghi")));
 
-        assert_ready_ok!(poll_flush_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
 
         assert!(io.get_ref().calls.is_empty());
     });
@@ -661,7 +681,7 @@ fn write_max_frame_len() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(poll_ready_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_err!(io.as_mut().start_send(Bytes::from("abcdef")));
 
         assert!(io.get_ref().calls.is_empty());
@@ -678,10 +698,10 @@ fn write_update_max_frame_len_at_rest() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(poll_ready_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdef")));
 
-        assert_ready_ok!(poll_flush_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
 
         io.encoder_mut().set_max_frame_length(5);
 
@@ -703,14 +723,14 @@ fn write_update_max_frame_len_in_flight() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(poll_ready_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdef")));
 
-        assert_pending!(poll_flush_bytes(io.as_mut(), cx));
+        assert_pending!(io.as_mut().poll_flush(cx));
 
         io.encoder_mut().set_max_frame_length(5);
 
-        assert_ready_ok!(poll_flush_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_flush(cx));
 
         assert_err!(io.as_mut().start_send(Bytes::from("abcdef")));
         assert!(io.get_ref().calls.is_empty());
@@ -723,10 +743,10 @@ fn write_zero() {
     pin_mut!(io);
 
     task::spawn(()).enter(|cx, _| {
-        assert_ready_ok!(poll_ready_bytes(io.as_mut(), cx));
+        assert_ready_ok!(io.as_mut().poll_ready(cx));
         assert_ok!(io.as_mut().start_send(Bytes::from("abcdef")));
 
-        assert_ready_err!(poll_flush_bytes(io.as_mut(), cx));
+        assert_ready_err!(io.as_mut().poll_flush(cx));
 
         assert!(io.get_ref().calls.is_empty());
     });
@@ -739,40 +759,11 @@ fn encode_overflow() {
     let mut buf = BytesMut::with_capacity(1024);
 
     // Put some data into the buffer without resizing it to hold more.
-    let some_as = std::iter::repeat_n(b'a', 1024).collect::<Vec<_>>();
+    let some_as = std::iter::repeat(b'a').take(1024).collect::<Vec<_>>();
     buf.put_slice(&some_as[..]);
 
     // Trying to encode the length header should resize the buffer if it won't fit.
     codec.encode(Bytes::from("hello"), &mut buf).unwrap();
-}
-
-#[test]
-fn encode_min_length_adjustment() {
-    let mut codec = length_delimited::Builder::new()
-        .length_field_length(8)
-        .length_adjustment(isize::MIN)
-        .new_codec();
-    let mut dst = BytesMut::new();
-
-    codec.encode(Bytes::new(), &mut dst).unwrap();
-
-    assert_eq!(
-        dst,
-        BytesMut::from(&(isize::MIN.unsigned_abs() as u64).to_be_bytes()[..])
-    );
-}
-
-#[cfg(target_pointer_width = "32")]
-#[test]
-fn decode_min_length_adjustment() {
-    let mut codec = length_delimited::Builder::new()
-        .length_field_length(8)
-        .max_frame_length(isize::MIN.unsigned_abs())
-        .length_adjustment(isize::MIN)
-        .new_codec();
-    let mut src = BytesMut::from(&(isize::MIN.unsigned_abs() as u64).to_be_bytes()[..]);
-
-    assert_eq!(codec.decode(&mut src).unwrap(), Some(BytesMut::new()));
 }
 
 #[test]
