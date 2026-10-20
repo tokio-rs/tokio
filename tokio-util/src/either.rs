@@ -5,6 +5,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+use futures_core::stream::FusedStream;
 use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf, Result};
 
 /// Combines two different futures, streams, or sinks having the same associated types into a single type.
@@ -179,6 +180,19 @@ where
     }
 }
 
+impl<L, R> FusedStream for Either<L, R>
+where
+    L: FusedStream,
+    R: FusedStream<Item = L::Item>,
+{
+    fn is_terminated(&self) -> bool {
+        match self {
+            Self::Left(l) => l.is_terminated(),
+            Self::Right(r) => r.is_terminated(),
+        }
+    }
+}
+
 impl<L, R, Item, Error> futures_sink::Sink<Item> for Either<L, R>
 where
     L: futures_sink::Sink<Item, Error = Error>,
@@ -223,6 +237,23 @@ mod tests {
         let mut either: Either<Once<u32>, Once<u32>> = Either::Left(once(1));
 
         assert_eq!(Some(1u32), either.next().await);
+    }
+
+    #[tokio::test]
+    async fn either_is_fused_stream() {
+        let mut left: Either<Once<u32>, Once<u32>> = Either::Left(once(1));
+
+        assert!(!left.is_terminated());
+        assert_eq!(left.next().await, Some(1));
+        assert!(left.is_terminated());
+        assert_eq!(left.next().await, None);
+
+        let mut right: Either<Once<u32>, Once<u32>> = Either::Right(once(2));
+
+        assert!(!right.is_terminated());
+        assert_eq!(right.next().await, Some(2));
+        assert!(right.is_terminated());
+        assert_eq!(right.next().await, None);
     }
 
     #[tokio::test]
