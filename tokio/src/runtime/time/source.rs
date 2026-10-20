@@ -29,8 +29,8 @@ impl TimeSource {
         ms.min(MAX_SAFE_MILLIS_DURATION)
     }
 
-    pub(crate) fn tick_to_duration(&self, t: u64) -> Duration {
-        Duration::from_millis(t)
+    pub(crate) fn duration_until_tick(&self, tick: u64, now: Instant) -> Duration {
+        Duration::from_millis(tick).saturating_sub(now.saturating_duration_since(self.start_time))
     }
 
     pub(crate) fn now(&self, clock: &Clock) -> u64 {

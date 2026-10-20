@@ -80,6 +80,47 @@ async fn sub_ms_delayed_sleep() {
     }
 }
 
+#[test]
+#[cfg(feature = "full")]
+fn sleep_auto_advance_from_fractional_time() {
+    for enable_io in [false, true] {
+        for phase_us in [0, 100, 500, 900, 999] {
+            for (deadline_us, expected_ms) in [
+                (1_000, 1),
+                (1_001, 2),
+                (17_000, 17),
+                (17_001, 18),
+                (17_999, 18),
+            ] {
+                let mut builder = tokio::runtime::Builder::new_current_thread();
+                builder.enable_time().start_paused(true);
+                if enable_io {
+                    builder.enable_io();
+                }
+
+                builder.build().unwrap().block_on(async {
+                    let start = Instant::now();
+                    time::advance(Duration::from_micros(phase_us)).await;
+
+                    let deadline = start + Duration::from_micros(deadline_us);
+                    let sleep = time::sleep_until(deadline);
+                    tokio::pin!(sleep);
+                    assert_pending!(futures::poll!(sleep.as_mut()));
+
+                    sleep.await;
+
+                    assert!(Instant::now() >= deadline);
+                    assert_eq!(
+                        start.elapsed(),
+                        Duration::from_millis(expected_ms),
+                        "phase {phase_us} us, deadline {deadline_us} us, IO enabled {enable_io}"
+                    );
+                });
+            }
+        }
+    }
+}
+
 #[tokio::test]
 async fn delayed_sleep_wrapping_level_0() {
     time::pause();
