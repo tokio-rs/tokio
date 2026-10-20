@@ -491,13 +491,13 @@ mod tests {
     // Keep the hot shard replenished, but bound the chain so a regression
     // fails an ordering assertion instead of hanging runtime shutdown.
     #[cfg(not(target_family = "wasm"))]
-    fn replenish_hot_shard(handle: Handle, remaining: usize, tx: mpsc::Sender<usize>) {
+    fn replenish_hot_shard(handle: Handle, hot: usize, remaining: usize, tx: mpsc::Sender<usize>) {
         let next_handle = handle.clone();
         let (queue, metrics) = handle.inner.blocking_spawner().sharded_queue();
-        push_to_shard(&handle, queue, metrics, 0, move || {
-            tx.send(0).unwrap();
+        push_to_shard(&handle, queue, metrics, hot, move || {
+            tx.send(hot).unwrap();
             if remaining > 1 {
-                replenish_hot_shard(next_handle, remaining - 1, tx);
+                replenish_hot_shard(next_handle, hot, remaining - 1, tx);
             }
         });
     }
@@ -506,33 +506,43 @@ mod tests {
     #[cfg(not(target_family = "wasm"))]
     fn worker_services_cold_shard_while_hot_shard_is_replenished() {
         let rt = sharded_runtime();
+        let (queue, metrics) = rt.handle().inner.blocking_spawner().sharded_queue();
+        // The first blocking worker has ID 0. Start it in the hot shard so
+        // the cold shard cannot win just because of the shuffled scan order.
+        let cursor = PopCursor::new(0);
+        let hot = cursor.current_shard();
+        let cold = cursor.order[NUM_SHARDS - 1] as usize;
         let (started_tx, started_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
-        let blocker = rt.spawn_blocking(move || {
+        push_to_shard(rt.handle(), queue, metrics, hot, move || {
             started_tx.send(()).unwrap();
             release_rx.recv_timeout(TIMEOUT).unwrap();
         });
+        let wakeup = rt.spawn_blocking(|| {});
         started_rx.recv_timeout(TIMEOUT).unwrap();
 
         let (tx, rx) = mpsc::channel();
-        let (queue, metrics) = rt.handle().inner.blocking_spawner().sharded_queue();
-        let cold = NUM_SHARDS - 1;
         let cold_tx = tx.clone();
         push_to_shard(rt.handle(), queue, metrics, cold, move || {
             cold_tx.send(cold).unwrap();
         });
-        replenish_hot_shard(rt.handle().clone(), 64, tx);
+        let hot_tasks = TASKS_PER_SHARD * 2 + 1;
+        replenish_hot_shard(rt.handle().clone(), hot, hot_tasks, tx);
         release_tx.send(()).unwrap();
 
-        let order: Vec<_> = (0..65).map(|_| rx.recv_timeout(TIMEOUT).unwrap()).collect();
-        rt.block_on(blocker).unwrap();
-        // With only two occupied shards, the cold task must run after at
-        // most one hot batch, regardless of the blocker's chosen shard.
+        let order: Vec<_> = (0..hot_tasks + 1)
+            .map(|_| rx.recv_timeout(TIMEOUT).unwrap())
+            .collect();
+        rt.block_on(wakeup).unwrap();
+        // The cold task must run after at most one hot batch.
         assert!(
             order[..TASKS_PER_SHARD + 1].contains(&cold),
             "execution order: {order:?}"
         );
-        assert_eq!(order.iter().filter(|&&index| index == 0).count(), 64);
+        assert_eq!(
+            order.iter().filter(|&&index| index == hot).count(),
+            hot_tasks
+        );
     }
 
     #[test]
@@ -549,7 +559,11 @@ mod tests {
 
         let (queue, metrics) = rt.handle().inner.blocking_spawner().sharded_queue();
         let (tx, rx) = mpsc::channel();
-        let previous = NUM_SHARDS / 2;
+        // A preserved cursor visits `previous` first; a reset cursor visits
+        // `initial` first. The sole blocking worker has ID 0.
+        let cursor = PopCursor::new(0);
+        let initial = cursor.current_shard();
+        let previous = cursor.order[NUM_SHARDS / 2] as usize;
         let done_tx = tx.clone();
         push_to_shard(rt.handle(), queue, metrics, previous, move || {
             done_tx.send(previous).unwrap();
@@ -571,7 +585,7 @@ mod tests {
             assert!(Instant::now() < deadline, "worker did not become idle");
             std::thread::yield_now();
         };
-        for index in [0, previous + 1] {
+        for index in [initial, previous] {
             let tx = tx.clone();
             push_to_shard(rt.handle(), queue, metrics, index, move || {
                 tx.send(index).unwrap();
@@ -585,14 +599,16 @@ mod tests {
         let first = rx.recv_timeout(TIMEOUT).unwrap();
         let second = rx.recv_timeout(TIMEOUT).unwrap();
         rt.block_on(wakeup).unwrap();
-        let mut observed = [first, second];
-        observed.sort_unstable();
-        assert_eq!(observed, [0, previous + 1]);
+        assert_eq!([first, second], [previous, initial]);
     }
 
     // Control shard placement so fairness does not depend on the RNG or timing.
-    fn drain_order(shards: &[usize], next_shard: usize) -> Vec<(usize, usize)> {
-        let rt = Builder::new_current_thread().build().unwrap();
+    fn drain_order(
+        handle: &Handle,
+        shards: &[usize],
+        next_shard: usize,
+        tasks: usize,
+    ) -> Vec<(usize, usize)> {
         let queue = ShardedImpl::new(ThreadManagementState {
             shutdown: false,
             shutdown_tx: None,
@@ -603,12 +619,10 @@ mod tests {
         let (tx, rx) = mpsc::channel();
 
         for &index in shards {
-            // Leave each shard non-empty across two complete batches.
-            for sequence in 0..TASKS_PER_SHARD * 2 + 1 {
+            for sequence in 0..tasks {
                 let tx = tx.clone();
-                let task = blocking_task_for_test(rt.handle(), move || {
-                    tx.send((index, sequence)).unwrap()
-                });
+                let task =
+                    blocking_task_for_test(handle, move || tx.send((index, sequence)).unwrap());
                 queue.shards[index].lock().queue.push_back(task);
                 queue.non_empty_mask.fetch_or(1 << index, Ordering::Relaxed);
             }
@@ -622,8 +636,7 @@ mod tests {
         rx.try_iter().collect()
     }
 
-    fn expected_order(shards: &[usize]) -> Vec<(usize, usize)> {
-        let tasks = TASKS_PER_SHARD * 2 + 1;
+    fn expected_order(shards: &[usize], tasks: usize) -> Vec<(usize, usize)> {
         (0..tasks)
             .step_by(TASKS_PER_SHARD)
             .flat_map(|base| {
@@ -637,6 +650,9 @@ mod tests {
 
     #[test]
     fn pop_rotates_through_busy_shards() {
+        let rt = Builder::new_current_thread().build().unwrap();
+        // Leave each shard non-empty across two complete batches.
+        let tasks = TASKS_PER_SHARD * 2 + 1;
         let starts: Vec<_> = if cfg!(miri) {
             vec![0, usize::MAX]
         } else {
@@ -646,7 +662,10 @@ mod tests {
             let shards: Vec<_> = (0..NUM_SHARDS)
                 .map(|i| (start % NUM_SHARDS + i) % NUM_SHARDS)
                 .collect();
-            assert_eq!(drain_order(&shards, start), expected_order(&shards));
+            assert_eq!(
+                drain_order(rt.handle(), &shards, start, tasks),
+                expected_order(&shards, tasks)
+            );
         }
     }
 
@@ -681,19 +700,28 @@ mod tests {
 
     #[test]
     fn pop_rotates_past_empty_shards() {
+        let rt = Builder::new_current_thread().build().unwrap();
+        // Cross a batch boundary, then drain each shard on the next visit.
+        let tasks = TASKS_PER_SHARD + 1;
         let indices: Vec<_> = if cfg!(miri) {
             vec![0, NUM_SHARDS / 2, NUM_SHARDS - 1]
         } else {
             (0..NUM_SHARDS).collect()
         };
         for &start in &indices {
-            assert!(drain_order(&[], start).is_empty());
+            assert!(drain_order(rt.handle(), &[], start, tasks).is_empty());
             for (i, &first) in indices.iter().enumerate() {
-                assert_eq!(drain_order(&[first], start), expected_order(&[first]));
+                assert_eq!(
+                    drain_order(rt.handle(), &[first], start, tasks),
+                    expected_order(&[first], tasks)
+                );
                 for &second in &indices[i + 1..] {
                     let mut shards = [first, second];
                     shards.sort_by_key(|&index| (index + NUM_SHARDS - start) % NUM_SHARDS);
-                    assert_eq!(drain_order(&shards, start), expected_order(&shards));
+                    assert_eq!(
+                        drain_order(rt.handle(), &shards, start, tasks),
+                        expected_order(&shards, tasks)
+                    );
                 }
             }
         }
