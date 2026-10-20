@@ -136,15 +136,22 @@ impl fmt::Debug for Child {
 }
 
 pub(crate) fn build_child(mut child: StdChild) -> io::Result<SpawnedChild> {
-    let stdin = match child.stdin.take().map(stdio).transpose() {
+    // Take every pipe before registering one. On a registration error the
+    // remaining pipes drop here. Leaving them on the orphaned child keeps
+    // the parent end open, so the child can block on a full pipe.
+    let stdin_pipe = child.stdin.take();
+    let stdout_pipe = child.stdout.take();
+    let stderr_pipe = child.stderr.take();
+
+    let stdin = match stdin_pipe.map(stdio).transpose() {
         Ok(io) => io,
         Err(e) => return Err(orphan_child_on_error(child, GlobalOrphanQueue, e)),
     };
-    let stdout = match child.stdout.take().map(stdio).transpose() {
+    let stdout = match stdout_pipe.map(stdio).transpose() {
         Ok(io) => io,
         Err(e) => return Err(orphan_child_on_error(child, GlobalOrphanQueue, e)),
     };
-    let stderr = match child.stderr.take().map(stdio).transpose() {
+    let stderr = match stderr_pipe.map(stdio).transpose() {
         Ok(io) => io,
         Err(e) => return Err(orphan_child_on_error(child, GlobalOrphanQueue, e)),
     };
@@ -412,14 +419,12 @@ mod orphan_on_error_tests {
     use super::orphan_child_on_error;
     use crate::process::unix::orphan::test::MockQueue;
     use crate::process::unix::orphan::Wait;
-    use std::cell::Cell;
     use std::io;
     use std::os::unix::process::ExitStatusExt;
     use std::process::ExitStatus;
-    use std::rc::Rc;
 
     struct MockWait {
-        total_waits: Rc<Cell<usize>>,
+        total_waits: usize,
         /// Number of `try_wait` calls that return `Ok(None)` before reporting exit.
         still_running_waits: usize,
     }
@@ -427,14 +432,14 @@ mod orphan_on_error_tests {
     impl MockWait {
         fn still_running() -> Self {
             Self {
-                total_waits: Rc::new(Cell::new(0)),
+                total_waits: 0,
                 still_running_waits: 1,
             }
         }
 
         fn already_exited() -> Self {
             Self {
-                total_waits: Rc::new(Cell::new(0)),
+                total_waits: 0,
                 still_running_waits: 0,
             }
         }
@@ -446,8 +451,8 @@ mod orphan_on_error_tests {
         }
 
         fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
-            let waits = self.total_waits.get();
-            self.total_waits.set(waits + 1);
+            let waits = self.total_waits;
+            self.total_waits += 1;
             if waits < self.still_running_waits {
                 Ok(None)
             } else {
@@ -459,18 +464,18 @@ mod orphan_on_error_tests {
     #[test]
     fn orphan_child_on_error_enqueues_when_still_running() {
         let queue = MockQueue::new();
-        let err = io::Error::new(io::ErrorKind::Other, "setup failed");
+        let err = io::Error::from_raw_os_error(libc::EMFILE);
         let returned = orphan_child_on_error(MockWait::still_running(), &queue, err);
-        assert_eq!(returned.kind(), io::ErrorKind::Other);
+        assert_eq!(returned.raw_os_error(), Some(libc::EMFILE));
         assert_eq!(queue.all_enqueued.borrow().len(), 1);
     }
 
     #[test]
     fn orphan_child_on_error_skips_queue_when_already_exited() {
         let queue = MockQueue::new();
-        let err = io::Error::new(io::ErrorKind::Other, "setup failed");
+        let err = io::Error::from_raw_os_error(libc::EMFILE);
         let returned = orphan_child_on_error(MockWait::already_exited(), &queue, err);
-        assert_eq!(returned.kind(), io::ErrorKind::Other);
+        assert_eq!(returned.raw_os_error(), Some(libc::EMFILE));
         assert!(queue.all_enqueued.borrow().is_empty());
     }
 }
