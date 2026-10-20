@@ -1,11 +1,11 @@
 //! Module defining an Either type.
+use futures_core::stream::FusedStream;
 use std::{
     future::Future,
     io::SeekFrom,
     pin::Pin,
     task::{Context, Poll},
 };
-use futures_core::stream::FusedStream;
 use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf, Result};
 
 /// Combines two different futures, streams, or sinks having the same associated types into a single type.
@@ -241,14 +241,18 @@ mod tests {
 
     #[tokio::test]
     async fn either_is_fused_stream() {
-        let mut left: Either<Once<u32>, Once<u32>> = Either::Left(once(1));
+        type TestStream = futures::stream::Once<std::future::Ready<u32>>;
+
+        let mut left: Either<TestStream, TestStream> =
+            Either::Left(futures::stream::once(std::future::ready(1)));
 
         assert!(!left.is_terminated());
         assert_eq!(left.next().await, Some(1));
         assert!(left.is_terminated());
         assert_eq!(left.next().await, None);
 
-        let mut right: Either<Once<u32>, Once<u32>> = Either::Right(once(2));
+        let mut right: Either<TestStream, TestStream> =
+            Either::Right(futures::stream::once(std::future::ready(2)));
 
         assert!(!right.is_terminated());
         assert_eq!(right.next().await, Some(2));
