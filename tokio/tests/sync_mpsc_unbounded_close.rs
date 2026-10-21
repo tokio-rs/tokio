@@ -1,15 +1,12 @@
-#![cfg(all(not(loom), not(target_family = "wasm")))]
+#![cfg(all(feature = "sync", not(loom), not(target_family = "wasm")))]
 
-use futures::{task::noop_waker_ref, Stream};
-use futures_core::FusedStream;
+use futures::task::noop_waker_ref;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::mem::ManuallyDrop;
-use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::UnboundedReceiverStream;
 
 struct Allocator;
 
@@ -59,16 +56,15 @@ fn close_during_send() {
         assert_eq!(rx.try_recv().unwrap(), value);
     }
 
-    let mut stream = UnboundedReceiverStream::new(rx);
     let observation = Rc::new(Cell::new(None));
     let observation_on_alloc = observation.clone();
     let callback = Box::new(move || {
         // Allocation happens after the send has been accepted, before the message
-        // is ready. Close and inspect the stream while that send is unfinished.
-        stream.close();
-        let size_hint = stream.size_hint();
-        let terminated = stream.is_terminated();
-        observation_on_alloc.set(Some((stream, size_hint, terminated)));
+        // is ready. Close and inspect the receiver while that send is unfinished.
+        rx.close();
+        let len = rx.len();
+        let is_empty = rx.is_empty();
+        observation_on_alloc.set(Some((rx, len, is_empty)));
     });
     ON_ALLOC.with(|hook| hook.set(Some(callback)));
     let sent = tx.send(block_capacity);
@@ -76,16 +72,13 @@ fn close_during_send() {
 
     assert!(unused_callback.is_none(), "send did not allocate a block");
     sent.unwrap();
-    let (mut stream, size_hint, terminated) = observation.take().unwrap();
-    assert!(!terminated, "an accepted send is still unfinished");
-    assert_eq!(size_hint, (1, Some(1)));
+    let (mut rx, len, is_empty) = observation.take().unwrap();
+    assert!(!is_empty, "an accepted send is still unfinished");
+    assert_eq!(len, 1);
 
     let mut cx = Context::from_waker(noop_waker_ref());
-    assert_eq!(
-        Pin::new(&mut stream).poll_next(&mut cx),
-        Poll::Ready(Some(block_capacity))
-    );
-    assert_eq!(Pin::new(&mut stream).poll_next(&mut cx), Poll::Ready(None));
-    assert!(stream.is_terminated());
-    assert_eq!(stream.size_hint(), (0, Some(0)));
+    assert_eq!(rx.poll_recv(&mut cx), Poll::Ready(Some(block_capacity)));
+    assert_eq!(rx.poll_recv(&mut cx), Poll::Ready(None));
+    assert!(rx.is_empty());
+    assert_eq!(rx.len(), 0);
 }
