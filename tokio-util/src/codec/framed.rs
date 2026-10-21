@@ -224,15 +224,22 @@ impl<T, U> Framed<T, U> {
     where
         F: FnOnce(U) -> C,
     {
-        // This could be potentially simplified once rust-lang/rust#86555 hits stable
-        let parts = self.into_parts();
-        Framed::from_parts(FramedParts {
-            io: parts.io,
-            codec: map(parts.codec),
-            read_buf: parts.read_buf,
-            write_buf: parts.write_buf,
-            _priv: (),
-        })
+        let FramedImpl {
+            inner,
+            codec,
+            state: RWFrames { read, write },
+        } = self.inner;
+
+        Framed {
+            inner: FramedImpl {
+                inner,
+                codec: map(codec),
+                state: RWFrames {
+                    read: ReadFrame::with_buffer(read.buffer, read.allocate_on_first_use),
+                    write: WriteFrame::with_buffer(write.buffer, write.allocate_on_first_use),
+                },
+            },
+        }
     }
 
     /// Returns a mutable reference to the underlying codec wrapped by

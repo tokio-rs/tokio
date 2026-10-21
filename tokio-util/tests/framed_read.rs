@@ -66,17 +66,55 @@ impl Decoder for U64Decoder {
     }
 }
 
+struct PendingReader;
+
+impl AsyncRead for PendingReader {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        _buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        Poll::Pending
+    }
+}
+
 #[test]
 fn default_read_buffer_allocates_on_first_poll() {
-    let mut framed = FramedRead::new(&b"\x00\x00\x00\x01"[..], U32Decoder);
+    let mut framed = FramedRead::new(PendingReader, U32Decoder);
     assert_eq!(framed.read_buffer().capacity(), 0);
+
+    let mut task = task::spawn(());
+    task.enter(|cx, _| {
+        assert!(pin!(framed).poll_next(cx).is_pending());
+    });
+
+    assert!(framed.read_buffer().capacity() >= 8 * 1024);
+}
+
+#[test]
+fn accessing_mutable_read_buffer_does_not_disable_default_allocation() {
+    let mut framed = FramedRead::new(PendingReader, U32Decoder);
+    assert!(framed.read_buffer_mut().is_empty());
+
+    let mut task = task::spawn(());
+    task.enter(|cx, _| {
+        assert!(pin!(framed).poll_next(cx).is_pending());
+    });
+
+    assert!(framed.read_buffer().capacity() >= 8 * 1024);
+}
+
+#[test]
+fn default_read_buffer_allows_custom_capacity() {
+    let mut framed = FramedRead::new(&b"\x00\x00\x00\x01"[..], U32Decoder);
+    *framed.read_buffer_mut() = BytesMut::with_capacity(64);
 
     let mut task = task::spawn(());
     task.enter(|cx, _| {
         assert_read!(pin!(framed).poll_next(cx), 1);
     });
 
-    assert!(framed.read_buffer().capacity() > 0);
+    assert!(framed.read_buffer().capacity() < 8 * 1024);
 }
 
 #[test]

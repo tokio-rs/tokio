@@ -67,12 +67,16 @@ impl Default for WriteFrame {
     }
 }
 
-impl From<BytesMut> for ReadFrame {
-    fn from(mut buffer: BytesMut) -> Self {
+impl ReadFrame {
+    pub(crate) fn with_buffer(mut buffer: BytesMut, allocate_on_first_use: bool) -> Self {
+        // A buffer with capacity was supplied through the mutable buffer accessor.
+        let allocate_on_first_use = allocate_on_first_use && buffer.capacity() == 0;
         let is_readable = !buffer.is_empty();
-        let size = buffer.capacity();
-        if size < INITIAL_CAPACITY {
-            buffer.reserve(INITIAL_CAPACITY - size);
+        if !allocate_on_first_use {
+            let size = buffer.capacity();
+            if size < INITIAL_CAPACITY {
+                buffer.reserve(INITIAL_CAPACITY - size);
+            }
         }
 
         Self {
@@ -80,23 +84,39 @@ impl From<BytesMut> for ReadFrame {
             is_readable,
             eof: false,
             has_errored: false,
-            allocate_on_first_use: false,
+            allocate_on_first_use,
         }
     }
 }
 
-impl From<BytesMut> for WriteFrame {
-    fn from(mut buffer: BytesMut) -> Self {
-        let size = buffer.capacity();
-        if size < INITIAL_CAPACITY {
-            buffer.reserve(INITIAL_CAPACITY - size);
+impl From<BytesMut> for ReadFrame {
+    fn from(buffer: BytesMut) -> Self {
+        Self::with_buffer(buffer, false)
+    }
+}
+
+impl WriteFrame {
+    pub(crate) fn with_buffer(mut buffer: BytesMut, allocate_on_first_use: bool) -> Self {
+        // A buffer with capacity was supplied through the mutable buffer accessor.
+        let allocate_on_first_use = allocate_on_first_use && buffer.capacity() == 0;
+        if !allocate_on_first_use {
+            let size = buffer.capacity();
+            if size < INITIAL_CAPACITY {
+                buffer.reserve(INITIAL_CAPACITY - size);
+            }
         }
 
         Self {
             buffer,
             backpressure_boundary: INITIAL_CAPACITY,
-            allocate_on_first_use: false,
+            allocate_on_first_use,
         }
+    }
+}
+
+impl From<BytesMut> for WriteFrame {
+    fn from(buffer: BytesMut) -> Self {
+        Self::with_buffer(buffer, false)
     }
 }
 
@@ -224,8 +244,9 @@ where
             // Make sure we've got room for at least one byte to read to ensure
             // that we don't get a spurious 0 that looks like EOF.
             if state.allocate_on_first_use {
-                let additional = INITIAL_CAPACITY.saturating_sub(state.buffer.len());
-                state.buffer.reserve(additional);
+                if state.buffer.capacity() == 0 {
+                    state.buffer.reserve(INITIAL_CAPACITY);
+                }
                 state.allocate_on_first_use = false;
             }
             state.buffer.reserve(1);
@@ -283,8 +304,9 @@ where
         let pinned = self.project();
         let state: &mut WriteFrame = pinned.state.borrow_mut();
         if state.allocate_on_first_use {
-            let additional = INITIAL_CAPACITY.saturating_sub(state.buffer.len());
-            state.buffer.reserve(additional);
+            if state.buffer.capacity() == 0 {
+                state.buffer.reserve(INITIAL_CAPACITY);
+            }
             state.allocate_on_first_use = false;
         }
         pinned.codec.encode(item, &mut state.buffer)?;

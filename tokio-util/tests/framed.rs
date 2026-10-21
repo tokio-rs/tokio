@@ -129,6 +129,34 @@ async fn can_read_from_existing_buf_after_codec_changed() {
 }
 
 #[test]
+fn map_codec_keeps_unused_buffers_unallocated() {
+    let framed = Framed::new((), U32Codec::default());
+    let framed = framed.map_codec(|codec| codec);
+
+    assert_eq!(framed.read_buffer().capacity(), 0);
+    assert_eq!(framed.write_buffer().capacity(), 0);
+}
+
+#[test]
+fn map_codec_keeps_explicit_capacity_behavior() {
+    let framed = Framed::with_capacity((), U32Codec::default(), 0);
+    let framed = framed.map_codec(|codec| codec);
+
+    assert!(framed.read_buffer().capacity() >= INITIAL_CAPACITY);
+    assert!(framed.write_buffer().capacity() >= INITIAL_CAPACITY);
+}
+
+#[test]
+fn map_codec_only_allocates_previously_used_buffer() {
+    let mut framed = Framed::new((), U32Codec::default());
+    *framed.read_buffer_mut() = BytesMut::with_capacity(64);
+    let framed = framed.map_codec(|codec| codec);
+
+    assert!(framed.read_buffer().capacity() > 64);
+    assert_eq!(framed.write_buffer().capacity(), 0);
+}
+
+#[test]
 fn external_buf_grows_to_init() {
     let mut parts = FramedParts::new(DontReadIntoThis, U32Codec::default());
     parts.read_buf = BytesMut::from(&[0, 0, 0, 42][..]);

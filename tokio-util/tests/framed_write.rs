@@ -74,6 +74,34 @@ fn default_write_buffer_allocates_on_first_send() {
 }
 
 #[test]
+fn accessing_mutable_write_buffer_does_not_disable_default_allocation() {
+    let mut framed = FramedWrite::new(
+        Mock {
+            calls: VecDeque::new(),
+        },
+        U32Encoder,
+    );
+    assert!(framed.write_buffer_mut().is_empty());
+
+    assert!(pin!(framed).start_send(7).is_ok());
+    assert!(framed.write_buffer().capacity() >= 8 * 1024);
+}
+
+#[test]
+fn default_write_buffer_allows_custom_capacity() {
+    let mut framed = FramedWrite::new(
+        Mock {
+            calls: VecDeque::new(),
+        },
+        U32Encoder,
+    );
+    *framed.write_buffer_mut() = BytesMut::with_capacity(64);
+
+    assert!(pin!(framed).start_send(7).is_ok());
+    assert!(framed.write_buffer().capacity() < 8 * 1024);
+}
+
+#[test]
 fn explicit_zero_write_capacity_is_preserved() {
     let mut framed = FramedWrite::with_capacity(
         Mock {
