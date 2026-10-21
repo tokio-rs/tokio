@@ -264,6 +264,30 @@ impl fmt::Debug for Driver {
     }
 }
 
+cfg_registry_fd! {
+    impl Handle {
+        cfg_event_loop! {
+            /// The reactor's own descriptor (`epoll`, `kqueue`), readable while
+            /// it has pending events.
+            pub(crate) fn registry_fd(&self) -> Option<std::os::fd::BorrowedFd<'_>> {
+                use std::os::fd::AsFd;
+                Some(self.registry.as_fd())
+            }
+        }
+    }
+}
+
+cfg_not_registry_fd! {
+    impl Handle {
+        cfg_event_loop! {
+            #[cfg(unix)]
+            pub(crate) fn registry_fd(&self) -> Option<std::os::fd::BorrowedFd<'_>> {
+                None
+            }
+        }
+    }
+}
+
 impl Handle {
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
     /// makes the next call to `turn` return immediately.

@@ -1,4 +1,4 @@
-333
+335
 &
 +
 <
@@ -131,6 +131,7 @@ FreeBSD
 frontend
 fs
 functionalities
+futex
 getters
 GID
 goroutines
@@ -168,6 +169,7 @@ Kotlin's
 latencies
 Lauck
 libc
+libuv
 lifecycle
 lifo
 LLVM
