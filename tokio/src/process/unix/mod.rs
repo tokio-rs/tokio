@@ -478,4 +478,96 @@ mod orphan_on_error_tests {
         assert_eq!(returned.raw_os_error(), Some(libc::EMFILE));
         assert!(queue.all_enqueued.borrow().is_empty());
     }
+
+    #[cfg(all(feature = "rt", not(miri)))]
+    struct KillChild {
+        pid: libc::pid_t,
+    }
+
+    #[cfg(all(feature = "rt", not(miri)))]
+    impl Drop for KillChild {
+        fn drop(&mut self) {
+            if self.pid <= 0 {
+                return;
+            }
+            let pid = self.pid;
+            self.pid = 0;
+            // SAFETY: `pid` is the child this test spawned. `build_child` moved
+            // the `Child` onto the orphan queue, so this guard only has the pid.
+            // `SIGKILL` cannot be caught. A null status pointer is valid for
+            // `waitpid`. `EINTR` retries; any other error means the child is
+            // already gone, including when this runs during an assertion unwind.
+            unsafe {
+                libc::kill(pid, libc::SIGKILL);
+                loop {
+                    let rc = libc::waitpid(pid, std::ptr::null_mut(), 0);
+                    if rc >= 0 {
+                        break;
+                    }
+                    let err = io::Error::last_os_error();
+                    if err.raw_os_error() == Some(libc::EINTR) {
+                        continue;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    #[cfg(all(feature = "rt", not(miri)))]
+    fn assert_parent_fd_closed(fd: std::os::unix::io::RawFd) {
+        // SAFETY: `F_GETFD` reads descriptor flags. It does not follow the fd
+        // as a pointer, and a closed descriptor is a defined argument.
+        let rc = unsafe { libc::fcntl(fd, libc::F_GETFD) };
+        assert_eq!(rc, -1, "parent fd {fd} is still open");
+        assert_eq!(
+            io::Error::last_os_error().raw_os_error(),
+            Some(libc::EBADF),
+            "parent fd {fd} was not closed"
+        );
+    }
+
+    /// `orphan_child_on_error` never sees the stdio pipes, so those tests stay
+    /// green if a failed registration leaves the other parent ends open.
+    #[cfg(all(feature = "rt", not(miri)))]
+    #[test]
+    fn build_child_closes_remaining_pipes_when_stdio_registration_fails() {
+        use std::os::unix::io::AsRawFd;
+
+        let rt = crate::runtime::Builder::new_current_thread()
+            .enable_io()
+            .build()
+            .expect("runtime");
+        let handle = rt.handle().clone();
+        // `add_source` fails once the driver is shut down, on every OS.
+        drop(rt);
+
+        let child = std::process::Command::new("/bin/sleep")
+            .arg("30")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .expect("spawn sleep");
+        let stdout_fd = child.stdout.as_ref().expect("stdout pipe").as_raw_fd();
+        let stderr_fd = child.stderr.as_ref().expect("stderr pipe").as_raw_fd();
+        assert_ne!(stdout_fd, stderr_fd);
+        let _kill = KillChild {
+            pid: libc::pid_t::try_from(child.id()).expect("pid"),
+        };
+        let _enter = handle.enter();
+
+        let err = match super::build_child(child) {
+            Ok(_spawned) => panic!("stdio registration should fail"),
+            Err(err) => err,
+        };
+        assert!(
+            crate::runtime::is_rt_shutdown_err(&err),
+            "expected the shut-down runtime error, got {err:?}"
+        );
+        // stdin is closed inside the failed `stdio` call either way.
+        // stdout and stderr stay open unless they were taken first.
+        assert_parent_fd_closed(stdout_fd);
+        assert_parent_fd_closed(stderr_fd);
+    }
 }
