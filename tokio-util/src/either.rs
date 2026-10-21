@@ -241,23 +241,15 @@ mod tests {
 
     #[tokio::test]
     async fn either_is_fused_stream() {
-        type TestStream = futures::stream::Once<std::future::Ready<u32>>;
-
-        let mut left: Either<TestStream, TestStream> =
-            Either::Left(futures::stream::once(std::future::ready(1)));
-
-        assert!(!left.is_terminated());
-        assert_eq!(left.next().await, Some(1));
-        assert!(left.is_terminated());
-        assert_eq!(left.next().await, None);
-
-        let mut right: Either<TestStream, TestStream> =
-            Either::Right(futures::stream::once(std::future::ready(2)));
-
-        assert!(!right.is_terminated());
-        assert_eq!(right.next().await, Some(2));
-        assert!(right.is_terminated());
-        assert_eq!(right.next().await, None);
+        for (mut either, expected) in [
+            (Either::Left(futures::stream::once(std::future::ready(1u32))), 1),
+            (Either::Right(futures::stream::once(std::future::ready(2u32))), 2),
+        ] {
+            assert!(!either.is_terminated());
+            assert_eq!(either.next().await, Some(expected));
+            assert!(either.is_terminated());
+            assert_eq!(either.next().await, None);
+        }
     }
 
     #[tokio::test]
