@@ -140,6 +140,11 @@ impl Decoder for AnyDelimiterCodec {
             // there's no max_length set, we'll read to the end of the buffer.
             let read_to = cmp::min(self.max_length.saturating_add(1), buf.len());
 
+            // The caller may have shortened the buffer since the last decode.
+            if self.next_index > read_to {
+                self.next_index = 0;
+            }
+
             let haystack = &buf[self.next_index..read_to];
             let new_chunk_offset = match self.seek_delimiters[..] {
                 [delimiter] => crate::util::memchr::memchr(delimiter, haystack),

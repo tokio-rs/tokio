@@ -63,6 +63,18 @@ fn lines_decoder() {
 }
 
 #[test]
+fn lines_decoder_rescans_shortened_buffer() {
+    let mut codec = LinesCodec::new_with_max_length(8);
+    let mut buf = BytesMut::from(&b"original"[..]);
+
+    assert_eq!(None, codec.decode(&mut buf).unwrap());
+
+    buf.clear();
+    buf.put_slice(b"new\n");
+    assert_eq!(Some("new".to_owned()), codec.decode(&mut buf).unwrap());
+}
+
+#[test]
 fn lines_decoder_invalid_utf8() {
     let mut codec = LinesCodec::new();
     let buf = &mut BytesMut::new();
@@ -248,6 +260,18 @@ fn any_delimiters_decoder_any_character() {
     assert_eq!("k", codec.decode_eof(buf).unwrap().unwrap());
     assert_eq!(None, codec.decode(buf).unwrap());
     assert_eq!(None, codec.decode_eof(buf).unwrap());
+}
+
+#[test]
+fn any_delimiters_decoder_rescans_shortened_buffer() {
+    let mut codec = AnyDelimiterCodec::new_with_max_length(b",;".to_vec(), b",".to_vec(), 8);
+    let mut buf = BytesMut::from(&b"original"[..]);
+
+    assert_eq!(None, codec.decode(&mut buf).unwrap());
+
+    buf.clear();
+    buf.put_slice(b"new;");
+    assert_eq!(Some(Bytes::from_static(b"new")), codec.decode(&mut buf).unwrap());
 }
 
 #[test]
