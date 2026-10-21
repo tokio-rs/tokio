@@ -206,6 +206,15 @@ async fn map_codec_preserves_error_state() {
 
     let mut framed = framed.map_codec(|codec| codec);
     assert!(framed.next().await.is_none());
+
+    // Mapping again must not retry decoding the same trailing bytes at EOF.
+    let mut framed = framed.map_codec(|codec| codec);
+    assert!(framed.next().await.is_none());
+
+    // New input completes the partial frame and resumes decoding after None.
+    *framed.get_mut() = &[0, 0, 42];
+    assert_eq!(assert_ok!(framed.next().await.unwrap()), 42);
+    assert!(framed.next().await.is_none());
 }
 
 #[test]

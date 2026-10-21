@@ -229,7 +229,9 @@ impl<T, U> Framed<T, U> {
         } = self.inner;
 
         // The new codec may be able to decode bytes the previous codec could not.
-        state.read.is_readable |= !state.read.buffer.is_empty();
+        if !state.read.eof {
+            state.read.is_readable |= !state.read.buffer.is_empty();
+        }
 
         Framed {
             inner: FramedImpl {
