@@ -5,11 +5,18 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(tokio_unstable, feature = "tracing", target_has_atomic = "64"))]
 
+use std::sync::Mutex;
 use tokio::sync;
 use tracing_mock::{expect, subscriber};
 
+// Serialize tests in this file so they cannot race on `tracing-core` callsite
+// interest registration.
+static TEST_MUTEX: Mutex<()> = Mutex::new(());
+
 #[test]
 fn test_barrier_creates_span() {
+    let _guard = TEST_MUTEX.lock();
+
     let barrier_span = expect::span()
         .named("runtime.resource")
         .with_target("tokio::sync::barrier");
@@ -45,6 +52,8 @@ fn test_barrier_creates_span() {
 
 #[test]
 fn test_mutex_creates_span() {
+    let _guard = TEST_MUTEX.lock();
+
     let mutex_span = expect::span()
         .named("runtime.resource")
         .with_target("tokio::sync::mutex");
@@ -89,6 +98,8 @@ fn test_mutex_creates_span() {
 
 #[test]
 fn test_oneshot_creates_span() {
+    let _guard = TEST_MUTEX.lock();
+
     let oneshot_span_id = expect::id();
     let oneshot_span = expect::span()
         .with_id(oneshot_span_id.clone())
@@ -188,6 +199,8 @@ fn test_oneshot_creates_span() {
 
 #[test]
 fn test_rwlock_creates_span() {
+    let _guard = TEST_MUTEX.lock();
+
     let rwlock_span = expect::span()
         .named("runtime.resource")
         .with_target("tokio::sync::rwlock");
@@ -244,6 +257,8 @@ fn test_rwlock_creates_span() {
 
 #[test]
 fn test_semaphore_creates_span() {
+    let _guard = TEST_MUTEX.lock();
+
     let semaphore_span = expect::span()
         .named("runtime.resource")
         .with_target("tokio::sync::semaphore");
@@ -285,18 +300,14 @@ fn test_semaphore_creates_span() {
 /// is in the middle of an operation.
 #[cfg(panic = "unwind")]
 mod subscriber_panic {
+    use super::TEST_MUTEX;
     use std::future::Future;
     use std::panic::{catch_unwind, AssertUnwindSafe};
     use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::Mutex;
     use tokio::sync;
     use tokio_test::{assert_pending, assert_ready_ok, task};
     use tracing::span::{Attributes, Id, Record};
     use tracing::{Event, Metadata, Subscriber};
-
-    // Serialize tests that run instrumented operations outside `with_default`
-    // so they cannot race with `tracing-core` callsite interest registration.
-    static TEST_MUTEX: Mutex<()> = Mutex::new(());
 
     /// A subscriber that panics on the first event with the given target.
     ///
