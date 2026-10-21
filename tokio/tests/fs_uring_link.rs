@@ -10,11 +10,11 @@
 
 use futures::future::Future;
 use libc::PATH_MAX;
-use std::future::{pending, poll_fn};
+use std::future::pending;
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::sync::mpsc;
-use std::task::{Context, Poll, Waker};
+use std::task::{Context, Waker};
 use std::time::Duration;
 use tempfile::{tempdir, TempDir};
 use tokio::fs::hard_link;
@@ -63,7 +63,7 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
         let (done_tx, done_rx) = mpsc::channel();
         let (dir, target) = create_tmp_dir();
         const N: usize = 100;
-        rt.block_on(async move {
+        rt.block_on(async {
             let mut futs = vec![];
 
             // spawning a bunch of uring operations.
@@ -77,7 +77,6 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
             }
 
             tokio::spawn(async move {
-                let _dir = dir;
                 let _futs = futs;
                 pending::<()>().await;
             });
@@ -150,7 +149,7 @@ async fn hard_link_existing_destination() {
     tokio::fs::write(&link, b"existing").await.unwrap();
 
     let result = hard_link(&target, &link).await;
-    assert_eq!(result.err().unwrap().raw_os_error().unwrap(), libc::EEXIST);
+    assert_eq!(result.unwrap_err().raw_os_error(), Some(libc::EEXIST));
     assert_eq!(tokio::fs::read(&link).await.unwrap(), b"existing");
 }
 
@@ -161,7 +160,7 @@ async fn hard_link_nonexistent_source() {
     let link = dir.path().join("link");
 
     let result = hard_link(&original, &link).await;
-    assert_eq!(result.err().unwrap().raw_os_error().unwrap(), libc::ENOENT);
+    assert_eq!(result.unwrap_err().raw_os_error(), Some(libc::ENOENT));
 }
 
 // `std::fs::hard_link` links the symlink itself on Linux, the io_uring path
@@ -206,30 +205,20 @@ fn cancel_op_future() {
     let rt = Builder::new_current_thread().enable_all().build().unwrap();
 
     rt.block_on(async move {
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, rx) = tokio::sync::oneshot::channel();
 
         let handle = tokio::spawn(async move {
             let fut = hard_link(target, link);
             tokio::pin!(fut);
 
-            poll_fn(move |_| {
-                // the first poll should return Pending.
-                assert_pending!(fut.as_mut().poll(&mut Context::from_waker(Waker::noop())));
-                tx.send(true).unwrap();
-
-                Poll::<()>::Pending
-            })
-            .await;
+            assert_pending!(fut.as_mut().poll(&mut Context::from_waker(Waker::noop())));
+            tx.send(()).unwrap();
+            pending::<()>().await;
         });
 
-        // Wait for the first poll
-        let val = rx.recv().await;
-        assert!(val.unwrap());
-
+        rx.await.unwrap();
         handle.abort();
-
-        let res = handle.await.unwrap_err();
-        assert!(res.is_cancelled());
+        assert!(handle.await.unwrap_err().is_cancelled());
     });
 
     // The cancelled op may still be in the kernel. Dropping the runtime waits
