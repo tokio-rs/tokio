@@ -78,7 +78,7 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
         }
 
         if !me.items.is_empty() {
-            if let Some(deadline) = me.deadline.as_pin_mut() {
+            if let Some(deadline) = me.deadline.as_mut().as_pin_mut() {
                 ready!(deadline.poll(cx));
             }
             me.deadline.set(None);
