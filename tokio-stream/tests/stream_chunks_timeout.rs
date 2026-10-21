@@ -28,3 +28,11 @@ async fn stream_chunks_remainder() -> Result<(), Box<dyn Error>> {
     assert_eq!(inner.next().await, Some(5));
     Ok(())
 }
+
+#[tokio::test(start_paused = true)]
+async fn empty_stream_does_not_allocate_large_chunk_buffer() {
+    let chunked = stream::empty::<u8>().chunks_timeout(usize::MAX, Duration::from_secs(1));
+    tokio::pin!(chunked);
+
+    assert_eq!(chunked.next().await, None);
+}

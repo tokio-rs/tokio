@@ -257,6 +257,7 @@ mod unix_datagram {
     assert_value!(UnixStream: Send & Sync & Unpin);
     assert_value!(unix::OwnedReadHalf: Send & Sync & Unpin);
     assert_value!(unix::OwnedWriteHalf: Send & Sync & Unpin);
+    assert_value!(unix::Permissions: Send & Sync & Unpin);
     assert_value!(unix::ReadHalf<'_>: Send & Sync & Unpin);
     assert_value!(unix::ReuniteError: Send & Sync & Unpin);
     assert_value!(unix::SocketAddr: Send & Sync & Unpin);
