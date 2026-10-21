@@ -57,6 +57,7 @@ impl<T, E> FramedWrite<T, E> {
                 state: WriteFrame {
                     buffer: BytesMut::with_capacity(capacity),
                     backpressure_boundary: capacity,
+                    allocate_on_first_use: false,
                 },
             },
         }

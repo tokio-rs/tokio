@@ -30,11 +30,13 @@ pub(crate) struct ReadFrame {
     pub(crate) is_readable: bool,
     pub(crate) buffer: BytesMut,
     pub(crate) has_errored: bool,
+    pub(crate) allocate_on_first_use: bool,
 }
 
 pub(crate) struct WriteFrame {
     pub(crate) buffer: BytesMut,
     pub(crate) backpressure_boundary: usize,
+    pub(crate) allocate_on_first_use: bool,
 }
 
 #[derive(Default)]
@@ -48,8 +50,9 @@ impl Default for ReadFrame {
         Self {
             eof: false,
             is_readable: false,
-            buffer: BytesMut::with_capacity(INITIAL_CAPACITY),
+            buffer: BytesMut::new(),
             has_errored: false,
+            allocate_on_first_use: true,
         }
     }
 }
@@ -57,8 +60,9 @@ impl Default for ReadFrame {
 impl Default for WriteFrame {
     fn default() -> Self {
         Self {
-            buffer: BytesMut::with_capacity(INITIAL_CAPACITY),
+            buffer: BytesMut::new(),
             backpressure_boundary: INITIAL_CAPACITY,
+            allocate_on_first_use: true,
         }
     }
 }
@@ -76,6 +80,7 @@ impl From<BytesMut> for ReadFrame {
             is_readable,
             eof: false,
             has_errored: false,
+            allocate_on_first_use: false,
         }
     }
 }
@@ -90,6 +95,7 @@ impl From<BytesMut> for WriteFrame {
         Self {
             buffer,
             backpressure_boundary: INITIAL_CAPACITY,
+            allocate_on_first_use: false,
         }
     }
 }
@@ -217,6 +223,11 @@ where
             // If we can't build a frame yet, try to read more data and try again.
             // Make sure we've got room for at least one byte to read to ensure
             // that we don't get a spurious 0 that looks like EOF.
+            if state.allocate_on_first_use {
+                let additional = INITIAL_CAPACITY.saturating_sub(state.buffer.len());
+                state.buffer.reserve(additional);
+                state.allocate_on_first_use = false;
+            }
             state.buffer.reserve(1);
             #[allow(clippy::blocks_in_conditions)]
             let bytect = match poll_read_buf(pinned.inner.as_mut(), cx, &mut state.buffer).map_err(
@@ -270,9 +281,13 @@ where
 
     fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
         let pinned = self.project();
-        pinned
-            .codec
-            .encode(item, &mut pinned.state.borrow_mut().buffer)?;
+        let state: &mut WriteFrame = pinned.state.borrow_mut();
+        if state.allocate_on_first_use {
+            let additional = INITIAL_CAPACITY.saturating_sub(state.buffer.len());
+            state.buffer.reserve(additional);
+            state.allocate_on_first_use = false;
+        }
+        pinned.codec.encode(item, &mut state.buffer)?;
         Ok(())
     }
 

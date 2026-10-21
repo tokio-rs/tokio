@@ -60,6 +60,7 @@ impl<T, D> FramedRead<T, D> {
                     is_readable: false,
                     buffer: BytesMut::with_capacity(capacity),
                     has_errored: false,
+                    allocate_on_first_use: false,
                 },
             },
         }

@@ -115,10 +115,12 @@ impl<T, U> Framed<T, U> {
                         is_readable: false,
                         buffer: BytesMut::with_capacity(capacity),
                         has_errored: false,
+                        allocate_on_first_use: false,
                     },
                     write: WriteFrame {
                         buffer: BytesMut::with_capacity(capacity),
                         backpressure_boundary: capacity,
+                        allocate_on_first_use: false,
                     },
                 },
             },

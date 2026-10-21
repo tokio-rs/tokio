@@ -53,6 +53,41 @@ impl Encoder<u64> for U64Encoder {
 }
 
 #[test]
+fn default_framed_buffers_start_unallocated() {
+    let framed = tokio_util::codec::Framed::new((), ());
+    assert_eq!(framed.read_buffer().capacity(), 0);
+    assert_eq!(framed.write_buffer().capacity(), 0);
+}
+
+#[test]
+fn default_write_buffer_allocates_on_first_send() {
+    let mut framed = FramedWrite::new(
+        Mock {
+            calls: VecDeque::new(),
+        },
+        U32Encoder,
+    );
+    assert_eq!(framed.write_buffer().capacity(), 0);
+
+    assert!(pin!(framed).start_send(7).is_ok());
+    assert!(framed.write_buffer().capacity() >= 8 * 1024);
+}
+
+#[test]
+fn explicit_zero_write_capacity_is_preserved() {
+    let mut framed = FramedWrite::with_capacity(
+        Mock {
+            calls: VecDeque::new(),
+        },
+        U32Encoder,
+        0,
+    );
+
+    assert!(pin!(framed).start_send(7).is_ok());
+    assert!(framed.write_buffer().capacity() < 8 * 1024);
+}
+
+#[test]
 fn write_multi_frame_in_packet() {
     let mut task = task::spawn(());
     let mock = mock! {

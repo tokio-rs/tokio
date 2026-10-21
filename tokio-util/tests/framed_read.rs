@@ -67,6 +67,30 @@ impl Decoder for U64Decoder {
 }
 
 #[test]
+fn default_read_buffer_allocates_on_first_poll() {
+    let mut framed = FramedRead::new(&b"\x00\x00\x00\x01"[..], U32Decoder);
+    assert_eq!(framed.read_buffer().capacity(), 0);
+
+    let mut task = task::spawn(());
+    task.enter(|cx, _| {
+        assert_read!(pin!(framed).poll_next(cx), 1);
+    });
+
+    assert!(framed.read_buffer().capacity() > 0);
+}
+
+#[test]
+fn explicit_zero_read_capacity_is_preserved() {
+    let mut framed = FramedRead::with_capacity(&b"\x00\x00\x00\x01"[..], U32Decoder, 0);
+    let mut task = task::spawn(());
+    task.enter(|cx, _| {
+        assert_read!(pin!(framed).poll_next(cx), 1);
+    });
+
+    assert!(framed.read_buffer().capacity() < 8 * 1024);
+}
+
+#[test]
 fn read_multi_frame_in_packet() {
     let mut task = task::spawn(());
     let mock = mock! {
