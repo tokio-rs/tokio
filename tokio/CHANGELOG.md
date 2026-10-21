@@ -1,3 +1,11 @@
+# 1.54.1 (October 21st, 2026)
+
+### Fixed
+
+- time: revert "remove the runtime handle from timers" ([#8692])
+
+[#8692]: https://github.com/tokio-rs/tokio/pull/8692
+
 # 1.54.0 (October 19th, 2026)
 
 The 1.54.0 release includes all changes up to 1.53.3.
