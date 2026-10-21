@@ -1,7 +1,7 @@
 use crate::Stream;
 use futures_core::FusedStream;
 use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll};
 use tokio::sync::mpsc::UnboundedReceiver;
 
 /// A wrapper around [`tokio::sync::mpsc::UnboundedReceiver`] that implements [`Stream`].
@@ -34,16 +34,12 @@ use tokio::sync::mpsc::UnboundedReceiver;
 #[derive(Debug)]
 pub struct UnboundedReceiverStream<T> {
     inner: UnboundedReceiver<T>,
-    done: bool,
 }
 
 impl<T> UnboundedReceiverStream<T> {
     /// Create a new `UnboundedReceiverStream`.
     pub fn new(recv: UnboundedReceiver<T>) -> Self {
-        Self {
-            inner: recv,
-            done: false,
-        }
+        Self { inner: recv }
     }
 
     /// Get back the inner `UnboundedReceiver`.
@@ -54,11 +50,7 @@ impl<T> UnboundedReceiverStream<T> {
     /// Closes the receiving half of a channel without dropping it.
     ///
     /// This prevents any further messages from being sent on the channel while
-    /// still enabling the receiver to drain messages that are buffered. Sends
-    /// that were already in progress may still complete after this call.
-    ///
-    /// To guarantee no messages are dropped, after calling `close()`, you must
-    /// receive all items from the stream until `None` is returned.
+    /// still enabling the receiver to drain messages that are buffered.
     pub fn close(&mut self) {
         self.inner.close();
     }
@@ -68,21 +60,18 @@ impl<T> Stream for UnboundedReceiverStream<T> {
     type Item = T;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let result = ready!(self.inner.poll_recv(cx));
-        self.done = result.is_none();
-        Poll::Ready(result)
+        self.inner.poll_recv(cx)
     }
 
     /// Returns the bounds of the stream based on the underlying receiver.
     ///
-    /// Returns `(receiver.len(), None)` until the stream has returned `None`.
-    /// A closed channel may still have sends in progress that are not counted
-    /// by `receiver.len()`.
+    /// For open channels, it returns `(receiver.len(), None)`.
     ///
-    /// After the stream has returned `None`, it returns `(0, Some(0))`.
+    /// For closed channels, it returns `(receiver.len(), receiver.len())`.
     fn size_hint(&self) -> (usize, Option<usize>) {
-        if self.done {
-            (0, Some(0))
+        if self.inner.is_closed() {
+            let len = self.inner.len();
+            (len, Some(len))
         } else {
             (self.inner.len(), None)
         }
@@ -91,7 +80,7 @@ impl<T> Stream for UnboundedReceiverStream<T> {
 
 impl<T> FusedStream for UnboundedReceiverStream<T> {
     fn is_terminated(&self) -> bool {
-        self.done
+        self.size_hint() == (0, Some(0))
     }
 }
 
@@ -103,8 +92,6 @@ impl<T> AsRef<UnboundedReceiver<T>> for UnboundedReceiverStream<T> {
 
 impl<T> AsMut<UnboundedReceiver<T>> for UnboundedReceiverStream<T> {
     fn as_mut(&mut self) -> &mut UnboundedReceiver<T> {
-        // The caller may replace the receiver with one that is not terminated.
-        self.done = false;
         &mut self.inner
     }
 }

@@ -78,8 +78,7 @@ fn close_during_send() {
     sent.unwrap();
     let (mut stream, size_hint, terminated) = observation.take().unwrap();
     assert!(!terminated, "an accepted send is still unfinished");
-    assert_eq!(size_hint.0, 0);
-    assert!(size_hint.1.is_none_or(|upper| upper >= 1));
+    assert_eq!(size_hint, (1, Some(1)));
 
     let mut cx = Context::from_waker(noop_waker_ref());
     assert_eq!(

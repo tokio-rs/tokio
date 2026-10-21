@@ -98,6 +98,41 @@ fn closing_unbounded_rx() {
 }
 
 #[test]
+fn unbounded_len_and_is_empty_after_close() {
+    loom::model(|| {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let sender = thread::spawn(move || tx.send(()));
+
+        rx.close();
+        // An accepted send must be counted even before its value is ready.
+        let len = rx.len();
+        let is_empty = rx.is_empty();
+
+        let sent = sender.join().unwrap().is_ok();
+        assert_eq!(len, usize::from(sent));
+        assert_eq!(is_empty, !sent);
+    });
+}
+
+#[test]
+fn unbounded_try_recv_after_close() {
+    loom::model(|| {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let sender = thread::spawn(move || tx.send(()));
+
+        rx.close();
+        let received = rx.try_recv();
+
+        if sender.join().unwrap().is_ok() {
+            assert_eq!(received, Ok(()));
+        } else {
+            assert_eq!(received, Err(mpsc::error::TryRecvError::Disconnected));
+        }
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Disconnected));
+    });
+}
+
+#[test]
 fn dropping_tx() {
     loom::model(|| {
         let (tx, mut rx) = mpsc::channel::<()>(16);
