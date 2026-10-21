@@ -220,6 +220,26 @@ fn lines_decoder_max_length_underrun_twice() {
 }
 
 #[test]
+fn lines_decoder_max_length_eof_ends_discard() {
+    const MAX_LENGTH: usize = 6;
+
+    let mut codec = LinesCodec::new_with_max_length(MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put_slice(b"too long line");
+    assert!(codec.decode_eof(buf).is_err());
+    assert_eq!(None, codec.decode_eof(buf).unwrap());
+    assert!(buf.is_empty());
+
+    // The stream resumes after eof: the over-long line ended at eof, so the
+    // first line of the new data must not be discarded with it.
+    buf.put_slice(b"line 1\nline 2\n");
+    assert_eq!("line 1", codec.decode(buf).unwrap().unwrap());
+    assert_eq!("line 2", codec.decode(buf).unwrap().unwrap());
+}
+
+#[test]
 fn lines_encoder() {
     let mut codec = LinesCodec::new();
     let mut buf = BytesMut::new();
@@ -428,6 +448,27 @@ fn any_delimiter_decoder_discard_repeat() {
     assert!(codec.decode(buf).is_err());
     buf.put_slice(b"a");
     assert_eq!(None, codec.decode(buf).unwrap());
+}
+
+#[test]
+fn any_delimiter_decoder_max_length_eof_ends_discard() {
+    const MAX_LENGTH: usize = 6;
+
+    let mut codec =
+        AnyDelimiterCodec::new_with_max_length(b",;\n\r".to_vec(), b",".to_vec(), MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put_slice(b"too long chunk");
+    assert!(codec.decode_eof(buf).is_err());
+    assert_eq!(None, codec.decode_eof(buf).unwrap());
+    assert!(buf.is_empty());
+
+    // The stream resumes after eof: the over-long chunk ended at eof, so the
+    // first chunk of the new data must not be discarded with it.
+    buf.put_slice(b"chunk1,chunk2,");
+    assert_eq!("chunk1", codec.decode(buf).unwrap().unwrap());
+    assert_eq!("chunk2", codec.decode(buf).unwrap().unwrap());
 }
 
 #[test]

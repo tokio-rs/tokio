@@ -195,12 +195,14 @@ impl Decoder for AnyDelimiterCodec {
         Ok(match self.decode(buf)? {
             Some(frame) => Some(frame),
             None => {
+                self.next_index = 0;
+                // A chunk that was being discarded ends at eof.
+                self.is_discarding = false;
                 // return remaining data, if any
                 if buf.is_empty() {
                     None
                 } else {
                     let chunk = buf.split_to(buf.len());
-                    self.next_index = 0;
                     Some(chunk.freeze())
                 }
             }

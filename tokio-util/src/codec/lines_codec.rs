@@ -167,6 +167,8 @@ impl Decoder for LinesCodec {
             Some(frame) => Some(frame),
             None => {
                 self.next_index = 0;
+                // A line that was being discarded ends at eof.
+                self.is_discarding = false;
                 // No terminating newline - return remaining data, if any
                 if buf.is_empty() || buf == &b"\r"[..] {
                     None
