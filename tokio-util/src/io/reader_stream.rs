@@ -77,12 +77,14 @@ impl<R: AsyncRead> ReaderStream<R> {
     /// `Result<Bytes, std::io::Error>`,
     /// with a specific read buffer initial capacity.
     ///
+    /// The buffer is allocated when the stream is first polled.
+    ///
     /// [`AsyncRead`]: tokio::io::AsyncRead
     /// [`Stream`]: futures_core::Stream
     pub fn with_capacity(reader: R, capacity: usize) -> Self {
         ReaderStream {
             reader: Some(reader),
-            buf: BytesMut::with_capacity(capacity),
+            buf: BytesMut::new(),
             capacity,
         }
     }
@@ -125,5 +127,36 @@ impl<R: AsyncRead> Stream for ReaderStream<R> {
 impl<R: AsyncRead> FusedStream for ReaderStream<R> {
     fn is_terminated(&self) -> bool {
         self.reader.is_none()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn with_capacity_defers_allocation_until_polled() {
+        let capacity = 16 * 1024;
+        let mut stream = ReaderStream::with_capacity(tokio::io::empty(), capacity);
+
+        assert_eq!(stream.buf.capacity(), 0);
+
+        let mut cx = Context::from_waker(std::task::Waker::noop());
+        assert!(matches!(
+            Pin::new(&mut stream).poll_next(&mut cx),
+            Poll::Ready(None)
+        ));
+        assert!(stream.buf.capacity() >= capacity);
+    }
+
+    #[test]
+    fn with_capacity_still_reads_data() {
+        let mut stream = ReaderStream::with_capacity(&b"hello"[..], 16 * 1024);
+        let mut cx = Context::from_waker(std::task::Waker::noop());
+
+        match Pin::new(&mut stream).poll_next(&mut cx) {
+            Poll::Ready(Some(Ok(chunk))) => assert_eq!(&chunk[..], b"hello"),
+            result => panic!("unexpected stream result: {result:?}"),
+        }
     }
 }
