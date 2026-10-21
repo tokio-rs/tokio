@@ -226,4 +226,11 @@ impl From<io::Error> for LinesCodecError {
     }
 }
 
-impl std::error::Error for LinesCodecError {}
+impl std::error::Error for LinesCodecError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(err) => Some(err),
+            Self::MaxLineLengthExceeded => None,
+        }
+    }
+}
