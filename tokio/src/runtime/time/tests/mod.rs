@@ -175,6 +175,31 @@ fn reset_future() {
     })
 }
 
+#[test]
+fn interval_poll_tick_races_with_fire() {
+    model(|| {
+        let rt = rt(false);
+        let handle = rt.handle().clone();
+
+        let jh = thread::spawn(move || {
+            let _guard = handle.enter();
+            let mut interval = crate::time::interval_at(
+                crate::time::Instant::now() + crate::time::Duration::from_secs(1),
+                crate::time::Duration::from_secs(1),
+            );
+            let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+            let _ = interval.poll_tick(&mut cx);
+            let _ = interval.poll_tick(&mut cx);
+        });
+
+        let time = rt.handle().inner.driver().time();
+        let clock = rt.handle().inner.driver().clock();
+        time.process_at_time(time.time_source().now(clock) + 2_000_000_000);
+
+        jh.join().unwrap();
+    })
+}
+
 #[cfg(not(loom))]
 fn normal_or_miri<T>(normal: T, miri: T) -> T {
     if cfg!(miri) {
