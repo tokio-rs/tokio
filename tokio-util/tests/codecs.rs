@@ -271,7 +271,10 @@ fn any_delimiters_decoder_rescans_shortened_buffer() {
 
     buf.clear();
     buf.put_slice(b"new;");
-    assert_eq!(Some(Bytes::from_static(b"new")), codec.decode(&mut buf).unwrap());
+    assert_eq!(
+        Some(Bytes::from_static(b"new")),
+        codec.decode(&mut buf).unwrap()
+    );
 }
 
 #[test]
