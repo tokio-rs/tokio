@@ -42,14 +42,14 @@ impl Timer {
     }
 
     pub(crate) fn reset(&mut self, handle: &scheduler::Handle, deadline: u64) {
-        let waker = self.entry.cancel_and_take_waker();
+        let waker = self.entry.cancel();
         // Install the waker before registration so an already-expired deadline
         // cannot fire before the new entry knows which task to wake.
         *self = Self::register(handle, EntryHandle::new_with_waker(deadline, waker));
     }
 
     pub(crate) fn cancel(&self) {
-        self.entry.cancel();
+        drop(self.entry.cancel());
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {

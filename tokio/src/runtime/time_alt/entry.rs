@@ -250,11 +250,8 @@ impl Handle {
         Poll::Pending
     }
 
-    pub(crate) fn cancel(&self) {
-        drop(self.cancel_and_take_waker());
-    }
-
-    pub(super) fn cancel_and_take_waker(&self) -> Option<Waker> {
+    /// Cancel the entry and return its registered waker, if any.
+    pub(crate) fn cancel(&self) -> Option<Waker> {
         let mut lock = self.entry.state.lock();
         if !lock.cancelled {
             lock.cancelled = true;
