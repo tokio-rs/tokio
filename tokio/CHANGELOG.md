@@ -1,3 +1,161 @@
+# 1.54.0 (October 19th, 2026)
+
+The 1.54.0 release includes all changes up to 1.53.3.
+
+The MSRV is increased to 1.85. ([#8514])
+
+### Added
+
+- fs: add `File::set_times`, `File::set_modified`, and `fs::FileTimes` ([#8504])
+- net: implement `Default` for `named_pipe::{ClientOptions, ServerOptions}` ([#8378])
+- runtime: add `Builder::max_io_events_per_busy_tick` ([#8410])
+- runtime: stabilize `tokio::runtime::worker_index()` ([#8431])
+- sync: add `SemaphorePermit::semaphore()` ([#8482])
+- sync: add `blocking_acquire` methods to `Semaphore` ([#8269])
+- sync: add `watch::Receiver::is_closed` ([#8481])
+- wasm: support JSPI for Emscripten target ([#8285], [#8627])
+- wasm: support the `wasm32-unknown-emscripten` target ([#8281], [#8422], [#8528], [#8628])
+
+### Changed
+
+- fs: reject zero in `File::set_max_buf_size` ([#8449])
+- io: make `copy_buf` cooperative ([#8459])
+- io: panic when `BufReader` or `BufStream` is created with zero capacity ([#8494])
+- io: panic when in-memory pipe is created with zero capacity ([#8397])
+- io: reject zero buffer size in `copy_bidirectional_with_sizes` ([#8454])
+- io: support vectored writes in `Sink` ([#8663])
+- net: start `UnixStream::pair` and `UnixDatagram::pair` sockets as writable ([#8444])
+- net: start accepted sockets as readable and writable ([#8435])
+- net: support `UCred` on Fuchsia ([#8257])
+- process: use `mio::unix::pipe` for Unix child stdio ([#8603])
+- runtime: cache-pad the shared injection queue and idle state ([#8622])
+- runtime: decide auto-boxing of spawned futures at monomorphization time ([#8414])
+- runtime: make `enable_io` available whenever `rt` is enabled ([#8387])
+- runtime: move `block_in_place` setup into a non-generic function ([#8315])
+- runtime: move the multi-thread inject queue to its own mutex ([#8382])
+- runtime: panic when `max_io_events_per_tick` is zero ([#8476])
+- runtime: suggest `.await` in nested `block_on` panic message ([#8501])
+- sync: avoid atomic reader count in broadcast slots ([#8357])
+- sync: use acquire/release orderings in `Notify` ([#8325])
+- time: remove the runtime handle from timers ([#8458])
+
+### Fixed
+
+- fs: restore `File` internal state when op fails ([#8291])
+- io: complete zero-length memory stream operations immediately ([#8323])
+- io: flush the writer when the reader stalls in `copy_buf` ([#8424])
+- io: keep the shutdown bit when clearing readiness ([#8435])
+- io: preserve the full `ScheduledIo` tick in readiness events ([#8331])
+- io: read lines as bytes so a partial line survives an I/O error ([#8400])
+- io: retry on `ErrorKind::Interrupted` in more I/O operations ([#8417], [#8432], [#8448], [#8453], [#8455], [#8460])
+- io: use `spawn_mandatory_blocking` for stdout and stderr ([#8506])
+- io: wait for pending operations before `BufReader` seeks ([#8599])
+- net: close `CreateFileW` handle on `SetNamedPipeHandleState` failure ([#8418])
+- net: fix peer credentials on NetBSD ([#8589])
+- net: saturate `TcpSocket` and `UnixSocket` listen backlog ([#8511])
+- net: treat `ENOTCONN` as success in `UnixStream::shutdown` ([#8526])
+- runtime: allow building with `--all-features` without `tokio_unstable` ([#8401])
+- runtime: avoid overflow in `shutdown_timeout()` ([#8497])
+- runtime: fix `spawn_blocking` hang when only scheduler workers exist ([#8408])
+- runtime: fix misleading signal driver panic message ([#8419])
+- sync: preserve FIFO lock order when coop budget is exhausted ([#8371])
+- sync: use `usize` for permit count in `SemaphorePermit` ([#8405])
+- time: avoid interval deadline overflow ([#8385])
+- time: handle wrapped top-level timer-wheel slots ([#8334])
+
+### Unstable
+
+- fs: fall back when `io_uring` has no IO driver ([#8165])
+- metrics: cap log histogram precision ([#8496])
+- runtime: add an opt-in sharded `spawn_blocking` queue ([#8337])
+- runtime: expose schedule latency in task hooks ([#8282])
+- taskdump: fix idle bookkeeping when a task dump wakes parked workers ([#8372])
+- taskdump: skip non-idle tasks during taskdumps ([#8568])
+
+### Documented
+
+- docs: fix stray braces and broken links in rustdoc ([#8605])
+- fs: document cancellation behavior of `tokio::fs` ([#8265])
+- net: add Safety docs for named pipe `from_raw_handle` ([#8378])
+- net: document that `TcpStream::connect` returns only the last error ([#8421])
+- runtime: add error documentation for `runtime::Builder` ([#8297])
+- runtime: link `available_parallelism` in worker count docs ([#8625])
+- sync: clarify panic behavior of `broadcast::channel()` ([#8420])
+- sync: fix typo in `Semaphore` documentation ([#8521])
+
+[#8165]: https://github.com/tokio-rs/tokio/pull/8165
+[#8257]: https://github.com/tokio-rs/tokio/pull/8257
+[#8265]: https://github.com/tokio-rs/tokio/pull/8265
+[#8269]: https://github.com/tokio-rs/tokio/pull/8269
+[#8281]: https://github.com/tokio-rs/tokio/pull/8281
+[#8282]: https://github.com/tokio-rs/tokio/pull/8282
+[#8285]: https://github.com/tokio-rs/tokio/pull/8285
+[#8291]: https://github.com/tokio-rs/tokio/pull/8291
+[#8297]: https://github.com/tokio-rs/tokio/pull/8297
+[#8315]: https://github.com/tokio-rs/tokio/pull/8315
+[#8323]: https://github.com/tokio-rs/tokio/pull/8323
+[#8325]: https://github.com/tokio-rs/tokio/pull/8325
+[#8331]: https://github.com/tokio-rs/tokio/pull/8331
+[#8334]: https://github.com/tokio-rs/tokio/pull/8334
+[#8337]: https://github.com/tokio-rs/tokio/pull/8337
+[#8357]: https://github.com/tokio-rs/tokio/pull/8357
+[#8371]: https://github.com/tokio-rs/tokio/pull/8371
+[#8372]: https://github.com/tokio-rs/tokio/pull/8372
+[#8378]: https://github.com/tokio-rs/tokio/pull/8378
+[#8382]: https://github.com/tokio-rs/tokio/pull/8382
+[#8385]: https://github.com/tokio-rs/tokio/pull/8385
+[#8387]: https://github.com/tokio-rs/tokio/pull/8387
+[#8397]: https://github.com/tokio-rs/tokio/pull/8397
+[#8400]: https://github.com/tokio-rs/tokio/pull/8400
+[#8401]: https://github.com/tokio-rs/tokio/pull/8401
+[#8405]: https://github.com/tokio-rs/tokio/pull/8405
+[#8408]: https://github.com/tokio-rs/tokio/pull/8408
+[#8410]: https://github.com/tokio-rs/tokio/pull/8410
+[#8414]: https://github.com/tokio-rs/tokio/pull/8414
+[#8417]: https://github.com/tokio-rs/tokio/pull/8417
+[#8418]: https://github.com/tokio-rs/tokio/pull/8418
+[#8419]: https://github.com/tokio-rs/tokio/pull/8419
+[#8420]: https://github.com/tokio-rs/tokio/pull/8420
+[#8421]: https://github.com/tokio-rs/tokio/pull/8421
+[#8422]: https://github.com/tokio-rs/tokio/pull/8422
+[#8424]: https://github.com/tokio-rs/tokio/pull/8424
+[#8431]: https://github.com/tokio-rs/tokio/pull/8431
+[#8432]: https://github.com/tokio-rs/tokio/pull/8432
+[#8435]: https://github.com/tokio-rs/tokio/pull/8435
+[#8444]: https://github.com/tokio-rs/tokio/pull/8444
+[#8448]: https://github.com/tokio-rs/tokio/pull/8448
+[#8449]: https://github.com/tokio-rs/tokio/pull/8449
+[#8453]: https://github.com/tokio-rs/tokio/pull/8453
+[#8454]: https://github.com/tokio-rs/tokio/pull/8454
+[#8455]: https://github.com/tokio-rs/tokio/pull/8455
+[#8458]: https://github.com/tokio-rs/tokio/pull/8458
+[#8459]: https://github.com/tokio-rs/tokio/pull/8459
+[#8460]: https://github.com/tokio-rs/tokio/pull/8460
+[#8476]: https://github.com/tokio-rs/tokio/pull/8476
+[#8481]: https://github.com/tokio-rs/tokio/pull/8481
+[#8482]: https://github.com/tokio-rs/tokio/pull/8482
+[#8494]: https://github.com/tokio-rs/tokio/pull/8494
+[#8496]: https://github.com/tokio-rs/tokio/pull/8496
+[#8497]: https://github.com/tokio-rs/tokio/pull/8497
+[#8501]: https://github.com/tokio-rs/tokio/pull/8501
+[#8504]: https://github.com/tokio-rs/tokio/pull/8504
+[#8506]: https://github.com/tokio-rs/tokio/pull/8506
+[#8511]: https://github.com/tokio-rs/tokio/pull/8511
+[#8514]: https://github.com/tokio-rs/tokio/pull/8514
+[#8521]: https://github.com/tokio-rs/tokio/pull/8521
+[#8526]: https://github.com/tokio-rs/tokio/pull/8526
+[#8528]: https://github.com/tokio-rs/tokio/pull/8528
+[#8568]: https://github.com/tokio-rs/tokio/pull/8568
+[#8589]: https://github.com/tokio-rs/tokio/pull/8589
+[#8599]: https://github.com/tokio-rs/tokio/pull/8599
+[#8603]: https://github.com/tokio-rs/tokio/pull/8603
+[#8605]: https://github.com/tokio-rs/tokio/pull/8605
+[#8622]: https://github.com/tokio-rs/tokio/pull/8622
+[#8625]: https://github.com/tokio-rs/tokio/pull/8625
+[#8627]: https://github.com/tokio-rs/tokio/pull/8627
+[#8628]: https://github.com/tokio-rs/tokio/pull/8628
+[#8663]: https://github.com/tokio-rs/tokio/pull/8663
+
 # 1.53.3 (October 13th, 2026)
 
 ### Added
