@@ -193,6 +193,9 @@ cfg_test_util! {
             inner.unfrozen = Some(std::time::Instant::now());
             Ok(())
         });
+
+        #[cfg(feature = "rt")]
+        crate::runtime::Handle::current().inner.driver().unpark();
     }
 
     /// Advances time.
@@ -276,6 +279,9 @@ cfg_test_util! {
 
             clock.advance(duration)
         });
+
+        #[cfg(feature = "rt")]
+        crate::runtime::Handle::current().inner.driver().unpark();
 
         crate::task::yield_now().await;
     }

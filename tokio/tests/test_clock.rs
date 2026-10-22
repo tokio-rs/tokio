@@ -56,3 +56,66 @@ async fn resuming_time_when_not_frozen_panics() {
     time::resume();
     time::resume();
 }
+
+#[cfg(not(any(target_os = "wasi", target_os = "emscripten")))]
+#[test]
+fn advance_wakes_parked_driver() {
+    use std::future::Future;
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc, Arc,
+    };
+    use std::task::Poll;
+
+    for enable_io in [false, true] {
+        let armed = Arc::new(AtomicBool::new(false));
+        let (go_tx, go_rx) = mpsc::channel();
+        let mut builder = tokio::runtime::Builder::new_current_thread();
+        builder.enable_time().start_paused(true).on_thread_park({
+            let armed = armed.clone();
+            move || {
+                if armed.swap(false, Ordering::SeqCst) {
+                    let _ = go_tx.send(());
+                }
+            }
+        });
+        if enable_io {
+            builder.enable_io();
+        }
+        let rt = builder.build().unwrap();
+
+        rt.block_on(async {
+            let start = Instant::now();
+            let duration = Duration::from_secs(60);
+            let (timer_complete_tx, timer_complete_rx) = mpsc::channel();
+            let handle = tokio::runtime::Handle::current();
+            // The blocking task inhibits auto-advance, so the driver parks in
+            // real time. It stays alive until the timer fires, so its release
+            // cannot be what wakes the driver.
+            let worker = tokio::task::spawn_blocking(move || {
+                go_rx
+                    .recv_timeout(Duration::from_secs(5))
+                    .map_err(|_| "runtime did not start parking")?;
+                std::thread::sleep(Duration::from_millis(20));
+                handle.block_on(time::advance(duration));
+                timer_complete_rx
+                    .recv_timeout(Duration::from_secs(5))
+                    .map_err(|_| "parked timer did not complete before watchdog")
+            });
+
+            let sleep = time::sleep(duration);
+            tokio::pin!(sleep);
+            std::future::poll_fn(|cx| {
+                assert!(sleep.as_mut().poll(cx).is_pending());
+                Poll::Ready(())
+            })
+            .await;
+            armed.store(true, Ordering::SeqCst);
+            sleep.await;
+            let elapsed = start.elapsed();
+            let _ = timer_complete_tx.send(());
+            worker.await.unwrap().unwrap();
+            assert_eq!(elapsed, duration);
+        });
+    }
+}
