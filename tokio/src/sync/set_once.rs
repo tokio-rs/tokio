@@ -20,8 +20,10 @@ use std::task::Poll;
 //  2. When `value_set` is true, the wait() future completes, get() will return
 //      Some(&T)
 //
-// The value cannot be changed after set() is called. Subsequent calls to set()
-// will return a `SetOnceError`.
+// The value cannot be changed through set() after the first successful call;
+// subsequent calls to set() will return a `SetOnceError`. It can still be
+// changed through get_mut(), since a mutable borrow of the SetOnce statically
+// guarantees no other references to the value exist.
 
 /// A thread-safe cell that can be written to only once.
 ///
@@ -300,9 +302,7 @@ impl<T> SetOnce<T> {
     /// assert_eq!(cell.get(), Some(&6));
     /// ```
     pub fn get_mut(&mut self) -> Option<&mut T> {
-        // Since we hold `&mut self`, no other thread can be reading or
-        // writing `value_set` concurrently, so any memory ordering is
-        // sufficient here.
+        // Exclusive access makes a relaxed load sufficient.
         if self.value_set.load(Ordering::Relaxed) {
             // SAFETY: we just checked that the SetOnce is initialized.
             Some(unsafe { self.get_unchecked_mut() })
