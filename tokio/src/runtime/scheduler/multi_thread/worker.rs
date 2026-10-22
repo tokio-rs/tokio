@@ -448,7 +448,7 @@ fn maybe_move_runtime() -> Result<(bool, bool), &'static str> {
                     // This probably means we are on the current_thread runtime or in a
                     // LocalSet, where it is _not_ okay to block.
                     return Err(
-                        "can call blocking only when running on the multi-threaded runtime",
+                        "cannot call `block_in_place` from a `current_thread` runtime or from within a `LocalSet`",
                     );
                 }
             }
