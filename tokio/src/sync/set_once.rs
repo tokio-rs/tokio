@@ -20,10 +20,10 @@ use std::task::Poll;
 //  2. When `value_set` is true, the wait() future completes, get() will return
 //      Some(&T)
 //
-// The value cannot be changed through set() after the first successful call;
-// subsequent calls to set() will return a `SetOnceError`. It can still be
-// changed through get_mut(), since a mutable borrow of the SetOnce statically
-// guarantees no other references to the value exist.
+// Through shared access (`&SetOnce`), the value can only be set once, via
+// set(); subsequent calls to set() will return a `SetOnceError`. As with any
+// type, a caller with exclusive access (`&mut SetOnce`) can still mutate or
+// replace the value directly, e.g. via get_mut().
 
 /// A thread-safe cell that can be written to only once.
 ///
