@@ -356,6 +356,20 @@ cfg_test_util! {
             inner.unfrozen.is_none() && inner.auto_advance_inhibit_count == 0
         }
 
+        /// Advances the clock by `duration` only if it is still paused, not
+        /// inhibited, and reads `now`. Another thread may have changed it since
+        /// the driver computed `duration` from `now`.
+        pub(crate) fn try_auto_advance(&self, now: Instant, duration: Duration) {
+            let mut inner = self.inner.lock();
+
+            if inner.unfrozen.is_none()
+                && inner.auto_advance_inhibit_count == 0
+                && inner.base == now.into_std()
+            {
+                inner.base += duration;
+            }
+        }
+
         pub(crate) fn advance(&self, duration: Duration) -> Result<(), &'static str> {
             let mut inner = self.inner.lock();
 
