@@ -380,3 +380,47 @@ async fn paused_time_spawn_unix_datagram_and_sleep() {
     h.await.unwrap();
     assert_eq!(time.elapsed(), Duration::from_millis(100));
 }
+
+// Regression test for https://github.com/tokio-rs/tokio/issues/8696:
+// `time::advance()` must wake the driver when it is parked in real time
+// because auto-advance is inhibited (here: a `spawn_blocking` task running).
+// Without the wakeup the timer only fires when the real-time park expires
+// (one timer-wheel slot, ~8.2 s), instead of right after the advance.
+#[test]
+fn advance_wakes_parked_driver_while_auto_advance_inhibited() {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .start_paused(true)
+        .build()
+        .unwrap();
+
+    let handle = rt.handle().clone();
+    let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+
+    rt.block_on(async {
+        let blocker = tokio::task::spawn_blocking(move || {
+            // Let the driver park in real time (auto-advance is inhibited
+            // while this blocking task runs), then advance past the deadline.
+            std::thread::sleep(Duration::from_millis(100));
+            handle.block_on(tokio::time::advance(Duration::from_secs(10)));
+            // Stay alive: dropping this task would release the inhibit and
+            // unpark the driver via `BlockingSchedule::release`, masking the
+            // bug this test covers.
+            let _ = done_rx.recv();
+        });
+
+        // Measure with the *real* (std) clock: under the paused clock the
+        // 10 s sleep always reports 10 s of virtual time either way.
+        let start = std::time::Instant::now();
+        tokio::time::sleep(Duration::from_secs(10)).await;
+        let elapsed = start.elapsed();
+
+        drop(done_tx);
+        blocker.await.unwrap();
+
+        assert!(
+            elapsed < Duration::from_secs(5),
+            "timer fired after {elapsed:?} of real time"
+        );
+    });
+}

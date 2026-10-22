@@ -277,6 +277,15 @@ cfg_test_util! {
             clock.advance(duration)
         });
 
+        // Wake the driver: it may be parked in real time while auto-advance is
+        // inhibited (e.g. a `spawn_blocking` task is running). The clock just
+        // moved underneath it, so it must re-evaluate its timers instead of
+        // sleeping out the stale real-time park.
+        #[cfg(feature = "rt")]
+        if let Ok(handle) = crate::runtime::Handle::try_current() {
+            handle.inner.driver().unpark();
+        }
+
         crate::task::yield_now().await;
     }
 
