@@ -530,24 +530,14 @@ impl<T: ?Sized> RwLock<T> {
         crate::future::block_on(self.read())
     }
 
-    /// Blockingly locks this `RwLock` with shared read access, returning an
-    /// owned [`OwnedRwLockReadGuard`].
-    ///
-    /// This method is identical to [`RwLock::blocking_read`], except that the
-    /// returned guard references the `RwLock` with an [`Arc`] rather than by
-    /// borrowing it. Therefore, the `RwLock` must be wrapped in an `Arc` to
-    /// call this method, and the guard will live for the `'static` lifetime,
-    /// as it keeps the `RwLock` alive by holding an `Arc`.
+    /// Like [`RwLock::blocking_read`], but takes an [`Arc`] and returns a guard
+    /// that keeps the lock alive instead of borrowing it.
     ///
     /// # Panics
     ///
-    /// This function panics if called within an asynchronous execution context.
-    ///
-    ///   - If you find yourself in an asynchronous execution context and needing
-    ///     to call some (synchronous) function which performs one of these
-    ///     `blocking_` operations, then consider wrapping that call inside
-    ///     [`spawn_blocking()`][crate::runtime::Handle::spawn_blocking]
-    ///     (or [`block_in_place()`][crate::task::block_in_place]).
+    /// Panics if called within an asynchronous execution context.
+    /// Use [`spawn_blocking`](crate::task::spawn_blocking) or
+    /// [`block_in_place`](crate::task::block_in_place) when calling from async code.
     ///
     /// # Examples
     ///
@@ -557,29 +547,16 @@ impl<T: ?Sized> RwLock<T> {
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let rwlock = Arc::new(RwLock::new(1));
-    ///     let mut write_lock = rwlock.write().await;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let rwlock = Arc::new(RwLock::new(1));
     ///
-    ///     let blocking_task = tokio::task::spawn_blocking({
-    ///         let rwlock = Arc::clone(&rwlock);
-    ///         move || {
-    ///             // This shall block until the `write_lock` is released.
-    ///             let read_lock = rwlock.blocking_read_owned();
-    ///             assert_eq!(*read_lock, 0);
-    ///         }
-    ///     });
+    /// let read_lock = tokio::task::spawn_blocking(move || rwlock.blocking_read_owned())
+    ///     .await
+    ///     .unwrap();
     ///
-    ///     *write_lock -= 1;
-    ///     drop(write_lock); // release the lock.
-    ///
-    ///     // Await the completion of the blocking task.
-    ///     blocking_task.await.unwrap();
-    ///
-    ///     // Assert uncontended.
-    ///     assert!(rwlock.try_write().is_ok());
-    /// }
+    /// assert_eq!(*read_lock, 1);
+    /// # }
     /// # }
     /// ```
     ///
@@ -938,24 +915,14 @@ impl<T: ?Sized> RwLock<T> {
         crate::future::block_on(self.write())
     }
 
-    /// Blockingly locks this `RwLock` with exclusive write access, returning
-    /// an owned [`OwnedRwLockWriteGuard`].
-    ///
-    /// This method is identical to [`RwLock::blocking_write`], except that the
-    /// returned guard references the `RwLock` with an [`Arc`] rather than by
-    /// borrowing it. Therefore, the `RwLock` must be wrapped in an `Arc` to
-    /// call this method, and the guard will live for the `'static` lifetime,
-    /// as it keeps the `RwLock` alive by holding an `Arc`.
+    /// Like [`RwLock::blocking_write`], but takes an [`Arc`] and returns a guard
+    /// that keeps the lock alive instead of borrowing it.
     ///
     /// # Panics
     ///
-    /// This function panics if called within an asynchronous execution context.
-    ///
-    ///   - If you find yourself in an asynchronous execution context and needing
-    ///     to call some (synchronous) function which performs one of these
-    ///     `blocking_` operations, then consider wrapping that call inside
-    ///     [`spawn_blocking()`][crate::runtime::Handle::spawn_blocking]
-    ///     (or [`block_in_place()`][crate::task::block_in_place]).
+    /// Panics if called within an asynchronous execution context.
+    /// Use [`spawn_blocking`](crate::task::spawn_blocking) or
+    /// [`block_in_place`](crate::task::block_in_place) when calling from async code.
     ///
     /// # Examples
     ///
@@ -965,31 +932,17 @@ impl<T: ?Sized> RwLock<T> {
     /// use std::sync::Arc;
     /// use tokio::sync::RwLock;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let rwlock = Arc::new(RwLock::new(1));
-    ///     let read_lock = rwlock.read().await;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let rwlock = Arc::new(RwLock::new(1));
     ///
-    ///     let blocking_task = tokio::task::spawn_blocking({
-    ///         let rwlock = Arc::clone(&rwlock);
-    ///         move || {
-    ///             // This shall block until the `read_lock` is released.
-    ///             let mut write_lock = rwlock.blocking_write_owned();
-    ///             *write_lock = 2;
-    ///         }
-    ///     });
+    /// let mut write_lock = tokio::task::spawn_blocking(move || rwlock.blocking_write_owned())
+    ///     .await
+    ///     .unwrap();
     ///
-    ///     assert_eq!(*read_lock, 1);
-    ///     // Release the last outstanding read lock.
-    ///     drop(read_lock);
-    ///
-    ///     // Await the completion of the blocking task.
-    ///     blocking_task.await.unwrap();
-    ///
-    ///     // Assert uncontended.
-    ///     let read_lock = rwlock.try_read().unwrap();
-    ///     assert_eq!(*read_lock, 2);
-    /// }
+    /// *write_lock = 2;
+    /// assert_eq!(*write_lock, 2);
+    /// # }
     /// # }
     /// ```
     ///
