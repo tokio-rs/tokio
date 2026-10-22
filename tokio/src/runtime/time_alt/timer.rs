@@ -18,10 +18,16 @@ impl std::fmt::Debug for Timer {
     }
 }
 
+impl Drop for Timer {
+    fn drop(&mut self) {
+        self.entry.cancel();
+    }
+}
+
 impl Timer {
     #[track_caller]
-    pub(crate) fn new(handle: &scheduler::Handle, deadline: u64) -> Self {
-        Self::register(handle, EntryHandle::new(deadline))
+    pub(crate) fn new(handle: scheduler::Handle, deadline: u64) -> Self {
+        Self::register(&handle, EntryHandle::new(deadline))
     }
 
     #[track_caller]
@@ -46,10 +52,6 @@ impl Timer {
         // Install the waker before registration so an already-expired deadline
         // cannot fire before the new entry knows which task to wake.
         *self = Self::register(handle, EntryHandle::new_with_waker(deadline, waker));
-    }
-
-    pub(crate) fn cancel(&self) {
-        drop(self.entry.cancel());
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {
