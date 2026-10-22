@@ -182,7 +182,7 @@ mod block_in_place_cases {
     }
 
     #[test]
-    #[should_panic = "can call blocking only when running on the multi-threaded runtime"]
+    #[should_panic = "cannot call `block_in_place` from a `current_thread` runtime or from within a `LocalSet`"]
     fn local_threadpool_blocking_in_place() {
         thread_local! {
             static ON_RT_THREAD: Cell<bool> = const { Cell::new(false) };
@@ -206,7 +206,7 @@ mod block_in_place_cases {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[should_panic = "can call blocking only when running on the multi-threaded runtime"]
+    #[should_panic = "cannot call `block_in_place` from a `current_thread` runtime or from within a `LocalSet`"]
     async fn block_in_place_in_run_until_mt() {
         let local_set = LocalSet::new();
         local_set
@@ -217,7 +217,7 @@ mod block_in_place_cases {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[should_panic = "can call blocking only when running on the multi-threaded runtime"]
+    #[should_panic = "cannot call `block_in_place` from a `current_thread` runtime or from within a `LocalSet`"]
     async fn block_in_place_in_spawn_local_mt() {
         let local_set = LocalSet::new();
         let jh = local_set.spawn_local(async {
@@ -228,7 +228,7 @@ mod block_in_place_cases {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[should_panic = "can call blocking only when running on the multi-threaded runtime"]
+    #[should_panic = "cannot call `block_in_place` from a `current_thread` runtime or from within a `LocalSet`"]
     async fn block_in_place_in_spawn_local_drop_mt() {
         let local_set = LocalSet::new();
         let jh = local_set.spawn_local(BlockInPlaceOnDrop);
@@ -238,7 +238,7 @@ mod block_in_place_cases {
     }
 
     #[tokio::test(flavor = "current_thread")]
-    #[should_panic = "can call blocking only when running on the multi-threaded runtime"]
+    #[should_panic = "cannot call `block_in_place` from a `current_thread` runtime or from within a `LocalSet`"]
     async fn block_in_place_in_run_until_ct() {
         let local_set = LocalSet::new();
         local_set
@@ -249,7 +249,7 @@ mod block_in_place_cases {
     }
 
     #[tokio::test(flavor = "current_thread")]
-    #[should_panic = "can call blocking only when running on the multi-threaded runtime"]
+    #[should_panic = "cannot call `block_in_place` from a `current_thread` runtime or from within a `LocalSet`"]
     async fn block_in_place_in_spawn_local_ct() {
         let local_set = LocalSet::new();
         let jh = local_set.spawn_local(async {
@@ -260,7 +260,7 @@ mod block_in_place_cases {
     }
 
     #[tokio::test(flavor = "current_thread")]
-    #[should_panic = "can call blocking only when running on the multi-threaded runtime"]
+    #[should_panic = "cannot call `block_in_place` from a `current_thread` runtime or from within a `LocalSet`"]
     async fn block_in_place_in_spawn_local_drop_ct() {
         let local_set = LocalSet::new();
         let jh = local_set.spawn_local(BlockInPlaceOnDrop);
