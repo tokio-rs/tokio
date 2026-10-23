@@ -110,6 +110,23 @@ async fn sleep_auto_advance_from_fractional_time() {
     }
 }
 
+#[tokio::test(start_paused = true)]
+async fn sub_ms_deadline_elapses_at_next_ms_tick() {
+    let start = Instant::now();
+    let mut sleep = task::spawn(time::sleep_until(start + Duration::from_micros(10_500)));
+    assert_pending!(sleep.poll());
+
+    time::advance(Duration::from_micros(10_500)).await;
+    assert_pending!(sleep.poll());
+
+    time::advance(Duration::from_micros(499)).await;
+    assert_pending!(sleep.poll());
+
+    time::advance(Duration::from_micros(1)).await;
+    assert!(sleep.is_woken());
+    assert_ready!(sleep.poll());
+}
+
 #[tokio::test]
 async fn delayed_sleep_wrapping_level_0() {
     time::pause();
