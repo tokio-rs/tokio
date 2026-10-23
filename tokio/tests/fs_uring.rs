@@ -20,29 +20,10 @@ use tokio::{
     runtime::{Builder, Runtime},
 };
 
-fn multi_rt(n: usize) -> Box<dyn Fn() -> Runtime> {
-    Box::new(move || {
-        Builder::new_multi_thread()
-            .worker_threads(n)
-            .enable_all()
-            .build()
-            .unwrap()
-    })
-}
+use crate::support::io_uring::rt_combinations;
 
-fn current_rt() -> Box<dyn Fn() -> Runtime> {
-    Box::new(|| Builder::new_current_thread().enable_all().build().unwrap())
-}
-
-fn rt_combinations() -> Vec<Box<dyn Fn() -> Runtime>> {
-    vec![
-        current_rt(),
-        multi_rt(1),
-        multi_rt(2),
-        multi_rt(8),
-        multi_rt(64),
-        multi_rt(256),
-    ]
+mod support {
+    pub(crate) mod io_uring;
 }
 
 #[test]
