@@ -26,8 +26,9 @@ impl Handle {
                 did_wake.store(true, std::sync::atomic::Ordering::SeqCst);
             }
             #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-            super::Inner::Alternative { ref did_wake, .. } => {
-                did_wake.store(true, std::sync::atomic::Ordering::SeqCst);
+            super::Inner::Alternative { .. } => {
+                // Wake tracking only prevents paused-clock auto-advance. The alternative
+                // timer runs on multi-thread runtimes, where time cannot be paused.
             }
         }
     }
