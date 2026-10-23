@@ -38,7 +38,7 @@ jobs:
           tar xf linux-${KERNEL_VERSION}.tar.xz
           cd linux-${KERNEL_VERSION}
           make defconfig
-          make -j$(nproc)
+          make -j$(nproc) CC="gcc -std=gnu11"
 
       - name: Generate test binaries with io_uring enabled
         run: |
