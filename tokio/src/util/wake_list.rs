@@ -1,5 +1,5 @@
-use core::mem::MaybeUninit;
-use core::ptr;
+use core::mem::{self, MaybeUninit};
+use core::{ptr, slice};
 use std::task::Waker;
 
 const NUM_WAKERS: usize = 32;
@@ -12,6 +12,31 @@ const NUM_WAKERS: usize = 32;
 pub(crate) struct WakeList {
     inner: [MaybeUninit<Waker>; NUM_WAKERS],
     curr: usize,
+}
+
+struct Drain<'a> {
+    inner: slice::IterMut<'a, MaybeUninit<Waker>>,
+}
+
+impl Iterator for Drain<'_> {
+    type Item = Waker;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().map(|waker| {
+            // SAFETY: `Drain` only iterates over initialized wakers.
+            unsafe { waker.assume_init_read() }
+        })
+    }
+}
+
+impl Drop for Drain<'_> {
+    fn drop(&mut self) {
+        let len = self.inner.len();
+        let ptr = self.inner.as_slice().as_ptr().cast::<Waker>().cast_mut();
+
+        // SAFETY: All remaining wakers in the iterator are initialized.
+        unsafe { ptr::drop_in_place(ptr::slice_from_raw_parts_mut(ptr, len)) };
+    }
 }
 
 impl WakeList {
@@ -36,38 +61,19 @@ impl WakeList {
         self.curr += 1;
     }
 
-    pub(crate) fn wake_all(&mut self) {
-        struct DropGuard {
-            start: *mut Waker,
-            end: *mut Waker,
-        }
-
-        impl Drop for DropGuard {
-            fn drop(&mut self) {
-                // SAFETY: Both pointers are part of the same object, with `start <= end`.
-                let len = unsafe { self.end.offset_from(self.start) } as usize;
-                let slice = ptr::slice_from_raw_parts_mut(self.start, len);
-                // SAFETY: All elements in `start..len` are initialized, so we can drop them.
-                unsafe { ptr::drop_in_place(slice) };
-            }
-        }
-
+    fn drain(&mut self) -> Drain<'_> {
         debug_assert!(self.curr <= NUM_WAKERS);
 
-        let mut guard = {
-            let start = self.inner.as_mut_ptr().cast::<Waker>();
-            // SAFETY: The resulting pointer is in bounds or one after the length of the same object.
-            let end = unsafe { start.add(self.curr) };
-            // Transfer ownership of the wakers in `inner` to `DropGuard`.
-            self.curr = 0;
-            DropGuard { start, end }
-        };
-        while !ptr::eq(guard.start, guard.end) {
-            // SAFETY: `start` is always initialized if `start != end`.
-            let waker = unsafe { ptr::read(guard.start) };
-            // SAFETY: The resulting pointer is in bounds or one after the length of the same object.
-            guard.start = unsafe { guard.start.add(1) };
-            // If this panics, then `guard` will clean up the remaining wakers.
+        let curr = mem::take(&mut self.curr);
+
+        Drain {
+            inner: self.inner[..curr].iter_mut(),
+        }
+    }
+
+    pub(crate) fn wake_all(&mut self) {
+        for waker in self.drain() {
+            // If this panics, then `Drain` will drop the remaining wakers.
             waker.wake();
         }
     }
