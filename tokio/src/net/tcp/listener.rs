@@ -384,6 +384,11 @@ impl TcpListener {
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.io.set_ttl(ttl)
     }
+
+    /// Returns the value of the `SO_ERROR` option.
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+        self.io.take_error()
+    }
 }
 
 impl TryFrom<net::TcpListener> for TcpListener {
