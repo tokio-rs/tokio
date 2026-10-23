@@ -154,7 +154,7 @@ impl UnixSocket {
     ///
     /// This calls the `bind(2)` operating-system function.
     pub fn bind(&self, path: impl AsRef<Path>) -> io::Result<()> {
-        let addr = socket2::SockAddr::unix(path)?;
+        let addr = unix_sockaddr(path.as_ref())?;
         self.inner.bind(&addr)
     }
 
@@ -208,7 +208,7 @@ impl UnixSocket {
             ));
         }
 
-        let addr = socket2::SockAddr::unix(path)?;
+        let addr = unix_sockaddr(path.as_ref())?;
         if let Err(err) = self.inner.connect(&addr) {
             if err.raw_os_error() != Some(libc::EINPROGRESS) {
                 return Err(err);
@@ -272,6 +272,34 @@ impl UnixSocket {
 
         Ok(())
     }
+}
+
+/// Builds the address for `bind` and `connect`.
+///
+/// `socket2::SockAddr::unix` copies the path verbatim, so a pathname with an
+/// interior NUL byte would be silently truncated by the kernel. Reject it the
+/// same way `std::os::unix::net::SocketAddr::from_pathname` does, which is what
+/// `UnixListener::bind` and `UnixStream::connect` use.
+fn unix_sockaddr(path: &Path) -> io::Result<socket2::SockAddr> {
+    use std::os::unix::ffi::OsStrExt;
+
+    let bytes = path.as_os_str().as_bytes();
+
+    // On Linux and Android, a leading NUL byte selects the abstract namespace,
+    // where NUL bytes are not special.
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    if bytes.starts_with(b"\0") {
+        return socket2::SockAddr::unix(path);
+    }
+
+    if bytes.contains(&0) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "paths must not contain interior null bytes",
+        ));
+    }
+
+    socket2::SockAddr::unix(path)
 }
 
 impl AsRawFd for UnixSocket {
