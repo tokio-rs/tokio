@@ -115,7 +115,7 @@ impl<T, D> FramedRead<T, D> {
     }
 
     /// Maps the decoder `D` to `C`, preserving the read buffer
-    /// wrapped by `Framed`.
+    /// and framing state wrapped by `FramedRead`.
     pub fn map_decoder<C, F>(self, map: F) -> FramedRead<T, C>
     where
         F: FnOnce(D) -> C,
@@ -123,9 +123,15 @@ impl<T, D> FramedRead<T, D> {
         // This could be potentially simplified once rust-lang/rust#86555 hits stable
         let FramedImpl {
             inner,
-            state,
+            mut state,
             codec,
         } = self.inner;
+
+        // The new decoder may be able to decode bytes the previous decoder could not.
+        if !state.eof {
+            state.is_readable |= !state.buffer.is_empty();
+        }
+
         FramedRead {
             inner: FramedImpl {
                 inner,
