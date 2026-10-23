@@ -1260,14 +1260,14 @@ jobs:
           # and contains no duplicates.
           #
           # Since `sort` is sensitive to locale, we set it
-          # using LC_ALL to en_US.UTF8 to be consistent in different
+          # using LC_ALL to C to be consistent in different
           # environments.
 
           (
-            sed '1d' $FILE | LC_ALL=en_US.UTF8 sort -uc
+            sed '1d' $FILE | LC_ALL=C sort -uc
           ) || {
             echo "Dictionary is not in sorted order. Correct order is:"
-            LC_ALL=en_US.UTF8 sort -u <(sed '1d' $FILE)
+            LC_ALL=C sort -u <(sed '1d' $FILE)
             false
           }
       - name: Run cargo-spellcheck
