@@ -194,7 +194,6 @@ cfg_test_util! {
             Ok(())
         });
 
-        #[cfg(feature = "rt")]
         crate::runtime::Handle::current().inner.driver().unpark();
     }
 
@@ -280,7 +279,6 @@ cfg_test_util! {
             clock.advance(duration)
         });
 
-        #[cfg(feature = "rt")]
         crate::runtime::Handle::current().inner.driver().unpark();
 
         crate::task::yield_now().await;
