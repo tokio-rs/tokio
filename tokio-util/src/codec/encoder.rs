@@ -20,6 +20,12 @@ pub trait Encoder<Item> {
     /// The `dst` provided is an internal buffer of the [`FramedWrite`] instance and
     /// will be written out when possible.
     ///
+    /// `dst` is reused across calls, so its capacity is retained for the lifetime
+    /// of the [`FramedWrite`]. `BytesMut` cannot release spare capacity in place,
+    /// so an encoder that must shrink it has to copy the unconsumed bytes into a
+    /// new `BytesMut` and should only do so when the retained capacity is
+    /// actually a problem.
+    ///
     /// [`FramedWrite`]: crate::codec::FramedWrite
     fn encode(&mut self, item: Item, dst: &mut BytesMut) -> Result<(), Self::Error>;
 }

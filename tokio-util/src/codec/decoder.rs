@@ -121,6 +121,12 @@ pub trait Decoder {
     ///
     /// An optimal buffer management strategy minimizes reallocations and
     /// over-allocations.
+    ///
+    /// Note that `BytesMut` cannot release spare capacity in place. Once a large
+    /// frame has grown `src`, that allocation is retained for as long as `src`
+    /// is used. A decoder that must shrink it has to copy the unconsumed bytes
+    /// into a new `BytesMut`, which is not free, so this should only be done
+    /// when the retained capacity is actually a problem.
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error>;
 
     /// A default method available to be called when there are no more bytes
