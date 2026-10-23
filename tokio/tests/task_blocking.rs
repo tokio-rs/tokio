@@ -253,6 +253,50 @@ async fn blocking_when_paused() {
 }
 
 #[cfg(feature = "test-util")]
+#[test]
+fn blocking_release_preserves_fractional_deadline() {
+    use std::sync::{mpsc, Arc, Mutex};
+
+    let release = Arc::new(Mutex::new(None::<mpsc::Sender<()>>));
+    let on_park_release = release.clone();
+    let rt = runtime::Builder::new_current_thread()
+        .enable_time()
+        .start_paused(true)
+        .on_thread_park(move || {
+            if let Some(release) = on_park_release.lock().unwrap().take() {
+                release.send(()).unwrap();
+            }
+        })
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        let start = time::Instant::now();
+        time::advance(Duration::from_nanos(999_999)).await;
+        let (started_tx, started_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let (finished_tx, finished_rx) = mpsc::channel();
+        let blocker = task::spawn_blocking(move || {
+            started_tx.send(()).unwrap();
+            release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            finished_tx.send(()).unwrap();
+        });
+        started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        *release.lock().unwrap() = Some(release_tx);
+
+        let sleep = time::sleep_until(start + Duration::from_millis(1));
+        tokio::pin!(sleep);
+        assert!(futures::poll!(sleep.as_mut()).is_pending());
+        assert_eq!(start.elapsed(), Duration::from_nanos(999_999));
+
+        sleep.await;
+        finished_rx.try_recv().unwrap();
+        assert_eq!(start.elapsed(), Duration::from_millis(1));
+        blocker.await.unwrap();
+    });
+}
+
+#[cfg(feature = "test-util")]
 #[tokio::test(start_paused = true)]
 async fn blocking_task_wakes_paused_runtime() {
     let t0 = std::time::Instant::now();
