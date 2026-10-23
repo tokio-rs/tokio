@@ -46,7 +46,6 @@ fn manual_resume_notifies_driver() {
     let rt = rt(true);
     let _enter = rt.enter();
     let time = rt.handle().inner.driver().time();
-    time.did_wake();
 
     crate::time::resume();
 
@@ -61,7 +60,6 @@ fn manual_advance_notifies_driver() {
     let rt = rt(true);
     let _enter = rt.enter();
     let time = rt.handle().inner.driver().time();
-    time.did_wake();
 
     let advance = crate::time::advance(std::time::Duration::from_nanos(1));
     pin!(advance);
