@@ -931,6 +931,27 @@ impl<T> Sender<T> {
         }
     }
 
+    /// Checks if the channel has been closed. This happens when all receivers
+    /// have dropped.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, rx) = broadcast::channel::<()>(16);
+    ///     assert!(!tx.is_closed());
+    ///
+    ///     drop(rx);
+    ///     assert!(tx.is_closed());
+    /// }
+    /// ```
+    pub fn is_closed(&self) -> bool {
+        self.shared.tail.lock().closed
+    }
+
     fn close_channel(&self) {
         let mut tail = self.shared.tail.lock();
         tail.closed = true;
