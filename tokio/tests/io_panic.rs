@@ -7,7 +7,7 @@
 
 use std::task::{Context, Poll};
 use std::{error::Error, pin::Pin};
-use tokio::io::{self, duplex, simplex, split, AsyncRead, AsyncWrite, ReadBuf, SimplexStream};
+use tokio::io::{self, duplex, split, AsyncRead, AsyncWrite, ReadBuf, SimplexStream};
 
 mod support {
     pub mod panic;
@@ -147,9 +147,10 @@ fn duplex_zero_capacity_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+#[allow(deprecated)]
 fn simplex_zero_capacity_panic_caller() -> Result<(), Box<dyn Error>> {
     let panic_location_file = test_panic(|| {
-        let _ = simplex(0);
+        let _ = io::simplex(0);
     });
 
     // The panic location should be in this file
