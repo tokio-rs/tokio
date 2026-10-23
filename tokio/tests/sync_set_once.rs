@@ -214,3 +214,34 @@ fn get_mut_from() {
 
     assert_eq!(once.get_mut(), Some(&mut 10));
 }
+
+#[test]
+fn take_uninit() {
+    let mut once = SetOnce::<u32>::new();
+
+    assert_eq!(once.take(), None);
+}
+
+#[test]
+fn take_and_reset() {
+    let mut once = SetOnce::new();
+    once.set(5).unwrap();
+
+    assert_eq!(once.take(), Some(5));
+    assert_eq!(once.get(), None);
+    assert_eq!(once.take(), None);
+
+    // Can be re-set after take
+    once.set(10).unwrap();
+    assert_eq!(once.get(), Some(&10));
+    assert_eq!(once.take(), Some(10));
+    assert_eq!(once.get(), None);
+}
+
+#[test]
+fn take_from() {
+    let mut once = SetOnce::from(10);
+
+    assert_eq!(once.take(), Some(10));
+    assert_eq!(once.get(), None);
+}

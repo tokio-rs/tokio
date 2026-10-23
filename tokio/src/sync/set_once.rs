@@ -23,7 +23,7 @@ use std::task::Poll;
 // Through shared access (`&SetOnce`), the value can only be set once, via
 // set(); subsequent calls to set() will return a `SetOnceError`. As with any
 // type, a caller with exclusive access (`&mut SetOnce`) can still mutate or
-// replace the value directly, e.g. via get_mut().
+// replace, or take the value directly, e.g. via get_mut() or take().
 
 /// A thread-safe cell that can be written to only once.
 ///
@@ -368,6 +368,30 @@ impl<T> SetOnce<T> {
             None
         }
     }
+
+    /// Takes ownership of the current value, leaving the cell empty. Returns
+    /// `None` if the cell is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::SetOnce;
+    ///
+    /// let mut cell: SetOnce<u32> = SetOnce::new();
+    /// assert_eq!(cell.take(), None);
+    ///
+    /// cell.set(5).unwrap();
+    /// assert_eq!(cell.take(), Some(5));
+    /// assert_eq!(cell.get(), None);
+    ///
+    /// // The cell can be set again after being taken.
+    /// cell.set(10).unwrap();
+    /// assert_eq!(cell.get(), Some(&10));
+    /// ```
+    pub fn take(&mut self) -> Option<T> {
+        std::mem::take(self).into_inner()
+    }
+
 
     /// Waits until the value is set.
     ///
