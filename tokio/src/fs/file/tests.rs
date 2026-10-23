@@ -779,7 +779,11 @@ fn write_err_incomplete_read_followed_by_set_len() {
     }
 
     let mut t = task::spawn(file.flush());
-    assert_ready_err!(t.poll());
+    let err = assert_ready_err!(t.poll());
+    assert_eq!(err.kind(), io::ErrorKind::Other);
+
+    let mut t = task::spawn(file.flush());
+    assert_ready_ok!(t.poll());
 }
 
 #[test]
