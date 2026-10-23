@@ -160,3 +160,29 @@ async fn set_permissions_after_bind_fails() -> io::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+#[cfg_attr(miri, ignore)] // No Unix domain sockets in miri.
+async fn reject_interior_nul_in_path() -> io::Result<()> {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut path = dir.path().join("victim").into_os_string();
+    path.push(OsStr::from_bytes(b"\0/../allowed.sock"));
+
+    let socket = UnixSocket::new_stream()?;
+    let err = socket.bind(&path).unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+    assert!(!dir.path().join("victim").exists());
+
+    let listener = UnixSocket::new_stream()?;
+    listener.bind(dir.path().join("victim"))?;
+    let _listener = listener.listen(1024)?;
+
+    let socket = UnixSocket::new_stream()?;
+    let err = socket.connect(&path).await.unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+
+    Ok(())
+}
