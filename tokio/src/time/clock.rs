@@ -357,8 +357,8 @@ cfg_test_util! {
         }
 
         /// Advances the clock by `duration` only if it is still paused, not
-        /// inhibited, and reads `now`. Another thread may have changed it since
-        /// the driver computed `duration` from `now`.
+        /// inhibited, and its value still equals `now`. Another thread may have
+        /// changed it since the driver computed `duration` from `now`.
         pub(crate) fn try_auto_advance(&self, now: Instant, duration: Duration) {
             let mut inner = self.inner.lock();
 
