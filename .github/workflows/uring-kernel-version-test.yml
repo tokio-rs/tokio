@@ -38,7 +38,7 @@ jobs:
           tar xf linux-${KERNEL_VERSION}.tar.xz
           cd linux-${KERNEL_VERSION}
           make defconfig
-          make -j$(nproc)
+          make -j$(nproc) CC="gcc -std=gnu11"
 
       # We are running tests also on a Kernel version that does not support io_uring
       # to check if the fallback mechanism works
