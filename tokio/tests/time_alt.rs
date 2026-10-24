@@ -80,11 +80,10 @@ fn sleep() {
 }
 
 #[test]
-fn reset_preserves_waker() {
+fn reset_does_not_lose_wakeup() {
     use std::sync::Arc;
     use std::task::{Context, Wake, Waker};
     use tokio::sync::Notify;
-    use tokio_test::assert_ready;
 
     struct NotifyOnWake(Notify);
 
@@ -94,31 +93,86 @@ fn reset_preserves_waker() {
         }
     }
 
-    async fn check() {
+    async fn check(delay: Duration) {
         let mut timer = Box::pin(tokio::time::sleep(Duration::from_secs(3600)));
         let notification = Arc::new(NotifyOnWake(Notify::new()));
         let waker = Waker::from(notification.clone());
         assert_pending!(timer.as_mut().poll(&mut Context::from_waker(&waker)));
 
-        // Both resets must preserve the registered waker without another poll.
+        // Both resets must keep the task notified without another poll.
         timer
             .as_mut()
             .reset(Instant::now() + Duration::from_secs(7200));
-        timer.as_mut().reset(Instant::now());
+        let deadline = Instant::now() + delay;
+        timer.as_mut().reset(deadline);
 
-        tokio::time::timeout(Duration::from_secs(1), notification.0.notified())
-            .await
-            .expect("reset timer did not wake its task");
-        assert_ready!(timer.as_mut().poll(&mut Context::from_waker(&waker)));
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                notification.0.notified().await;
+                // Reset may notify before the deadline. Repoll to register
+                // the waker on the replacement timer if it is still pending.
+                if timer
+                    .as_mut()
+                    .poll(&mut Context::from_waker(&waker))
+                    .is_ready()
+                {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("reset timer did not wake its task");
+        assert!(Instant::now() >= deadline);
     }
 
     for rt in rt_combinations() {
         rt.block_on(async {
-            // Exercise remote registration and registration on a worker thread.
-            check().await;
-            tokio::spawn(check()).await.unwrap();
+            for delay in [Duration::ZERO, Duration::from_millis(20)] {
+                // Exercise remote registration and registration on a worker thread.
+                check(delay).await;
+                tokio::spawn(check(delay)).await.unwrap();
+            }
         });
     }
+}
+
+#[test]
+fn reset_timer_waker_can_register_timer() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    use std::task::{Context, Wake, Waker};
+
+    struct ReenterOnWake(AtomicBool);
+
+    impl Wake for ReenterOnWake {
+        fn wake(self: Arc<Self>) {
+            let _ = tokio::time::sleep(Duration::from_secs(5)).now_or_never();
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_alt_timer()
+        .enable_time()
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        tokio::spawn(async {
+            let mut timer = Box::pin(tokio::time::sleep(Duration::from_secs(3600)));
+            let notification = Arc::new(ReenterOnWake(AtomicBool::new(false)));
+            let waker = Waker::from(notification.clone());
+            assert_pending!(timer.as_mut().poll(&mut Context::from_waker(&waker)));
+
+            timer
+                .as_mut()
+                .reset(Instant::now() + Duration::from_secs(7200));
+            assert!(notification.0.load(Ordering::SeqCst));
+        })
+        .await
+        .unwrap();
+    });
 }
 
 #[test]

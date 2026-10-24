@@ -185,18 +185,11 @@ impl From<&Handle> for NonNull<Entry> {
 
 impl Handle {
     pub(crate) fn new(deadline: u64) -> Self {
-        Self::new_with_waker(deadline, None)
-    }
-
-    pub(super) fn new_with_waker(deadline: u64, waker: Option<Waker>) -> Self {
         let entry = Arc::new(Entry {
             cancel_pointers: linked_list::Pointers::new(),
             extra_pointers: linked_list::Pointers::new(),
             deadline,
-            state: Mutex::new(State {
-                waker,
-                ..State::default()
-            }),
+            state: Mutex::new(State::default()),
             _pin: PhantomPinned,
         });
 
