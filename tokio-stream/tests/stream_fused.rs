@@ -349,3 +349,40 @@ async fn throttle_terminated_after_inner_done() {
     assert!(stream.as_ref().get_ref().is_terminated());
     assert_eq!(stream.next().await, None);
 }
+
+// ── wrappers ─────────────────────────────────────────────────────────────────
+
+/// `JoinSetStream` is only available with the `rt` feature.
+#[cfg(feature = "rt")]
+mod wrappers {
+    use super::*;
+
+    use tokio::task::JoinSet;
+    use tokio_stream::wrappers::JoinSetStream;
+
+    #[tokio::test]
+    async fn join_set_stream_is_terminated_when_empty() {
+        let mut stream = JoinSetStream::new(JoinSet::<i32>::new());
+
+        // An empty `JoinSet` never yields another item, so the stream is
+        // already terminated before it is polled.
+        assert!(stream.is_terminated());
+        assert!(stream.next().await.is_none());
+        assert!(stream.is_terminated());
+    }
+
+    #[tokio::test]
+    async fn join_set_stream_terminated_after_tasks_are_joined() {
+        let mut set = JoinSet::new();
+        set.spawn(async { 1 });
+        let mut stream = JoinSetStream::new(set);
+
+        // The set still holds a task, so the stream is not terminated.
+        assert!(!stream.is_terminated());
+        assert_eq!(stream.next().await.unwrap().unwrap(), 1);
+
+        // Joining the last task empties the set, so the stream is terminated.
+        assert!(stream.is_terminated());
+        assert!(stream.next().await.is_none());
+    }
+}

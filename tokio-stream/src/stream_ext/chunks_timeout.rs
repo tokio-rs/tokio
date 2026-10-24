@@ -30,7 +30,7 @@ impl<S: Stream> ChunksTimeout<S> {
             stream: Fuse::new(stream),
             deadline: None,
             duration,
-            items: Vec::with_capacity(max_size),
+            items: Vec::new(),
             cap: max_size,
         }
     }

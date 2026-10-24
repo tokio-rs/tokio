@@ -14,11 +14,11 @@ use std::task::Poll;
 use std::time::Duration;
 use std::{future::poll_fn, path::PathBuf};
 use tempfile::NamedTempFile;
+use tokio::task::JoinSet;
 use tokio::{
     fs::OpenOptions,
     runtime::{Builder, Runtime},
 };
-use tokio_util::task::TaskTracker;
 
 fn multi_rt(n: usize) -> Box<dyn Fn() -> Runtime> {
     Box::new(move || {
@@ -105,16 +105,15 @@ fn open_many_files() {
         let (_tmp_files, paths): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(NUM_FILES);
 
         rt.block_on(async move {
-            let tracker = TaskTracker::new();
+            let mut tasks = JoinSet::new();
 
             for i in 0..10_000 {
                 let path = paths.get(i % NUM_FILES).unwrap().clone();
-                tracker.spawn(async move {
+                tasks.spawn(async move {
                     let _file = OpenOptions::new().read(true).open(path).await.unwrap();
                 });
             }
-            tracker.close();
-            tracker.wait().await;
+            tasks.join_all().await;
         });
     }
 
