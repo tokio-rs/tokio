@@ -55,13 +55,9 @@ fn read_to_string_internal<R: AsyncRead + ?Sized>(
     cx: &mut Context<'_>,
 ) -> Poll<io::Result<usize>> {
     let io_res = ready!(read_to_end_internal(buf, reader, read, cx));
-    let utf8_res = String::from_utf8(buf.take());
 
-    // At this point both buf and output are empty. The allocation is in utf8_res.
-
-    debug_assert!(buf.is_empty());
     debug_assert!(output.is_empty());
-    finish_string_read(io_res, utf8_res, *read, output, true)
+    finish_string_read(io_res, buf.take(), *read, output, true)
 }
 
 impl<A> Future for ReadToString<'_, A>
