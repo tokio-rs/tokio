@@ -124,11 +124,13 @@ impl Stats {
         task_schedule_latency
     }
 
-    pub(crate) fn record_schedule_latency(
+    // LIFO polls share a scheduler critical section with the initial task.
+    // Count their public metrics separately without changing the EWMA input.
+    pub(crate) fn start_lifo_poll(
         &mut self,
         schedule_latency_context: Option<ScheduleLatencyContext>,
     ) -> Option<Duration> {
-        self.batch.record_schedule_latency(schedule_latency_context)
+        self.batch.start_poll(schedule_latency_context)
     }
 
     pub(crate) fn end_poll(&mut self) {
