@@ -62,6 +62,30 @@ fn rt(start_paused: bool) -> crate::runtime::Runtime {
 
 #[test]
 #[cfg(feature = "test-util")]
+fn automatic_advance_rejects_stale_snapshot() {
+    model(|| {
+        use std::time::Duration;
+
+        let clock = crate::time::Clock::new(true, true);
+        let now = clock.now();
+
+        clock.advance(Duration::from_millis(5)).unwrap();
+        clock.try_auto_advance(now, Duration::from_millis(10));
+        assert_eq!(clock.now(), now + Duration::from_millis(5));
+
+        let now = clock.now();
+        clock.inhibit_auto_advance();
+        clock.try_auto_advance(now, Duration::from_millis(10));
+        assert_eq!(clock.now(), now);
+
+        clock.allow_auto_advance();
+        clock.try_auto_advance(now, Duration::from_millis(10));
+        assert_eq!(clock.now(), now + Duration::from_millis(10));
+    });
+}
+
+#[test]
+#[cfg(feature = "test-util")]
 fn automatic_advance_respects_concurrent_inhibition() {
     model(|| {
         let (mut driver, handle) = paused_driver();
