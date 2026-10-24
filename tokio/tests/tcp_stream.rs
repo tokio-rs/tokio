@@ -474,8 +474,11 @@ fn check_drop_replaced_waker(stream: &Arc<TcpStream>, fut: impl Future<Output = 
 
 #[tokio::test]
 async fn drop_replaced_poll_read_ready_waker_outside_lock() {
-    let (_client, mut server) = create_pair().await;
-    read_until_pending(&mut server);
+    let (_client, server) = create_pair().await;
+    assert_eq!(
+        server.try_read(&mut [0; 1]).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
     let server = Arc::new(server);
 
     check_drop_replaced_waker(&server, poll_fn(|cx| server.poll_read_ready(cx)));
@@ -483,8 +486,11 @@ async fn drop_replaced_poll_read_ready_waker_outside_lock() {
 
 #[tokio::test]
 async fn drop_replaced_readable_waker_outside_lock() {
-    let (_client, mut server) = create_pair().await;
-    read_until_pending(&mut server);
+    let (_client, server) = create_pair().await;
+    assert_eq!(
+        server.try_read(&mut [0; 1]).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
     let server = Arc::new(server);
 
     check_drop_replaced_waker(&server, server.readable());
