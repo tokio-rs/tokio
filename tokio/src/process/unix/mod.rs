@@ -315,7 +315,7 @@ impl AsyncRead for ChildStdout {
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         // SAFETY: Receiver reads into the buffer without inspecting uninitialized bytes.
-        unsafe { self.inner.poll_read(cx, buf) }
+        unsafe { self.inner.poll_read_pipe(cx, buf) }
     }
 }
 
