@@ -228,7 +228,10 @@ fn lines_decoder_max_length_eof_ends_discard() {
 
     buf.reserve(200);
     buf.put_slice(b"too long line");
-    assert!(codec.decode_eof(buf).is_err());
+    assert!(matches!(
+        codec.decode_eof(buf),
+        Err(tokio_util::codec::LinesCodecError::MaxLineLengthExceeded)
+    ));
     assert_eq!(None, codec.decode_eof(buf).unwrap());
     assert!(buf.is_empty());
 
@@ -460,7 +463,10 @@ fn any_delimiter_decoder_max_length_eof_ends_discard() {
 
     buf.reserve(200);
     buf.put_slice(b"too long chunk");
-    assert!(codec.decode_eof(buf).is_err());
+    assert!(matches!(
+        codec.decode_eof(buf),
+        Err(tokio_util::codec::AnyDelimiterCodecError::MaxChunkLengthExceeded)
+    ));
     assert_eq!(None, codec.decode_eof(buf).unwrap());
     assert!(buf.is_empty());
 

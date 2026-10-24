@@ -89,7 +89,8 @@ impl AnyDelimiterCodec {
     /// will discard up to `limit` bytes from that chunk until a delimiter
     /// character is reached, returning `None` until the delimiter over the limit
     /// has been fully discarded. After that point, calls to `decode` will
-    /// function as normal.
+    /// function as normal. Reaching eof in `decode_eof` also ends the chunk,
+    /// so data decoded after that is not discarded.
     ///
     /// # Note
     ///
