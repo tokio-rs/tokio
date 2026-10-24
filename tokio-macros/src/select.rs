@@ -31,6 +31,7 @@ pub(crate) fn declare_output_enum(input: TokenStream) -> TokenStream {
     );
 
     TokenStream::from(quote! {
+        #[allow(clippy::redundant_pub_crate)]
         pub(super) enum Out<#( #variants ),*> {
             #( #variants(#variants), )*
             // Include a `Disabled` variant signifying that all select branches
@@ -38,6 +39,7 @@ pub(crate) fn declare_output_enum(input: TokenStream) -> TokenStream {
             Disabled,
         }
 
+        #[allow(clippy::redundant_pub_crate)]
         pub(super) type Mask = #mask;
     })
 }
