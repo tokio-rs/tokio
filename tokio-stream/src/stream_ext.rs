@@ -69,9 +69,7 @@ cfg_time! {
     mod chunks_timeout;
     pub use chunks_timeout::ChunksTimeout;
 
-    /// Clamps `duration` like `tokio::time::sleep` does, so that adding it to
-    /// `Instant::now()` can't overflow.
-    fn clamp_timer_duration(duration: Duration) -> Duration {
+    fn safe_delay(duration: Duration) -> Duration {
         duration.min(Duration::from_secs(86400 * 365 * 30))
     }
 }

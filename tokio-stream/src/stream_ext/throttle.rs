@@ -1,6 +1,6 @@
 //! Slow down a stream by enforcing a delay between items.
 
-use crate::stream_ext::clamp_timer_duration;
+use crate::stream_ext::safe_delay;
 use crate::Stream;
 use futures_core::FusedStream;
 use tokio::time::{sleep, Duration, Instant, Sleep};
@@ -17,7 +17,7 @@ where
 {
     Throttle {
         delay: None,
-        duration: clamp_timer_duration(duration),
+        duration: safe_delay(duration),
         has_delayed: true,
         stream,
     }

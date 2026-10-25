@@ -1,4 +1,4 @@
-use crate::stream_ext::{clamp_timer_duration, Fuse};
+use crate::stream_ext::{safe_delay, Fuse};
 use crate::Stream;
 use tokio::time::{sleep, Instant, Sleep};
 
@@ -35,7 +35,7 @@ impl<S: Stream> Timeout<S> {
         Timeout {
             stream: Fuse::new(stream),
             deadline,
-            duration: clamp_timer_duration(duration),
+            duration: safe_delay(duration),
             poll_deadline: true,
         }
     }
