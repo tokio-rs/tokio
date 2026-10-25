@@ -158,6 +158,12 @@ async fn stat_permission_denied() {
         return;
     }
 
+    // A 0o244 directory does not stop root, so the EACCES this test expects
+    // never happens when running as root (e.g. in the CI kernel test guest).
+    if unsafe { libc::geteuid() } == 0 {
+        return;
+    }
+
     let dir = tempdir().unwrap();
     let permission_denied_directory_path = dir.path().join("baz");
     create_dir(&permission_denied_directory_path).await.unwrap();

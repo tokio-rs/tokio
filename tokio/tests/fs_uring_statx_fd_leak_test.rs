@@ -3,7 +3,11 @@
     feature = "io-uring",
     feature = "rt",
     feature = "fs",
-    target_os = "linux"
+    target_os = "linux",
+    // `tokio::fs::read` only takes the io_uring path on these targets (see the
+    // FIXME in `src/fs/read.rs`); on musl it falls back to `spawn_blocking` and
+    // the poll-count assumptions below do not hold.
+    any(target_env = "gnu", target_os = "android")
 ))]
 
 mod support {
