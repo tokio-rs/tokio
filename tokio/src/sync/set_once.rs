@@ -46,7 +46,7 @@ use std::task::Poll;
 /// // checking with .get doesn't block main thread
 /// println!("{:?}", ONCE.get());
 ///
-/// // wait until the value is set, blocks the thread
+/// // wait asynchronously until the value is set
 /// println!("{:?}", ONCE.wait().await);
 ///
 /// Ok(())
