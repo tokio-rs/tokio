@@ -52,6 +52,10 @@ fn put_back_original_data(output: &mut String, mut vector: Vec<u8>, num_bytes_re
 
 /// Converts `vector` into a `String`, given that all but its last `appended`
 /// bytes came from a `String` and are therefore valid UTF-8 already.
+///
+/// `read_until` only ever appends to the buffer, so the existing contents are
+/// untouched. This does not hold for `read_to_string`, whose reader gets the
+/// buffer through `ReadBuf::filled_mut()`.
 fn into_string(vector: Vec<u8>, appended: usize) -> Result<String, FromUtf8Error> {
     if str::from_utf8(&vector[vector.len() - appended..]).is_ok() {
         // Safety: the concatenation of two valid UTF-8 sequences is valid UTF-8.
@@ -69,14 +73,11 @@ fn into_string(vector: Vec<u8>, appended: usize) -> Result<String, FromUtf8Error
 /// disagree on what should happen when an IO error occurs.
 pub(super) fn finish_string_read(
     io_res: io::Result<usize>,
-    vector: Vec<u8>,
+    utf8_res: Result<String, FromUtf8Error>,
     read: usize,
     output: &mut String,
     truncate_on_io_error: bool,
 ) -> Poll<io::Result<usize>> {
-    let appended = *io_res.as_ref().unwrap_or(&read);
-    let utf8_res = into_string(vector, appended);
-
     match (io_res, utf8_res) {
         (Ok(num_bytes), Ok(string)) => {
             debug_assert_eq!(read, 0);
@@ -114,9 +115,14 @@ fn read_line_internal<R: AsyncBufRead + ?Sized>(
     read: &mut usize,
 ) -> Poll<io::Result<usize>> {
     let io_res = ready!(read_until_internal(reader, cx, b'\n', buf, read));
+    let appended = *io_res.as_ref().unwrap_or(read);
+    let utf8_res = into_string(mem::take(buf), appended);
 
+    // At this point both buf and output are empty. The allocation is in utf8_res.
+
+    debug_assert!(buf.is_empty());
     debug_assert!(output.is_empty());
-    finish_string_read(io_res, mem::take(buf), *read, output, false)
+    finish_string_read(io_res, utf8_res, *read, output, false)
 }
 
 impl<R: AsyncBufRead + ?Sized + Unpin> Future for ReadLine<'_, R> {

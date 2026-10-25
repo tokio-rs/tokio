@@ -90,18 +90,14 @@ async fn to_string_appends() {
 
 #[tokio::test]
 async fn to_string_invalid_utf8_after_multibyte_char() {
-    let data = b"\xa9".to_vec();
-
     let mut s = "café".to_string();
 
-    match AsyncReadExt::read_to_string(&mut data.as_slice(), &mut s).await {
-        Ok(len) => panic!("Should fail: {len} bytes."),
-        Err(err) => {
-            assert_eq!(err.kind(), io::ErrorKind::InvalidData);
-            let utf8 = err.into_inner().unwrap().downcast::<Utf8Error>().unwrap();
-            assert_eq!(utf8.valid_up_to(), 5);
-        }
-    }
+    let err = AsyncReadExt::read_to_string(&mut &b"\xa9"[..], &mut s)
+        .await
+        .expect_err("Should fail");
+    assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+    let utf8 = err.into_inner().unwrap().downcast::<Utf8Error>().unwrap();
+    assert_eq!(utf8.valid_up_to(), 5);
 
     assert_eq!(s, "café");
 }
