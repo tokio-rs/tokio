@@ -34,25 +34,15 @@ impl WakeList {
         self.curr += 1;
     }
 
-    fn take(&mut self) -> &mut [Waker] {
-        // SAFETY: self.inner[..curr] are initialized.
-        unsafe {
-            let filled = slice::from_raw_parts_mut(self.inner.as_mut_ptr(), self.curr);
-            self.curr = 0;
-            // TODO(MSRV 1.93): Switch to assume_init_mut.
-            &mut *(filled as *mut [_] as *mut [Waker])
-        }
-    }
-
     pub(crate) fn wake_all(&mut self) {
-        struct DropGuard<'a> {
-            iter: slice::IterMut<'a, Waker>,
-        }
+        // TODO(MSRV 1.100): Switch to std::mem::DropGuard.
+        struct DropGuard<'a>(slice::IterMut<'a, Waker>);
 
         impl Drop for DropGuard<'_> {
             fn drop(&mut self) {
-                // TODO(MSRV): Switch to as_mut_slice.
-                for waker in &mut self.iter {
+                // TODO(MSRV): Drop via as_mut_slice.
+                for waker in &mut self.0 {
+                    // If this panics, the program is aborted.
                     // SAFETY: We own the remaining element.
                     unsafe { ptr::drop_in_place(waker) };
                 }
@@ -61,12 +51,17 @@ impl WakeList {
 
         debug_assert!(self.curr <= NUM_WAKERS);
 
-        // TODO(MSRV 1.100): Switch to std::mem::DropGuard.
-        let mut guard = DropGuard {
-            iter: self.take().iter_mut(),
+        let mut guard = {
+            // SAFETY: The first `curr` elements are initialized.
+            let filled = unsafe { self.inner.get_unchecked_mut(..self.curr) };
+            // TODO(MSRV 1.93): Switch to assume_init_mut.
+            let filled = unsafe { &mut *(filled as *mut [MaybeUninit<Waker>] as *mut [Waker]) };
+            // Transfer ownership of the wakers in `inner` to `DropGuard`.
+            self.curr = 0;
+            DropGuard(filled.iter_mut())
         };
-        // SAFETY: We own the taken element.
-        for waker in (&mut guard.iter).map(|waker| unsafe { ptr::read(waker) }) {
+        // SAFETY: We own the element.
+        for waker in (&mut guard.0).map(|waker| unsafe { ptr::read(waker) }) {
             // If this panics, then `guard` will clean up the remaining wakers.
             waker.wake();
         }
@@ -75,7 +70,11 @@ impl WakeList {
 
 impl Drop for WakeList {
     fn drop(&mut self) {
-        // SAFETY: We own the taken elements.
-        unsafe { ptr::drop_in_place(self.take()) };
+        // SAFETY: The first `curr` elements are initialized, so we can drop them.
+        unsafe {
+            let filled = self.inner.get_unchecked_mut(..self.curr);
+            // TODO(MSRV 1.93): Switch to assume_init_drop.
+            ptr::drop_in_place(filled as *mut [MaybeUninit<Waker>] as *mut [Waker]);
+        }
     }
 }
