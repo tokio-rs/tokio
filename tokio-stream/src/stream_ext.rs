@@ -68,6 +68,10 @@ cfg_time! {
     use throttle::{throttle, Throttle};
     mod chunks_timeout;
     pub use chunks_timeout::ChunksTimeout;
+
+    fn safe_delay(duration: Duration) -> Duration {
+        duration.min(Duration::from_secs(86400 * 365 * 30))
+    }
 }
 
 /// An extension trait for the [`Stream`] trait that provides a variety of
