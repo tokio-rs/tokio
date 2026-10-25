@@ -1,3 +1,4 @@
+use std::iter::Map;
 use std::mem::MaybeUninit;
 use std::task::Waker;
 use std::{ptr, slice};
@@ -36,15 +37,13 @@ impl WakeList {
 
     pub(crate) fn wake_all(&mut self) {
         // TODO(MSRV 1.100): Switch to std::mem::DropGuard.
-        struct DropGuard<'a>(slice::IterMut<'a, Waker>);
+        struct DropGuard<'a, F: FnMut(&'a mut Waker) -> Waker>(Map<slice::IterMut<'a, Waker>, F>);
 
-        impl Drop for DropGuard<'_> {
+        impl<'a, F: FnMut(&'a mut Waker) -> Waker> Drop for DropGuard<'a, F> {
             fn drop(&mut self) {
-                // TODO(MSRV): Drop via as_mut_slice.
                 for waker in &mut self.0 {
                     // If this panics, the program is aborted.
-                    // SAFETY: We own the remaining element.
-                    unsafe { ptr::drop_in_place(waker) };
+                    drop(waker);
                 }
             }
         }
@@ -58,10 +57,10 @@ impl WakeList {
             let filled = unsafe { &mut *(filled as *mut [MaybeUninit<Waker>] as *mut [Waker]) };
             // Transfer ownership of the wakers in `inner` to `DropGuard`.
             self.curr = 0;
-            DropGuard(filled.iter_mut())
+            // SAFETY: We own the elements.
+            DropGuard(filled.iter_mut().map(|waker| unsafe { ptr::read(waker) }))
         };
-        // SAFETY: We own the element.
-        for waker in (&mut guard.0).map(|waker| unsafe { ptr::read(waker) }) {
+        for waker in &mut guard.0 {
             // If this panics, then `guard` will clean up the remaining wakers.
             waker.wake();
         }
