@@ -10,8 +10,7 @@ on:
 
 jobs:
   build:
-    # Linux 4.19 does not compile with GCC's C23 default on Ubuntu 26.04.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     env:
       KERNEL_VERSION: ${{ inputs.kernel_version }}
     steps:
