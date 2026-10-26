@@ -4,7 +4,14 @@ use crate::runtime::driver::op::Lifecycle;
 
 use io_uring::{opcode, Probe};
 use std::os::fd::AsRawFd;
-use std::sync::atomic::Ordering;
+
+struct ClearFailFlag;
+
+impl Drop for ClearFailFlag {
+    fn drop(&mut self) {
+        super::FAIL_NEXT_ADD_URING_SOURCE.with(|flag| flag.set(false));
+    }
+}
 
 // Builds a driver whose io_uring context is initialized, or returns `None` when
 // io_uring is unavailable on the host.
@@ -59,19 +66,25 @@ impl Drop for BrokenRing {
 #[cfg_attr(miri, ignore)]
 fn register_failure_drops_the_ring_so_init_can_retry() {
     let (_driver, handle) = Driver::new(1024, None).unwrap();
-    super::FAIL_NEXT_ADD_URING_SOURCE.store(true, Ordering::Relaxed);
+    super::FAIL_NEXT_ADD_URING_SOURCE.with(|flag| flag.set(true));
+    let _clear = ClearFailFlag;
 
     let mut probe = Probe::new();
-    let first = handle.try_init(&mut probe);
-    let Err(err) = first else {
-        super::FAIL_NEXT_ADD_URING_SOURCE.store(false, Ordering::Relaxed);
-        panic!("expected registration to fail");
-    };
+    let err = handle
+        .try_init(&mut probe)
+        .expect_err("expected registration to fail");
 
-    if err.raw_os_error() != Some(libc::EMFILE) {
-        super::FAIL_NEXT_ADD_URING_SOURCE.store(false, Ordering::Relaxed);
-        // The host has no io_uring, so init failed before registration.
-        return;
+    // Same unsupported cases as `check_and_init`. Any other error fails the test.
+    match err.raw_os_error() {
+        Some(libc::EMFILE) => {}
+        Some(libc::ENOSYS) | Some(libc::EPERM) => {
+            assert!(
+                handle.get_uring().lock().uring.is_none(),
+                "unsupported setup left a ring stored"
+            );
+            return;
+        }
+        _ => panic!("unexpected setup error: {err}"),
     }
 
     assert!(handle.get_uring().lock().uring.is_none());

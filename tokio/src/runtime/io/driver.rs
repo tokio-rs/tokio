@@ -375,60 +375,6 @@ impl Direction {
     }
 }
 
-/// Drop a ring this attempt just created when reactor registration fails.
-///
-/// The following attempt has to create the ring and register it again.
-/// An unregistered ring left in place makes that attempt look finished,
-/// so the fd never joins the reactor.
-pub(super) fn drop_ring_if_register_failed<T>(
-    ring: &mut Option<T>,
-    created: bool,
-    register_error: Option<io::Error>,
-) -> io::Result<()> {
-    match register_error {
-        Some(err) => {
-            if created {
-                ring.take();
-            }
-            Err(err)
-        }
-        None => Ok(()),
-    }
-}
-
-#[cfg(all(test, not(loom), not(miri)))]
-mod uring_register_rollback_tests {
-    use super::drop_ring_if_register_failed;
-    use std::io;
-
-    #[test]
-    fn failed_register_drops_a_ring_this_attempt_created() {
-        let mut ring = Some(());
-        let err =
-            drop_ring_if_register_failed(&mut ring, true, Some(io::Error::from_raw_os_error(24)))
-                .expect_err("registration failure");
-        assert_eq!(err.raw_os_error(), Some(24));
-        assert!(ring.is_none());
-    }
-
-    #[test]
-    fn failed_register_keeps_a_ring_from_an_earlier_attempt() {
-        let mut ring = Some(());
-        let err =
-            drop_ring_if_register_failed(&mut ring, false, Some(io::Error::from_raw_os_error(24)))
-                .expect_err("registration failure");
-        assert_eq!(err.raw_os_error(), Some(24));
-        assert!(ring.is_some());
-    }
-
-    #[test]
-    fn successful_register_keeps_the_ring() {
-        let mut ring = Some(());
-        drop_ring_if_register_failed(&mut ring, true, None).unwrap();
-        assert!(ring.is_some());
-    }
-}
-
 #[cfg(all(test, unix, feature = "net", not(loom), not(miri)))]
 mod tests {
     use super::*;
