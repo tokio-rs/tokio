@@ -67,9 +67,11 @@ cfg_rt_multi_thread! {
     ///
     /// # Panics
     ///
-    /// This function panics if called from a [`current_thread`] runtime.
+    /// This function panics if called from a [`current_thread`] runtime or from
+    /// within a [`LocalSet`].
     ///
     /// [`current_thread`]: fn@crate::runtime::Builder::new_current_thread
+    /// [`LocalSet`]: struct@crate::task::LocalSet
     #[track_caller]
     pub fn block_in_place<F, R>(f: F) -> R
     where

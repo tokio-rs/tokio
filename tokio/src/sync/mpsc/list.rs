@@ -224,7 +224,6 @@ impl<T> Tx<T> {
         // Safety: curr_ptr is never null.
         let mut curr = unsafe { NonNull::new_unchecked(curr_ptr) };
 
-        // TODO: Unify this logic with Block::grow
         for _ in 0..3 {
             match unsafe { curr.as_ref().try_push(&mut block, AcqRel, Acquire) } {
                 Ok(()) => {

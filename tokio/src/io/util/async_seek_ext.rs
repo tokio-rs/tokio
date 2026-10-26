@@ -31,8 +31,7 @@ cfg_io_util! {
     ///
     /// [`AsyncSeek`]: AsyncSeek
     pub trait AsyncSeekExt: AsyncSeek {
-        /// Creates a future which will seek an IO object, and then yield the
-        /// new position in the object and the object itself.
+        /// Creates a future which seeks an I/O object and returns its new position.
         ///
         /// Equivalent to:
         ///
@@ -40,8 +39,8 @@ cfg_io_util! {
         /// async fn seek(&mut self, pos: SeekFrom) -> io::Result<u64>;
         /// ```
         ///
-        /// In the case of an error the buffer and the object will be discarded, with
-        /// the error yielded.
+        /// If the seek fails, the error is returned. The I/O object remains
+        /// available to the caller, but its position may have changed.
         ///
         /// # Examples
         ///
