@@ -64,11 +64,10 @@ pin_project! {
     /// [`Handle`]: struct@tokio::runtime::Handle
     /// [`Runtime::handle()`]: fn@tokio::runtime::Runtime::handle
     /// [`RuntimeExt`]: trait@crate::context::RuntimeExt
-    /// [`new_static`]: fn@Self::new_static
     /// [`sleep`]: fn@tokio::time::sleep
     /// [current thread]: fn@tokio::runtime::Builder::new_current_thread
     /// [enables time]: fn@tokio::runtime::Builder::enable_time
-    /// [multi thread]: fn@tokio::runtime::Builder::new_multi_thread
+    /// [multi thread]: https://docs.rs/tokio/latest/tokio/runtime/struct.Builder.html#method.new_multi_thread
     pub struct TokioContext<F> {
         #[pin]
         inner: F,
