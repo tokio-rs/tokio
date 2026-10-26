@@ -326,7 +326,10 @@ impl ScheduledIo {
         let is_shutdown = SHUTDOWN.unpack(curr) != 0;
 
         if ready.is_empty() && !is_shutdown {
-            // Update the task info
+            // Update the task info. A replaced waker is declared before the
+            // lock so that it is dropped after the lock is released, as its
+            // destructor may lock the waiter list again.
+            let _old_waker;
             let mut waiters = self.waiters.lock();
             let waker = match direction {
                 Direction::Read => &mut waiters.reader,
@@ -334,9 +337,8 @@ impl ScheduledIo {
             };
 
             // Avoid cloning the waker if one is already stored that matches the
-            // current task. A replaced waker is dropped after the lock is
-            // released, as its destructor may lock the waiter list again.
-            let old_waker = match waker {
+            // current task.
+            _old_waker = match waker {
                 Some(waker) if waker.will_wake(cx.waker()) => None,
                 _ => waker.replace(cx.waker().clone()),
             };
@@ -346,7 +348,7 @@ impl ScheduledIo {
             let curr = self.readiness.load(Acquire);
             let ready = direction.mask() & Ready::from_usize(READINESS.unpack(curr));
             let is_shutdown = SHUTDOWN.unpack(curr) != 0;
-            let res = if is_shutdown {
+            if is_shutdown {
                 Poll::Ready(ReadyEvent {
                     tick: TICK.unpack(curr) as u16,
                     ready: direction.mask(),
@@ -360,12 +362,7 @@ impl ScheduledIo {
                     ready,
                     is_shutdown,
                 })
-            };
-
-            drop(waiters);
-            drop(old_waker);
-
-            res
+            }
         } else {
             Poll::Ready(ReadyEvent {
                 tick: TICK.unpack(curr) as u16,
