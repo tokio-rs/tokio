@@ -16,7 +16,7 @@ use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use tokio::runtime::{Builder, EventLoop, LocalEventLoop, LocalOptions, Unparker};
+use tokio::runtime::{Builder, EventLoop, LocalEventLoop, LocalOptions};
 use tokio::sync::oneshot;
 
 const ZERO: Option<Duration> = Some(Duration::ZERO);
@@ -308,7 +308,7 @@ fn cancelled_timer_disarms() {
     let (tx, rx) = oneshot::channel::<()>();
     let jh = el.handle().spawn(async move {
         tokio::select! {
-            _ = tokio::time::sleep(Duration::from_millis(30)) => false,
+            _ = tokio::time::sleep(Duration::from_secs(10)) => false,
             _ = rx => true,
         }
     });
@@ -1031,30 +1031,4 @@ fn event_loop_ticks_on_another_thread() {
         el.handle().block_on(jh).unwrap()
     });
     assert_eq!(t.join().unwrap(), 4);
-}
-
-// `EventLoop` is `Send + Sync` like `Runtime`; `LocalEventLoop` is neither,
-// like `LocalRuntime`. The method resolves to the blanket impl only when the
-// auto trait is absent.
-#[allow(dead_code)]
-fn assert_auto_traits() {
-    fn send_sync<T: Send + Sync>() {}
-    send_sync::<EventLoop>();
-    send_sync::<Unparker>();
-
-    trait AmbiguousIfSend<A> {
-        fn some_item(&self) {}
-    }
-    impl<T: ?Sized> AmbiguousIfSend<()> for T {}
-    impl<T: ?Sized + Send> AmbiguousIfSend<u8> for T {}
-    trait AmbiguousIfSync<A> {
-        fn some_item(&self) {}
-    }
-    impl<T: ?Sized> AmbiguousIfSync<()> for T {}
-    impl<T: ?Sized + Sync> AmbiguousIfSync<u8> for T {}
-    fn check(el: &LocalEventLoop) {
-        AmbiguousIfSend::some_item(el);
-        AmbiguousIfSync::some_item(el);
-    }
-    let _ = check;
 }

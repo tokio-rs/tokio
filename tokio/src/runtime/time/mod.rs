@@ -423,7 +423,7 @@ impl Handle {
         new_tick: u64,
         entry: NonNull<TimerShared>,
     ) {
-        let waker = unsafe {
+        let (waker, unpark) = unsafe {
             let mut lock = self.inner.lock();
 
             // We may have raced with a firing/deregistration, so check before
@@ -436,7 +436,10 @@ impl Handle {
             let entry = entry.as_ref().handle();
 
             if self.is_shutdown() {
-                unsafe { entry.fire(Err(crate::time::error::Error::shutdown())) }
+                (
+                    unsafe { entry.fire(Err(crate::time::error::Error::shutdown())) },
+                    false,
+                )
             } else {
                 entry.set_expiration(new_tick);
 
@@ -445,24 +448,27 @@ impl Handle {
                 // the timer entry.
                 match unsafe { lock.wheel.insert(entry) } {
                     Ok(when) => {
-                        if lock
+                        let unpark = lock
                             .next_wake
                             .is_none_or(|next_wake| when < next_wake.get())
-                            && !driver_held_by_current_thread(driver)
-                        {
-                            driver.unpark_io();
-                        }
+                            && !driver_held_by_current_thread(driver);
 
-                        None
+                        (None, unpark)
                     }
-                    Err((entry, crate::time::error::InsertError::Elapsed)) => unsafe {
-                        entry.fire(Ok(()))
-                    },
+                    Err((entry, crate::time::error::InsertError::Elapsed)) => {
+                        (unsafe { entry.fire(Ok(())) }, false)
+                    }
                 }
             }
 
             // Must release lock before invoking waker to avoid the risk of deadlock.
         };
+
+        // Unparking may run the event loop's `on_work_available` callback,
+        // which may take the lock again.
+        if unpark {
+            driver.unpark_io();
+        }
 
         // The timer was fired synchronously as a result of the reregistration.
         // Wake the waker; this is needed because we might reset _after_ a poll,
