@@ -484,7 +484,8 @@
 //! When the build links WebAssembly JavaScript Promise Integration (JSPI), a
 //! wait that would block suspends on the host event loop rather than blocking.
 //! This requires Emscripten 6.0.10 or later. Builds without JSPI will spin on
-//! timed parks, and panic otherwise.
+//! timed parks when only the time driver is enabled, and panic on any wait
+//! that involves the I/O driver.
 //!
 //! Suspension requires the current export to have been wrapped with
 //! `WebAssembly.promising`. A wait from any other activation throws
