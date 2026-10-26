@@ -275,24 +275,58 @@ impl<R: Scheduler> Core<R> {
     }
 
     fn next_sleep(&self) -> Option<Duration> {
+        match self.next_wake() {
+            NextWake::Ready => Some(Duration::ZERO),
+            NextWake::Timer(tick) => Some(self.until_tick(tick)),
+            NextWake::Never => None,
+        }
+    }
+
+    /// [`next_sleep`](Self::next_sleep) without the clock read: a timer
+    /// deadline as the wheel's tick, which a host compares against the one
+    /// it armed.
+    fn next_wake(&self) -> NextWake {
         let handle = self.handle();
         let driver = handle.inner.driver();
         if self.local_ready
             || handle.inner.as_current_thread().has_injected_work()
             || driver.has_pending_wakeup()
         {
-            return Some(Duration::ZERO);
+            return NextWake::Ready;
         }
         #[cfg(feature = "time")]
-        {
-            driver.time.as_ref()?.next_timeout(&driver.clock)
+        if let Some(tick) = driver.time.as_ref().and_then(|time| time.next_expiration()) {
+            return NextWake::Timer(tick);
         }
-        #[cfg(not(feature = "time"))]
-        {
-            let _ = driver;
-            None
-        }
+        NextWake::Never
     }
+
+    #[cfg(feature = "time")]
+    fn until_tick(&self, tick: u64) -> Duration {
+        let driver = self.handle().inner.driver();
+        let time = driver
+            .time
+            .as_ref()
+            .expect("a timer deadline needs the time driver");
+        time.until_tick(tick, &driver.clock)
+    }
+
+    #[cfg(not(feature = "time"))]
+    fn until_tick(&self, _tick: u64) -> Duration {
+        unreachable!("no timer deadline without the time driver")
+    }
+}
+
+/// What the host waits for after a turn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NextWake {
+    /// Work is ready now.
+    Ready,
+    /// Nothing until the timer wheel's tick, unless woken.
+    #[cfg_attr(not(feature = "time"), allow(dead_code))]
+    Timer(u64),
+    /// Nothing scheduled.
+    Never,
 }
 
 /// Wakes a parked [`EventLoop`] or [`LocalEventLoop`] from any thread.

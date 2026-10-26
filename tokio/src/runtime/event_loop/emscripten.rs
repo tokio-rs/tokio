@@ -9,7 +9,7 @@
 //! native one lives while `block_on` runs, so `main` may return with work in
 //! flight.
 
-use super::Core;
+use super::{Core, NextWake};
 use crate::runtime::local_runtime::LocalRuntime;
 
 use std::cell::{Cell, RefCell};
@@ -19,7 +19,6 @@ use std::os::fd::{AsRawFd, RawFd};
 use std::rc::{Rc, Weak};
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::sync::Arc;
-use std::time::Duration;
 
 type Callback = extern "C" fn(*mut c_void);
 type EpollCallback = extern "C" fn(i32, *mut c_void);
@@ -100,8 +99,8 @@ pub(super) struct Hosted {
     /// Tasks per tick: the builder's `event_interval`.
     batch: usize,
     listening: Cell<bool>,
-    /// The armed deadline's timeout id.
-    deadline: Cell<Option<i32>>,
+    /// The armed deadline's timeout id and the wheel tick it fires for.
+    deadline: Cell<Option<(i32, u64)>>,
     /// The follow-up tick for ready work.
     immediate: Cell<Option<i32>>,
     hold: Arc<Hold>,
@@ -138,29 +137,42 @@ impl Hosted {
 
     /// Re-arms the host after a tick or park: a timer for the deadline, an
     /// immediate for ready work, and the hold on the runtime while tasks
-    /// are alive.
+    /// are alive. Every host call is a wasm-to-JS call, so an armed timer
+    /// stays when its deadline did not move, and ready work leaves it to the
+    /// next turn.
     pub(super) fn after_turn(&self) {
         let Some(core) = self.core.upgrade() else {
             return;
         };
         let core = core.borrow();
-        if let Some(id) = self.deadline.take() {
-            // SAFETY: a pending timeout armed below.
-            unsafe { emscripten_clear_timeout(id) };
-        }
-        match core.next_sleep() {
-            Some(Duration::ZERO) => self.schedule(),
-            Some(after) => {
-                let ms = after.as_secs_f64() * 1000.0;
+        match core.next_wake() {
+            NextWake::Ready => self.schedule(),
+            NextWake::Timer(tick) => {
+                if self.deadline.get().is_some_and(|(_, armed)| armed == tick) {
+                    return self.reconcile_hold(&core);
+                }
+                self.disarm();
+                let ms = core.until_tick(tick).as_secs_f64() * 1000.0;
                 let this = self as *const Hosted as *mut c_void;
                 // SAFETY: `user_data` is this `Hosted`, which clears the
                 // timeout in `drop` before the loop drops.
-                self.deadline
-                    .set(Some(unsafe { emscripten_set_timeout(deadline, ms, this) }));
+                let id = unsafe { emscripten_set_timeout(deadline, ms, this) };
+                self.deadline.set(Some((id, tick)));
             }
-            None => {}
+            NextWake::Never => self.disarm(),
         }
+        self.reconcile_hold(&core);
+    }
+
+    fn reconcile_hold(&self, core: &Core<LocalRuntime>) {
         self.hold.set(core.handle().inner.num_alive_tasks() > 0);
+    }
+
+    fn disarm(&self) {
+        if let Some((id, _)) = self.deadline.take() {
+            // SAFETY: a pending timeout armed in `after_turn`.
+            unsafe { emscripten_clear_timeout(id) };
+        }
     }
 
     /// Adds or removes the readiness listener. It fires every host turn
@@ -261,10 +273,7 @@ impl Hosted {
 
 impl Drop for Hosted {
     fn drop(&mut self) {
-        if let Some(id) = self.deadline.take() {
-            // SAFETY: a pending timeout armed in `after_turn`.
-            unsafe { emscripten_clear_timeout(id) };
-        }
+        self.disarm();
         if let Some(id) = self.immediate.take() {
             // SAFETY: a pending immediate armed in `schedule`.
             unsafe { emscripten_clear_immediate(id) };
