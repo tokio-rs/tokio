@@ -12,6 +12,11 @@ use super::{Handle, TOKEN_WAKEUP};
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 use std::{io, mem, task::Waker};
 
+#[cfg(test)]
+use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(test)]
+static FAIL_NEXT_ADD_URING_SOURCE: AtomicBool = AtomicBool::new(false);
+
 const DEFAULT_RING_SIZE: u32 = 256;
 
 /// Outcome of registering an op with the io_uring.
@@ -192,6 +197,11 @@ impl Drop for UringContext {
 
 impl Handle {
     fn add_uring_source(&self, uringfd: RawFd) -> io::Result<()> {
+        #[cfg(test)]
+        if FAIL_NEXT_ADD_URING_SOURCE.swap(false, Ordering::Relaxed) {
+            return Err(io::Error::from_raw_os_error(libc::EMFILE));
+        }
+
         let mut source = SourceFd(&uringfd);
         self.registry
             .register(&mut source, TOKEN_WAKEUP, Interest::READABLE.to_mio())
@@ -260,11 +270,14 @@ impl Handle {
     /// Initialize the io_uring context if it hasn't been initialized yet.
     fn try_init(&self, probe: &mut Probe) -> io::Result<()> {
         let mut guard = self.get_uring().lock();
-        if guard.try_init(probe)? {
-            self.add_uring_source(guard.ring().as_raw_fd())?;
-        }
-
-        Ok(())
+        let created = guard.try_init(probe)?;
+        let registered = if created {
+            let fd = guard.ring().as_raw_fd();
+            self.add_uring_source(fd)
+        } else {
+            Ok(())
+        };
+        super::drop_ring_if_register_failed(&mut guard.uring, created, registered.err())
     }
 
     /// Register an operation with the io_uring.

@@ -4,6 +4,7 @@ use crate::runtime::driver::op::Lifecycle;
 
 use io_uring::{opcode, Probe};
 use std::os::fd::AsRawFd;
+use std::sync::atomic::Ordering;
 
 // Builds a driver whose io_uring context is initialized, or returns `None` when
 // io_uring is unavailable on the host.
@@ -50,6 +51,34 @@ impl Drop for BrokenRing {
             libc::close(self.saved);
         }
     }
+}
+
+// A failed reactor registration must not leave the ring stored. The next
+// init would otherwise treat it as already set up and skip registration.
+#[test]
+#[cfg_attr(miri, ignore)]
+fn register_failure_drops_the_ring_so_init_can_retry() {
+    let (_driver, handle) = Driver::new(1024, None).unwrap();
+    super::FAIL_NEXT_ADD_URING_SOURCE.store(true, Ordering::Relaxed);
+
+    let mut probe = Probe::new();
+    let first = handle.try_init(&mut probe);
+    let Err(err) = first else {
+        super::FAIL_NEXT_ADD_URING_SOURCE.store(false, Ordering::Relaxed);
+        panic!("expected registration to fail");
+    };
+
+    if err.raw_os_error() != Some(libc::EMFILE) {
+        super::FAIL_NEXT_ADD_URING_SOURCE.store(false, Ordering::Relaxed);
+        // The host has no io_uring, so init failed before registration.
+        return;
+    }
+
+    assert!(handle.get_uring().lock().uring.is_none());
+    handle
+        .try_init(&mut probe)
+        .expect("retry after dropping the unregistered ring");
+    assert!(handle.get_uring().lock().uring.is_some());
 }
 
 // Once an entry is pushed onto the submission queue the kernel may already own
