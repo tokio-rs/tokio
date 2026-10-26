@@ -20,8 +20,10 @@ use std::task::Poll;
 //  2. When `value_set` is true, the wait() future completes, get() will return
 //      Some(&T)
 //
-// The value cannot be changed after set() is called. Subsequent calls to set()
-// will return a `SetOnceError`.
+// Through shared access (`&SetOnce`), the value can only be set once, via
+// set(); subsequent calls to set() will return a `SetOnceError`. As with any
+// type, a caller with exclusive access (`&mut SetOnce`) can still mutate or
+// replace the value directly, e.g. via get_mut().
 
 /// A thread-safe cell that can be written to only once.
 ///
@@ -44,7 +46,7 @@ use std::task::Poll;
 /// // checking with .get doesn't block main thread
 /// println!("{:?}", ONCE.get());
 ///
-/// // wait until the value is set, blocks the thread
+/// // wait asynchronously until the value is set
 /// println!("{:?}", ONCE.wait().await);
 ///
 /// Ok(())
@@ -258,6 +260,15 @@ impl<T> SetOnce<T> {
         unsafe { &*self.value.with(|ptr| (*ptr).as_ptr()) }
     }
 
+    // SAFETY: The SetOnce must not be empty.
+    unsafe fn get_unchecked_mut(&mut self) -> &mut T {
+        // SAFETY:
+        //
+        // 1. The caller guarantees that the SetOnce is initialized.
+        // 2. The `&mut self` guarantees that there are no other references to the value.
+        unsafe { &mut *self.value.with_mut(|ptr| (*ptr).as_mut_ptr()) }
+    }
+
     /// Returns a reference to the value currently stored in the `SetOnce`, or
     /// `None` if the `SetOnce` is empty.
     pub fn get(&self) -> Option<&T> {
@@ -265,6 +276,36 @@ impl<T> SetOnce<T> {
             // SAFETY: the SetOnce is initialized, so we can safely
             // call get_unchecked and return the value
             Some(unsafe { self.get_unchecked() })
+        } else {
+            None
+        }
+    }
+
+    /// Returns a mutable reference to the value currently stored in the
+    /// `SetOnce`, or `None` if the `SetOnce` is empty.
+    ///
+    /// Since this call borrows the `SetOnce` mutably, it is safe to mutate the
+    /// value inside the `SetOnce` — the mutable borrow statically guarantees
+    /// no other references exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::sync::SetOnce;
+    ///
+    /// let mut cell: SetOnce<u32> = SetOnce::new();
+    /// assert_eq!(cell.get_mut(), None);
+    ///
+    /// cell.set(5).unwrap();
+    /// *cell.get_mut().unwrap() += 1;
+    ///
+    /// assert_eq!(cell.get(), Some(&6));
+    /// ```
+    pub fn get_mut(&mut self) -> Option<&mut T> {
+        // Exclusive access makes a relaxed load sufficient.
+        if self.value_set.load(Ordering::Relaxed) {
+            // SAFETY: we just checked that the SetOnce is initialized.
+            Some(unsafe { self.get_unchecked_mut() })
         } else {
             None
         }
