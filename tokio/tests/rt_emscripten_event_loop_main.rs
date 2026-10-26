@@ -7,7 +7,9 @@
 //! on one loop and a client on the other, then a server whose client is a
 //! Node socket connecting after every tokio timer has fired: for that
 //! stretch only the event loop's own hold on the runtime keeps the process
-//! alive.
+//! alive. Two further loops are owned by their own tasks, which drop one and
+//! shut the other down from inside a host tick: each must shut down as that
+//! tick returns, cancelling the sibling it still runs.
 //!
 //! `harness = false`, so `main` can return into the host loop. Runs both with
 //! and without `-sJSPI`; without it any stack suspension traps, so completion
@@ -26,6 +28,7 @@
     feature = "net"
 ))]
 mod emscripten {
+    use std::cell::RefCell;
     use std::future::Future;
     use std::sync::atomic::{AtomicU32, Ordering::SeqCst};
     use std::time::{Duration, Instant};
@@ -34,6 +37,17 @@ mod emscripten {
 
     static COMPLETED: AtomicU32 = AtomicU32::new(0);
     static EXPECTED: AtomicU32 = AtomicU32::new(0);
+
+    thread_local! {
+        /// Loops owned by their own tasks, which take them out of here.
+        static OWNED: RefCell<Vec<Option<LocalEventLoop>>> = const { RefCell::new(Vec::new()) };
+    }
+    /// Siblings cancelled as their loop's runtime dropped.
+    static CANCELLED: AtomicU32 = AtomicU32::new(0);
+    /// Tasks that ran on a loop let go of, past the tick that let go.
+    static OUTLIVED: AtomicU32 = AtomicU32::new(0);
+    /// Owners that let go of their loop and ran on.
+    static RELEASED: AtomicU32 = AtomicU32::new(0);
 
     extern "C" {
         fn emscripten_run_script(script: *const std::ffi::c_char);
@@ -54,16 +68,52 @@ mod emscripten {
         unsafe { emscripten_run_script_int(script.as_ptr()) }
     }
 
+    fn build() -> LocalEventLoop {
+        Builder::new_current_thread()
+            .enable_all()
+            .event_interval(4)
+            .build_hosted_local_event_loop(Default::default())
+            .unwrap()
+    }
+
     fn event_loop() -> &'static LocalEventLoop {
         // The event loops outlive `main`: the ticks they schedule on the
         // host are what run the tasks.
-        Box::leak(Box::new(
-            Builder::new_current_thread()
-                .enable_all()
-                .event_interval(4)
-                .build_hosted_local_event_loop(Default::default())
-                .unwrap(),
-        ))
+        Box::leak(Box::new(build()))
+    }
+
+    /// A loop whose owner is one of its own tasks: `let_go` runs from a
+    /// host tick with the loop taken out of `OWNED`, while a sibling with a
+    /// far timer is still pending. The loop must survive that tick and shut
+    /// down as it returns, dropping the sibling.
+    fn self_owned(let_go: fn(LocalEventLoop)) {
+        struct Sibling;
+        impl Drop for Sibling {
+            fn drop(&mut self) {
+                CANCELLED.fetch_add(1, SeqCst);
+            }
+        }
+        let el = build();
+        el.spawn_local(async {
+            let _sibling = Sibling;
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            OUTLIVED.fetch_add(1, SeqCst);
+        });
+        let slot = OWNED.with(|owned| {
+            let mut owned = owned.borrow_mut();
+            owned.push(None);
+            owned.len() - 1
+        });
+        el.spawn_local(async move {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            let el = OWNED.with(|owned| owned.borrow_mut()[slot].take().unwrap());
+            let_go(el);
+            // Still running on the loop it let go of, until it next yields.
+            RELEASED.fetch_add(1, SeqCst);
+            tokio::task::yield_now().await;
+            OUTLIVED.fetch_add(1, SeqCst);
+        });
+        OWNED.with(|owned| owned.borrow_mut()[slot] = Some(el));
     }
 
     fn root(el: &LocalEventLoop, fut: impl Future<Output = ()> + 'static) {
@@ -139,6 +189,19 @@ mod emscripten {
         root(el_b, async move {
             tokio::time::sleep(Duration::from_millis(5)).await;
             assert_eq!(rx.await.unwrap(), 7);
+        });
+
+        self_owned(drop);
+        self_owned(LocalEventLoop::shutdown_background);
+        root(el_a, async {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            assert_eq!(RELEASED.load(SeqCst), 2, "owners ran on after letting go");
+            assert_eq!(
+                CANCELLED.load(SeqCst),
+                2,
+                "siblings cancelled with their loops"
+            );
+            assert_eq!(OUTLIVED.load(SeqCst), 0);
         });
 
         {

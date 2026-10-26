@@ -182,7 +182,9 @@ pub struct EventLoop {
 /// host loop itself: the program spawns and returns to the host. Such a loop
 /// keeps the Emscripten runtime alive while it has tasks. A
 /// [`Handle::block_on`] suspended through JSPI on the same thread defers
-/// hosted ticks until it returns.
+/// hosted ticks until it returns. One of its own tasks may drop it or shut
+/// it down: the loop then shuts down as the host's tick returns, cancelling
+/// its other tasks.
 ///
 /// [`Builder::build_local_event_loop`]: crate::runtime::Builder::build_local_event_loop
 /// [`Handle::block_on`]: crate::runtime::Handle::block_on
@@ -194,7 +196,8 @@ pub struct LocalEventLoop {
     hosted: Option<Rc<emscripten::Hosted>>,
     /// Shared weakly with the host's callbacks on a hosted loop, which tick
     /// between the program's own calls; never while one is in progress, as
-    /// a tick does not yield to the host.
+    /// a tick does not yield to the host. A callback holds it for its tick,
+    /// so a task dropping the loop releases it only once that tick returns.
     core: Rc<RefCell<Core<LocalRuntime>>>,
 }
 
@@ -435,7 +438,9 @@ macro_rules! event_loop_methods {
         ///
         /// [`Runtime::shutdown_timeout`]: crate::runtime::Runtime::shutdown_timeout
         pub fn shutdown_timeout(self, duration: Duration) {
-            self.into_runtime().shutdown_timeout(duration);
+            if let Some(runtime) = self.into_runtime() {
+                runtime.shutdown_timeout(duration);
+            }
         }
 
         /// Shuts down the runtime, without waiting for any spawned work to
@@ -445,7 +450,9 @@ macro_rules! event_loop_methods {
         ///
         /// [`Runtime::shutdown_background`]: crate::runtime::Runtime::shutdown_background
         pub fn shutdown_background(self) {
-            self.into_runtime().shutdown_background();
+            if let Some(runtime) = self.into_runtime() {
+                runtime.shutdown_background();
+            }
         }
     };
 }
@@ -471,8 +478,8 @@ impl EventLoop {
 
     fn after_turn(&self) {}
 
-    fn into_runtime(self) -> Runtime {
-        self.core.runtime
+    fn into_runtime(self) -> Option<Runtime> {
+        Some(self.core.runtime)
     }
 
     event_loop_methods!();
@@ -521,13 +528,15 @@ impl LocalEventLoop {
         }
     }
 
-    fn into_runtime(self) -> LocalRuntime {
+    /// `None` when a hosted loop is shut down from its own tick: the host's
+    /// callback still holds the core, and drops the runtime as the tick
+    /// returns. Without threads nothing is left to wait for, so that is the
+    /// background shutdown.
+    fn into_runtime(self) -> Option<LocalRuntime> {
         #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
         drop(self.hosted);
-        match Rc::try_unwrap(self.core) {
-            Ok(core) => core.into_inner().runtime,
-            Err(_) => unreachable!("only the host's callbacks share the core, weakly"),
-        }
+        let core = Rc::try_unwrap(self.core).ok()?;
+        Some(core.into_inner().runtime)
     }
 
     /// Spawns a future onto the runtime. It is queued, and the host
