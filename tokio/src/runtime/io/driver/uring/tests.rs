@@ -54,7 +54,7 @@ impl Drop for BrokenRing {
 }
 
 // A failed reactor registration must not leave the ring stored. The next
-// init would otherwise treat it as already set up and skip registration.
+// call would otherwise treat it as already set up and skip registration.
 #[test]
 #[cfg_attr(miri, ignore)]
 fn register_failure_drops_the_ring_so_init_can_retry() {
@@ -75,8 +75,10 @@ fn register_failure_drops_the_ring_so_init_can_retry() {
     }
 
     assert!(handle.get_uring().lock().uring.is_none());
+    // `register_probe` rejects a probe that was already filled.
+    let mut retry_probe = Probe::new();
     handle
-        .try_init(&mut probe)
+        .try_init(&mut retry_probe)
         .expect("retry after dropping the unregistered ring");
     assert!(handle.get_uring().lock().uring.is_some());
 }

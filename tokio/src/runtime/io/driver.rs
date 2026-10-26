@@ -377,8 +377,8 @@ impl Direction {
 
 /// Drop a ring this attempt just created when reactor registration fails.
 ///
-/// The next init has to create the ring and register it again. An
-/// unregistered ring left in place makes that next call look finished,
+/// The following attempt has to create the ring and register it again.
+/// An unregistered ring left in place makes that attempt look finished,
 /// so the fd never joins the reactor.
 pub(super) fn drop_ring_if_register_failed<T>(
     ring: &mut Option<T>,
