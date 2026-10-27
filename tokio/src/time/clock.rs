@@ -277,6 +277,17 @@ cfg_test_util! {
             clock.advance(duration)
         });
 
+        // While blocking work runs, auto-advance is inhibited and the time driver parks on a
+        // real timeout instead of advancing the clock itself. Moving the clock forward does not
+        // interrupt that wait, so a timer it covers would fire only when the real timeout
+        // expires. Wake the driver so it re-checks its deadlines against the new time.
+        #[cfg(feature = "rt")]
+        {
+            if let Ok(handle) = crate::runtime::Handle::try_current() {
+                handle.inner.driver().unpark();
+            }
+        }
+
         crate::task::yield_now().await;
     }
 

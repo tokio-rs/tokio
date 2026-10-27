@@ -380,3 +380,33 @@ async fn paused_time_spawn_unix_datagram_and_sleep() {
     h.await.unwrap();
     assert_eq!(time.elapsed(), Duration::from_millis(100));
 }
+
+/// Regression test for #8696.
+///
+/// While blocking work runs, auto-advance is inhibited and the time driver parks on a real
+/// timeout instead of advancing the clock itself. Advancing the clock from another thread has
+/// to wake the driver, or the timer fires only once that real timeout expires.
+#[tokio::test(flavor = "current_thread", start_paused = true)]
+async fn advance_wakes_a_parked_driver() {
+    let handle = tokio::runtime::Handle::current();
+    let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+
+    let blocker = tokio::task::spawn_blocking(move || {
+        // Give the driver time to park on the sleep's real timeout.
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        handle.block_on(time::advance(std::time::Duration::from_secs(10)));
+        // Stay alive, so the wake cannot come from this task finishing.
+        let _ = done_rx.recv();
+    });
+
+    let start = std::time::Instant::now();
+    time::sleep(std::time::Duration::from_secs(10)).await;
+    assert!(
+        start.elapsed() < std::time::Duration::from_secs(5),
+        "timer waited on real time for {:?}",
+        start.elapsed()
+    );
+
+    drop(done_tx);
+    blocker.await.unwrap();
+}
