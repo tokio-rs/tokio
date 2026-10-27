@@ -515,15 +515,40 @@ mod orphan_on_error_tests {
     }
 
     #[cfg(all(feature = "rt", not(miri)))]
-    fn assert_parent_fd_closed(fd: std::os::unix::io::RawFd) {
-        // SAFETY: `F_GETFD` reads descriptor flags. It does not follow the fd
-        // as a pointer, and a closed descriptor is a defined argument.
-        let rc = unsafe { libc::fcntl(fd, libc::F_GETFD) };
-        assert_eq!(rc, -1, "parent fd {fd} is still open");
+    fn pipe_ends() -> (std::os::unix::io::OwnedFd, std::os::unix::io::OwnedFd) {
+        use std::os::unix::io::FromRawFd;
+
+        let mut fds = [0; 2];
+        // SAFETY: `pipe` writes two open descriptors into `fds` on success.
+        let rc = unsafe { libc::pipe(fds.as_mut_ptr()) };
+        assert_eq!(rc, 0, "pipe: {}", io::Error::last_os_error());
+        for fd in fds {
+            // SAFETY: `fd` is one of the descriptors `pipe` just returned.
+            // `ChildStdout::from` requires `FD_CLOEXEC`.
+            let set = unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) };
+            assert_eq!(set, 0, "FD_CLOEXEC: {}", io::Error::last_os_error());
+        }
+        // SAFETY: both descriptors are open. This function takes ownership.
+        unsafe {
+            (
+                std::os::unix::io::OwnedFd::from_raw_fd(fds[0]),
+                std::os::unix::io::OwnedFd::from_raw_fd(fds[1]),
+            )
+        }
+    }
+
+    #[cfg(all(feature = "rt", not(miri)))]
+    fn assert_read_end_closed(write: &std::os::unix::io::OwnedFd) {
+        use std::os::unix::io::AsRawFd;
+
+        let buf = [0u8; 1];
+        // SAFETY: `write` is still open, and the buffer is one byte.
+        let rc = unsafe { libc::write(write.as_raw_fd(), buf.as_ptr().cast(), 1) };
+        assert_eq!(rc, -1, "parent read end is still open");
         assert_eq!(
             io::Error::last_os_error().raw_os_error(),
-            Some(libc::EBADF),
-            "parent fd {fd} was not closed"
+            Some(libc::EPIPE),
+            "parent read end was not closed"
         );
     }
 
@@ -532,8 +557,6 @@ mod orphan_on_error_tests {
     #[cfg(all(feature = "rt", not(miri)))]
     #[test]
     fn build_child_closes_remaining_pipes_when_stdio_registration_fails() {
-        use std::os::unix::io::AsRawFd;
-
         let rt = crate::runtime::Builder::new_current_thread()
             .enable_io()
             .build()
@@ -542,16 +565,22 @@ mod orphan_on_error_tests {
         // `add_source` fails once the driver is shut down, on every OS.
         drop(rt);
 
-        let child = std::process::Command::new("/bin/sleep")
+        let mut child = std::process::Command::new("/bin/sleep")
             .arg("30")
             .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .spawn()
             .expect("spawn sleep");
-        let stdout_fd = child.stdout.as_ref().expect("stdout pipe").as_raw_fd();
-        let stderr_fd = child.stderr.as_ref().expect("stderr pipe").as_raw_fd();
-        assert_ne!(stdout_fd, stderr_fd);
+        // Pipes are created after spawn so `sleep` does not inherit the read
+        // ends. Other tests in this process reuse descriptor numbers, so
+        // `F_GETFD` after close is not proof. `EPIPE` on the write end means
+        // that read end was dropped, which unblocks a child blocked on a full
+        // pipe. stdin is closed inside the failed `stdio` call either way.
+        let (stdout_read, stdout_write) = pipe_ends();
+        let (stderr_read, stderr_write) = pipe_ends();
+        child.stdout = Some(std::process::ChildStdout::from(stdout_read));
+        child.stderr = Some(std::process::ChildStderr::from(stderr_read));
         let _kill = KillChild {
             pid: libc::pid_t::try_from(child.id()).expect("pid"),
         };
@@ -565,9 +594,7 @@ mod orphan_on_error_tests {
             crate::runtime::is_rt_shutdown_err(&err),
             "expected the shut-down runtime error, got {err:?}"
         );
-        // stdin is closed inside the failed `stdio` call either way.
-        // stdout and stderr stay open unless they were taken first.
-        assert_parent_fd_closed(stdout_fd);
-        assert_parent_fd_closed(stderr_fd);
+        assert_read_end_closed(&stdout_write);
+        assert_read_end_closed(&stderr_write);
     }
 }
