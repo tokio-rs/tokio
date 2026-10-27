@@ -534,10 +534,7 @@ impl OpenOptions {
             Kind::Uring(opts) => {
                 if let Ok(handle) = crate::runtime::Handle::try_current() {
                     if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
-                        if driver_handle
-                            .check_and_init(io_uring::opcode::OpenAt::CODE)
-                            .await?
-                        {
+                        if driver_handle.check_and_init(io_uring::opcode::OpenAt::CODE)? {
                             return crate::io::uring::open::open(path, opts).await;
                         }
                     }

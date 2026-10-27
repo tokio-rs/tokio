@@ -44,10 +44,7 @@ pub async fn try_exists(path: impl AsRef<Path>) -> io::Result<bool> {
     {
         if let Ok(handle) = crate::runtime::Handle::try_current() {
             if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
-                if driver_handle
-                    .check_and_init(io_uring::opcode::Statx::CODE)
-                    .await?
-                {
+                if driver_handle.check_and_init(io_uring::opcode::Statx::CODE)? {
                     return try_exists_uring(path).await;
                 }
             }

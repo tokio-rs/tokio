@@ -48,33 +48,6 @@ impl UringContext {
         self.uring.as_mut().expect("io_uring not initialized")
     }
 
-    /// Perform `io_uring_setup` system call, and Returns true if this
-    /// actually initialized the io_uring.
-    ///
-    /// If the machine doesn't support io_uring, then this will return an
-    /// `ENOSYS` error.
-    pub(crate) fn try_init(&mut self, probe: &mut Probe) -> io::Result<bool> {
-        if self.uring.is_some() {
-            // Already initialized.
-            return Ok(false);
-        }
-
-        let uring = IoUring::new(DEFAULT_RING_SIZE)?;
-
-        match uring.submitter().register_probe(probe) {
-            Ok(_) => {}
-            Err(e) if e.raw_os_error() == Some(libc::EINVAL) => {
-                // The kernel does not support IORING_REGISTER_PROBE.
-                return Err(io::Error::from_raw_os_error(libc::ENOSYS));
-            }
-            Err(e) => return Err(e),
-        }
-
-        self.uring.replace(uring);
-
-        Ok(true)
-    }
-
     pub(crate) fn dispatch_completions(&mut self) {
         let ops = &mut self.ops;
         let Some(uring) = self.uring.as_mut() else {
@@ -245,28 +218,11 @@ impl Handle {
     /// If either io_uring is unsupported or the opcode is unsupported,
     /// this returns `Ok(false)`.
     /// An error is returned if an io_uring syscall returns an unexpected error value.
-    ///
-    /// TODO: This would like to be a synchronous function,
-    /// but we require `OnceLock::get_or_try_init`.
-    /// <https://github.com/rust-lang/rust/issues/109737>
-    pub(crate) async fn check_and_init(&self, opcode: u8) -> io::Result<bool> {
-        let probe = self
-            .uring_probe
-            .get_or_try_init(|| async {
-                let mut probe = Probe::new();
-                match self.try_init(&mut probe) {
-                    Ok(()) => Ok(Some(probe)),
-                    // If the system doesn't support io_uring, we set the probe to `None`.
-                    Err(e) if e.raw_os_error() == Some(libc::ENOSYS) => Ok(None),
-                    // If we get EPERM, io-uring syscalls may be blocked (for example, by seccomp).
-                    // In this case, we try to fall back to spawn_blocking for this and future operations.
-                    // See also: https://github.com/tokio-rs/tokio/issues/7691
-                    Err(e) if e.raw_os_error() == Some(libc::EPERM) => Ok(None),
-                    // For other system errors, we just return it.
-                    Err(e) => Err(e),
-                }
-            })
-            .await?;
+    pub(crate) fn check_and_init(&self, opcode: u8) -> io::Result<bool> {
+        let probe = match self.uring_probe.get() {
+            Some(probe) => probe,
+            None => self.init_probe()?,
+        };
 
         Ok(probe
             .as_ref()
@@ -274,27 +230,54 @@ impl Handle {
     }
 
     /// Initialize the io_uring context if it hasn't been initialized yet.
-    fn try_init(&self, probe: &mut Probe) -> io::Result<()> {
+    fn init_probe(&self) -> io::Result<&Option<Probe>> {
         let mut guard = self.get_uring().lock();
-        if guard.try_init(probe)? {
-            self.add_uring_source(guard.ring().as_raw_fd())?;
+        if let Some(probe) = self.uring_probe.get() {
+            return Ok(probe);
         }
+        let mut probe = Probe::new();
+        let probe = match self.try_init(&mut guard, &mut probe) {
+            Ok(()) => Some(probe),
+            // If the system doesn't support io_uring, we set the probe to `None`.
+            Err(e) if e.raw_os_error() == Some(libc::ENOSYS) => None,
+            // If we get EPERM, io-uring syscalls may be blocked (for example, by seccomp).
+            // In this case, builtin operations try to fall back to spawn_blocking for this and future operations.
+            // See also: https://github.com/tokio-rs/tokio/issues/7691
+            Err(e) if e.raw_os_error() == Some(libc::EPERM) => None,
+            // For other system errors, we just return it.
+            Err(e) => return Err(e),
+        };
+        // Publish before unlocking so another initializer cannot replace the ring.
+        Ok(self.uring_probe.get_or_init(|| probe))
+    }
 
+    fn try_init(&self, guard: &mut UringContext, probe: &mut Probe) -> io::Result<()> {
+        let uring = IoUring::new(DEFAULT_RING_SIZE)?;
+        match uring.submitter().register_probe(probe) {
+            Ok(()) => {}
+            Err(e) if e.raw_os_error() == Some(libc::EINVAL) => {
+                // The kernel does not support IORING_REGISTER_PROBE.
+                return Err(io::Error::from_raw_os_error(libc::ENOSYS));
+            }
+            Err(e) => return Err(e),
+        }
+        self.add_uring_source(uring.as_raw_fd())?;
+        guard.uring = Some(uring);
         Ok(())
     }
 
     /// Register an operation with the io_uring.
     ///
-    /// If this is the first io_uring operation, it will also initialize the io_uring context.
-    /// If io_uring isn't supported, this function returns an `ENOSYS` error, so the caller can
-    /// perform custom handling, such as falling back to an alternative mechanism.
+    /// # Panics
+    ///
+    /// Panics if called before the ring has been successfully initialized.
     ///
     /// # Safety
     ///
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> RegisterResult {
-        assert!(self.uring_probe.initialized());
+        assert!(self.uring_probe.get().and_then(Option::as_ref).is_some());
 
         // Uring is initialized.
 

@@ -37,10 +37,7 @@ pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Re
     {
         if let Ok(handle) = crate::runtime::Handle::try_current() {
             if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
-                if driver_handle
-                    .check_and_init(io_uring::opcode::Write::CODE)
-                    .await?
-                {
+                if driver_handle.check_and_init(io_uring::opcode::Write::CODE)? {
                     return write_uring(path, contents).await;
                 }
             }
