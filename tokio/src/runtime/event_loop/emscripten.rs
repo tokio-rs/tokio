@@ -216,7 +216,7 @@ impl Hosted {
     /// # Safety
     ///
     /// `user_data` is the argument a `Hosted` registered the callback with.
-    /// `drop` unregisters every callback, so none fires on a freed `Hosted`.
+    /// `drop` removes every callback, so none fires on a freed `Hosted`.
     unsafe fn from_callback(user_data: *mut c_void) -> Rc<Hosted> {
         let hosted = unsafe { &*(user_data as *const Hosted) };
         hosted
