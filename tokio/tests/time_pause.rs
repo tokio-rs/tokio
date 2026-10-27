@@ -386,6 +386,10 @@ async fn paused_time_spawn_unix_datagram_and_sleep() {
 /// While blocking work runs, auto-advance is inhibited and the time driver parks on a real
 /// timeout instead of advancing the clock itself. Advancing the clock from another thread has
 /// to wake the driver, or the timer fires only once that real timeout expires.
+///
+/// Skipped where there are no blocking threads: on those targets `spawn_blocking` runs the
+/// closure inline, which parks the runtime the test needs to make progress.
+#[cfg(not(any(target_os = "emscripten", target_os = "wasi")))]
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn advance_wakes_a_parked_driver() {
     let handle = tokio::runtime::Handle::current();
