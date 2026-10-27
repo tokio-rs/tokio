@@ -173,12 +173,30 @@ impl Barrier {
         let local_gen = lock.generation_id;
         lock.count += 1;
         if lock.count < self.num_threads {
-            // We need a while loop to guard against spurious wakeups.
+            // We need a loop to guard against spurious wakeups.
             // https://en.wikipedia.org/wiki/Spurious_wakeup
-            while local_gen == lock.generation_id {
+            loop {
                 let (guard, timeout_result) = self.cvar.wait_timeout(lock, timeout).unwrap();
                 lock = guard;
+
+                // The barrier completed (possibly concurrently with our
+                // timeout), so we were released as part of the rendezvous.
+                if local_gen != lock.generation_id {
+                    break;
+                }
+
                 if timeout_result.timed_out() {
+                    // Roll back the `count += 1` performed above before
+                    // returning. `count` is reset to 0 only on the leader path
+                    // (the `else` branch below), so a generation that never
+                    // reaches `num_threads` would otherwise leak this arrival,
+                    // letting a later generation cross `num_threads` with fewer
+                    // than `num_threads` threads actually present and elect a
+                    // spurious leader. Cannot underflow: we hold the lock and
+                    // the generation is unchanged since our own `count += 1`, so
+                    // no leader has reset `count` and it still includes us.
+                    debug_assert!(lock.count > 0);
+                    lock.count -= 1;
                     return None;
                 }
             }
