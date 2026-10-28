@@ -634,4 +634,25 @@ impl Interval {
     pub fn period(&self) -> Duration {
         self.period
     }
+
+    /// Returns the instant at which the next tick will complete.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::time::{self, Instant};
+    ///
+    /// use std::time::Duration;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let start = Instant::now();
+    /// let interval = time::interval_at(start, Duration::from_millis(10));
+    ///
+    /// assert_eq!(interval.deadline(), start);
+    /// # }
+    /// ```
+    pub fn deadline(&self) -> Instant {
+        self.delay.deadline()
+    }
 }
