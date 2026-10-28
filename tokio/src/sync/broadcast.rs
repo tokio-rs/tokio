@@ -939,14 +939,14 @@ impl<T> Sender<T> {
     /// ```
     /// use tokio::sync::broadcast;
     ///
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     let (tx, rx) = broadcast::channel::<()>(16);
-    ///     assert!(!tx.is_closed());
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let (tx, rx) = broadcast::channel::<()>(16);
+    /// assert!(!tx.is_closed());
     ///
-    ///     drop(rx);
-    ///     assert!(tx.is_closed());
-    /// }
+    /// drop(rx);
+    /// assert!(tx.is_closed());
+    /// # }
     /// ```
     pub fn is_closed(&self) -> bool {
         self.shared.tail.lock().closed
