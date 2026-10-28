@@ -193,8 +193,9 @@ impl Drop for UringContext {
 impl Handle {
     fn add_uring_source(&self, uringfd: RawFd) -> io::Result<()> {
         let mut source = SourceFd(&uringfd);
-        self.registry
-            .register(&mut source, TOKEN_WAKEUP, Interest::READABLE.to_mio())
+        self.with_registry(|registry| {
+            registry.register(&mut source, TOKEN_WAKEUP, Interest::READABLE.to_mio())
+        })
     }
 
     pub(crate) fn get_uring(&self) -> &Mutex<UringContext> {

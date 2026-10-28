@@ -317,6 +317,7 @@ impl Inner {
         if let Some(mut driver) = self.shared.driver.try_lock() {
             if let Some(mut driver) = driver.take() {
                 driver.shutdown(handle);
+                handle.release_io();
             }
         } else {
             debug_assert!(false, "driver locked during shutdown");
