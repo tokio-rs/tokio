@@ -627,3 +627,32 @@ async fn next_many_correctly_loops_around() {
         );
     }
 }
+
+#[tokio::test]
+async fn extend_does_not_allow_duplicate_keys() {
+    let mut streams = StreamMap::new();
+    streams.insert("key", stream::once(1u8));
+    streams.extend(vec![("key", stream::once(42u8))]);
+
+    assert_eq!(
+        streams.len(),
+        1,
+        "StreamMap should not contain duplicate keys after extend"
+    );
+    assert_eq!(streams.next().await, Some(("key", 42)));
+    assert_eq!(streams.next().await, None);
+}
+
+#[tokio::test]
+async fn extend_with_internal_duplicates() {
+    let mut streams = StreamMap::new();
+    streams.extend(vec![("key", stream::once(1u8)), ("key", stream::once(2u8))]);
+
+    assert_eq!(
+        streams.len(),
+        1,
+        "Duplicate keys within iterator must be deduplicated"
+    );
+    assert_eq!(streams.next().await, Some(("key", 2)));
+    assert_eq!(streams.next().await, None);
+}
