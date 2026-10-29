@@ -122,3 +122,47 @@ fn current_thread() -> Runtime {
         .build()
         .unwrap()
 }
+
+#[test]
+fn waker_panic_during_driver_park_preserves_runtime() {
+    use std::future::Future;
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+    use std::sync::Arc;
+    use std::task::{Context, Wake, Waker};
+    use std::time::Duration;
+
+    struct PanicWaker;
+    impl Wake for PanicWaker {
+        fn wake(self: Arc<Self>) {
+            panic!("waker panicked");
+        }
+    }
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
+
+    let mut sleep = {
+        let _enter = rt.enter();
+        Box::pin(tokio::time::sleep(Duration::from_millis(1)))
+    };
+    let waker = Waker::from(Arc::new(PanicWaker));
+    assert!(sleep
+        .as_mut()
+        .poll(&mut Context::from_waker(&waker))
+        .is_pending());
+
+    let res = catch_unwind(AssertUnwindSafe(|| {
+        rt.block_on(async { tokio::time::sleep(Duration::from_millis(10)).await })
+    }));
+    assert!(res.is_err());
+
+    // Subsequent block_on calls must succeed and not panic with "driver missing" or hang.
+    let res = catch_unwind(AssertUnwindSafe(|| {
+        rt.block_on(async { tokio::time::sleep(Duration::from_millis(5)).await })
+    }));
+    assert!(res.is_ok());
+
+    drop(sleep);
+}
