@@ -14,17 +14,17 @@
 #![warn(rust_2018_idioms)]
 
 use bytes::{Buf, BytesMut};
-use futures::SinkExt;
-use http::{header::HeaderValue, Request, Response, StatusCode};
-#[macro_use]
-extern crate serde_derive;
-use std::{env, error::Error, fmt, io};
-use tokio::net::{TcpListener, TcpStream};
-use tokio_stream::StreamExt;
-use tokio_util::codec::{Decoder, Encoder, Framed};
+use http::{header::HeaderValue, Request, Response};
+#[cfg(not(test))]
+use std::{env, error::Error};
+use std::{fmt, io};
+use tokio_util::codec::{Decoder, Encoder};
 
+#[cfg(not(test))]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    use tokio::net::TcpListener;
+
     // Parse the arguments, bind the TCP socket we'll be listening to, spin up
     // our worker threads, and start shipping sockets to those worker threads.
     let addr = env::args()
@@ -43,7 +43,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 }
 
-async fn process(stream: TcpStream) -> Result<(), Box<dyn Error>> {
+#[cfg(not(test))]
+async fn process(stream: tokio::net::TcpStream) -> Result<(), Box<dyn Error>> {
+    use futures::SinkExt;
+    use tokio_stream::StreamExt;
+    use tokio_util::codec::Framed;
+
     let mut transport = Framed::new(stream, Http);
 
     while let Some(request) = transport.next().await {
@@ -59,7 +64,11 @@ async fn process(stream: TcpStream) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(not(test))]
 async fn respond(req: Request<()>) -> Result<Response<String>, Box<dyn Error>> {
+    use http::StatusCode;
+    use serde_derive::Serialize;
+
     let mut response = Response::builder();
     let body = match req.uri().path() {
         "/plaintext" => {
