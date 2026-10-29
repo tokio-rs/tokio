@@ -480,7 +480,7 @@ impl TimerEntry {
     pub(crate) fn init(self: Pin<&mut Self>, deadline: u64) {
         unsafe {
             self.driver()
-                .reregister(&self.driver.driver().io, deadline, (&self.inner).into());
+                .reregister(self.driver.driver(), deadline, (&self.inner).into());
         }
     }
 
@@ -523,7 +523,7 @@ impl TimerEntry {
 
         unsafe {
             self.driver()
-                .reregister(&self.driver.driver().io, deadline, (&self.inner).into());
+                .reregister(self.driver.driver(), deadline, (&self.inner).into());
         }
     }
 
