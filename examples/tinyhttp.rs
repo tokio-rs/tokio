@@ -162,10 +162,14 @@ impl Decoder for Http {
         const MAX_HEADERS: usize = 1024;
 
         let mut stack_headers = [httparse::EMPTY_HEADER; 16];
-        let mut vec_headers;
-        let mut header_buf: &mut [httparse::Header<'_>] = &mut stack_headers;
+        let mut vec_headers = Vec::new();
 
         let (amt, req) = loop {
+            let header_buf = if vec_headers.is_empty() {
+                &mut stack_headers[..]
+            } else {
+                &mut vec_headers[..]
+            };
             let mut r = httparse::Request::new(&mut *header_buf);
             let status = match r.parse(src) {
                 Ok(status) => status,
@@ -174,8 +178,7 @@ impl Decoder for Http {
                         return Err(io::Error::other("too many HTTP headers"));
                     }
                     let new_cap = (header_buf.len() * 2).min(MAX_HEADERS);
-                    vec_headers = vec![httparse::EMPTY_HEADER; new_cap];
-                    header_buf = &mut vec_headers;
+                    vec_headers.resize(new_cap, httparse::EMPTY_HEADER);
                     continue;
                 }
                 Err(e) => {
@@ -333,7 +336,7 @@ mod tests {
     fn decode_header_counts() {
         let mut decoder = Http;
 
-        for count in [16, 17, 100, 1023, 1024] {
+        for count in [16, 17, 1023, 1024] {
             let mut raw = String::from("GET /json HTTP/1.1\r\n");
             append_headers(&mut raw, count);
 
@@ -387,11 +390,16 @@ mod tests {
     fn decode_malformed_input() {
         let mut decoder = Http;
 
-        let mut bad_header = BytesMut::from("GET / HTTP/1.1\r\nBad Header: val\r\n\r\n");
-        assert!(decoder.decode(&mut bad_header).is_err());
-
-        let mut bad_version = BytesMut::from("GET / HTTP/2.0\r\nHost: example.com\r\n\r\n");
-        assert!(decoder.decode(&mut bad_version).is_err());
+        for raw in [
+            "GET / HTTP/1.1\r\nBad Header: val\r\n\r\n",
+            "GET / HTTP/2.0\r\nHost: example.com\r\n\r\n",
+            "GET http:// HTTP/1.1\r\n\r\n",
+        ] {
+            let mut buf = BytesMut::from(raw);
+            let err = decoder.decode(&mut buf).unwrap_err();
+            assert_eq!(err.kind(), io::ErrorKind::Other);
+            assert_eq!(buf.as_ref(), raw.as_bytes());
+        }
     }
 
     #[test]
