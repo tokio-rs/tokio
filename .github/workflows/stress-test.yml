@@ -14,6 +14,7 @@ env:
   RUST_BACKTRACE: 1
   # Change to specific Rust release to pin
   rust_stable: 1.85
+  parking_lot_msrv_version: '0.12.5'
 
 permissions:
   contents: read
@@ -36,6 +37,8 @@ jobs:
         uses: taiki-e/install-action@valgrind
 
       - uses: Swatinem/rust-cache@v2
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
       # Compiles each of the stress test examples.
       - name: Compile stress test examples
         run: cargo build -p stress-test --release --example ${{ matrix.stress-test }}
