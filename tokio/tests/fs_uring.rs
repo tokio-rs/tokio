@@ -122,6 +122,92 @@ fn open_many_files() {
     }
 }
 
+#[cfg(all(feature = "signal", feature = "time"))]
+#[tokio::test]
+async fn shutdown_retries_interrupted_wait() {
+    use std::os::unix::thread::JoinHandleExt;
+    use tokio::signal::unix::{signal, SignalKind};
+    use tokio::time::timeout;
+
+    const TIMEOUT: Duration = Duration::from_secs(10);
+
+    let Ok(ring) = io_uring::IoUring::new(2) else {
+        return;
+    };
+    let mut probe = io_uring::Probe::new();
+    if ring.submitter().register_probe(&mut probe).is_err()
+        || !probe.is_supported(io_uring::opcode::OpenAt::CODE)
+    {
+        return;
+    }
+    drop(ring);
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("fifo");
+    nix::unistd::mkfifo(&path, nix::sys::stat::Mode::S_IRWXU).unwrap();
+    let mut signal = signal(SignalKind::user_defined1()).unwrap();
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let open_path = path.clone();
+    let shutdown = std::thread::spawn(move || {
+        let rt = current_rt()();
+        // Initialise io_uring before polling the operation we will cancel.
+        rt.block_on(tokio::fs::File::open("/dev/null")).unwrap();
+        {
+            let _enter = rt.enter();
+            // O_CREAT forces io_uring to use its blocking open path for the FIFO.
+            let mut open = tokio_test::task::spawn(tokio::fs::File::create(open_path));
+            tokio_test::assert_pending!(open.poll());
+        }
+        // SAFETY: gettid take no arguments and returns this thread's ID.
+        tx.send(unsafe { libc::syscall(libc::SYS_gettid) }).unwrap();
+        drop(rt);
+    });
+
+    let pthread = shutdown.as_pthread_t();
+    let interrupt_result = tokio::spawn(timeout(TIMEOUT, async move {
+        let tid = rx.await.unwrap();
+        let syscall_path = format!("/proc/self/task/{tid}/syscall");
+        let syscall_number = format!("{} ", libc::SYS_io_uring_enter);
+        let wait_for_uring_enter = || async {
+            while !std::fs::read_to_string(&syscall_path)
+                .unwrap()
+                .starts_with(&syscall_number)
+            {
+                tokio::task::yield_now().await;
+            }
+        };
+        // The FIFO has no reader, so shutdown must wait for the cancelled open.
+        wait_for_uring_enter().await;
+        // SAFETY: the join handle keeps the thread ID valid, and SIGUSR1 has a handler.
+        assert_eq!(
+            unsafe { libc::pthread_kill(pthread as libc::pthread_t, libc::SIGUSR1) },
+            0
+        );
+        signal.recv().await.unwrap();
+        // After signal delivry, another wait proves shutdown retried before we release the FIFO.
+        wait_for_uring_enter().await;
+    }))
+    .await;
+
+    // Release the FIFO before propagating failures. O_RDWR never waits for a peer.
+    let _reader = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)
+        .unwrap();
+    timeout(TIMEOUT, async {
+        while !shutdown.is_finished() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("runtime shutdown did not complete");
+    shutdown
+        .join()
+        .unwrap_or_else(|panic| std::panic::resume_unwind(panic));
+    interrupt_result.unwrap().unwrap();
+}
+
 #[tokio::test]
 async fn cancel_op_future() {
     let (_tmp_file, path): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(1);
