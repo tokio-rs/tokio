@@ -57,6 +57,7 @@ tokio-stream = "0.1"
 async-stream = "0.3.0"
 futures = "0.3.0"
 futures-test = "0.3.5"
+# Kept back compared to `tokio`'s non-dev equivalent to simplify CI.
 parking_lot = "0.12.0"
 tempfile = "3.1.0"
 
