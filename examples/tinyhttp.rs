@@ -297,3 +297,151 @@ mod date {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn append_headers(request: &mut String, count: usize) {
+        for i in 0..count {
+            request.push_str(&format!("X-Header-{i}: value-{i}\r\n"));
+        }
+        request.push_str("\r\n");
+    }
+
+    #[test]
+    fn decode_fewer_than_16_headers() {
+        let mut decoder = Http;
+        let mut buf = BytesMut::from(
+            "GET /plaintext HTTP/1.1\r\n\
+             Host: localhost:8080\r\n\
+             User-Agent: test\r\n\r\n",
+        );
+
+        let req = decoder.decode(&mut buf).unwrap().unwrap();
+        assert_eq!(req.method(), http::Method::GET);
+        assert_eq!(req.uri(), "/plaintext");
+        assert_eq!(req.version(), http::Version::HTTP_11);
+        assert_eq!(req.headers().get("host").unwrap(), "localhost:8080");
+        assert_eq!(req.headers().get("user-agent").unwrap(), "test");
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn decode_header_counts() {
+        let mut decoder = Http;
+
+        let count = 16;
+        let mut raw = String::from("GET /json HTTP/1.1\r\n");
+        append_headers(&mut raw, count);
+
+        let mut buf = BytesMut::from(raw.as_str());
+        let req = decoder.decode(&mut buf).unwrap().unwrap();
+        assert_eq!(req.headers().len(), count);
+        for i in 0..count {
+            let name = format!("x-header-{i}");
+            let expected = format!("value-{i}");
+            assert_eq!(req.headers().get(&name).unwrap(), expected.as_str());
+        }
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn decode_exceeding_header_capacity() {
+        let mut decoder = Http;
+        let mut raw = String::from("GET /plaintext HTTP/1.1\r\n");
+        append_headers(&mut raw, 17);
+
+        let mut buf = BytesMut::from(raw.as_str());
+        let err = decoder.decode(&mut buf).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::Other);
+        assert_eq!(
+            err.to_string(),
+            "failed to parse http request: TooManyHeaders"
+        );
+        assert_eq!(buf.as_ref(), raw.as_bytes());
+    }
+
+    #[test]
+    fn decode_partial_request() {
+        let mut decoder = Http;
+
+        let count = 2;
+        let mut raw = String::from("GET /plaintext HTTP/1.1\r\n");
+        append_headers(&mut raw, count);
+
+        for split in 0..raw.len() {
+            let mut buf = BytesMut::from(&raw.as_bytes()[..split]);
+            assert!(decoder.decode(&mut buf).unwrap().is_none());
+            assert_eq!(buf.as_ref(), &raw.as_bytes()[..split]);
+
+            buf.extend_from_slice(&raw.as_bytes()[split..]);
+            let req = decoder.decode(&mut buf).unwrap().unwrap();
+            assert_eq!(req.headers().len(), count);
+            assert!(buf.is_empty());
+        }
+    }
+
+    #[test]
+    fn decode_malformed_input() {
+        let mut decoder = Http;
+
+        let mut bad_header = BytesMut::from("GET / HTTP/1.1\r\nBad Header: val\r\n\r\n");
+        assert!(decoder.decode(&mut bad_header).is_err());
+
+        let mut bad_version = BytesMut::from("GET / HTTP/2.0\r\nHost: example.com\r\n\r\n");
+        assert!(decoder.decode(&mut bad_version).is_err());
+    }
+
+    #[test]
+    fn decode_rejects_http_10() {
+        let mut decoder = Http;
+        let raw = "GET / HTTP/1.0\r\nHost: example.com\r\n\r\n";
+        let mut buf = BytesMut::from(raw);
+
+        let err = decoder.decode(&mut buf).unwrap_err();
+        assert_eq!(err.to_string(), "only HTTP/1.1 accepted");
+        assert_eq!(buf.as_ref(), raw.as_bytes());
+    }
+
+    #[test]
+    fn decode_pipelined_requests() {
+        let mut decoder = Http;
+
+        let count = 0;
+        let mut raw = String::from("GET /plaintext HTTP/1.1\r\nHost: one\r\n");
+        append_headers(&mut raw, count);
+        let second = "GET /json HTTP/1.1\r\nHost: two\r\n\r\n";
+        raw.push_str(second);
+        let mut buf = BytesMut::from(raw.as_str());
+
+        let req1 = decoder.decode(&mut buf).unwrap().unwrap();
+        assert_eq!(req1.uri(), "/plaintext");
+        assert_eq!(req1.headers().get("host").unwrap(), "one");
+        assert_eq!(req1.headers().len(), count + 1);
+        assert_eq!(buf.as_ref(), second.as_bytes());
+
+        let req2 = decoder.decode(&mut buf).unwrap().unwrap();
+        assert_eq!(req2.uri(), "/json");
+        assert_eq!(req2.headers().get("host").unwrap(), "two");
+
+        assert!(decoder.decode(&mut buf).unwrap().is_none());
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn decode_duplicate_headers() {
+        let mut decoder = Http;
+        let mut buf = BytesMut::from(
+            "GET /plaintext HTTP/1.1\r\n\
+             Accept: text/plain\r\n\
+             Accept: text/html\r\n\r\n",
+        );
+
+        let req = decoder.decode(&mut buf).unwrap().unwrap();
+        let accepts: Vec<_> = req.headers().get_all("accept").iter().collect();
+        assert_eq!(accepts.len(), 2);
+        assert_eq!(accepts[0], "text/plain");
+        assert_eq!(accepts[1], "text/html");
+    }
+}
