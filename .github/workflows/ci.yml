@@ -866,7 +866,7 @@ jobs:
           # Removing the tokio workspace patch to check without path dependencies
           # (if not specified differently in the crate)
           perl -0 -i.bak -pe 's/\[patch\.crates-io\].+\n\[/[/s' Cargo.toml
-          cargo clippy --workspace --exclude tokio --tests --no-deps --features $TOKIO_STABLE_FEATURES
+          cargo clippy --workspace --exclude tokio --exclude examples --tests --no-deps --features $TOKIO_STABLE_FEATURES
       - name: "clippy --workspace --all-features --unstable"
         run: |
           # Forcing the cargo lock regeneration to apply the tokio patch
@@ -876,7 +876,7 @@ jobs:
           cargo clippy --workspace --tests --no-deps --all-features
           # check without path dependencies
           mv Cargo.toml.nopatch Cargo.toml
-          cargo clippy --workspace --exclude tokio --tests --no-deps --all-features
+          cargo clippy --workspace --exclude tokio --exclude examples --tests --no-deps --all-features
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
