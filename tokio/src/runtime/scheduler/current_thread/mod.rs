@@ -25,6 +25,10 @@ use std::time::Duration;
 use std::time::Instant;
 use std::{fmt, thread};
 
+cfg_event_loop! {
+    mod event_loop;
+}
+
 /// Executes tasks on the current thread
 pub(crate) struct CurrentThread {
     /// Core scheduler data is acquired by a thread entering `block_on`.
@@ -492,6 +496,12 @@ impl Context {
 
     pub(crate) fn defer(&self, waker: &Waker) {
         self.defer.defer(waker);
+    }
+
+    /// Whether this context's scheduler owns `driver`.
+    #[cfg(feature = "time")]
+    pub(crate) fn owns_driver(&self, driver: &driver::Handle) -> bool {
+        std::ptr::eq(&self.handle.driver, driver)
     }
 }
 

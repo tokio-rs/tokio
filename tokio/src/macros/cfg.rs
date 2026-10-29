@@ -634,6 +634,72 @@ macro_rules! cfg_unstable {
     };
 }
 
+/// `EventLoop` and `LocalEventLoop`: the runtime driven from a host loop,
+/// under `tokio_unstable`.
+macro_rules! cfg_event_loop {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(tokio_unstable, feature = "rt"))]
+            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "rt"))))]
+            $item
+        )*
+    };
+}
+
+/// The targets on which mio's `Registry` is `AsFd`: the reactor's own
+/// `epoll` or `kqueue` descriptor, which is readable while events are
+/// pending. Mirrors the condition on `impl AsFd for Registry` in mio's
+/// `src/poll.rs`.
+macro_rules! cfg_registry_fd {
+    ($($item:item)*) => {
+        $(
+            #[cfg(all(
+                unix,
+                not(mio_unsupported_force_poll_poll),
+                not(any(
+                    target_os = "aix",
+                    target_os = "espidf",
+                    target_os = "nuttx",
+                    target_os = "fuchsia",
+                    target_os = "haiku",
+                    target_os = "hermit",
+                    target_os = "hurd",
+                    target_os = "nto",
+                    target_os = "vita",
+                    target_os = "cygwin",
+                    target_os = "horizon"
+                )),
+            ))]
+            $item
+        )*
+    };
+}
+
+macro_rules! cfg_not_registry_fd {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(all(
+                unix,
+                not(mio_unsupported_force_poll_poll),
+                not(any(
+                    target_os = "aix",
+                    target_os = "espidf",
+                    target_os = "nuttx",
+                    target_os = "fuchsia",
+                    target_os = "haiku",
+                    target_os = "hermit",
+                    target_os = "hurd",
+                    target_os = "nto",
+                    target_os = "vita",
+                    target_os = "cygwin",
+                    target_os = "horizon"
+                )),
+            )))]
+            $item
+        )*
+    };
+}
+
 macro_rules! cfg_not_trace {
     ($($item:item)*) => {
         $(

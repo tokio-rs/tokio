@@ -786,3 +786,12 @@ mod local_runtime {
     assert_value!(tokio::runtime::LocalRuntime: !Send & !Sync & Unpin);
     assert_value!(tokio::runtime::LocalOptions: !Send & !Sync & Unpin);
 }
+
+#[cfg(tokio_unstable)]
+mod event_loop {
+    use super::*;
+
+    assert_value!(tokio::runtime::EventLoop: Send & Sync & Unpin);
+    assert_value!(tokio::runtime::LocalEventLoop: !Send & !Sync & Unpin);
+    assert_value!(tokio::runtime::Unparker: Send & Sync & Unpin);
+}

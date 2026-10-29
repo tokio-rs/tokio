@@ -36,6 +36,14 @@ impl<T: 'static> Inject<T> {
         }
     }
 
+    cfg_event_loop! {
+        // `rt-multi-thread` has its own.
+        #[cfg(not(feature = "rt-multi-thread"))]
+        pub(crate) fn is_empty(&self) -> bool {
+            self.shared.is_empty()
+        }
+    }
+
     // Kind of annoying to have to include the cfg here
     #[cfg(any(all(tokio_unstable, feature = "taskdump"), feature = "rt-multi-thread"))]
     pub(crate) fn is_closed(&self) -> bool {
