@@ -3,31 +3,24 @@ use super::RegisterResult;
 use crate::runtime::driver::op::Lifecycle;
 
 use io_uring::{opcode, Probe};
+use std::io;
 use std::os::fd::AsRawFd;
 
-struct ClearFailFlag;
-
-impl Drop for ClearFailFlag {
-    fn drop(&mut self) {
-        super::FAIL_NEXT_ADD_URING_SOURCE.with(|flag| flag.set(false));
-    }
-}
-
-// Builds a driver whose io_uring context is initialized, or returns `None` when
-// io_uring is unavailable on the host.
+// Builds a driver whose io_uring context is stored and registered, or returns
+// `None` when io_uring is unavailable on the host.
 fn ready_handle() -> Option<(Driver, Handle)> {
     let (driver, handle) = Driver::new(1024, None).ok()?;
 
     let mut probe = Probe::new();
-    {
-        let mut guard = handle.get_uring().lock();
-        if !guard.try_init(&mut probe).ok()? {
-            return None;
-        }
-    }
+    handle.try_init(&mut probe).ok()?;
+    handle.get_uring().lock().uring.as_ref()?;
     handle.uring_probe.set(Some(probe)).unwrap();
 
     Some((driver, handle))
+}
+
+fn unsupported_uring(err: &io::Error) -> bool {
+    matches!(err.raw_os_error(), Some(libc::ENOSYS) | Some(libc::EPERM))
 }
 
 // Makes the next submission fail with a non-`EBUSY` error by pointing the ring's
@@ -61,38 +54,34 @@ impl Drop for BrokenRing {
 }
 
 // A failed reactor registration must not leave the ring stored. The next
-// call would otherwise treat it as already set up and skip registration.
+// `try_init` would otherwise see a stored ring and skip registration.
 #[test]
 #[cfg_attr(miri, ignore)]
-fn register_failure_drops_the_ring_so_init_can_retry() {
+fn register_failure_does_not_store_the_ring() {
     let (_driver, handle) = Driver::new(1024, None).unwrap();
-    super::FAIL_NEXT_ADD_URING_SOURCE.with(|flag| flag.set(true));
-    let _clear = ClearFailFlag;
+    let uring = match io_uring::IoUring::new(super::DEFAULT_RING_SIZE) {
+        Ok(uring) => uring,
+        Err(err) if unsupported_uring(&err) => return,
+        Err(err) => panic!("unexpected setup error: {err}"),
+    };
 
-    let mut probe = Probe::new();
-    let err = handle
-        .try_init(&mut probe)
-        .expect_err("expected registration to fail");
+    // This fd is already in the reactor, so publishing it fails with EEXIST.
+    // Storing the ring before that registration would leave it in place.
+    let registry = handle.registry.try_clone().expect("clone reactor registry");
+    super::register_uring_fd(&registry, uring.as_raw_fd()).expect("pre-register the ring fd");
 
-    // Same unsupported cases as `check_and_init`. Any other error fails the test.
-    match err.raw_os_error() {
-        Some(libc::EMFILE) => {}
-        Some(libc::ENOSYS) | Some(libc::EPERM) => {
-            assert!(
-                handle.get_uring().lock().uring.is_none(),
-                "unsupported setup left a ring stored"
-            );
-            return;
-        }
-        _ => panic!("unexpected setup error: {err}"),
+    {
+        let mut guard = handle.get_uring().lock();
+        let err = super::publish_ring(&registry, &mut guard, uring)
+            .expect_err("second registration of the same fd");
+        assert_eq!(err.raw_os_error(), Some(libc::EEXIST));
+        assert!(guard.uring.is_none(), "failed registration stored the ring");
     }
 
-    assert!(handle.get_uring().lock().uring.is_none());
-    // `register_probe` rejects a probe that was already filled.
-    let mut retry_probe = Probe::new();
+    let mut probe = Probe::new();
     handle
-        .try_init(&mut retry_probe)
-        .expect("retry after dropping the unregistered ring");
+        .try_init(&mut probe)
+        .expect("retry after a registration failure");
     assert!(handle.get_uring().lock().uring.is_some());
 }
 
