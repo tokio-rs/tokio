@@ -21,7 +21,7 @@ env:
   rust_miri_nightly: nightly-2026-08-17
   rust_emscripten_nightly: nightly-2026-08-17
   emsdk_version: '6.0.10'
-  rust_clippy: '1.88'
+  rust_clippy: '1.95'
   # When updating this, also update:
   # - README.md
   # - tokio/README.md
@@ -30,7 +30,7 @@ env:
   # - tokio-util/Cargo.toml
   # - tokio-test/Cargo.toml
   # - tokio-stream/Cargo.toml
-  rust_min: '1.85'
+  rust_min: '1.95'
   # This excludes unstable features like io_uring,
   # which require '--cfg tokio_unstable'.
   TOKIO_STABLE_FEATURES: "full,test-util"
@@ -252,7 +252,7 @@ jobs:
       - name: Install Rust ${{ env.rust_stable }}
         uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: 1.85
+            toolchain: 1.95
 
       - name: Install Valgrind
         uses: taiki-e/install-action@valgrind
