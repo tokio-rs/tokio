@@ -485,10 +485,10 @@ pub trait StreamExt: Stream {
 
     /// Creates a stream which ends after the first `None`.
     ///
-    /// After a stream returns `None`, behavior is undefined. Future calls to
-    /// `poll_next` may or may not return `Some(T)` again or they may panic.
-    /// `fuse()` adapts a stream, ensuring that after `None` is given, it will
-    /// return `None` forever.
+    /// After a stream returns `None`, the `Stream` trait does not specify how
+    /// subsequent polls behave. They may yield more items, panic, or remain
+    /// pending, but must never cause undefined behavior. `fuse()` ensures
+    /// that every poll after the first `None` also returns `None`.
     ///
     /// # Examples
     ///
