@@ -934,19 +934,20 @@ impl<T> Sender<T> {
     /// Checks if the channel has been closed. This happens when all receivers
     /// have dropped.
     ///
+    /// Calling [`subscribe`] can reopen the channel, making this return `false` again.
+    ///
+    /// [`subscribe`]: Sender::subscribe
+    ///
     /// # Examples
     ///
     /// ```
     /// use tokio::sync::broadcast;
     ///
-    /// # #[tokio::main(flavor = "current_thread")]
-    /// # async fn main() {
     /// let (tx, rx) = broadcast::channel::<()>(16);
     /// assert!(!tx.is_closed());
     ///
     /// drop(rx);
     /// assert!(tx.is_closed());
-    /// # }
     /// ```
     pub fn is_closed(&self) -> bool {
         self.shared.tail.lock().closed
