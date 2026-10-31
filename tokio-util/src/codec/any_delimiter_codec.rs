@@ -89,7 +89,8 @@ impl AnyDelimiterCodec {
     /// will discard up to `limit` bytes from that chunk until a delimiter
     /// character is reached, returning `None` until the delimiter over the limit
     /// has been fully discarded. After that point, calls to `decode` will
-    /// function as normal.
+    /// function as normal. Reaching eof in `decode_eof` also ends the chunk,
+    /// so data decoded after that is not discarded.
     ///
     /// # Note
     ///
@@ -195,12 +196,14 @@ impl Decoder for AnyDelimiterCodec {
         Ok(match self.decode(buf)? {
             Some(frame) => Some(frame),
             None => {
+                self.next_index = 0;
+                // A chunk that was being discarded ends at eof.
+                self.is_discarding = false;
                 // return remaining data, if any
                 if buf.is_empty() {
                     None
                 } else {
                     let chunk = buf.split_to(buf.len());
-                    self.next_index = 0;
                     Some(chunk.freeze())
                 }
             }

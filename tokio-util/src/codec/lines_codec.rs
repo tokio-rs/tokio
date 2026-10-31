@@ -54,7 +54,8 @@ impl LinesCodec {
     /// will discard up to `limit` bytes from that line until a newline
     /// character is reached, returning `None` until the line over the limit
     /// has been fully discarded. After that point, calls to `decode` will
-    /// function as normal.
+    /// function as normal. Reaching eof in `decode_eof` also ends the line,
+    /// so data decoded after that is not discarded.
     ///
     /// # Note
     ///
@@ -167,6 +168,8 @@ impl Decoder for LinesCodec {
             Some(frame) => Some(frame),
             None => {
                 self.next_index = 0;
+                // A line that was being discarded ends at eof.
+                self.is_discarding = false;
                 // No terminating newline - return remaining data, if any
                 if buf.is_empty() || buf == &b"\r"[..] {
                     None
