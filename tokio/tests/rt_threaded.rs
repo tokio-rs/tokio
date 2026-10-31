@@ -951,4 +951,72 @@ mod unstable {
 
         assert_ne!(rt1.handle().id(), rt2.handle().id());
     }
+
+    /// `global_queue_share_per_worker` sets the fraction of the global queue a
+    /// worker takes per pull. Across the valid `(0.0, 1.0]` range and a spread
+    /// of worker counts, every spawned task must still complete (the global
+    /// queue is always fully drained, regardless of the share).
+    #[test]
+    fn global_queue_share_per_worker_drains_all_tasks() {
+        const TASKS: usize = 1_000;
+
+        for worker_threads in [1, 2, 4, 16] {
+            for share in [0.1, 0.25, 0.5, 1.0] {
+                let rt = runtime::Builder::new_multi_thread()
+                    .worker_threads(worker_threads)
+                    .global_queue_share_per_worker(share)
+                    .build()
+                    .unwrap();
+
+                let cnt = Arc::new(AtomicUsize::new(0));
+                rt.block_on(async {
+                    let mut set = tokio::task::JoinSet::new();
+                    for _ in 0..TASKS {
+                        let cnt = cnt.clone();
+                        set.spawn(async move { cnt.fetch_add(1, Ordering::Relaxed) });
+                    }
+                    while let Some(res) = set.join_next().await {
+                        res.unwrap();
+                    }
+                });
+
+                assert_eq!(
+                    cnt.load(Relaxed),
+                    TASKS,
+                    "worker_threads={worker_threads}, share={share}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "global_queue_share_per_worker must be in the range")]
+    fn global_queue_share_per_worker_rejects_out_of_range() {
+        let _ = runtime::Builder::new_multi_thread().global_queue_share_per_worker(1.5);
+    }
+
+    #[test]
+    #[should_panic(expected = "global_queue_share_per_worker must be in the range")]
+    fn global_queue_share_per_worker_rejects_zero() {
+        let _ = runtime::Builder::new_multi_thread().global_queue_share_per_worker(0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "global_queue_share_per_worker must be in the range")]
+    fn global_queue_share_per_worker_rejects_nan() {
+        let _ = runtime::Builder::new_multi_thread().global_queue_share_per_worker(f32::NAN);
+    }
+
+    #[test]
+    #[should_panic(expected = "global_queue_share_per_worker must be in the range")]
+    fn global_queue_share_per_worker_rejects_infinity() {
+        let _ = runtime::Builder::new_multi_thread().global_queue_share_per_worker(f32::INFINITY);
+    }
+
+    #[test]
+    #[should_panic(expected = "global_queue_share_per_worker must be in the range")]
+    fn global_queue_share_per_worker_rejects_neg_infinity() {
+        let _ =
+            runtime::Builder::new_multi_thread().global_queue_share_per_worker(f32::NEG_INFINITY);
+    }
 }
