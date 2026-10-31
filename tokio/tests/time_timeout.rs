@@ -146,6 +146,24 @@ fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
 
+#[tokio::test(start_paused = true)]
+async fn timeout_deadline_matches_expected_instant() {
+    let (_tx, rx) = oneshot::channel::<()>();
+
+    let expected = Instant::now() + ms(100);
+    let fut = timeout(ms(100), rx);
+    assert_eq!(fut.deadline(), Some(expected));
+}
+
+#[tokio::test(start_paused = true)]
+async fn timeout_at_deadline_matches_given_instant() {
+    let (_tx, rx) = oneshot::channel::<()>();
+
+    let expected = Instant::now() + ms(100);
+    let fut = timeout_at(expected, rx);
+    assert_eq!(fut.deadline(), Some(expected));
+}
+
 #[tokio::test]
 async fn timeout_is_not_exhausted_by_future() {
     let fut = timeout(ms(1), async {
