@@ -87,3 +87,17 @@ async fn to_string_appends() {
     assert_eq!(len, 3);
     assert_eq!(s, "abcdef");
 }
+
+#[tokio::test]
+async fn to_string_invalid_utf8_after_multibyte_char() {
+    let mut s = "café".to_string();
+
+    let err = AsyncReadExt::read_to_string(&mut &b"\xa9"[..], &mut s)
+        .await
+        .expect_err("Should fail");
+    assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+    let utf8 = err.into_inner().unwrap().downcast::<Utf8Error>().unwrap();
+    assert_eq!(utf8.valid_up_to(), 5);
+
+    assert_eq!(s, "café");
+}

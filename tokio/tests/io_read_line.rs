@@ -115,3 +115,31 @@ async fn read_line_fail_and_utf8_fail() {
     assert_eq!(err.to_string(), "The world has no end");
     assert_eq!(line.as_str(), "Foo");
 }
+
+#[tokio::test]
+async fn read_line_appends_char_split_across_reads() {
+    let mock = Builder::new().read(b"caf\xc3").read(b"\xa9\n").build();
+
+    let mut read = BufReader::new(mock);
+
+    let mut line = "le ".to_string();
+    let bytes = read.read_line(&mut line).await.unwrap();
+    assert_eq!(bytes, 6);
+    assert_eq!(line.as_str(), "le café\n");
+}
+
+#[tokio::test]
+async fn read_line_invalid_utf8_after_multibyte_char() {
+    // The line starts with a continuation byte, which must not be accepted
+    // just because the existing string ends with a complete character.
+    let mock = Builder::new().read(b"\xa9\n").build();
+
+    let mut read = BufReader::new(mock);
+
+    let mut line = "café".to_string();
+    let err = read.read_line(&mut line).await.expect_err("Should fail");
+    assert_eq!(err.kind(), ErrorKind::InvalidData);
+    let utf8 = err.into_inner().unwrap().downcast::<Utf8Error>().unwrap();
+    assert_eq!(utf8.valid_up_to(), 5);
+    assert_eq!(line.as_str(), "café");
+}
