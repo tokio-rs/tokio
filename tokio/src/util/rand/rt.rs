@@ -1,6 +1,28 @@
 use super::{FastRand, RngSeed};
 
+use std::collections::hash_map::DefaultHasher;
+use std::hash::Hasher;
 use std::sync::Mutex;
+
+impl RngSeed {
+    /// Generates a seed from the provided byte slice.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # #[cfg(tokio_unstable)]
+    /// # {
+    /// # use tokio::runtime::RngSeed;
+    /// let seed = RngSeed::from_bytes(b"make me a seed");
+    /// # }
+    /// ```
+    #[allow(unreachable_pub)]
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        let mut hasher = DefaultHasher::default();
+        hasher.write(bytes);
+        Self::from_u64(hasher.finish())
+    }
+}
 
 /// A deterministic generator for seeds (and other generators).
 ///
