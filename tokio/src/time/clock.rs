@@ -67,6 +67,13 @@ cfg_test_util! {
         inner: Mutex<Inner>,
     }
 
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub(crate) enum ClockState {
+        Running,
+        Paused,
+        PausedInhibited,
+    }
+
     // Used to track if the clock was ever paused. This is an optimization to
     // avoid touching the mutex if `test-util` was accidentally enabled in
     // release mode.
@@ -351,9 +358,15 @@ cfg_test_util! {
             inner.auto_advance_inhibit_count -= 1;
         }
 
-        pub(crate) fn can_auto_advance(&self) -> bool {
+        pub(crate) fn state(&self) -> ClockState {
             let inner = self.inner.lock();
-            inner.unfrozen.is_none() && inner.auto_advance_inhibit_count == 0
+            if inner.unfrozen.is_some() {
+                ClockState::Running
+            } else if inner.auto_advance_inhibit_count == 0 {
+                ClockState::Paused
+            } else {
+                ClockState::PausedInhibited
+            }
         }
 
         pub(crate) fn advance(&self, duration: Duration) -> Result<(), &'static str> {
