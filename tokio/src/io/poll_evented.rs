@@ -166,6 +166,41 @@ feature! {
         where
             &'a E: io::Read + 'a,
         {
+            unsafe { self.poll_read_inner(cx, buf, true) }
+        }
+
+        /// Like `poll_read`, but a read that is shorter than the buffer is not taken as a sign that
+        /// the pipe is drained.
+        ///
+        /// A pipe can be in packet mode (`O_DIRECT`), where each read returns a single packet even
+        /// if more data is waiting. The flag is set on the write end, so the reader can't see it.
+        ///
+        /// Read more:
+        /// <https://github.com/tokio-rs/tokio/issues/7051>
+        ///
+        // Safety: The caller must ensure that `E` can read into uninitialized memory
+        #[cfg(unix)]
+        pub(crate) unsafe fn poll_read_pipe<'a>(
+            &'a self,
+            cx: &mut Context<'_>,
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>>
+        where
+            &'a E: io::Read + 'a,
+        {
+            unsafe { self.poll_read_inner(cx, buf, false) }
+        }
+
+        // Safety: The caller must ensure that `E` can read into uninitialized memory
+        unsafe fn poll_read_inner<'a>(
+            &'a self,
+            cx: &mut Context<'_>,
+            buf: &mut ReadBuf<'_>,
+            #[allow(unused_variables)] short_read_means_drained: bool,
+        ) -> Poll<io::Result<()>>
+        where
+            &'a E: io::Read + 'a,
+        {
             use std::io::Read;
 
             loop {
@@ -208,7 +243,7 @@ feature! {
                                 target_os = "watchos",
                             )
                         ))]
-                        if 0 < n && n < len {
+                        if short_read_means_drained && 0 < n && n < len {
                             self.registration.clear_readiness(evt);
                         }
 
