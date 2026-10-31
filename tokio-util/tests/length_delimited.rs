@@ -327,6 +327,23 @@ fn read_max_frame_len() {
     assert_next_err!(io);
 }
 
+// Once https://github.com/tokio-rs/tokio/issues/4815 is fixed this test can be removed.
+#[test]
+fn read_max_frame_len_with_positive_adjustment() {
+    let io = length_delimited::Builder::new()
+        .max_frame_length(9)
+        .length_adjustment(4)
+        .num_skip(0)
+        .new_read(mock! {
+            data(b"\x00\x00\x00\x09abcdefghi"),
+            data(b"\x00\x00\x00\x0aabcdefghij"),
+        });
+    pin_mut!(io);
+
+    assert_next_eq!(io, b"\x00\x00\x00\x09abcdefghi");
+    assert_next_err!(io);
+}
+
 #[test]
 fn read_update_max_frame_len_at_rest() {
     let io = length_delimited::Builder::new().new_read(mock! {
