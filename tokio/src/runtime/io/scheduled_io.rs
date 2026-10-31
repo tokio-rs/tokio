@@ -326,7 +326,10 @@ impl ScheduledIo {
         let is_shutdown = SHUTDOWN.unpack(curr) != 0;
 
         if ready.is_empty() && !is_shutdown {
-            // Update the task info
+            // Update the task info. A replaced waker is declared before the
+            // lock so that it is dropped after the lock is released, as its
+            // destructor may lock the waiter list again.
+            let _old_waker;
             let mut waiters = self.waiters.lock();
             let waker = match direction {
                 Direction::Read => &mut waiters.reader,
@@ -335,10 +338,10 @@ impl ScheduledIo {
 
             // Avoid cloning the waker if one is already stored that matches the
             // current task.
-            match waker {
-                Some(waker) => waker.clone_from(cx.waker()),
-                None => *waker = Some(cx.waker().clone()),
-            }
+            _old_waker = match waker {
+                Some(waker) if waker.will_wake(cx.waker()) => None,
+                _ => waker.replace(cx.waker().clone()),
+            };
 
             // Try again, in case the readiness was changed while we were
             // taking the waiters lock
@@ -378,8 +381,13 @@ impl ScheduledIo {
 
     pub(crate) fn clear_wakers(&self) {
         let mut waiters = self.waiters.lock();
-        waiters.reader.take();
-        waiters.writer.take();
+        let reader = waiters.reader.take();
+        let writer = waiters.writer.take();
+        // Drop the wakers after the lock is released, as their destructors
+        // may lock the waiter list again.
+        drop(waiters);
+        drop(reader);
+        drop(writer);
     }
 }
 
@@ -535,8 +543,17 @@ impl Future for Readiness<'_> {
                         // Our waker has been notified.
                         *state = State::Done;
                     } else {
-                        // Update the waker, if necessary.
-                        w.waker.as_mut().unwrap().clone_from(cx.waker());
+                        // Update the waker, if necessary. A replaced waker is
+                        // dropped after the lock is released, as its
+                        // destructor may lock the waiter list again.
+                        let waker = w.waker.as_mut().unwrap();
+                        let old_waker = if waker.will_wake(cx.waker()) {
+                            None
+                        } else {
+                            Some(std::mem::replace(waker, cx.waker().clone()))
+                        };
+                        drop(waiters);
+                        drop(old_waker);
                         return Poll::Pending;
                     }
 
