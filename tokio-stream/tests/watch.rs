@@ -3,7 +3,7 @@
 use tokio::sync::watch;
 use tokio_stream::wrappers::WatchStream;
 use tokio_stream::StreamExt;
-use tokio_test::assert_pending;
+use tokio_test::{assert_pending, assert_ready_eq};
 use tokio_test::task::spawn;
 
 #[tokio::test]
@@ -54,4 +54,19 @@ async fn watch_stream_from_changes() {
     tx.send("bye").unwrap();
 
     assert_eq!(stream.next().await.unwrap(), "bye");
+}
+
+#[tokio::test]
+async fn watch_stream_from_changes_yields_unseen_update() {
+    let (tx, rx) = watch::channel("hello");
+    tx.send("bye").unwrap();
+
+    let mut stream = WatchStream::from_changes(rx);
+    assert_ready_eq!(spawn(&mut stream).poll_next(), Some("bye"));
+
+    // The previous update is now seen, so wait for the next one.
+    assert_pending!(spawn(&mut stream).poll_next());
+
+    tx.send("again").unwrap();
+    assert_ready_eq!(spawn(&mut stream).poll_next(), Some("again"));
 }
