@@ -54,7 +54,7 @@ impl<T> Mutex<T> {
     #[inline]
     #[cfg(not(all(loom, test)))]
     pub(crate) const fn const_new(t: T) -> Mutex<T> {
-        Mutex(PhantomData, parking_lot::const_mutex(t))
+        Mutex(PhantomData, parking_lot::Mutex::new(t))
     }
 
     #[inline]

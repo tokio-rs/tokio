@@ -31,6 +31,7 @@ env:
   # - tokio-test/Cargo.toml
   # - tokio-stream/Cargo.toml
   rust_min: '1.85'
+  parking_lot_msrv_version: '0.12.5'
   # This excludes unstable features like io_uring,
   # which require '--cfg tokio_unstable'.
   TOKIO_STABLE_FEATURES: "full,test-util"
@@ -157,6 +158,8 @@ jobs:
         with:
           # FIXME: temporary workaround, see: https://github.com/Swatinem/rust-cache/issues/341
           cache-bin: ${{ matrix.os != 'macos-latest' }}
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
 
       - name: test --features ${{ env.TOKIO_STABLE_FEATURES }} panic=abort
         run: |
@@ -258,6 +261,8 @@ jobs:
         uses: taiki-e/install-action@valgrind
 
       - uses: Swatinem/rust-cache@v2
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
       # Compile tests
       - name: cargo build test-mem
         run: cargo build --features rt-net --bin test-mem
@@ -488,6 +493,8 @@ jobs:
           toolchain: ${{ env.rust_nightly }}
 
       - uses: Swatinem/rust-cache@v2
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
       - name: asan
         run: cargo test --workspace --features $TOKIO_STABLE_FEATURES --target x86_64-unknown-linux-gnu --tests -- --test-threads 1 --nocapture
         env:
@@ -565,6 +572,8 @@ jobs:
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@v2
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
       - run: cargo hack check -Zbuild-std --workspace --each-feature --target ${{ matrix.target.name }} --exclude-features "${{ matrix.target.exclude_features }}"
         env:
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings
@@ -697,6 +706,8 @@ jobs:
           qemu: '7.2'
 
       - uses: Swatinem/rust-cache@v2
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
       - name: test tokio --all-features
         run: |
           cargo nextest run -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
@@ -723,6 +734,8 @@ jobs:
           tool: cargo-hack
 
       - uses: Swatinem/rust-cache@v2
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
 
       # https://github.com/tokio-rs/tokio/pull/5356
       # https://github.com/tokio-rs/tokio/issues/5373
@@ -760,6 +773,8 @@ jobs:
         uses: taiki-e/install-action@cargo-hack
 
       - uses: Swatinem/rust-cache@v2
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
       - name: check --feature-powerset ${{ matrix.name }}
         run: cargo hack check --all --feature-powerset --exclude-features "${{ matrix.exclude_features }}" --depth 2 --keep-going
         env:
@@ -779,6 +794,8 @@ jobs:
         with:
           tool: cargo-hack
       - uses: Swatinem/rust-cache@v2
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
       - name: "cargo check"
         run: |
           # `cargo check -p tokio --all-features` must pass without `tokio_unstable`;
@@ -808,6 +825,8 @@ jobs:
         uses: taiki-e/install-action@cargo-hack
 
       - uses: Swatinem/rust-cache@v2
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
       - name: "check -Z minimal-versions"
         run: |
           # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
@@ -859,6 +878,8 @@ jobs:
           toolchain: ${{ env.rust_clippy }}
           components: clippy
       - uses: Swatinem/rust-cache@v2
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
       # Run clippy
       - name: "clippy --workspace --features ${{ env.TOKIO_STABLE_FEATURES }}"
         run: |
@@ -873,6 +894,8 @@ jobs:
           rm Cargo.lock
           mv Cargo.toml Cargo.toml.nopatch
           mv Cargo.toml.bak Cargo.toml
+          # Pin parking_lot to a MSRV-compatible version
+          cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
           cargo clippy --workspace --tests --no-deps --all-features
           # check without path dependencies
           mv Cargo.toml.nopatch Cargo.toml
@@ -898,6 +921,8 @@ jobs:
         with:
           toolchain: ${{ env.rust_nightly }}
       - uses: Swatinem/rust-cache@v2
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
       - name: "doc --lib --all-features"
         run: cargo doc --lib --no-deps --document-private-items --features $TOKIO_STABLE_FEATURES,${{ matrix.run.extra_features }}
         env:
@@ -1051,6 +1076,8 @@ jobs:
           toolchain: ${{ env.rust_nightly }}
           target: x86_64-fortanix-unknown-sgx
       - uses: Swatinem/rust-cache@v2
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
       # NOTE: Currently the only test we can run is to build tokio with rt and sync features.
       - name: build tokio
         run: cargo build --target x86_64-fortanix-unknown-sgx --features rt,sync
@@ -1067,6 +1094,8 @@ jobs:
         with:
           toolchain: ${{ env.rust_nightly }}
           target: x86_64-unknown-redox
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
       - name: check tokio on redox
         run: cargo check --target x86_64-unknown-redox --features $TOKIO_STABLE_FEATURES
         working-directory: tokio
@@ -1277,6 +1306,8 @@ jobs:
           # the README for details: https://github.com/awslabs/cargo-check-external-types
           toolchain: nightly-2025-08-06
       - uses: Swatinem/rust-cache@v2
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
       - name: Install cargo-check-external-types
         uses: taiki-e/cache-cargo-install-action@v3
         with:
@@ -1299,6 +1330,8 @@ jobs:
         with:
           toolchain: ${{ env.rust_nightly }}
       - uses: Swatinem/rust-cache@v2
+      - name: "Pin parking_lot to a MSRV-compatible version"
+        run: cargo update parking_lot --precise ${{ env.parking_lot_msrv_version }}
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
       - name: Check /tokio/
@@ -1424,6 +1457,8 @@ jobs:
             sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
           run: |
             . $HOME/.cargo/env
+            # Pin parking_lot to a MSRV-compatible version
+            cargo update -p parking_lot --precise ${{ env.parking_lot_msrv_version }}
             # Workaround for https://github.com/rust-lang/libc/issues/5598
             cargo update -p libc --precise 0.2.189
             cargo test --workspace --features $TOKIO_STABLE_FEATURES
@@ -1455,6 +1490,8 @@ jobs:
             sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_nightly }}
           run: |
             . $HOME/.cargo/env
+            # Pin parking_lot to a MSRV-compatible version
+            cargo update -p parking_lot --precise ${{ env.parking_lot_msrv_version }}
             # Workaround for https://github.com/rust-lang/libc/issues/5598
             cargo update -p libc --precise 0.2.189
             # We use `--features $TOKIO_STABLE_FEATURES,tracing` instead of
@@ -1482,6 +1519,8 @@ jobs:
             sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
           run: |
             . $HOME/.cargo/env
+            # Pin parking_lot to a MSRV-compatible version
+            cargo update -p parking_lot --precise ${{ env.parking_lot_msrv_version }}
             # Workaround for https://github.com/rust-lang/libc/issues/5598
             cargo update -p libc --precise 0.2.189
             rustup target add i686-unknown-freebsd
