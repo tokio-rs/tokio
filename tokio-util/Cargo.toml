@@ -47,7 +47,7 @@ tracing = { version = "0.1.29", default-features = false, features = ["std"], op
 hashbrown = { version = "0.15.0", default-features = false, optional = true }
 
 [target.'cfg(unix)'.dependencies]
-libc = { version = "0.2.168", optional = true } # Backs the LinesCodec delimiter scan via libc::memchr
+libc = { version = "0.2.168", optional = true } # Backs the LinesCodec and AnyDelimiterCodec delimiter scans via libc::memchr
 
 [dev-dependencies]
 tokio = { version = "1.0.0", features = ["full"] }

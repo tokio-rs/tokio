@@ -167,8 +167,10 @@
 //! The multi-thread scheduler executes futures on a _thread pool_, using a
 //! work-stealing strategy. By default, it will start a worker thread for each
 //! CPU core available on the system. This tends to be the ideal configuration
-//! for most applications. The multi-thread scheduler requires the `rt-multi-thread`
-//! feature flag, and is selected by default:
+//! for most applications, but see the docs of
+//! [`std::thread::available_parallelism`] for caveats. The multi-thread
+//! scheduler requires the `rt-multi-thread` feature flag, and is selected by
+//! default:
 //! ```
 //! # #[cfg(not(target_family = "wasm"))]
 //! # {
@@ -461,10 +463,10 @@ cfg_time! {
     impl Timer {
         #[cfg_attr(not(all(tokio_unstable, feature = "rt-multi-thread")), allow(unused_variables))]
         #[track_caller]
-        pub(crate) fn new(handle: &scheduler::Handle, deadline: u64) -> Self {
+        pub(crate) fn new(handle: scheduler::Handle, deadline: u64) -> Self {
             match handle.timer_flavor() {
                 TimerFlavor::Traditional => {
-                    Timer::Traditional(time::TimerEntry::new())
+                    Timer::Traditional(time::TimerEntry::new(handle))
                 }
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
                 TimerFlavor::Alternative => {
@@ -473,13 +475,13 @@ cfg_time! {
             }
         }
 
-        pub(crate) fn init(self: Pin<&mut Self>, handle: &scheduler::Handle, deadline: u64) {
+        pub(crate) fn init(self: Pin<&mut Self>, deadline: u64) {
             // Safety: we never move the inner entries.
             let this = unsafe { self.get_unchecked_mut() };
             match this {
                 // Safety: we never move the inner entries.
                 Timer::Traditional(entry) => unsafe {
-                    Pin::new_unchecked(entry).init(handle, deadline);
+                    Pin::new_unchecked(entry).init(deadline)
                 }
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
                 Timer::Alternative(_) => {},
@@ -494,36 +496,19 @@ cfg_time! {
             }
         }
 
-        pub(crate) fn cancel(self: Pin<&mut Self>, handle: &scheduler::Handle) {
+        #[cfg_attr(not(all(tokio_unstable, feature = "rt-multi-thread")), allow(unused_variables))]
+        pub(crate) fn reset(self: Pin<&mut Self>, handle: scheduler::Handle, deadline: u64) {
             // Safety: we never move the inner entries.
             let this = unsafe { self.get_unchecked_mut() };
             match this {
                 // Safety: we never move the inner entries.
                 Timer::Traditional(entry) => unsafe {
-                    Pin::new_unchecked(entry).cancel(handle);
+                    Pin::new_unchecked(entry).reset(deadline)
                 }
                 // Safety: we never move the inner entries.
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
                 Timer::Alternative(entry) => unsafe {
-                    Pin::new_unchecked(entry).cancel();
-                }
-            }
-        }
-
-        pub(crate) fn reset(self: Pin<&mut Self>, handle: &scheduler::Handle, deadline: u64) {
-            // Safety: we never move the inner entries.
-            let this = unsafe { self.get_unchecked_mut() };
-            match this {
-                // Safety: we never move the inner entries.
-                Timer::Traditional(entry) => unsafe {
-                    Pin::new_unchecked(entry).reset(handle, deadline);
-                }
-                // Safety: we never move the inner entries.
-                #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                Timer::Alternative(entry) => unsafe {
-                    let mut entry = Pin::new_unchecked(entry);
-                    entry.cancel();
-                    entry.set(time_alt::Timer::new(handle, deadline));
+                    Pin::new_unchecked(entry).set(time_alt::Timer::new(handle, deadline))
                 },
             }
         }
@@ -531,14 +516,13 @@ cfg_time! {
         pub(crate) fn poll_elapsed(
             self: Pin<&mut Self>,
             cx: &mut Context<'_>,
-            handle: &scheduler::Handle,
         ) -> Poll<Result<(), crate::time::error::Error>> {
             // Safety: we never move the inner entries.
             let this = unsafe { self.get_unchecked_mut() };
             match this {
                 // Safety: we never move the inner entries.
                 Timer::Traditional(entry) => unsafe {
-                    Pin::new_unchecked(entry).poll_elapsed(cx, handle)
+                    Pin::new_unchecked(entry).poll_elapsed(cx)
                 }
                 // Safety: we never move the inner entries.
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]

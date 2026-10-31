@@ -140,9 +140,11 @@ impl Decoder for AnyDelimiterCodec {
             // there's no max_length set, we'll read to the end of the buffer.
             let read_to = cmp::min(self.max_length.saturating_add(1), buf.len());
 
-            let new_chunk_offset = buf[self.next_index..read_to]
-                .iter()
-                .position(|b| self.seek_delimiters.contains(b));
+            let haystack = &buf[self.next_index..read_to];
+            let new_chunk_offset = match self.seek_delimiters[..] {
+                [delimiter] => crate::util::memchr::memchr(delimiter, haystack),
+                ref delims => haystack.iter().position(|b| delims.contains(b)),
+            };
 
             match (self.is_discarding, new_chunk_offset) {
                 (true, Some(offset)) => {
@@ -257,4 +259,11 @@ impl From<io::Error> for AnyDelimiterCodecError {
     }
 }
 
-impl std::error::Error for AnyDelimiterCodecError {}
+impl std::error::Error for AnyDelimiterCodecError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(err) => Some(err),
+            Self::MaxChunkLengthExceeded => None,
+        }
+    }
+}

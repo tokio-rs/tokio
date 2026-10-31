@@ -164,6 +164,7 @@ cfg_not_wasi! {
         assert_value!(tokio::fs::DirBuilder: Send & Sync & Unpin);
         assert_value!(tokio::fs::DirEntry: Send & Sync & Unpin);
         assert_value!(tokio::fs::File: Send & Sync & Unpin);
+        assert_value!(tokio::fs::FileTimes: Send & Sync & Unpin);
         assert_value!(tokio::fs::OpenOptions: Send & Sync & Unpin);
         assert_value!(tokio::fs::ReadDir: Send & Sync & Unpin);
 
@@ -207,6 +208,12 @@ cfg_not_wasi! {
         async_assert_fn!(tokio::fs::File::into_std(_): Send & Sync & !Unpin);
         async_assert_fn!(
             tokio::fs::File::set_permissions(_, std::fs::Permissions): Send & Sync & !Unpin
+        );
+        async_assert_fn!(
+            tokio::fs::File::set_times(_, tokio::fs::FileTimes): Send & Sync & !Unpin
+        );
+        async_assert_fn!(
+            tokio::fs::File::set_modified(_, std::time::SystemTime): Send & Sync & !Unpin
         );
     }
 }
@@ -276,6 +283,7 @@ mod unix_datagram {
     assert_value!(UnixStream: Send & Sync & Unpin);
     assert_value!(unix::OwnedReadHalf: Send & Sync & Unpin);
     assert_value!(unix::OwnedWriteHalf: Send & Sync & Unpin);
+    assert_value!(unix::Permissions: Send & Sync & Unpin);
     assert_value!(unix::ReadHalf<'_>: Send & Sync & Unpin);
     assert_value!(unix::ReuniteError: Send & Sync & Unpin);
     assert_value!(unix::SocketAddr: Send & Sync & Unpin);
@@ -909,6 +917,9 @@ mod unix_asyncfd {
     assert_value!(AsyncFdReadyMutGuard<'_, ImplsFd<YY>>: Send & Sync & Unpin);
     assert_value!(AsyncFdReadyMutGuard<'_, ImplsFd<YN>>: Send & !Sync & Unpin);
     assert_value!(AsyncFdReadyMutGuard<'_, ImplsFd<NN>>: !Send & !Sync & Unpin);
+    assert_value!(AsyncFdRegisterError<ImplsFd<YY>>: Send & Sync & Unpin);
+    assert_value!(AsyncFdRegisterError<ImplsFd<YN>>: Send & !Sync & Unpin);
+    assert_value!(AsyncFdRegisterError<ImplsFd<NN>>: !Send & !Sync & Unpin);
     assert_value!(AsyncFdTryNewError<ImplsFd<YY>>: Send & Sync & Unpin);
     assert_value!(AsyncFdTryNewError<ImplsFd<YN>>: Send & !Sync & Unpin);
     assert_value!(AsyncFdTryNewError<ImplsFd<NN>>: !Send & !Sync & Unpin);

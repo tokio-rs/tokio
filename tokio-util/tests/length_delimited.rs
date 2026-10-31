@@ -301,6 +301,21 @@ fn read_incomplete_payload() {
 }
 
 #[test]
+fn read_head_then_eof() {
+    let io = FramedRead::new(
+        mock! {
+            data(b"\x00\x00\x00\x09"),
+            Poll::Pending,
+        },
+        LengthDelimitedCodec::new(),
+    );
+    pin_mut!(io);
+
+    assert_next_pending!(io);
+    assert_next_err!(io);
+}
+
+#[test]
 fn read_max_frame_len() {
     let io = length_delimited::Builder::new()
         .max_frame_length(5)
@@ -729,6 +744,35 @@ fn encode_overflow() {
 
     // Trying to encode the length header should resize the buffer if it won't fit.
     codec.encode(Bytes::from("hello"), &mut buf).unwrap();
+}
+
+#[test]
+fn encode_min_length_adjustment() {
+    let mut codec = length_delimited::Builder::new()
+        .length_field_length(8)
+        .length_adjustment(isize::MIN)
+        .new_codec();
+    let mut dst = BytesMut::new();
+
+    codec.encode(Bytes::new(), &mut dst).unwrap();
+
+    assert_eq!(
+        dst,
+        BytesMut::from(&(isize::MIN.unsigned_abs() as u64).to_be_bytes()[..])
+    );
+}
+
+#[cfg(target_pointer_width = "32")]
+#[test]
+fn decode_min_length_adjustment() {
+    let mut codec = length_delimited::Builder::new()
+        .length_field_length(8)
+        .max_frame_length(isize::MIN.unsigned_abs())
+        .length_adjustment(isize::MIN)
+        .new_codec();
+    let mut src = BytesMut::from(&(isize::MIN.unsigned_abs() as u64).to_be_bytes()[..]);
+
+    assert_eq!(codec.decode(&mut src).unwrap(), Some(BytesMut::new()));
 }
 
 #[test]

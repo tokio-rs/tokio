@@ -14,11 +14,11 @@ use std::task::Poll;
 use std::time::Duration;
 use std::{future::poll_fn, path::PathBuf};
 use tempfile::NamedTempFile;
+use tokio::task::JoinSet;
 use tokio::{
     fs::OpenOptions,
     runtime::{Builder, Runtime},
 };
-use tokio_util::task::TaskTracker;
 
 fn multi_rt(n: usize) -> Box<dyn Fn() -> Runtime> {
     Box::new(move || {
@@ -48,35 +48,48 @@ fn rt_combinations() -> Vec<Box<dyn Fn() -> Runtime>> {
 #[test]
 fn shutdown_runtime_while_performing_io_uring_ops() {
     fn run(rt: Runtime) {
-        let (tx, rx) = mpsc::channel();
         let (done_tx, done_rx) = mpsc::channel();
 
         let (_tmp, path) = create_tmp_files(1);
-        rt.spawn(async move {
+        rt.block_on(async move {
             let path = path[0].clone();
+            let mut futs = vec![];
 
             // spawning a bunch of uring operations.
-            loop {
+            for _ in 0..100 {
                 let path = path.clone();
-                tokio::spawn(async move {
+                let mut fut = Box::pin(async move {
                     let mut opt = OpenOptions::new();
                     opt.read(true);
-                    opt.open(&path).await.unwrap();
+                    opt.open(&path).await
                 });
-
-                // Avoid busy looping.
-                tokio::task::yield_now().await;
+                if let Poll::Ready(result) = futures::poll!(fut.as_mut()) {
+                    result.unwrap();
+                }
+                futs.push(fut);
             }
+            tokio::spawn(async move {
+                let _futs = futs;
+                loop {
+                    let path = path.clone();
+                    tokio::spawn(async move {
+                        let mut opt = OpenOptions::new();
+                        opt.read(true);
+                        opt.open(&path).await.unwrap();
+                    });
+
+                    // Avoid busy looping.
+                    tokio::task::yield_now().await;
+                }
+            });
         });
 
         std::thread::spawn(move || {
-            let rt: Runtime = rx.recv().unwrap();
             rt.shutdown_timeout(Duration::from_millis(300));
             done_tx.send(()).unwrap();
         });
 
-        tx.send(rt).unwrap();
-        done_rx.recv().unwrap();
+        done_rx.recv_timeout(Duration::from_secs(5)).unwrap();
     }
 
     for rt in rt_combinations() {
@@ -92,22 +105,107 @@ fn open_many_files() {
         let (_tmp_files, paths): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(NUM_FILES);
 
         rt.block_on(async move {
-            let tracker = TaskTracker::new();
+            let mut tasks = JoinSet::new();
 
             for i in 0..10_000 {
                 let path = paths.get(i % NUM_FILES).unwrap().clone();
-                tracker.spawn(async move {
+                tasks.spawn(async move {
                     let _file = OpenOptions::new().read(true).open(path).await.unwrap();
                 });
             }
-            tracker.close();
-            tracker.wait().await;
+            tasks.join_all().await;
         });
     }
 
     for rt in rt_combinations() {
         run(rt());
     }
+}
+
+#[cfg(all(feature = "signal", feature = "time"))]
+#[tokio::test]
+async fn shutdown_retries_interrupted_wait() {
+    use std::os::unix::thread::JoinHandleExt;
+    use tokio::signal::unix::{signal, SignalKind};
+    use tokio::time::timeout;
+
+    const TIMEOUT: Duration = Duration::from_secs(10);
+
+    let Ok(ring) = io_uring::IoUring::new(2) else {
+        return;
+    };
+    let mut probe = io_uring::Probe::new();
+    if ring.submitter().register_probe(&mut probe).is_err()
+        || !probe.is_supported(io_uring::opcode::OpenAt::CODE)
+    {
+        return;
+    }
+    drop(ring);
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("fifo");
+    nix::unistd::mkfifo(&path, nix::sys::stat::Mode::S_IRWXU).unwrap();
+    let mut signal = signal(SignalKind::user_defined1()).unwrap();
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let open_path = path.clone();
+    let shutdown = std::thread::spawn(move || {
+        let rt = current_rt()();
+        // Initialise io_uring before polling the operation we will cancel.
+        rt.block_on(tokio::fs::File::open("/dev/null")).unwrap();
+        {
+            let _enter = rt.enter();
+            // O_CREAT forces io_uring to use its blocking open path for the FIFO.
+            let mut open = tokio_test::task::spawn(tokio::fs::File::create(open_path));
+            tokio_test::assert_pending!(open.poll());
+        }
+        // SAFETY: gettid take no arguments and returns this thread's ID.
+        tx.send(unsafe { libc::syscall(libc::SYS_gettid) }).unwrap();
+        drop(rt);
+    });
+
+    let pthread = shutdown.as_pthread_t();
+    let interrupt_result = tokio::spawn(timeout(TIMEOUT, async move {
+        let tid = rx.await.unwrap();
+        let syscall_path = format!("/proc/self/task/{tid}/syscall");
+        let syscall_number = format!("{} ", libc::SYS_io_uring_enter);
+        let wait_for_uring_enter = || async {
+            while !std::fs::read_to_string(&syscall_path)
+                .unwrap()
+                .starts_with(&syscall_number)
+            {
+                tokio::task::yield_now().await;
+            }
+        };
+        // The FIFO has no reader, so shutdown must wait for the cancelled open.
+        wait_for_uring_enter().await;
+        // SAFETY: the join handle keeps the thread ID valid, and SIGUSR1 has a handler.
+        assert_eq!(
+            unsafe { libc::pthread_kill(pthread as libc::pthread_t, libc::SIGUSR1) },
+            0
+        );
+        signal.recv().await.unwrap();
+        // After signal delivry, another wait proves shutdown retried before we release the FIFO.
+        wait_for_uring_enter().await;
+    }))
+    .await;
+
+    // Release the FIFO before propagating failures. O_RDWR never waits for a peer.
+    let _reader = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)
+        .unwrap();
+    timeout(TIMEOUT, async {
+        while !shutdown.is_finished() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("runtime shutdown did not complete");
+    shutdown
+        .join()
+        .unwrap_or_else(|panic| std::panic::resume_unwind(panic));
+    interrupt_result.unwrap().unwrap();
 }
 
 #[tokio::test]

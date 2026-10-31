@@ -69,6 +69,7 @@ use crate::runtime::{
 use crate::runtime::{context, TaskHooks};
 use crate::task::coop;
 use crate::util::atomic_cell::AtomicCell;
+use crate::util::cacheline::CachePadded;
 use crate::util::rand::{FastRand, RngSeedGenerator};
 
 use std::cell::RefCell;
@@ -175,10 +176,10 @@ pub(crate) struct Shared {
     /// Global task queue used for:
     ///  1. Submit work to the scheduler while **not** currently on a worker thread.
     ///  2. Submit work to the scheduler when a worker run queue is saturated
-    pub(super) inject: InjectQueue<Arc<Handle>>,
+    pub(super) inject: CachePadded<InjectQueue<Arc<Handle>>>,
 
     /// Coordinates idle workers
-    idle: Idle,
+    idle: CachePadded<Idle>,
 
     /// Collection of all active tasks spawned onto this executor.
     pub(crate) owned: OwnedTasks<Arc<Handle>>,
@@ -323,8 +324,8 @@ pub(super) fn create(
         task_hooks: TaskHooks::from_config(&config),
         shared: Shared {
             remotes: remotes.into_boxed_slice(),
-            inject: InjectQueue::new(),
-            idle,
+            inject: CachePadded::new(InjectQueue::new()),
+            idle: CachePadded::new(idle),
             owned: OwnedTasks::new(size),
             synced: Mutex::new(Synced {
                 idle: idle_synced,
@@ -447,7 +448,7 @@ fn maybe_move_runtime() -> Result<(bool, bool), &'static str> {
                     // This probably means we are on the current_thread runtime or in a
                     // LocalSet, where it is _not_ okay to block.
                     return Err(
-                        "can call blocking only when running on the multi-threaded runtime",
+                        "cannot call `block_in_place` from a `current_thread` runtime or from within a `LocalSet`",
                     );
                 }
             }
@@ -676,10 +677,8 @@ impl Context {
 
         self.assert_lifo_enabled_is_correct(&core);
 
-        // Measure the poll start time. Note that we may end up polling other
-        // tasks under this poll-time measurement. Tasks from the LIFO slot
-        // inherit the "parent"'s limits, but their schedule latency is recorded
-        // separately when each task is polled.
+        // Measure each task poll independently. LIFO tasks still inherit the
+        // parent's cooperative budget and scheduler critical section.
         let schedule_latency_context = task
             .get_scheduled_at()
             .prepare(self.worker.handle.shared.schedule_latency_start);
@@ -693,8 +692,6 @@ impl Context {
 
         // Run the task
         coop::budget(|| {
-            // Unlike the poll time above, poll start callback is attached to the task id,
-            // so it is tightly associated with the actual poll invocation.
             #[cfg(tokio_unstable)]
             self.worker
                 .handle
@@ -723,19 +720,18 @@ impl Context {
                     }
                 };
 
+                core.stats.end_poll();
+
                 // Check for a task in the LIFO slot
                 let task = match core.lifo_slot.take() {
                     Some(task) => task,
                     None => {
                         self.reset_lifo_enabled(&mut core);
-                        core.stats.end_poll();
                         return ControlFlow::Continue(core);
                     }
                 };
 
                 if !coop::has_budget_remaining() {
-                    core.stats.end_poll();
-
                     // Not enough budget left to run the LIFO task, push it to
                     // the back of the queue and return.
                     core.run_queue.push_back_or_overflow(
@@ -767,14 +763,12 @@ impl Context {
 
                 let task = self.worker.handle.shared.owned.assert_owner(task);
 
-                // Record the LIFO task's schedule latency independently from
-                // the outer task's poll-time sample. The returned value is the
-                // same sample that is passed to the histogram recorder.
+                // Start a separate poll-time sample without increasing the
+                // number of scheduler critical sections in this batch.
                 let schedule_latency_context = task
                     .get_scheduled_at()
                     .prepare(self.worker.handle.shared.schedule_latency_start);
-                let _task_schedule_latency =
-                    core.stats.record_schedule_latency(schedule_latency_context);
+                let _task_schedule_latency = core.stats.start_lifo_poll(schedule_latency_context);
 
                 *self.core.borrow_mut() = Some(core);
 

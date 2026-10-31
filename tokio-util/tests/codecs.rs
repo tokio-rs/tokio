@@ -431,6 +431,64 @@ fn any_delimiter_decoder_discard_repeat() {
 }
 
 #[test]
+fn any_delimiter_decoder_single_delimiter() {
+    let mut codec = AnyDelimiterCodec::new(b"\0".to_vec(), b",".to_vec());
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put_slice(b"chunk 1\0chunk,2\0\0chunk");
+    assert_eq!("chunk 1", codec.decode(buf).unwrap().unwrap());
+    assert_eq!("chunk,2", codec.decode(buf).unwrap().unwrap());
+    assert_eq!("", codec.decode(buf).unwrap().unwrap());
+    assert_eq!(None, codec.decode(buf).unwrap());
+    buf.put_slice(b" 3\0");
+    assert_eq!("chunk 3", codec.decode(buf).unwrap().unwrap());
+    buf.put_slice(b"k");
+    assert_eq!(None, codec.decode(buf).unwrap());
+    assert_eq!("k", codec.decode_eof(buf).unwrap().unwrap());
+    assert_eq!(None, codec.decode_eof(buf).unwrap());
+}
+
+#[test]
+fn any_delimiter_decoder_single_delimiter_max_length() {
+    const MAX_LENGTH: usize = 5;
+
+    let mut codec =
+        AnyDelimiterCodec::new_with_max_length(b"\n".to_vec(), b",".to_vec(), MAX_LENGTH);
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put_slice(b"too long\nshort\n");
+    assert!(codec.decode(buf).is_err());
+    assert_eq!("short", codec.decode(buf).unwrap().unwrap());
+    assert_eq!(None, codec.decode(buf).unwrap());
+}
+
+#[test]
+fn any_delimiter_decoder_high_bytes() {
+    let mut codec = AnyDelimiterCodec::new(b"\x80\xff".to_vec(), b",".to_vec());
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put_slice(b"a\x7fb\xffc\x81d\x80e\xfe");
+    assert_eq!(&b"a\x7fb"[..], codec.decode(buf).unwrap().unwrap());
+    assert_eq!(&b"c\x81d"[..], codec.decode(buf).unwrap().unwrap());
+    assert_eq!(None, codec.decode(buf).unwrap());
+    assert_eq!(&b"e\xfe"[..], codec.decode_eof(buf).unwrap().unwrap());
+}
+
+#[test]
+fn any_delimiter_decoder_no_delimiters() {
+    let mut codec = AnyDelimiterCodec::new(Vec::new(), b",".to_vec());
+    let buf = &mut BytesMut::new();
+
+    buf.reserve(200);
+    buf.put_slice(b"a,b;c\n\0");
+    assert_eq!(None, codec.decode(buf).unwrap());
+    assert_eq!("a,b;c\n\0", codec.decode_eof(buf).unwrap().unwrap());
+}
+
+#[test]
 fn any_delimiter_encoder() {
     let mut codec = AnyDelimiterCodec::new(b",".to_vec(), b";--;".to_vec());
     let mut buf = BytesMut::new();
@@ -440,4 +498,37 @@ fn any_delimiter_encoder() {
 
     codec.encode("chunk 2", &mut buf).unwrap();
     assert_eq!("chunk 1;--;chunk 2;--;", buf);
+}
+
+#[test]
+fn codec_error_sources() {
+    use std::error::Error;
+    use std::io::{self, ErrorKind};
+    use tokio_util::codec::{AnyDelimiterCodecError, LinesCodecError};
+
+    let lines_error = LinesCodecError::from(io::Error::from(ErrorKind::BrokenPipe));
+    assert_eq!(
+        lines_error
+            .source()
+            .unwrap()
+            .downcast_ref::<io::Error>()
+            .unwrap()
+            .kind(),
+        ErrorKind::BrokenPipe
+    );
+    assert!(LinesCodecError::MaxLineLengthExceeded.source().is_none());
+
+    let delimiter_error = AnyDelimiterCodecError::from(io::Error::from(ErrorKind::TimedOut));
+    assert_eq!(
+        delimiter_error
+            .source()
+            .unwrap()
+            .downcast_ref::<io::Error>()
+            .unwrap()
+            .kind(),
+        ErrorKind::TimedOut
+    );
+    assert!(AnyDelimiterCodecError::MaxChunkLengthExceeded
+        .source()
+        .is_none());
 }
