@@ -19,39 +19,14 @@ use std::task::Poll;
 use std::time::Duration;
 use tempfile::{tempdir, NamedTempFile};
 use tokio::fs::{create_dir, metadata, set_permissions, symlink, try_exists, write};
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 use tokio::task::JoinSet;
 use tokio_test::assert_pending;
 
-use crate::support::io_uring::{io_uring_supported, uring_fs_op_in_use};
+use crate::support::io_uring::{io_uring_supported, rt_combinations, uring_fs_op_in_use};
 
 mod support {
     pub(crate) mod io_uring;
-}
-
-fn multi_rt(n: usize) -> Box<dyn Fn() -> Runtime> {
-    Box::new(move || {
-        Builder::new_multi_thread()
-            .worker_threads(n)
-            .enable_all()
-            .build()
-            .unwrap()
-    })
-}
-
-fn current_rt() -> Box<dyn Fn() -> Runtime> {
-    Box::new(|| Builder::new_current_thread().enable_all().build().unwrap())
-}
-
-fn rt_combinations() -> Vec<Box<dyn Fn() -> Runtime>> {
-    vec![
-        current_rt(),
-        multi_rt(1),
-        multi_rt(2),
-        multi_rt(8),
-        multi_rt(64),
-        multi_rt(256),
-    ]
 }
 
 #[test]
