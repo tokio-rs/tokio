@@ -102,6 +102,18 @@ impl Handle {
                 .as_ref()
                 .expect("A Tokio 1.x context was found, but IO is disabled. Call `enable_io` on the runtime builder to enable IO.")
         }
+
+        /// Closes the I/O driver's registry and waker. Called by the
+        /// scheduler at shutdown, once the driver is no longer polled.
+        pub(crate) fn release_io(&self) {
+            if let Some(io) = self.io.as_ref() {
+                io.release_resources();
+            }
+        }
+    }
+
+    cfg_not_io_driver! {
+        pub(crate) fn release_io(&self) {}
     }
 
     cfg_signal_internal_and_unix! {
