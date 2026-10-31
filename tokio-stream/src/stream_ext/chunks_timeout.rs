@@ -57,10 +57,14 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
                     }
                     me.items.push(item);
                     if me.items.len() >= *me.cap {
+                        // The timer no longer applies to a completed chunk.
+                        me.deadline.set(None);
                         return Poll::Ready(Some(std::mem::take(me.items)));
                     }
                 }
                 Poll::Ready(None) => {
+                    // No more input can arrive, so the deadline is no longer needed.
+                    me.deadline.set(None);
                     // Returning Some here is only correct because we fuse the inner stream.
                     let last = if me.items.is_empty() {
                         None
@@ -74,9 +78,10 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
         }
 
         if !me.items.is_empty() {
-            if let Some(deadline) = me.deadline.as_pin_mut() {
+            if let Some(deadline) = me.deadline.as_mut().as_pin_mut() {
                 ready!(deadline.poll(cx));
             }
+            me.deadline.set(None);
             return Poll::Ready(Some(std::mem::take(me.items)));
         }
 
