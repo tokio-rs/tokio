@@ -41,6 +41,35 @@ fn rt(start_paused: bool) -> crate::runtime::Runtime {
 }
 
 #[test]
+#[cfg(all(feature = "test-util", not(loom)))]
+fn manual_resume_notifies_driver() {
+    let rt = rt(true);
+    let _enter = rt.enter();
+    let time = rt.handle().inner.driver().time();
+
+    crate::time::resume();
+
+    assert!(time.did_wake(), "manual resume must notify the driver");
+}
+
+#[test]
+#[cfg(all(feature = "test-util", not(loom)))]
+fn manual_advance_notifies_driver() {
+    use std::future::Future;
+
+    let rt = rt(true);
+    let _enter = rt.enter();
+    let time = rt.handle().inner.driver().time();
+
+    let advance = crate::time::advance(std::time::Duration::from_nanos(1));
+    pin!(advance);
+    let mut cx = Context::from_waker(noop_waker_ref());
+    assert!(advance.as_mut().poll(&mut cx).is_pending());
+
+    assert!(time.did_wake(), "manual advance must notify the driver");
+}
+
+#[test]
 fn single_timer() {
     model(|| {
         let rt = rt(false);
