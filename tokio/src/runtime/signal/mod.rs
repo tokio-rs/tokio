@@ -3,7 +3,7 @@
 //! Signal driver
 
 use crate::runtime::{driver, io};
-use crate::signal::registry::globals;
+use crate::signal::registry::{globals, globals_unchecked};
 
 use mio::net::UnixStream;
 use std::io::{self as std_io, Read};
@@ -64,7 +64,7 @@ impl Driver {
         // only expect at least one dup to receive the notification.
 
         // Manually drop as we don't actually own this instance of UnixStream.
-        let receiver_fd = globals().receiver.as_raw_fd();
+        let receiver_fd = globals()?.receiver.as_raw_fd();
 
         // safety: there is nothing unsafe about this, but the `from_raw_fd` fn is marked as unsafe.
         let original =
@@ -123,7 +123,7 @@ impl Driver {
         }
 
         // Broadcast any signals which were received
-        globals().broadcast();
+        globals_unchecked().broadcast();
     }
 }
 
