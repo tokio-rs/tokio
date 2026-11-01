@@ -83,9 +83,10 @@ impl<T> OrphanQueueImpl<T> {
         // queue lock: `drain_orphan_queue` takes the same lock, so the
         // re-check and the push are atomic with respect to draining. If the
         // child has already exited, reap it here instead of enqueueing it.
-        match orphan.try_wait() {
-            Ok(None) => queue.push(orphan),
-            Ok(Some(_)) | Err(_) => {}
+        // `try_wait` reaps the child as a side effect when it reports
+        // `Ok(Some(_))`, so only a still-running child is queued.
+        if let Ok(None) = orphan.try_wait() {
+            queue.push(orphan);
         }
     }
 
