@@ -34,6 +34,20 @@ fn single_thread() {
 }
 
 #[test]
+#[cfg(not(target_family = "wasm"))]
+#[cfg_attr(miri, ignore)]
+fn build_returns_error_if_worker_thread_cannot_be_spawned() {
+    let spawn_result = std::thread::Builder::new()
+        .stack_size(usize::MAX)
+        .spawn(|| ());
+    assert!(spawn_result.is_err());
+
+    let mut builder = runtime::Builder::new_multi_thread();
+    builder.worker_threads(4).thread_stack_size(usize::MAX);
+    assert!(builder.build().is_err());
+}
+
+#[test]
 #[cfg_attr(miri, ignore)] // Too slow on miri.
 fn many_oneshot_futures() {
     // used for notifying the main thread
