@@ -11,7 +11,7 @@ cfg_io_uring! {
 
 use crate::io::interest::Interest;
 use crate::io::ready::Ready;
-use crate::loom::sync::Mutex;
+use crate::loom::sync::{Mutex, RwLock};
 use crate::runtime::driver;
 use crate::runtime::io::registration_set;
 use crate::runtime::io::{IoDriverMetrics, RegistrationSet, ScheduledIo};
@@ -40,19 +40,23 @@ pub(crate) struct Driver {
 
 /// A reference to an I/O driver.
 pub(crate) struct Handle {
-    /// Registers I/O resources.
-    registry: mio::Registry,
+    /// The registry and the waker. Both keep OS resources of the event queue
+    /// open, so they are dropped when the runtime shuts down.
+    ///
+    /// The lock keeps them alive while in use: closing the waker during a
+    /// concurrent `wake` would write to a file descriptor that may already
+    /// have been reused.
+    ///
+    /// Never acquire this lock while holding `synced`, and never acquire it
+    /// twice on the same thread: a nested read can deadlock with a queued
+    /// writer.
+    resources: RwLock<Option<Resources>>,
 
     /// Tracks all registrations
     registrations: RegistrationSet,
 
     /// State that should be synchronized
     synced: Mutex<registration_set::Synced>,
-
-    /// Used to wake up the reactor from a call to `turn`.
-    /// Not supported on `Wasi` due to lack of threading support.
-    #[cfg(not(target_os = "wasi"))]
-    waker: mio::Waker,
 
     pub(crate) metrics: IoDriverMetrics,
 
@@ -73,6 +77,16 @@ pub(crate) struct Handle {
         target_os = "linux",
     ))]
     pub(crate) uring_probe: OnceCell<Option<io_uring::Probe>>,
+}
+
+struct Resources {
+    /// Registers I/O resources.
+    registry: mio::Registry,
+
+    /// Used to wake up the reactor from a call to `turn`.
+    /// Not supported on `Wasi` due to lack of threading support.
+    #[cfg(not(target_os = "wasi"))]
+    waker: mio::Waker,
 }
 
 #[derive(Debug)]
@@ -135,11 +149,13 @@ impl Driver {
         let (registrations, synced) = RegistrationSet::new();
 
         let handle = Handle {
-            registry,
+            resources: RwLock::new(Some(Resources {
+                registry,
+                #[cfg(not(target_os = "wasi"))]
+                waker,
+            })),
             registrations,
             synced: Mutex::new(synced),
-            #[cfg(not(target_os = "wasi"))]
-            waker,
             metrics: IoDriverMetrics::default(),
             #[cfg(all(
                 tokio_unstable,
@@ -274,9 +290,32 @@ impl Handle {
     /// after this method has been called. If the reactor is not currently
     /// blocked in `turn`, then the next call to `turn` will not block and
     /// return immediately.
+    ///
+    /// Does nothing once the runtime has shut down.
     pub(crate) fn unpark(&self) {
-        #[cfg(not(target_os = "wasi"))]
-        self.waker.wake().expect("failed to wake I/O driver");
+        if let Some(resources) = self.resources.read().as_ref() {
+            resources.wake();
+        }
+    }
+
+    /// Closes the registry and the waker, so that a handle outliving the
+    /// runtime does not keep the system event queue open.
+    ///
+    /// Must only be called once the driver is no longer polled.
+    pub(crate) fn release_resources(&self) {
+        *self.resources.write() = None;
+    }
+
+    /// Calls `f` with the registry, or fails if the runtime has shut down.
+    ///
+    /// `f` must not acquire `resources` again.
+    fn with_registry<R>(&self, f: impl FnOnce(&mio::Registry) -> io::Result<R>) -> io::Result<R> {
+        match self.resources.read().as_ref() {
+            Some(resources) => f(&resources.registry),
+            None => Err(io::Error::other(
+                crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR,
+            )),
+        }
     }
 
     /// Registers an I/O resource with the reactor for a given `mio::Ready` state.
@@ -287,25 +326,29 @@ impl Handle {
         source: &mut impl mio::event::Source,
         interest: Interest,
     ) -> io::Result<Arc<ScheduledIo>> {
-        let scheduled_io = self.registrations.allocate(&mut self.synced.lock())?;
-        let token = scheduled_io.token();
+        // Holding the registry across `allocate` and `register` means it
+        // cannot be closed in between.
+        self.with_registry(|registry| {
+            let scheduled_io = self.registrations.allocate(&mut self.synced.lock())?;
+            let token = scheduled_io.token();
 
-        // we should remove the `scheduled_io` from the `registrations` set if registering
-        // the `source` with the OS fails. Otherwise it will leak the `scheduled_io`.
-        if let Err(e) = self.registry.register(source, token, interest.to_mio()) {
-            // safety: `scheduled_io` is part of the `registrations` set.
-            unsafe {
-                self.registrations
-                    .remove(&mut self.synced.lock(), &scheduled_io)
-            };
+            // we should remove the `scheduled_io` from the `registrations` set if registering
+            // the `source` with the OS fails. Otherwise it will leak the `scheduled_io`.
+            if let Err(e) = registry.register(source, token, interest.to_mio()) {
+                // safety: `scheduled_io` is part of the `registrations` set.
+                unsafe {
+                    self.registrations
+                        .remove(&mut self.synced.lock(), &scheduled_io)
+                };
 
-            return Err(e);
-        }
+                return Err(e);
+            }
 
-        // TODO: move this logic to `RegistrationSet` and use a `CountedLinkedList`
-        self.metrics.incr_fd_count();
+            // TODO: move this logic to `RegistrationSet` and use a `CountedLinkedList`
+            self.metrics.incr_fd_count();
 
-        Ok(scheduled_io)
+            Ok(scheduled_io)
+        })
     }
 
     /// Deregisters an I/O resource from the reactor.
@@ -314,6 +357,18 @@ impl Handle {
         registration: &Arc<ScheduledIo>,
         source: &mut impl Source,
     ) -> io::Result<()> {
+        let resources = self.resources.read();
+        let resources = match resources.as_ref() {
+            Some(resources) => resources,
+            None => {
+                // The runtime has shut down. The driver is never polled
+                // again, so the `ScheduledIo` token can no longer be
+                // dispatched, and pending releases are never processed.
+                self.metrics.dec_fd_count();
+                return Ok(());
+            }
+        };
+
         // Deregister the source with the OS poller **first**.
         //
         // If `deregister` fails (for example, because the caller closed the raw
@@ -322,13 +377,15 @@ impl Handle {
         // duplicated before the original fd number was closed, the open file
         // description remains registered in epoll with the `ScheduledIo` token
         // pointer even though `EPOLL_CTL_DEL` fails with `EBADF`.
-        self.registry.deregister(source)?;
+        resources.registry.deregister(source)?;
 
         if self
             .registrations
             .deregister(&mut self.synced.lock(), registration)
         {
-            self.unpark();
+            // Wake through the guard we already hold: `self.unpark()` would
+            // take the read lock a second time.
+            resources.wake();
         }
 
         self.metrics.dec_fd_count();
@@ -340,6 +397,13 @@ impl Handle {
         if self.registrations.needs_release() {
             self.registrations.release(&mut self.synced.lock());
         }
+    }
+}
+
+impl Resources {
+    fn wake(&self) {
+        #[cfg(not(target_os = "wasi"))]
+        self.waker.wake().expect("failed to wake I/O driver");
     }
 }
 

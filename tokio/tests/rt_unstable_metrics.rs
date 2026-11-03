@@ -788,6 +788,23 @@ fn io_driver_fd_count() {
     assert_eq!(metrics.io_driver_fd_registered_count(), 1);
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn io_driver_fd_count_after_drop() {
+    for rt in [current_thread(), threaded()] {
+        let metrics = rt.metrics();
+
+        let listener =
+            rt.block_on(async { tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap() });
+        assert_eq!(metrics.io_driver_fd_registered_count(), 1);
+
+        drop(rt);
+        drop(listener);
+
+        assert_eq!(metrics.io_driver_fd_deregistered_count(), 1);
+    }
+}
+
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 #[test]
 fn io_driver_ready_count() {

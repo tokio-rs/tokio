@@ -49,8 +49,11 @@ const NOTIFIED: usize = 3;
 
 /// Shared across multiple Parker handles
 struct Shared {
-    /// Shared driver. Only one thread at a time can use this
-    driver: TryLock<Driver>,
+    /// Shared driver. Only one thread at a time can use this.
+    ///
+    /// Taken and dropped on shutdown, so that a `Handle` that outlives the
+    /// runtime does not keep the driver's resources open.
+    driver: TryLock<Option<Driver>>,
 }
 
 impl Parker {
@@ -61,7 +64,7 @@ impl Parker {
                 mutex: Mutex::new(()),
                 condvar: Condvar::new(),
                 shared: Arc::new(Shared {
-                    driver: TryLock::new(driver),
+                    driver: TryLock::new(Some(driver)),
                 }),
             }),
         }
@@ -88,7 +91,8 @@ impl Parker {
         duration: Duration,
     ) -> HadDriver {
         if let Some(mut driver) = self.inner.shared.driver.try_lock() {
-            self.inner.park_driver(&mut driver, handle, Some(duration))
+            let driver = driver.as_mut().expect("driver missing");
+            self.inner.park_driver(driver, handle, Some(duration))
         } else if !duration.is_zero() {
             self.inner.park_condvar(Some(duration));
             HadDriver::No
@@ -141,7 +145,8 @@ impl Inner {
         }
 
         if let Some(mut driver) = self.shared.driver.try_lock() {
-            self.park_driver(&mut driver, handle, None)
+            let driver = driver.as_mut().expect("driver missing");
+            self.park_driver(driver, handle, None)
         } else {
             self.park_condvar(None);
             HadDriver::No
@@ -307,8 +312,15 @@ impl Inner {
     }
 
     fn shutdown(&self, handle: &driver::Handle) {
+        // Every core is shut down once all of them have stopped parking, so
+        // the lock is free. The first core to get here drops the driver.
         if let Some(mut driver) = self.shared.driver.try_lock() {
-            driver.shutdown(handle);
+            if let Some(mut driver) = driver.take() {
+                driver.shutdown(handle);
+                handle.release_io();
+            }
+        } else {
+            debug_assert!(false, "driver locked during shutdown");
         }
 
         self.condvar.notify_all();

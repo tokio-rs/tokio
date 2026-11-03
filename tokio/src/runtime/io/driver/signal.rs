@@ -7,9 +7,9 @@ impl Handle {
         &self,
         receiver: &mut mio::net::UnixStream,
     ) -> io::Result<()> {
-        self.registry
-            .register(receiver, TOKEN_SIGNAL, mio::Interest::READABLE)?;
-        Ok(())
+        self.with_registry(|registry| {
+            registry.register(receiver, TOKEN_SIGNAL, mio::Interest::READABLE)
+        })
     }
 }
 

@@ -71,6 +71,12 @@ impl RegistrationSet {
     // Returns `true` if the caller should unblock the I/O driver to purge
     // registrations pending release.
     pub(super) fn deregister(&self, synced: &mut Synced, registration: &Arc<ScheduledIo>) -> bool {
+        // After shutdown the driver is never polled again, so nothing would
+        // ever release the entry.
+        if synced.is_shutdown {
+            return false;
+        }
+
         synced.pending_release.push(registration.clone());
 
         let len = synced.pending_release.len();
@@ -147,6 +153,22 @@ unsafe impl linked_list::Link for Arc<ScheduledIo> {
     }
 }
 
+#[cfg(all(test, not(loom)))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deregister_after_shutdown_is_not_queued() {
+        let (set, mut synced) = RegistrationSet::new();
+        let io = set.allocate(&mut synced).unwrap();
+
+        drop(set.shutdown(&mut synced));
+
+        assert!(!set.deregister(&mut synced, &io));
+        assert!(synced.pending_release.is_empty());
+    }
+}
+
 #[cfg(all(test, loom))]
 mod loom_tests {
     use super::*;
@@ -182,6 +204,10 @@ mod loom_tests {
             if self.set.needs_release() {
                 self.set.release(&mut self.synced.lock());
             }
+        }
+
+        fn shutdown(&self) {
+            drop(self.set.shutdown(&mut self.synced.lock()));
         }
     }
 
@@ -219,6 +245,27 @@ mod loom_tests {
             handle.release();
 
             assert!(!handle.set.needs_release());
+        });
+    }
+
+    /// Models deregistration racing with driver shutdown. Nothing drains
+    /// `pending_release` after shutdown, so a deregistration that lands after it
+    /// must not be queued.
+    #[test]
+    fn deregister_races_with_shutdown() {
+        loom::model(|| {
+            let handle = Arc::new(Registrations::new());
+            let scheduled_io = handle.allocate();
+
+            let handle_clone = handle.clone();
+            let shutdown_th = thread::spawn(move || handle_clone.shutdown());
+
+            handle.deregister(&scheduled_io);
+            drop(scheduled_io);
+
+            shutdown_th.join().unwrap();
+
+            assert!(handle.synced.lock().pending_release.is_empty());
         });
     }
 }

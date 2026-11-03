@@ -106,8 +106,42 @@ fn shutdown_drops_waker_holding_registration() {
     assert!(dropped.load(Ordering::Relaxed));
 }
 
+#[test]
+fn into_std_after_drop_current_thread() {
+    into_std_after_drop(rt());
+}
+
+#[test]
+fn into_std_after_drop_multi_thread() {
+    into_std_after_drop(multi_thread_rt());
+}
+
+fn into_std_after_drop(rt: runtime::Runtime) {
+    let listener = {
+        let _enter = rt.enter();
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+
+        listener.set_nonblocking(true).unwrap();
+
+        TcpListener::from_std(listener).unwrap()
+    };
+
+    drop(rt);
+
+    // Deregistering from a shut down driver must not fail.
+    listener.into_std().unwrap();
+}
+
 fn rt() -> runtime::Runtime {
     runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+}
+
+fn multi_thread_rt() -> runtime::Runtime {
+    runtime::Builder::new_multi_thread()
+        .worker_threads(2)
         .enable_all()
         .build()
         .unwrap()

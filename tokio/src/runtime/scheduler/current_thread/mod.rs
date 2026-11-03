@@ -315,6 +315,10 @@ fn shutdown2(mut core: Box<Core>, handle: &Handle) -> Box<Core> {
         driver.shutdown(&handle.driver);
     }
 
+    // Also runs when a panic while parking dropped the driver, so that
+    // `driver.shutdown` above was skipped.
+    handle.driver.release_io();
+
     core
 }
 
