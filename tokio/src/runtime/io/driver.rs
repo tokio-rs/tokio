@@ -5,8 +5,7 @@ cfg_signal_internal_and_unix! {
 cfg_io_uring! {
     mod uring;
     use uring::UringContext;
-    pub(crate) use uring::RegisterResult;
-    use crate::sync::OnceCell;
+    pub(crate) use uring::{uring_supports, RegisterResult};
 }
 
 use crate::io::interest::Interest;
@@ -72,7 +71,9 @@ pub(crate) struct Handle {
         feature = "fs",
         target_os = "linux",
     ))]
-    pub(crate) uring_probe: OnceCell<Option<io_uring::Probe>>,
+    /// Opcodes supported by the kernel, or `None` if io_uring is disabled or
+    /// unavailable. Set once when the driver is created.
+    pub(crate) uring_probe: Option<io_uring::Probe>,
 }
 
 #[derive(Debug)]
@@ -119,11 +120,35 @@ fn _assert_kinds() {
 impl Driver {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
-    pub(crate) fn new(nevents: usize, nevents_busy: Option<usize>) -> io::Result<(Driver, Handle)> {
+    ///
+    /// If `enable_io_uring` is set and io_uring is supported, the io_uring
+    /// instance is also set up here.
+    pub(crate) fn new(
+        nevents: usize,
+        nevents_busy: Option<usize>,
+        enable_io_uring: bool,
+    ) -> io::Result<(Driver, Handle)> {
         let poll = mio::Poll::new()?;
         #[cfg(not(target_os = "wasi"))]
         let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
         let registry = poll.registry().try_clone()?;
+
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
+        let (uring_context, uring_probe) = uring::setup(&registry, enable_io_uring)?;
+        #[cfg(not(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        )))]
+        let _ = enable_io_uring;
 
         let driver = Driver {
             signal_ready: false,
@@ -148,7 +173,7 @@ impl Driver {
                 feature = "fs",
                 target_os = "linux",
             ))]
-            uring_context: Mutex::new(UringContext::new()),
+            uring_context: Mutex::new(uring_context),
             #[cfg(all(
                 tokio_unstable,
                 feature = "io-uring",
@@ -156,7 +181,7 @@ impl Driver {
                 feature = "fs",
                 target_os = "linux",
             ))]
-            uring_probe: OnceCell::new(),
+            uring_probe,
         };
 
         Ok((driver, handle))
@@ -382,7 +407,7 @@ mod tests {
 
     #[test]
     fn busy_turn_takes_busy_batch() {
-        let (mut driver, handle) = Driver::new(16, Some(2)).unwrap();
+        let (mut driver, handle) = Driver::new(16, Some(2), false).unwrap();
         let mut sources = Vec::new();
         for _ in 0..5 {
             let (mut rx, mut tx) = mio::net::UnixStream::pair().unwrap();

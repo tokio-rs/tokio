@@ -2,24 +2,14 @@ use super::super::{Driver, Handle};
 use super::RegisterResult;
 use crate::runtime::driver::op::Lifecycle;
 
-use io_uring::{opcode, Probe};
+use io_uring::opcode;
 use std::os::fd::AsRawFd;
 
 // Builds a driver whose io_uring context is initialized, or returns `None` when
 // io_uring is unavailable on the host.
 fn ready_handle() -> Option<(Driver, Handle)> {
-    let (driver, handle) = Driver::new(1024, None).ok()?;
-
-    let mut probe = Probe::new();
-    {
-        let mut guard = handle.get_uring().lock();
-        if !guard.try_init(&mut probe).ok()? {
-            return None;
-        }
-    }
-    handle.uring_probe.set(Some(probe)).unwrap();
-
-    Some((driver, handle))
+    let (driver, handle) = Driver::new(1024, None, true).ok()?;
+    handle.uring_probe.is_some().then_some((driver, handle))
 }
 
 // Makes the next submission fail with a non-`EBUSY` error by pointing the ring's
@@ -79,4 +69,28 @@ fn register_op_keeps_entry_on_submit_failure() {
     ));
 
     drop(broken);
+}
+
+// When io_uring is requested, the driver sets it up on creation, before any
+// operation is submitted.
+#[test]
+#[cfg_attr(miri, ignore)]
+fn driver_sets_up_uring_on_creation() {
+    let Some((_driver, handle)) = ready_handle() else {
+        return;
+    };
+
+    assert!(handle.get_uring().lock().uring.is_some());
+    assert!(handle.is_uring_ready(opcode::Read::CODE));
+}
+
+// When io_uring is not requested, the driver doesn't create a ring.
+#[test]
+#[cfg_attr(miri, ignore)]
+fn driver_skips_uring_when_not_enabled() {
+    let (_driver, handle) = Driver::new(1024, None, false).unwrap();
+
+    assert!(handle.uring_probe.is_none());
+    assert!(handle.get_uring().lock().uring.is_none());
+    assert!(!handle.is_uring_ready(opcode::Read::CODE));
 }
