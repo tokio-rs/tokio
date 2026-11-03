@@ -3,8 +3,8 @@
 use tokio::sync::watch;
 use tokio_stream::wrappers::WatchStream;
 use tokio_stream::StreamExt;
-use tokio_test::{assert_pending, assert_ready_eq};
 use tokio_test::task::spawn;
+use tokio_test::{assert_pending, assert_ready_eq};
 
 #[tokio::test]
 async fn watch_stream_message_not_twice() {

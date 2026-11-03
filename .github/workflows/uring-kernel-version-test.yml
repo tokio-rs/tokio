@@ -38,7 +38,7 @@ jobs:
           tar xf linux-${KERNEL_VERSION}.tar.xz
           cd linux-${KERNEL_VERSION}
           make defconfig
-          make -j$(nproc)
+          make -j$(nproc) CC="gcc -std=gnu11"
 
       # We are running tests also on a Kernel version that does not support io_uring
       # to check if the fallback mechanism works
@@ -101,6 +101,7 @@ jobs:
           # unstripped test binaries, and `open_many_files` in `fs_uring` had
           # 200-340 MB of anon RSS when the 1 GiB guest OOM-killed it.
           qemu-system-x86_64 \
+            -cpu max \
             -kernel linux-${{ env.KERNEL_VERSION }}/arch/x86/boot/bzImage \
             -initrd initramfs.cpio.gz \
             -append "console=ttyS0 rootfstype=ramfs panic=1" \
