@@ -65,7 +65,7 @@ loom = { version = "0.7", features = ["futures", "checkpoint"] }
 
 # Used by tests/tracing_task.rs, which needs threads and so skips WASI.
 [target.'cfg(all(tokio_unstable, target_has_atomic = "64", not(target_os = "wasi")))'.dev-dependencies]
-tokio = { version = "1.0.0", features = ["full", "tracing"] }
+tokio = { version = "1.0.0", features = ["tracing"] }
 tracing = { version = "0.1.29", default-features = false, features = ["std"] }
 tracing-mock = "= 0.1.0-beta.1"
 
