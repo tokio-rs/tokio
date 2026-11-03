@@ -53,36 +53,71 @@ impl Drop for BrokenRing {
     }
 }
 
+// Points the reactor registration fd at `/dev/null` for the duration of a
+// `try_init`, then puts the original epoll fd back.
+struct BrokenRegistry {
+    ep: i32,
+    saved: i32,
+}
+
+impl BrokenRegistry {
+    fn new(handle: &Handle) -> Self {
+        let ep = handle.registry.as_raw_fd();
+        // SAFETY: `dup` and `dup2` are valid for this open epoll descriptor.
+        let saved = unsafe { libc::dup(ep) };
+        assert!(saved >= 0);
+        let null = std::fs::File::open("/dev/null").unwrap();
+        let rc = unsafe { libc::dup2(null.as_raw_fd(), ep) };
+        assert_eq!(rc, ep);
+        Self { ep, saved }
+    }
+}
+
+impl Drop for BrokenRegistry {
+    fn drop(&mut self) {
+        // SAFETY: `saved` is the epoll descriptor duplicated above.
+        unsafe {
+            libc::dup2(self.saved, self.ep);
+            libc::close(self.saved);
+        }
+    }
+}
+
 // A failed reactor registration must not leave the ring stored. The next
 // `try_init` would otherwise see a stored ring and skip registration.
+// A second call must not replace a ring that is already stored.
 #[test]
 #[cfg_attr(miri, ignore)]
 fn register_failure_does_not_store_the_ring() {
     let (_driver, handle) = Driver::new(1024, None).unwrap();
-    let uring = match io_uring::IoUring::new(super::DEFAULT_RING_SIZE) {
-        Ok(uring) => uring,
+    match io_uring::IoUring::new(super::DEFAULT_RING_SIZE) {
+        Ok(_) => {}
         Err(err) if unsupported_uring(&err) => return,
         Err(err) => panic!("unexpected setup error: {err}"),
-    };
-
-    // This fd is already in the reactor, so publishing it fails with EEXIST.
-    // Storing the ring before that registration would leave it in place.
-    let registry = handle.registry.try_clone().expect("clone reactor registry");
-    super::register_uring_fd(&registry, uring.as_raw_fd()).expect("pre-register the ring fd");
+    }
 
     {
-        let mut guard = handle.get_uring().lock();
-        let err = super::publish_ring(&registry, &mut guard, uring)
-            .expect_err("second registration of the same fd");
-        assert_eq!(err.raw_os_error(), Some(libc::EEXIST));
-        assert!(guard.uring.is_none(), "failed registration stored the ring");
+        let _broken = BrokenRegistry::new(&handle);
+        let mut probe = Probe::new();
+        let err = handle
+            .try_init(&mut probe)
+            .expect_err("registration against /dev/null");
+        assert_ne!(err.raw_os_error(), Some(libc::ENOSYS));
+        assert!(
+            handle.get_uring().lock().uring.is_none(),
+            "failed registration stored the ring"
+        );
     }
 
     let mut probe = Probe::new();
     handle
         .try_init(&mut probe)
         .expect("retry after a registration failure");
-    assert!(handle.get_uring().lock().uring.is_some());
+    let fd = handle.get_uring().lock().ring().as_raw_fd();
+
+    let mut probe = Probe::new();
+    handle.try_init(&mut probe).expect("existing ring");
+    assert_eq!(handle.get_uring().lock().ring().as_raw_fd(), fd);
 }
 
 // Once an entry is pushed onto the submission queue the kernel may already own
