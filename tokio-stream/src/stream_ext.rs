@@ -1103,8 +1103,8 @@ pub trait StreamExt: Stream {
 
     /// Slows down a stream by enforcing a delay between items.
     ///
-    /// After the final item, the stream also waits for the delay before returning
-    /// `None`, unless the duration is zero.
+    /// After the last item, the stream also waits for the delay before returning
+    /// `None`.
     ///
     /// The underlying timer behind this utility has a granularity of one millisecond.
     ///
