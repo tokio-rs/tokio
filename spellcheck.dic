@@ -1,4 +1,4 @@
-333
+335
 &
 +
 0o777
@@ -232,6 +232,7 @@ ntasks
 ok
 oneshot
 opcode
+opcodes
 os
 parker
 parsers
@@ -260,6 +261,7 @@ rwlock
 rx
 scalability
 scheduler's
+seccomp
 semver
 setpgid
 sharded

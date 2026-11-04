@@ -250,7 +250,7 @@ pub(super) fn setup(
 /// supported by the kernel.
 ///
 /// Returns `false` if there is no current runtime, the runtime has no IO
-/// driver, or io_uring or `opcode` is unsupported. In that case the caller
+/// driver, or io_uring or opcode is unsupported. In that case the caller
 /// should fall back to the blocking implementation.
 pub(crate) fn uring_supports(opcode: u8) -> bool {
     crate::runtime::Handle::try_current().is_ok_and(|handle| {
