@@ -857,6 +857,24 @@ impl Context {
         if let Some(f) = &self.worker.handle.shared.config.after_unpark {
             f();
         }
+
+        // Regression guard for the `Idle::sleepers` bookkeeping. A worker that
+        // exits the park loop on shutdown must not still be tracked as a sleeper,
+        // otherwise `num_unparked` and `sleepers` are left in a state that does
+        // not match reality. This is what #8372 fixed for tracing.
+        #[cfg(debug_assertions)]
+        debug_assert!(
+            !core.is_shutdown
+                || !self
+                    .worker
+                    .handle
+                    .shared
+                    .idle
+                    .is_parked(&self.worker.handle.shared, self.worker.index),
+            "worker {} exited the park loop on shutdown but is still in `Idle::sleepers`",
+            self.worker.index,
+        );
+
         core
     }
 
@@ -1222,8 +1240,9 @@ impl Core {
     ///
     /// Returns true if the transition happened, false if there is work to do first.
     fn transition_to_parked(&mut self, worker: &Worker) -> bool {
-        // Workers should not park if they have work to do or are about to be traced
-        if self.has_tasks() || self.is_traced {
+        // Workers should not park if they have work to do, are about to be traced,
+        // or the scheduler is shutting down.
+        if self.has_tasks() || self.is_traced || self.is_shutdown {
             return false;
         }
 
@@ -1250,9 +1269,11 @@ impl Core {
     /// Returns `true` if the transition happened.
     fn transition_from_parked(&mut self, worker: &Worker) -> bool {
         // If a task is in the lifo slot/run queue, then we must unpark regardless of
-        // being notified. Same when woken to be traced: a dump unparks worker
-        // threads without going through `Idle`, so the worker does it here.
-        if self.has_tasks() || self.is_traced {
+        // being notified. Same when woken to be traced or during shutdown: both
+        // paths wake worker threads without going through `Idle`, so the worker
+        // does the logical unpark here. This also ensures the worker leaves
+        // `sleepers` before the park loop exits when the scheduler shuts down.
+        if self.has_tasks() || self.is_traced || self.is_shutdown {
             // When a worker wakes, it should only transition to the "searching"
             // state when the wake originates from another worker *or* a new task
             // is pushed. We do *not* want the worker to transition to "searching"
