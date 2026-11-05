@@ -54,7 +54,7 @@ pub(crate) mod rand {
         }
 
         #[test]
-        #[cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
+        #[cfg_attr(target_family = "wasm", ignore)] // threads not supported
         fn another_thread_has_another_seed() {
             let here = seed();
             let there = std::thread::spawn(seed).join().unwrap();
