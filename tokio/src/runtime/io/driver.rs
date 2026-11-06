@@ -6,7 +6,7 @@ cfg_io_uring! {
     mod uring;
     use uring::UringContext;
     pub(crate) use uring::RegisterResult;
-    use crate::sync::OnceCell;
+    use std::sync::OnceLock;
 }
 
 use crate::io::interest::Interest;
@@ -72,7 +72,7 @@ pub(crate) struct Handle {
         feature = "fs",
         target_os = "linux",
     ))]
-    pub(crate) uring_probe: OnceCell<Option<io_uring::Probe>>,
+    pub(crate) uring_probe: OnceLock<Option<io_uring::Probe>>,
 }
 
 #[derive(Debug)]
@@ -156,7 +156,7 @@ impl Driver {
                 feature = "fs",
                 target_os = "linux",
             ))]
-            uring_probe: OnceCell::new(),
+            uring_probe: OnceLock::new(),
         };
 
         Ok((driver, handle))

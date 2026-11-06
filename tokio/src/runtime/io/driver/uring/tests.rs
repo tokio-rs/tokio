@@ -2,24 +2,18 @@ use super::super::{Driver, Handle};
 use super::RegisterResult;
 use crate::runtime::driver::op::Lifecycle;
 
-use io_uring::{opcode, Probe};
+use io_uring::opcode;
 use std::os::fd::AsRawFd;
 
 // Builds a driver whose io_uring context is initialized, or returns `None` when
 // io_uring is unavailable on the host.
 fn ready_handle() -> Option<(Driver, Handle)> {
-    let (driver, handle) = Driver::new(1024, None).ok()?;
+    let (driver, handle) = Driver::new(1024, None).unwrap();
 
-    let mut probe = Probe::new();
-    {
-        let mut guard = handle.get_uring().lock();
-        if !guard.try_init(&mut probe).ok()? {
-            return None;
-        }
-    }
-    handle.uring_probe.set(Some(probe)).unwrap();
-
-    Some((driver, handle))
+    handle
+        .check_and_init(opcode::Nop::CODE)
+        .unwrap()
+        .then_some((driver, handle))
 }
 
 // Makes the next submission fail with a non-`EBUSY` error by pointing the ring's
