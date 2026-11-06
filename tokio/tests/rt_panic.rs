@@ -116,6 +116,51 @@ fn builder_name_panic_caller() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[test]
+fn waker_panic_in_driver_turn_leaves_runtime_usable() -> Result<(), Box<dyn Error>> {
+    use std::future::Future;
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+    use std::sync::Arc;
+    use std::task::{Context, Wake, Waker};
+    use std::time::Duration;
+
+    struct PanicWaker;
+
+    impl Wake for PanicWaker {
+        fn wake(self: Arc<Self>) {
+            panic!("waker panicked");
+        }
+    }
+
+    let rt = current_thread();
+
+    // Register a timer whose waker panics when the timer fires.
+    let mut sleep = {
+        let _enter = rt.enter();
+        Box::pin(tokio::time::sleep(Duration::from_millis(1)))
+    };
+    let waker = Waker::from(Arc::new(PanicWaker));
+    assert!(sleep
+        .as_mut()
+        .poll(&mut Context::from_waker(&waker))
+        .is_pending());
+
+    // The timer fires inside the driver turn, so the panic unwinds out of `block_on`.
+    let panicked = catch_unwind(AssertUnwindSafe(|| {
+        rt.block_on(async { tokio::time::sleep(Duration::from_millis(5)).await });
+    }));
+    assert!(panicked.is_err());
+
+    // The driver must be back in the core: the runtime still parks, and dropping
+    // it must not trip the "never placed the Core back" check.
+    rt.block_on(async { tokio::time::sleep(Duration::from_millis(1)).await });
+
+    drop(sleep);
+    drop(rt);
+
+    Ok(())
+}
+
 fn current_thread() -> Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
