@@ -32,12 +32,137 @@ fn model(f: impl Fn() + Send + Sync + 'static) {
     f();
 }
 
+#[cfg(feature = "test-util")]
+fn paused_driver() -> (
+    crate::runtime::driver::Driver,
+    Arc<crate::runtime::driver::Handle>,
+) {
+    use crate::runtime::driver::{Cfg, Driver};
+
+    let (driver, handle) = Driver::new(Cfg {
+        enable_io: false,
+        enable_time: true,
+        enable_pause_time: true,
+        start_paused: true,
+        nevents: 1,
+        nevents_busy: None,
+        timer_flavor: crate::runtime::TimerFlavor::Traditional,
+    })
+    .unwrap();
+    (driver, Arc::new(handle))
+}
+
 fn rt(start_paused: bool) -> crate::runtime::Runtime {
     crate::runtime::Builder::new_current_thread()
         .enable_time()
         .start_paused(start_paused)
         .build()
         .unwrap()
+}
+
+#[test]
+#[cfg(feature = "test-util")]
+fn automatic_advance_rejects_stale_snapshot() {
+    model(|| {
+        use std::time::Duration;
+
+        let clock = crate::time::Clock::new(true, true);
+        let now = clock.now();
+
+        clock.advance(Duration::from_millis(5)).unwrap();
+        clock.try_auto_advance(now, Duration::from_millis(10));
+        assert_eq!(clock.now(), now + Duration::from_millis(5));
+
+        let now = clock.now();
+        clock.inhibit_auto_advance();
+        clock.try_auto_advance(now, Duration::from_millis(10));
+        assert_eq!(clock.now(), now);
+
+        clock.allow_auto_advance();
+        clock.try_auto_advance(now, Duration::from_millis(10));
+        assert_eq!(clock.now(), now + Duration::from_millis(10));
+    });
+}
+
+#[test]
+#[cfg(feature = "test-util")]
+fn automatic_advance_respects_concurrent_inhibition() {
+    model(|| {
+        let (mut driver, handle) = paused_driver();
+        let blocker_handle = handle.clone();
+        let blocker = thread::spawn(move || {
+            let clock = blocker_handle.clock();
+            clock.inhibit_auto_advance();
+            let before = clock.now();
+            thread::yield_now();
+            let after = clock.now();
+            clock.allow_auto_advance();
+            blocker_handle.unpark();
+            assert_eq!(
+                before, after,
+                "clock moved while auto-advance was inhibited"
+            );
+        });
+        driver.park_timeout(&handle, std::time::Duration::from_millis(10));
+        blocker.join().unwrap();
+        driver.shutdown(&handle);
+    });
+}
+
+#[test]
+#[cfg(feature = "test-util")]
+fn automatic_advance_preserves_concurrent_manual_advance() {
+    model(|| {
+        let rt = rt(true);
+        let start = rt.handle().inner.driver().clock().now();
+        let handle = rt.handle().clone();
+        let advance = thread::spawn(move || {
+            handle.block_on(async {
+                crate::time::advance(std::time::Duration::from_millis(5)).await;
+                start.elapsed()
+            })
+        });
+        let elapsed = rt.block_on(async {
+            crate::time::sleep_until(start + std::time::Duration::from_millis(10)).await;
+            start.elapsed()
+        });
+        let manual_elapsed = advance.join().unwrap();
+        drop(rt);
+        // If the manual advance landed first, auto-advance must stop at the deadline.
+        if manual_elapsed == std::time::Duration::from_millis(5) {
+            assert_eq!(elapsed, std::time::Duration::from_millis(10));
+        }
+    });
+}
+
+#[test]
+#[cfg(feature = "test-util")]
+fn automatic_advance_tolerates_concurrent_resume() {
+    model(|| {
+        let rt = rt(true);
+        let handle = rt.handle().clone();
+        let (finished_tx, finished_rx) = crate::sync::oneshot::channel();
+        let resume = thread::spawn(move || {
+            let _enter = handle.enter();
+            crate::time::resume();
+            crate::time::pause();
+            finished_tx.send(()).unwrap();
+        });
+        rt.block_on(async {
+            use std::future::Future;
+
+            let sleep = crate::time::sleep(std::time::Duration::from_millis(10));
+            pin!(sleep);
+            std::future::poll_fn(|cx| {
+                let _ = sleep.as_mut().poll(cx);
+                std::task::Poll::Ready(())
+            })
+            .await;
+            // Loom cannot expire a backend timeout while the clock is running.
+            finished_rx.await.unwrap();
+        });
+        resume.join().unwrap();
+    });
 }
 
 #[test]
