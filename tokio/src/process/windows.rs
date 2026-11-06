@@ -30,7 +30,7 @@ use std::process::Stdio;
 use std::process::{Child as StdChild, ExitStatus};
 use std::ptr::null_mut;
 use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
 use windows_sys::{
     Win32::Foundation::{DuplicateHandle, DUPLICATE_SAME_ACCESS, HANDLE, INVALID_HANDLE_VALUE},
@@ -197,7 +197,80 @@ pub(crate) struct ChildStdio {
     io: Blocking<ArcFile>,
 }
 
-pub(crate) type ChildStdin = ChildStdio;
+#[derive(Debug)]
+pub(crate) struct ChildStdin {
+    inner: Option<ChildStdio>,
+}
+
+impl From<ChildStdio> for ChildStdin {
+    fn from(inner: ChildStdio) -> Self {
+        Self { inner: Some(inner) }
+    }
+}
+
+impl ChildStdin {
+    pub(super) fn into_stdio(self) -> io::Result<Stdio> {
+        self.inner
+            .ok_or_else(|| io::Error::from(io::ErrorKind::BrokenPipe))?
+            .into_stdio()
+    }
+
+    pub(super) fn into_owned_handle(self) -> io::Result<OwnedHandle> {
+        self.inner
+            .ok_or_else(|| io::Error::from(io::ErrorKind::BrokenPipe))?
+            .into_owned_handle()
+    }
+}
+
+impl AsRawHandle for ChildStdin {
+    fn as_raw_handle(&self) -> RawHandle {
+        self.inner
+            .as_ref()
+            .expect("child stdin has been shut down")
+            .as_raw_handle()
+    }
+}
+
+impl AsyncWrite for ChildStdin {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        match self.inner.as_mut() {
+            Some(inner) => Pin::new(inner).poll_write(cx, buf),
+            None => Poll::Ready(Err(io::ErrorKind::BrokenPipe.into())),
+        }
+    }
+
+    fn poll_write_vectored(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        match self.inner.as_mut() {
+            Some(inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
+            None => Poll::Ready(Err(io::ErrorKind::BrokenPipe.into())),
+        }
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        match self.inner.as_mut() {
+            Some(inner) => Pin::new(inner).poll_flush(cx),
+            None => Poll::Ready(Ok(())),
+        }
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        if let Some(inner) = self.inner.as_mut() {
+            // Blocking writes keep a copy of the handle until they finish.
+            ready!(Pin::new(inner).poll_flush(cx))?;
+            self.inner.take();
+        }
+        Poll::Ready(Ok(()))
+    }
+}
+
 pub(crate) type ChildStdout = ChildStdio;
 pub(crate) type ChildStderr = ChildStdio;
 
@@ -245,9 +318,10 @@ impl AsyncWrite for ChildStdio {
     }
 }
 
-pub(super) fn stdio<T>(io: T) -> io::Result<ChildStdio>
+pub(super) fn stdio<T, U>(io: T) -> io::Result<U>
 where
     T: IntoRawHandle,
+    U: From<ChildStdio>,
 {
     use std::os::windows::prelude::FromRawHandle;
 
@@ -257,7 +331,7 @@ where
     // read from the buffer it is borrowing and correctly
     // reports the length of the data written into the buffer.
     let io = unsafe { Blocking::new(io) };
-    Ok(ChildStdio { raw, io })
+    Ok(ChildStdio { raw, io }.into())
 }
 
 fn convert_to_file(child_stdio: ChildStdio) -> io::Result<StdFile> {
