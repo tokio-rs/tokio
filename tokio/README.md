@@ -208,6 +208,14 @@ increases the MSRV of Tokio, we do not guarantee that this does not happen.
 However, every minor release will have some set of versions of dependencies that
 works with the MSRV of that minor release.
 
+A notable exception to that is the `parking_lot` dependency: its MSRV is
+considered to be detached from Tokio's, i.e. it may have a higher MSRV, but as
+long as it is not transitively pulled, Tokio's effecive MSRV is not impacted
+and respects the above. For this reason, the optional dependency's associated
+Cargo feature is excluded from `full` and therefore has to be additionally
+specified if actually used in the end. When doing so, the used Rust version
+then has to comply with `parking_lot`'s MSRV.
+
 ## Release schedule
 
 Tokio doesn't follow a fixed release schedule, but we typically make one minor

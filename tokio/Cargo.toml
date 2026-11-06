@@ -25,14 +25,13 @@ keywords = ["io", "async", "non-blocking", "futures"]
 # Include nothing by default
 default = []
 
-# enable everything
+# enable everything, except `parking_lot`
 full = [
   "fs",
   "io-util",
   "io-std",
   "macros",
   "net",
-  "parking_lot",
   "process",
   "rt",
   "rt-multi-thread",
@@ -99,7 +98,8 @@ pin-project-lite = "0.2.11"
 # Everything else is optional...
 bytes = { version = "1.2.1", optional = true }
 mio = { version = "1.2.0", optional = true, default-features = false }
-parking_lot = { version = "0.12.0", optional = true }
+# Excluded from `full`; if used, the MSRV follows `parking_lot`'s.
+parking_lot = { version = "0.13.0", optional = true }
 
 [target.'cfg(any(not(target_family = "wasm"), target_os = "emscripten", all(target_os = "wasi", not(target_env = "p1"))))'.dependencies]
 socket2 = { version = "0.6.3", optional = true, features = ["all"] }

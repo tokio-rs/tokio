@@ -16,12 +16,12 @@ env:
   RUSTUP_WINDOWS_PATH_ADD_BIN: 1
   # Change to specific Rust release to pin
   rust_stable: stable
-  rust_nightly: nightly-2025-10-12
+  rust_nightly: nightly-2026-03-01
   # Pin a specific miri version
   rust_miri_nightly: nightly-2026-08-17
   rust_emscripten_nightly: nightly-2026-08-17
   emsdk_version: '6.0.10'
-  rust_clippy: '1.88'
+  rust_clippy: '1.95'
   # When updating this, also update:
   # - README.md
   # - tokio/README.md
@@ -161,7 +161,7 @@ jobs:
       - name: test --features ${{ env.TOKIO_STABLE_FEATURES }} panic=abort
         run: |
           set -euxo pipefail
-          RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests" cargo nextest run \
+          RUSTFLAGS="$RUSTFLAGS -C panic=abort -Zpanic-abort-tests --cfg tokio_nightly_tests" cargo nextest run \
             --workspace \
             --exclude tokio-macros \
             --exclude tests-build \
@@ -237,7 +237,7 @@ jobs:
       - name: Check tests --features ${{ env.TOKIO_STABLE_FEATURES }}
         run: |
           set -euxo pipefail
-          cargo check --workspace --tests --features $TOKIO_STABLE_FEATURES
+          cargo check --workspace --tests --features $TOKIO_STABLE_FEATURES,parking_lot
           # Removing the tokio workspace patch to run tests without path dependencies
           # (if not specified differently in the crate)
           perl -0 -i -pe 's/\[patch\.crates-io\].+\n\[/[/s' Cargo.toml
@@ -699,12 +699,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: test tokio --all-features
         run: |
-          cargo nextest run -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
-          cargo test --doc -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
+          cargo nextest run -Zbuild-std -Zjson-target-spec --config unstable.json-target-spec=true --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
+          cargo test --doc -Zbuild-std -Zjson-target-spec --target target-specs/i686-unknown-linux-gnu.json -p tokio --features $TOKIO_STABLE_FEATURES,taskdump
         env:
           RUST_TEST_THREADS: 1
           RUSTDOCFLAGS: --cfg tokio_unstable
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests --cfg tokio_nightly_tests
 
   no-atomic-u64-check:
     name: Check tokio --feature-powerset --depth 2 on i686-unknown-linux-gnu without AtomicU64
@@ -729,9 +729,9 @@ jobs:
       - name: Check
         # We use `--skip io-uring,schedule-latency` since io-uring crate doesn't provide a binding for the i686 target
         # and schedule latency tracking is only supported on 64-bit targets.
-        run: cargo hack check -Zbuild-std --target target-specs/i686-unknown-linux-gnu.json -p tokio --feature-powerset --skip io-uring,schedule-latency --depth 2 --keep-going
+        run: cargo hack check -Zbuild-std -Zjson-target-spec --target target-specs/i686-unknown-linux-gnu.json -p tokio --feature-powerset --skip io-uring,schedule-latency --depth 2 --keep-going
         env:
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_nightly_tests
 
   features:
     name: features exclude ${{ matrix.name }}
@@ -785,12 +785,10 @@ jobs:
           # unstable Cargo features must be inert unless `tokio_unstable` is also enabled.
           if [[ "${{ github.event.pull_request.base.ref }}" =~ ^tokio-1\..* ]]; then
             # Only check `tokio` crate as the PR is backporting to an earlier tokio release.
-
-            cargo check -p tokio --all-features
+            cargo check -p tokio --features $TOKIO_STABLE_FEATURES
           else
             # Check all crates in the workspace
-
-            cargo check -p tokio --all-features
+            cargo check -p tokio --features $TOKIO_STABLE_FEATURES
             cargo hack check -p tokio-macros -p tokio-stream -p tokio-util -p tokio-test --all-features
           fi
 
@@ -1424,8 +1422,6 @@ jobs:
             sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
           run: |
             . $HOME/.cargo/env
-            # Workaround for https://github.com/rust-lang/libc/issues/5598
-            cargo update -p libc --precise 0.2.189
             cargo test --workspace --features $TOKIO_STABLE_FEATURES
             # Enable all unstable features except `io_uring` and `taskdump`,
             # which are Linux-only features.
@@ -1455,8 +1451,6 @@ jobs:
             sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_nightly }}
           run: |
             . $HOME/.cargo/env
-            # Workaround for https://github.com/rust-lang/libc/issues/5598
-            cargo update -p libc --precise 0.2.189
             # We use `--features $TOKIO_STABLE_FEATURES,tracing` instead of
             # `--all-features` to exclude `taskdump` and `io_uring`, which are Linux-only
             # features.
@@ -1482,8 +1476,6 @@ jobs:
             sh rustup.sh -y --profile minimal --default-toolchain ${{ env.rust_stable }}
           run: |
             . $HOME/.cargo/env
-            # Workaround for https://github.com/rust-lang/libc/issues/5598
-            cargo update -p libc --precise 0.2.189
             rustup target add i686-unknown-freebsd
             cargo test --workspace --features $TOKIO_STABLE_FEATURES \
               --target i686-unknown-freebsd
