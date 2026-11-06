@@ -53,21 +53,22 @@ pub struct DuplexStream {
 
 /// A unidirectional pipe to read and write bytes in memory.
 ///
-/// It can be constructed by [`simplex`] function which will create a pair of
-/// reader and writer or by calling [`SimplexStream::new_unsplit`] that will
-/// create a handle for both reading and writing.
+/// Use [`SimplexStream::new_unsplit`] to create a single handle for reading
+/// and writing. For separate sender and receiver handles that close on drop,
+/// use [`tokio_util::io::simplex::new`](https://docs.rs/tokio-util/latest/tokio_util/io/simplex/fn.new.html)
+/// with the `tokio-util` crate's `io` feature.
 ///
 /// # Example
 ///
 /// ```
 /// # async fn ex() -> std::io::Result<()> {
 /// # use tokio::io::{AsyncReadExt, AsyncWriteExt};
-/// let (mut receiver, mut sender) = tokio::io::simplex(64);
+/// let mut stream = tokio::io::SimplexStream::new_unsplit(64);
 ///
-/// sender.write_all(b"ping").await?;
+/// stream.write_all(b"ping").await?;
 ///
 /// let mut buf = [0u8; 4];
-/// receiver.read_exact(&mut buf).await?;
+/// stream.read_exact(&mut buf).await?;
 /// assert_eq!(&buf, b"ping");
 /// # Ok(())
 /// # }
@@ -236,6 +237,14 @@ impl Wakers {
 /// The `max_buf_size` argument is the maximum amount of bytes that can be
 /// written to a buffer before it returns `Poll::Pending`.
 ///
+/// # Deprecation
+///
+/// Dropping either half does not close the pipe or wake the other half.
+/// This may leave reads or writes pending forever. Use
+/// [`tokio_util::io::simplex::new`](https://docs.rs/tokio-util/latest/tokio_util/io/simplex/fn.new.html)
+/// with the `tokio-util` crate's `io` feature instead. The replacement
+/// returns `(Sender, Receiver)` rather than `(reader, writer)`.
+///
 /// # Unify reader and writer
 ///
 /// The reader and writer half can be unified into a single structure
@@ -244,6 +253,7 @@ impl Wakers {
 /// using [`SimplexStream::new_unsplit()`].
 ///
 /// ```
+/// # #[allow(deprecated)]
 /// # async fn ex() -> std::io::Result<()> {
 /// # use tokio::io::{AsyncReadExt, AsyncWriteExt};
 /// let (reader, writer) = tokio::io::simplex(64);
@@ -260,6 +270,7 @@ impl Wakers {
 /// # Panics
 ///
 /// This function panics if `max_buf_size` is 0.
+#[deprecated(note = "use `tokio_util::io::simplex::new` to close the pipe on drop")]
 #[track_caller]
 #[cfg_attr(docsrs, doc(cfg(feature = "io-util")))]
 pub fn simplex(max_buf_size: usize) -> (ReadHalf<SimplexStream>, WriteHalf<SimplexStream>) {
@@ -267,8 +278,8 @@ pub fn simplex(max_buf_size: usize) -> (ReadHalf<SimplexStream>, WriteHalf<Simpl
 }
 
 impl SimplexStream {
-    /// Creates unidirectional buffer that acts like in memory pipe. To create split
-    /// version with separate reader and writer you can use [`simplex`] function.
+    /// Creates a unidirectional in-memory pipe with one handle for both reading
+    /// and writing.
     ///
     /// The `max_buf_size` argument is the maximum amount of bytes that can be
     /// written to a buffer before it returns `Poll::Pending`.
