@@ -76,8 +76,8 @@ pub(crate) fn next_expiration_time(wheel: &Wheel, drv_hdl: &driver::Handle) -> O
         let time_source = time_hdl.time_source();
 
         wheel.next_expiration_time().map(|tick| {
-            let now = time_source.now(clock);
-            time_source.tick_to_duration(tick.saturating_sub(now))
+            let now = clock.now();
+            time_source.duration_until_tick(tick, now)
         })
     })
 }
@@ -92,7 +92,7 @@ pub(crate) fn pre_auto_advance(drv_hdl: &driver::Handle, duration: Option<Durati
 
         if duration.is_some() {
             let clock = drv_hdl.clock();
-            if clock.can_auto_advance() {
+            if clock.state() == crate::time::ClockState::Paused {
                 return true;
             }
 
@@ -159,7 +159,7 @@ pub(crate) fn post_auto_advance(drv_hdl: &driver::Handle, duration: Option<Durat
 
         if let Some(park_duration) = duration {
             let clock = drv_hdl.clock();
-            if clock.can_auto_advance() && !time_hdl.did_wake() {
+            if clock.state() == crate::time::ClockState::Paused && !time_hdl.did_wake() {
                 if let Err(msg) = clock.advance(park_duration) {
                     panic!("{msg}");
                 }

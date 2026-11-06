@@ -80,6 +80,53 @@ async fn sub_ms_delayed_sleep() {
     }
 }
 
+#[tokio::test(start_paused = true)]
+async fn sleep_auto_advance_from_fractional_time() {
+    for phase_us in [0, 100, 500, 900, 999] {
+        for (deadline_us, expected_ms) in [
+            (1_000, 1),
+            (1_001, 2),
+            (10_500, 11),
+            (17_000, 17),
+            (17_001, 18),
+            (17_999, 18),
+        ] {
+            let start = Instant::now();
+            time::advance(Duration::from_micros(phase_us)).await;
+
+            let deadline = start + Duration::from_micros(deadline_us);
+            let sleep = time::sleep_until(deadline);
+            tokio::pin!(sleep);
+            assert_pending!(futures::poll!(sleep.as_mut()));
+
+            sleep.await;
+
+            assert_eq!(
+                start.elapsed(),
+                Duration::from_millis(expected_ms),
+                "phase {phase_us} us, deadline {deadline_us} us"
+            );
+        }
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn sub_ms_deadline_elapses_at_next_ms_tick() {
+    let start = Instant::now();
+    let mut sleep = task::spawn(time::sleep_until(start + Duration::from_micros(10_500)));
+    assert_pending!(sleep.poll());
+
+    time::advance(Duration::from_micros(10_500)).await;
+    assert_pending!(sleep.poll());
+
+    time::advance(Duration::from_micros(499)).await;
+    assert_pending!(sleep.poll());
+
+    time::advance(Duration::from_micros(1)).await;
+    assert!(sleep.is_woken());
+    assert_ready!(sleep.poll());
+}
+
 #[tokio::test]
 async fn delayed_sleep_wrapping_level_0() {
     time::pause();
