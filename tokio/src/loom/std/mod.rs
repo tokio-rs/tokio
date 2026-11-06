@@ -31,16 +31,35 @@ pub(crate) mod hint {
 
 pub(crate) mod rand {
     use std::collections::hash_map::RandomState;
-    use std::hash::{BuildHasher, Hash, Hasher};
-    use std::sync::atomic::AtomicU32;
-    use std::sync::atomic::Ordering::Relaxed;
-
-    static COUNTER: AtomicU32 = AtomicU32::new(1);
+    use std::hash::BuildHasher;
 
     pub(crate) fn seed() -> u64 {
-        let rand_state = RandomState::new();
-        // Hash some unique-ish data to generate some new state
-        rand_state.hash_one(COUNTER.fetch_add(1, Relaxed))
+        // Every `RandomState::new()` has keys of its own: random ones per
+        // thread, which the next call on that thread changes. Hashing the
+        // same value with them gives a new seed each time, with no state of
+        // ours that differs from one run of a deterministic simulator to the
+        // next (a process-wide counter does).
+        RandomState::new().hash_one(0u8)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::seed;
+
+        #[test]
+        fn every_seed_on_a_thread_is_new() {
+            let seeds = [seed(), seed(), seed()];
+            assert_ne!(seeds[0], seeds[1]);
+            assert_ne!(seeds[1], seeds[2]);
+        }
+
+        #[test]
+        #[cfg_attr(target_family = "wasm", ignore)] // threads not supported
+        fn another_thread_has_another_seed() {
+            let here = seed();
+            let there = std::thread::spawn(seed).join().unwrap();
+            assert_ne!(here, there);
+        }
     }
 }
 
