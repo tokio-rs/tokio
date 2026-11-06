@@ -11,8 +11,9 @@ use tokio::sync::watch::error::RecvError;
 /// A wrapper around [`tokio::sync::watch::Receiver`] that implements [`Stream`].
 ///
 /// This stream will start by yielding the current value when the `WatchStream` is polled,
-/// regardless of whether it was the initial value or sent afterwards,
-/// unless you use [`WatchStream<T>::from_changes`].
+/// regardless of whether it was the initial value or sent afterwards.
+/// Use [`WatchStream<T>::from_changes`] to wait for changes not yet seen by
+/// the supplied receiver.
 ///
 /// # Examples
 ///
@@ -90,7 +91,11 @@ impl<T: 'static + Clone + Send + Sync> WatchStream<T> {
         }
     }
 
-    /// Create a new `WatchStream` that waits for the value to be changed.
+    /// Create a new `WatchStream` that waits for changes not yet seen by the
+    /// supplied receiver.
+    ///
+    /// If the receiver already has an unseen change, the first poll yields
+    /// the current value without waiting for another send.
     pub fn from_changes(rx: Receiver<T>) -> Self {
         Self {
             inner: ReusableBoxFuture::new(make_future(rx)),
