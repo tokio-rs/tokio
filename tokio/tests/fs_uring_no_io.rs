@@ -10,6 +10,7 @@
 
 use std::future::poll_fn;
 use std::io::Write;
+use std::os::unix::fs::MetadataExt;
 use std::pin::Pin;
 
 use tempfile::{tempdir, NamedTempFile};
@@ -107,4 +108,19 @@ fn rename_should_fall_back_to_blocking_if_runtime_has_no_io_driver() {
 
     assert!(!source_path.exists());
     assert_eq!(std::fs::read(renamed_path).unwrap(), b"hello");
+}
+
+#[test]
+fn hard_link_should_fall_back_to_blocking_if_runtime_has_no_io_driver() {
+    let temp_dir = tempdir().unwrap();
+    let original_path = temp_dir.path().join("original");
+    let link_path = temp_dir.path().join("link");
+    std::fs::write(&original_path, b"hello").unwrap();
+
+    runtime_without_io()
+        .block_on(tokio::fs::hard_link(&original_path, &link_path))
+        .unwrap();
+
+    assert_eq!(std::fs::metadata(&original_path).unwrap().nlink(), 2);
+    assert_eq!(std::fs::read(link_path).unwrap(), b"hello");
 }
