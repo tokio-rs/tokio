@@ -867,6 +867,41 @@ fn sync_data_err_ordered_after_write() {
 }
 
 #[test]
+fn metadata_ordered_after_write() {
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(HELLO))
+        .returning(|_| Ok(HELLO.len()));
+    // `std::fs::Metadata` cannot be constructed here, so return an error.
+    file.expect_metadata()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|| Err(io::ErrorKind::Other.into()));
+
+    let mut file = File::from_std(file);
+    let mut t = task::spawn(file.write(HELLO));
+    assert_ready_ok!(t.poll());
+
+    let mut t = task::spawn(file.metadata());
+    assert_pending!(t.poll());
+
+    assert_eq!(1, pool::len());
+    pool::run_one();
+
+    assert!(t.is_woken());
+    assert_pending!(t.poll());
+
+    assert_eq!(1, pool::len());
+    pool::run_one();
+
+    assert!(t.is_woken());
+    assert_ready_err!(t.poll());
+}
+
+#[test]
 fn open_set_len_ok() {
     let mut file = MockFile::default();
     file.expect_set_len().with(eq(123)).returning(|_| Ok(()));
