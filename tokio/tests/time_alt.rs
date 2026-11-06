@@ -124,6 +124,46 @@ fn cancelled_timer_waker_drop_can_register_timer() {
 }
 
 #[test]
+fn poll_after_completion() {
+    use tokio_test::assert_ready;
+
+    for rt in rt_combinations() {
+        rt.block_on(async {
+            tokio::spawn(async {
+                // `unconstrained` removes coop so the assertion only depends on `Sleep`.
+                let timer =
+                    tokio::task::coop::unconstrained(tokio::time::sleep(Duration::from_millis(1)));
+                tokio::pin!(timer);
+
+                timer.as_mut().await;
+
+                for _ in 0..1024 {
+                    assert_ready!(timer.as_mut().poll(&mut noop_context()));
+                }
+
+                let timer = tokio::time::sleep(Duration::from_millis(1));
+                tokio::pin!(timer);
+
+                timer.as_mut().await;
+
+                // Every ready poll consumes budget, so the coop budget runs out.
+                let mut polls = 0;
+                while timer.as_mut().poll(&mut noop_context()).is_ready() {
+                    polls += 1;
+                    assert!(polls < 1024, "the coop budget never ran out");
+                }
+
+                // The budget is restored once the task yields.
+                tokio::task::yield_now().await;
+                assert_ready!(timer.as_mut().poll(&mut noop_context()));
+            })
+            .await
+            .unwrap();
+        });
+    }
+}
+
+#[test]
 fn timeout() {
     const N: u32 = 512;
 
