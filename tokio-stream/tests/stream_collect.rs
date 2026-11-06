@@ -295,3 +295,21 @@ async fn collect_results_err() {
     let err = assert_ready_err!(fut.poll());
     assert_eq!("oh no", err);
 }
+
+#[tokio::test]
+async fn collect_results_err_from_infinite_stream() {
+    // `iter::repeat` reports a lower bound of `usize::MAX`, but collecting
+    // into a `Result` stops at the first error.
+    let mut n = 0;
+    let stream = stream::iter(std::iter::repeat(())).map(|()| {
+        n += 1;
+        if n < 3 {
+            Ok(n)
+        } else {
+            Err("oh no")
+        }
+    });
+
+    let res: Result<Vec<u32>, &str> = stream.collect().await;
+    assert_eq!(Err("oh no"), res);
+}
