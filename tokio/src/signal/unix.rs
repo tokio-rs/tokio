@@ -63,11 +63,16 @@ pub(crate) struct OsExtraData {
     pub(crate) receiver: UnixStream,
 }
 
-impl Default for OsExtraData {
-    fn default() -> Self {
-        let (receiver, sender) = UnixStream::pair().expect("failed to create UnixStream");
+impl OsExtraData {
+    /// Creates the socketpair used to wake the signal driver.
+    ///
+    /// This fails when `socketpair(2)` fails, for example when the process is
+    /// out of file descriptors. The error is returned to the caller instead of
+    /// aborting the process.
+    pub(crate) fn new() -> io::Result<Self> {
+        let (receiver, sender) = UnixStream::pair()?;
 
-        Self { sender, receiver }
+        Ok(Self { sender, receiver })
     }
 }
 
@@ -274,7 +279,7 @@ fn signal_enable(signal: SignalKind, handle: &Handle) -> io::Result<()> {
     // Check that we have a signal driver running
     handle.check_inner()?;
 
-    let globals = globals();
+    let globals = globals()?;
     let siginfo = match globals.storage().get(signal as EventId) {
         Some(slot) => slot,
         None => return Err(io::Error::other("signal too large")),
@@ -411,7 +416,7 @@ pub(crate) fn signal_with_handle(
     // Turn the signal delivery on once we are ready for it
     signal_enable(kind, handle)?;
 
-    Ok(globals().register_listener(kind.0 as EventId))
+    Ok(globals()?.register_listener(kind.0 as EventId))
 }
 
 impl Signal {
@@ -542,5 +547,25 @@ mod tests {
     fn into_c_int() {
         let value: std::os::raw::c_int = SignalKind::interrupt().into();
         assert_eq!(value, libc::SIGINT as _);
+    }
+
+    #[test]
+    fn os_extra_data_new_returns_a_connected_pair() {
+        use std::io::Read;
+
+        let mut extra = OsExtraData::new().expect("socketpair should be available");
+
+        extra.sender.write_all(b"x").unwrap();
+        let mut buf = [0; 1];
+        extra.receiver.read_exact(&mut buf).unwrap();
+        assert_eq!(&buf, b"x");
+    }
+
+    #[test]
+    fn globals_are_initialized_once_and_reused() {
+        let first = globals().expect("registry should initialize");
+        let second = globals().expect("registry should be cached");
+
+        assert!(std::ptr::eq(first, second));
     }
 }

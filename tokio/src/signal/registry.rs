@@ -1,6 +1,7 @@
 use crate::signal::unix::{OsExtraData, OsStorage};
 use crate::sync::watch;
 
+use std::io;
 use std::ops;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
@@ -130,25 +131,47 @@ impl Globals {
     }
 }
 
-fn globals_init() -> Globals
+fn globals_init() -> io::Result<Globals>
 where
-    OsExtraData: 'static + Send + Sync + Default,
+    OsExtraData: 'static + Send + Sync,
     OsStorage: 'static + Send + Sync + Default,
 {
-    Globals {
-        extra: OsExtraData::default(),
+    Ok(Globals {
+        extra: OsExtraData::new()?,
         registry: Registry::new(OsStorage::default()),
-    }
+    })
 }
 
-pub(crate) fn globals() -> &'static Globals
+static GLOBALS: OnceLock<Globals> = OnceLock::new();
+
+/// Returns the process-wide signal registry, initializing it on first use.
+///
+/// Initialization is fallible because the signal self-pipe cannot always be
+/// created. A failed initialization is not cached, so a later call can succeed
+/// once the underlying condition (such as file descriptor exhaustion) clears.
+pub(crate) fn globals() -> io::Result<&'static Globals>
 where
-    OsExtraData: 'static + Send + Sync + Default,
+    OsExtraData: 'static + Send + Sync,
     OsStorage: 'static + Send + Sync + Default,
 {
-    static GLOBALS: OnceLock<Globals> = OnceLock::new();
+    if let Some(globals) = GLOBALS.get() {
+        return Ok(globals);
+    }
 
-    GLOBALS.get_or_init(globals_init)
+    let globals = globals_init()?;
+
+    Ok(GLOBALS.get_or_init(|| globals))
+}
+
+/// Returns the signal registry, assuming initialization already succeeded.
+///
+/// Only call this after [`globals`] has returned `Ok`, which is the case for
+/// every user of the signal driver: the driver can only exist once the
+/// registry was initialized.
+pub(crate) fn globals_unchecked() -> &'static Globals {
+    GLOBALS
+        .get()
+        .expect("signal registry used before initialization")
 }
 
 #[cfg(all(test, not(loom)))]
