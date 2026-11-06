@@ -999,3 +999,25 @@ fn receiver_len_after_lag_error_advances_cursor() {
     assert_eq!(assert_recv!(rx), 4);
     assert_eq!(rx.len(), 0);
 }
+
+/// `Sender::is_closed` becomes true only once every `Receiver` has dropped,
+/// not when any one of several drops, and `subscribe` can reopen the channel.
+#[test]
+fn sender_is_closed() {
+    let (tx, rx1) = broadcast::channel::<()>(16);
+    let rx2 = tx.subscribe();
+
+    assert!(!tx.is_closed());
+
+    drop(rx1);
+    assert!(!tx.is_closed());
+
+    drop(rx2);
+    assert!(tx.is_closed());
+
+    let rx3 = tx.subscribe();
+    assert!(!tx.is_closed());
+
+    drop(rx3);
+    assert!(tx.is_closed());
+}
