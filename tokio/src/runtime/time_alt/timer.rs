@@ -27,23 +27,36 @@ impl Drop for Timer {
 impl Timer {
     #[track_caller]
     pub(crate) fn new(handle: scheduler::Handle, deadline: u64) -> Self {
-        let entry = with_current_temp_local_context(&handle, |ctx| match ctx {
-            Some(TempLocalContext::Running { registration_queue }) => {
-                let entry = EntryHandle::new(deadline);
-                unsafe { registration_queue.push_front(entry.clone()) }
-                entry
-            }
+        Self::register(&handle, EntryHandle::new(deadline))
+    }
+
+    #[track_caller]
+    fn register(handle: &scheduler::Handle, entry: EntryHandle) -> Self {
+        with_current_temp_local_context(handle, |ctx| match ctx {
+            Some(TempLocalContext::Running { registration_queue }) => unsafe {
+                registration_queue.push_front(entry.clone())
+            },
             #[cfg(feature = "rt-multi-thread")]
             Some(TempLocalContext::Shutdown) => panic!("{RUNTIME_SHUTTING_DOWN_ERROR}"),
 
             _ => {
-                let entry = EntryHandle::new(deadline);
-                push_from_remote(&handle, entry.clone());
-                entry
+                push_from_remote(handle, entry.clone());
             }
         });
 
         Timer { entry }
+    }
+
+    pub(crate) fn reset(&mut self, handle: &scheduler::Handle, deadline: u64) {
+        let waker = self.entry.cancel();
+        *self = Self::register(handle, EntryHandle::new(deadline));
+
+        // The next poll will register the waker on the new entry or observe that
+        // it has already fired. Wake outside the registration context, as the
+        // waker may reenter the runtime.
+        if let Some(waker) = waker {
+            waker.wake();
+        }
     }
 
     pub(crate) fn is_elapsed(&self) -> bool {
