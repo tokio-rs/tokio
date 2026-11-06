@@ -84,6 +84,7 @@ path = "udp-codec.rs"
 [[example]]
 name = "tinyhttp"
 path = "tinyhttp.rs"
+test = true
 
 [[example]]
 name = "custom-executor"
