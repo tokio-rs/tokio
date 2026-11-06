@@ -131,6 +131,10 @@ impl TcpListener {
     /// established, the corresponding [`TcpStream`] and the remote peer's
     /// address will be returned.
     ///
+    /// This function does not enable [`TCP_NODELAY`] on the resulting stream.
+    /// The Nagle algorithm remains enabled by default, which is a common
+    /// pitfall when low latency is desired.
+    ///
     /// # Cancel safety
     ///
     /// This method is cancel safe. If the method is used as a branch in
@@ -139,6 +143,7 @@ impl TcpListener {
     /// accepted by this method.
     ///
     /// [`TcpStream`]: struct@crate::net::TcpStream
+    /// [`TCP_NODELAY`]: TcpStream::set_nodelay
     ///
     /// # Examples
     ///
