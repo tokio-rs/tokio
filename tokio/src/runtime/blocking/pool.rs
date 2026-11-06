@@ -485,10 +485,12 @@ impl Spawner {
                             thread_mgmt_state.worker_thread_index += 1;
                             thread_mgmt_state.worker_threads.insert(id, handle);
                         }
-                        Err(ref e) if can_defer_task_to_blocking_thread(
-                            e,
-                            self.num_blocking_threads(),
-                        ) => {
+                        Err(ref e)
+                            if can_defer_task_to_blocking_thread(
+                                e,
+                                self.num_blocking_threads(),
+                            ) =>
+                        {
                             // OS temporarily failed to spawn a new thread.
                             // The task will be picked up eventually by a currently
                             // busy thread.
