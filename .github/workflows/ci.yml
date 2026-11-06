@@ -764,6 +764,12 @@ jobs:
         run: cargo hack check --all --feature-powerset --exclude-features "${{ matrix.exclude_features }}" --depth 2 --keep-going
         env:
           RUSTFLAGS: ${{ matrix.rustflags }}
+      # io-uring only turns on together with rt and fs, which --depth 2 never reaches
+      - name: check io-uring with only rt and fs
+        if: matrix.exclude_features == ''
+        run: cargo check -p tokio --no-default-features --features rt,fs,io-uring
+        env:
+          RUSTFLAGS: ${{ matrix.rustflags }}
 
   minrust:
     name: minrust

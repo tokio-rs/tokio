@@ -504,6 +504,14 @@ cfg_not_sync! {
         pub(crate) use mutex::Mutex;
     }
 
+    cfg_io_uring! {
+        pub(crate) use batch_semaphore::{AcquireError, TryAcquireError};
+        mod semaphore;
+        pub(crate) use semaphore::{Semaphore, SemaphorePermit};
+        mod once_cell;
+        pub(crate) use self::once_cell::OnceCell;
+    }
+
     #[cfg(any(feature = "rt", feature = "signal", all(unix, feature = "process")))]
     pub(crate) mod notify;
 
