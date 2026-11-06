@@ -71,8 +71,10 @@ use crate::task::coop;
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::cacheline::CachePadded;
 use crate::util::rand::{FastRand, RngSeedGenerator};
+use crate::util::trace::SpawnMeta;
 
 use std::cell::RefCell;
+use std::io;
 use std::ops::ControlFlow;
 use std::task::Waker;
 use std::thread;
@@ -510,10 +512,32 @@ fn maybe_move_runtime() -> Result<(bool, bool), &'static str> {
 }
 
 impl Launch {
-    pub(crate) fn launch(mut self) {
-        for worker in self.0.drain(..) {
-            runtime::spawn_blocking(move || run(worker));
+    pub(crate) fn launch(self) -> io::Result<()> {
+        let rt = runtime::Handle::current();
+        let mut workers = self.0.into_iter();
+
+        while let Some(worker) = workers.next() {
+            let worker_to_run = worker.clone();
+            let fn_size = std::mem::size_of_val(&worker_to_run);
+            let (_, result) = rt.inner.blocking_spawner().spawn_blocking_inner(
+                move || run(worker_to_run),
+                blocking::Mandatory::NonMandatory,
+                SpawnMeta::new_unnamed(fn_size),
+                &rt,
+            );
+
+            if let Err(error) = result {
+                for worker in std::iter::once(worker).chain(workers) {
+                    if let Some(core) = worker.core.take() {
+                        worker.handle.shutdown_core(core);
+                    }
+                }
+
+                return Err(io::Error::from(error));
+            }
         }
+
+        Ok(())
     }
 }
 
