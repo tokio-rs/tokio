@@ -389,6 +389,7 @@ impl<T> UnboundedReceiver<T> {
     /// Checks if a channel is empty.
     ///
     /// This method returns `true` if the channel has no messages.
+    /// Sends in progress are counted once they have been accepted by the channel.
     ///
     /// # Examples
     /// ```
@@ -409,6 +410,8 @@ impl<T> UnboundedReceiver<T> {
     }
 
     /// Returns the number of messages in the channel.
+    ///
+    /// Sends in progress are counted once they have been accepted by the channel.
     ///
     /// # Examples
     /// ```
