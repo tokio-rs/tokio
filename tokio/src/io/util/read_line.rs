@@ -115,14 +115,15 @@ fn read_line_internal<R: AsyncBufRead + ?Sized>(
     read: &mut usize,
 ) -> Poll<io::Result<usize>> {
     let io_res = ready!(read_until_internal(reader, cx, b'\n', buf, read));
-    let appended = *io_res.as_ref().unwrap_or(read);
+    let read = mem::take(read);
+    let appended = *io_res.as_ref().unwrap_or(&read);
     let utf8_res = into_string(mem::take(buf), appended);
 
     // At this point both buf and output are empty. The allocation is in utf8_res.
 
     debug_assert!(buf.is_empty());
     debug_assert!(output.is_empty());
-    finish_string_read(io_res, utf8_res, *read, output, false)
+    finish_string_read(io_res, utf8_res, read, output, false)
 }
 
 impl<R: AsyncBufRead + ?Sized + Unpin> Future for ReadLine<'_, R> {

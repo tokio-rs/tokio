@@ -143,3 +143,59 @@ async fn read_line_invalid_utf8_after_multibyte_char() {
     assert_eq!(utf8.valid_up_to(), 5);
     assert_eq!(line.as_str(), "café");
 }
+
+#[test]
+fn read_line_panic_in_consume() {
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+    use tokio::io::{AsyncBufRead, AsyncRead, ReadBuf};
+
+    struct PanickingReader(bool);
+
+    impl AsyncRead for PanickingReader {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            _buf: &mut ReadBuf<'_>,
+        ) -> Poll<std::io::Result<()>> {
+            unreachable!()
+        }
+    }
+
+    impl AsyncBufRead for PanickingReader {
+        fn poll_fill_buf(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+        ) -> Poll<std::io::Result<&[u8]>> {
+            if self.0 {
+                Poll::Ready(Ok(b"\xff"))
+            } else {
+                Poll::Ready(Ok(b"\n"))
+            }
+        }
+
+        fn consume(mut self: Pin<&mut Self>, _amt: usize) {
+            if self.0 {
+                self.0 = false;
+                panic!("boom");
+            }
+        }
+    }
+
+    let mut rd = PanickingReader(true);
+    let mut line = String::from("abc");
+    let mut fut = Box::pin(rd.read_line(&mut line));
+
+    let waker = futures::task::noop_waker();
+    let mut cx = Context::from_waker(&waker);
+
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _ = fut.as_mut().poll(&mut cx);
+    }));
+
+    let res = fut.as_mut().poll(&mut cx);
+    for _ in line.chars() {}
+    assert!(matches!(res, Poll::Ready(Err(ref e)) if e.kind() == ErrorKind::InvalidData));
+    assert_eq!(line, "abc");
+}
