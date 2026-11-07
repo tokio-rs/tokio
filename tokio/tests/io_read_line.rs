@@ -145,6 +145,7 @@ async fn read_line_invalid_utf8_after_multibyte_char() {
 }
 
 #[test]
+#[cfg(panic = "unwind")]
 fn read_line_panic_in_consume() {
     use std::future::Future;
     use std::pin::Pin;
