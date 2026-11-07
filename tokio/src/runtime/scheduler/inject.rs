@@ -36,6 +36,10 @@ impl<T: 'static> Inject<T> {
         }
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.shared.is_empty()
+    }
+
     // Kind of annoying to have to include the cfg here
     #[cfg(any(all(tokio_unstable, feature = "taskdump"), feature = "rt-multi-thread"))]
     pub(crate) fn is_closed(&self) -> bool {
