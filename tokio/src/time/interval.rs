@@ -462,8 +462,7 @@ impl Interval {
         let scheduled_deadline = self.delay.deadline();
 
         if self.timer_elapsed {
-            self.delay.as_mut().reset(scheduled_deadline);
-            self.timer_elapsed = false;
+            self.reset_at(scheduled_deadline);
         }
 
         ready!(self.delay.as_mut().poll(cx));
@@ -519,7 +518,7 @@ impl Interval {
     /// # }
     /// ```
     pub fn reset(&mut self) {
-        self.delay.as_mut().reset(Instant::now() + self.period);
+        self.reset_at(Instant::now() + self.period);
     }
 
     /// Resets the interval immediately.
@@ -551,7 +550,7 @@ impl Interval {
     /// # }
     /// ```
     pub fn reset_immediately(&mut self) {
-        self.delay.as_mut().reset(Instant::now());
+        self.reset_at(Instant::now());
     }
 
     /// Resets the interval after the specified [`std::time::Duration`].
@@ -584,8 +583,7 @@ impl Interval {
     /// # }
     /// ```
     pub fn reset_after(&mut self, after: Duration) {
-        let deadline = Instant::now() + safe_delay(after);
-        self.delay.as_mut().reset(deadline);
+        self.reset_at(Instant::now() + safe_delay(after));
     }
 
     /// Resets the interval to a [`crate::time::Instant`] deadline.
@@ -622,6 +620,7 @@ impl Interval {
     /// ```
     pub fn reset_at(&mut self, deadline: Instant) {
         self.delay.as_mut().reset(deadline);
+        self.timer_elapsed = false;
     }
 
     /// Returns the [`MissedTickBehavior`] strategy currently being used.
