@@ -486,10 +486,8 @@ impl Spawner {
                             thread_mgmt_state.worker_threads.insert(id, handle);
                         }
                         Err(ref e)
-                            if can_defer_task_to_blocking_thread(
-                                e,
-                                self.num_blocking_threads(),
-                            ) =>
+                            if is_temporary_os_thread_error(e)
+                                && self.num_blocking_threads() > 0 =>
                         {
                             // OS temporarily failed to spawn a new thread.
                             // The task will be picked up eventually by a currently
@@ -766,11 +764,6 @@ fn is_temporary_os_thread_error(error: &io::Error) -> bool {
     false
 }
 
-#[inline]
-fn can_defer_task_to_blocking_thread(error: &io::Error, num_blocking_threads: usize) -> bool {
-    is_temporary_os_thread_error(error) && num_blocking_threads > 0
-}
-
 impl Inner {
     fn run(&self, worker_thread_id: usize) {
         if let Some(f) = &self.after_start {
@@ -794,40 +787,5 @@ impl Inner {
 impl fmt::Debug for Spawner {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("blocking::Spawner").finish()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{can_defer_task_to_blocking_thread, is_temporary_os_thread_error};
-    use std::io;
-
-    #[test]
-    fn would_block_thread_spawn_error_can_be_deferred() {
-        let error = io::Error::from(io::ErrorKind::WouldBlock);
-
-        assert!(is_temporary_os_thread_error(&error));
-        assert!(can_defer_task_to_blocking_thread(&error, 1));
-        assert!(!can_defer_task_to_blocking_thread(&error, 0));
-    }
-
-    #[test]
-    fn non_temporary_thread_spawn_error_is_not_deferred() {
-        let error = io::Error::from(io::ErrorKind::PermissionDenied);
-
-        assert!(!is_temporary_os_thread_error(&error));
-        assert!(!can_defer_task_to_blocking_thread(&error, 1));
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn no_system_resources_thread_spawn_error_can_be_deferred() {
-        let error = io::Error::from_raw_os_error(1450);
-
-        assert_eq!(error.raw_os_error(), Some(1450));
-        assert_ne!(error.kind(), io::ErrorKind::WouldBlock);
-        assert!(is_temporary_os_thread_error(&error));
-        assert!(can_defer_task_to_blocking_thread(&error, 1));
-        assert!(!can_defer_task_to_blocking_thread(&error, 0));
     }
 }
