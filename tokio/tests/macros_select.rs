@@ -1159,3 +1159,15 @@ async fn select_is_budget_aware() {
     let poll = futures::poll!(&mut task());
     assert!(poll.is_pending());
 }
+
+#[maybe_tokio_test]
+#[deny(clippy::redundant_pub_crate)]
+async fn clippy_redundant_pub_crate() {
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(1);
+    drop(tx);
+
+    tokio::select! {
+        Some(()) = rx.recv() => {}
+        else => {}
+    }
+}

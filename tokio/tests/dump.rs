@@ -203,6 +203,34 @@ fn notified_during_tracing() {
     });
 }
 
+/// A task that wakes itself while the dumper is polling it must not panic.
+///
+/// Taking a dump polls each task. Waking from inside that poll is legal, and
+/// the wake goes through `Schedule::schedule`, which borrows the scheduler
+/// core. If the dump holds that borrow across the poll it panics with
+/// "RefCell already borrowed" and takes the runtime down with it.
+#[test]
+fn self_wake_during_tracing_current_thread() {
+    let rt = runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        let task = tokio::spawn(std::future::poll_fn(|cx| {
+            if Handle::is_tracing() {
+                cx.waker().wake_by_ref();
+            }
+            std::task::Poll::<()>::Pending
+        }));
+
+        tokio::task::yield_now().await;
+        let _dump = Handle::current().dump().await;
+
+        task.abort();
+    });
+}
+
 /// Regression tests for the scheduler's idle bookkeeping across a dump.
 ///
 /// Requesting a dump wakes every worker thread directly, without going through

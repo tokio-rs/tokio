@@ -644,6 +644,7 @@ doc! {macro_rules! select {
         // This module is defined within a scope and should not leak out of this
         // macro.
         #[doc(hidden)]
+        #[allow(clippy::redundant_pub_crate)]
         mod __tokio_select_util {
             // Generate an enum with one variant per select branch
             $crate::select_priv_declare_output_enum!( ( $($count)* ) );

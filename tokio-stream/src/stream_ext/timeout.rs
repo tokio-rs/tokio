@@ -1,6 +1,6 @@
-use crate::stream_ext::Fuse;
+use crate::stream_ext::{safe_delay, Fuse};
 use crate::Stream;
-use tokio::time::{sleep, Sleep};
+use tokio::time::{sleep, Instant, Sleep};
 
 use core::future::Future;
 use core::pin::Pin;
@@ -35,7 +35,7 @@ impl<S: Stream> Timeout<S> {
         Timeout {
             stream: Fuse::new(stream),
             deadline,
-            duration,
+            duration: safe_delay(duration),
             poll_deadline: true,
         }
     }
@@ -45,12 +45,12 @@ impl<S: Stream> Stream for Timeout<S> {
     type Item = Result<S::Item, Elapsed>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut me = self.project();
+        let me = self.project();
 
         match me.stream.poll_next(cx) {
             Poll::Ready(v) => {
                 if v.is_some() {
-                    me.deadline.set(sleep(*me.duration));
+                    me.deadline.reset(Instant::now() + *me.duration);
                     *me.poll_deadline = true;
                 }
                 return Poll::Ready(v.map(Ok));
