@@ -755,12 +755,11 @@ fn is_temporary_os_thread_error(error: &io::Error) -> bool {
     }
 
     #[cfg(windows)]
-    {
+    if error.raw_os_error() == Some(1450) {
         // Windows reports temporary resource exhaustion as ERROR_NO_SYSTEM_RESOURCES.
-        return error.raw_os_error() == Some(1450);
+        return true;
     }
 
-    #[cfg(not(windows))]
     false
 }
 
