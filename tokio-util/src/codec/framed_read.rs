@@ -146,6 +146,10 @@ impl<T, D> FramedRead<T, D> {
     }
 
     /// Returns a mutable reference to the read buffer.
+    ///
+    /// Only append data to this buffer. Removing or changing existing bytes
+    /// may invalidate state cached by the decoder, causing it to miss frame
+    /// boundaries or panic on a subsequent decode.
     pub fn read_buffer_mut(&mut self) -> &mut BytesMut {
         &mut self.inner.state.buffer
     }
