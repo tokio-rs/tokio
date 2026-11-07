@@ -89,10 +89,6 @@ impl<T: 'static> InjectQueue<T> {
 }
 
 impl<T: 'static> Inject<T> {
-    pub(crate) fn is_empty(&self) -> bool {
-        self.shared.is_empty()
-    }
-
     /// Pushes several values into the queue.
     #[inline]
     pub(crate) fn push_batch<I>(&self, mut iter: I)
