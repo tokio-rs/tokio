@@ -23,7 +23,8 @@ use super::time_alt;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::Mutex;
-use crate::runtime::driver::{self, IoHandle, IoStack};
+use crate::runtime::driver::{self, IoStack};
+use crate::runtime::scheduler;
 use crate::time::error::Error;
 use crate::time::{Clock, Duration};
 use crate::util::WakeList;
@@ -399,11 +400,11 @@ impl Handle {
     /// the `TimerEntry`)
     pub(self) unsafe fn reregister(
         &self,
-        unpark: &IoHandle,
+        rt_handle: &scheduler::Handle,
         new_tick: u64,
         entry: NonNull<TimerShared>,
     ) {
-        let waker = unsafe {
+        let (waker, unpark) = unsafe {
             let mut lock = self.inner.lock();
 
             // We may have raced with a firing/deregistration, so check before
@@ -416,7 +417,10 @@ impl Handle {
             let entry = entry.as_ref().handle();
 
             if self.is_shutdown() {
-                unsafe { entry.fire(Err(crate::time::error::Error::shutdown())) }
+                (
+                    unsafe { entry.fire(Err(crate::time::error::Error::shutdown())) },
+                    false,
+                )
             } else {
                 entry.set_expiration(new_tick);
 
@@ -425,23 +429,24 @@ impl Handle {
                 // the timer entry.
                 match unsafe { lock.wheel.insert(entry) } {
                     Ok(when) => {
-                        if lock
+                        let unpark = lock
                             .next_wake
-                            .is_none_or(|next_wake| when < next_wake.get())
-                        {
-                            unpark.unpark();
-                        }
+                            .is_none_or(|next_wake| when < next_wake.get());
 
-                        None
+                        (None, unpark)
                     }
-                    Err((entry, crate::time::error::InsertError::Elapsed)) => unsafe {
-                        entry.fire(Ok(()))
-                    },
+                    Err((entry, crate::time::error::InsertError::Elapsed)) => {
+                        (unsafe { entry.fire(Ok(())) }, false)
+                    }
                 }
             }
 
             // Must release lock before invoking waker to avoid the risk of deadlock.
         };
+
+        if unpark {
+            rt_handle.unpark_timer();
+        }
 
         // The timer was fired synchronously as a result of the reregistration.
         // Wake the waker; this is needed because we might reset _after_ a poll,

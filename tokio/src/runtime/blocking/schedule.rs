@@ -45,7 +45,7 @@ impl task::Schedule for BlockingSchedule {
             match &self.handle.inner {
                 scheduler::Handle::CurrentThread(handle) => {
                     handle.driver.clock.allow_auto_advance();
-                    handle.driver.unpark();
+                    handle.unpark();
                 }
                 #[cfg(feature = "rt-multi-thread")]
                 scheduler::Handle::MultiThread(_) => {}

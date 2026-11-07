@@ -62,6 +62,20 @@ impl Handle {
             Handle::Disabled => unreachable!(),
         }
     }
+
+    #[cfg(feature = "time")]
+    pub(crate) fn unpark_timer(&self) {
+        match *self {
+            #[cfg(feature = "rt")]
+            Handle::CurrentThread(ref h) => h.unpark(),
+
+            #[cfg(feature = "rt-multi-thread")]
+            Handle::MultiThread(ref h) => h.driver.io.unpark(),
+
+            #[cfg(not(feature = "rt"))]
+            Handle::Disabled => unreachable!(),
+        }
+    }
 }
 
 cfg_rt! {
