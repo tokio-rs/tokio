@@ -215,13 +215,11 @@ fn closed_err() -> io::Error {
 
 impl ChildStdin {
     pub(super) fn into_stdio(self) -> io::Result<Stdio> {
-        self.inner.ok_or_else(closed_err)?
-            .into_stdio()
+        self.inner.ok_or_else(closed_err)?.into_stdio()
     }
 
     pub(super) fn into_owned_handle(self) -> io::Result<OwnedHandle> {
-        self.inner.ok_or_else(closed_err)?
-            .into_owned_handle()
+        self.inner.ok_or_else(closed_err)?.into_owned_handle()
     }
 }
 
