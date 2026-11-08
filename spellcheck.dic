@@ -1,4 +1,4 @@
-335
+334
 &
 +
 0o777
@@ -261,7 +261,6 @@ rwlock
 rx
 scalability
 scheduler's
-seccomp
 semver
 setpgid
 sharded
