@@ -479,84 +479,13 @@ mod orphan_on_error_tests {
         assert!(queue.all_enqueued.borrow().is_empty());
     }
 
-    #[cfg(all(feature = "rt", not(miri)))]
-    struct KillChild {
-        pid: libc::pid_t,
-    }
-
-    #[cfg(all(feature = "rt", not(miri)))]
-    impl Drop for KillChild {
-        fn drop(&mut self) {
-            if self.pid <= 0 {
-                return;
-            }
-            let pid = self.pid;
-            self.pid = 0;
-            // SAFETY: `pid` is the child this test spawned. `build_child` moved
-            // the `Child` onto the orphan queue, so this guard only has the pid.
-            // `SIGKILL` cannot be caught. A null status pointer is valid for
-            // `waitpid`. `EINTR` retries; any other error means the child is
-            // already gone, including when this runs during an assertion unwind.
-            unsafe {
-                libc::kill(pid, libc::SIGKILL);
-                loop {
-                    let rc = libc::waitpid(pid, std::ptr::null_mut(), 0);
-                    if rc >= 0 {
-                        break;
-                    }
-                    let err = io::Error::last_os_error();
-                    if err.raw_os_error() == Some(libc::EINTR) {
-                        continue;
-                    }
-                    break;
-                }
-            }
-        }
-    }
-
-    #[cfg(all(feature = "rt", not(miri)))]
-    fn pipe_ends() -> (std::os::unix::io::OwnedFd, std::os::unix::io::OwnedFd) {
-        use std::os::unix::io::FromRawFd;
-
-        let mut fds = [0; 2];
-        // SAFETY: `pipe` writes two open descriptors into `fds` on success.
-        let rc = unsafe { libc::pipe(fds.as_mut_ptr()) };
-        assert_eq!(rc, 0, "pipe: {}", io::Error::last_os_error());
-        for fd in fds {
-            // SAFETY: `fd` is one of the descriptors `pipe` just returned.
-            // `ChildStdout::from` requires `FD_CLOEXEC`.
-            let set = unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) };
-            assert_eq!(set, 0, "FD_CLOEXEC: {}", io::Error::last_os_error());
-        }
-        // SAFETY: both descriptors are open. This function takes ownership.
-        unsafe {
-            (
-                std::os::unix::io::OwnedFd::from_raw_fd(fds[0]),
-                std::os::unix::io::OwnedFd::from_raw_fd(fds[1]),
-            )
-        }
-    }
-
-    #[cfg(all(feature = "rt", not(miri)))]
-    fn assert_read_end_closed(write: &std::os::unix::io::OwnedFd) {
-        use std::os::unix::io::AsRawFd;
-
-        let buf = [0u8; 1];
-        // SAFETY: `write` is still open, and the buffer is one byte.
-        let rc = unsafe { libc::write(write.as_raw_fd(), buf.as_ptr().cast(), 1) };
-        assert_eq!(rc, -1, "parent read end is still open");
-        assert_eq!(
-            io::Error::last_os_error().raw_os_error(),
-            Some(libc::EPIPE),
-            "parent read end was not closed"
-        );
-    }
-
     /// `orphan_child_on_error` never sees the stdio pipes, so those tests stay
     /// green if a failed registration leaves the other parent ends open.
     #[cfg(all(feature = "rt", not(miri)))]
     #[test]
     fn build_child_closes_remaining_pipes_when_stdio_registration_fails() {
+        use std::process::{Command, Stdio};
+
         let rt = crate::runtime::Builder::new_current_thread()
             .enable_io()
             .build()
@@ -565,25 +494,19 @@ mod orphan_on_error_tests {
         // `add_source` fails once the driver is shut down, on every OS.
         drop(rt);
 
-        let mut child = std::process::Command::new("/bin/sleep")
-            .arg("30")
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
+        // The child writes to stdout and stderr until both pipes close.
+        // If `build_child` left `child.stdout` or `child.stderr` on the
+        // orphaned `StdChild`, `orphan.wait()` below would hang on the full pipe.
+        let child = Command::new("sh")
+            .args([
+                "-c",
+                "while echo x 2>/dev/null; do :; done; while echo x >&2; do :; done",
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .spawn()
-            .expect("spawn sleep");
-        // Pipes are created after spawn so `sleep` does not inherit the read
-        // ends. Other tests in this process reuse descriptor numbers, so
-        // `F_GETFD` after close is not proof. `EPIPE` on the write end means
-        // that read end was dropped, which unblocks a child blocked on a full
-        // pipe. stdin is closed inside the failed `stdio` call either way.
-        let (stdout_read, stdout_write) = pipe_ends();
-        let (stderr_read, stderr_write) = pipe_ends();
-        child.stdout = Some(std::process::ChildStdout::from(stdout_read));
-        child.stderr = Some(std::process::ChildStderr::from(stderr_read));
-        let _kill = KillChild {
-            pid: libc::pid_t::try_from(child.id()).expect("pid"),
-        };
+            .expect("spawn sh");
         let _enter = handle.enter();
 
         let err = match super::build_child(child) {
@@ -594,7 +517,8 @@ mod orphan_on_error_tests {
             crate::runtime::is_rt_shutdown_err(&err),
             "expected the shut-down runtime error, got {err:?}"
         );
-        assert_read_end_closed(&stdout_write);
-        assert_read_end_closed(&stderr_write);
+        for mut orphan in super::get_orphan_queue().drain_for_test() {
+            orphan.wait().expect("wait orphan");
+        }
     }
 }

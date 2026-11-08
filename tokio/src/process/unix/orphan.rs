@@ -67,6 +67,11 @@ impl<T> OrphanQueueImpl<T> {
         self.queue.lock().len()
     }
 
+    #[cfg(all(test, not(loom), feature = "rt", not(miri)))]
+    pub(super) fn drain_for_test(&self) -> Vec<T> {
+        std::mem::take(&mut *self.queue.lock())
+    }
+
     pub(crate) fn push_orphan(&self, orphan: T)
     where
         T: Wait,
