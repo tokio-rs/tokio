@@ -71,8 +71,8 @@ pub(crate) struct Handle {
         feature = "fs",
         target_os = "linux",
     ))]
-    /// Opcodes supported by the kernel, or `None` if io_uring is disabled or
-    /// unavailable. Set once when the driver is created.
+    /// Opcodes supported by the kernel, or `None` if io_uring is not enabled
+    /// or unavailable. Set by `Handle::enable_io_uring`.
     pub(crate) uring_probe: Option<io_uring::Probe>,
 }
 
@@ -120,35 +120,11 @@ fn _assert_kinds() {
 impl Driver {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
-    ///
-    /// If `enable_io_uring` is set and io_uring is supported, the io_uring
-    /// instance is also set up here.
-    pub(crate) fn new(
-        nevents: usize,
-        nevents_busy: Option<usize>,
-        enable_io_uring: bool,
-    ) -> io::Result<(Driver, Handle)> {
+    pub(crate) fn new(nevents: usize, nevents_busy: Option<usize>) -> io::Result<(Driver, Handle)> {
         let poll = mio::Poll::new()?;
         #[cfg(not(target_os = "wasi"))]
         let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
         let registry = poll.registry().try_clone()?;
-
-        #[cfg(all(
-            tokio_unstable,
-            feature = "io-uring",
-            feature = "rt",
-            feature = "fs",
-            target_os = "linux",
-        ))]
-        let (uring_context, uring_probe) = uring::setup(&registry, enable_io_uring)?;
-        #[cfg(not(all(
-            tokio_unstable,
-            feature = "io-uring",
-            feature = "rt",
-            feature = "fs",
-            target_os = "linux",
-        )))]
-        let _ = enable_io_uring;
 
         let driver = Driver {
             signal_ready: false,
@@ -173,7 +149,7 @@ impl Driver {
                 feature = "fs",
                 target_os = "linux",
             ))]
-            uring_context: Mutex::new(uring_context),
+            uring_context: Mutex::new(UringContext::new()),
             #[cfg(all(
                 tokio_unstable,
                 feature = "io-uring",
@@ -181,7 +157,7 @@ impl Driver {
                 feature = "fs",
                 target_os = "linux",
             ))]
-            uring_probe,
+            uring_probe: None,
         };
 
         Ok((driver, handle))
@@ -366,6 +342,18 @@ impl Handle {
             self.registrations.release(&mut self.synced.lock());
         }
     }
+
+    /// Without io_uring compiled in, there is nothing to set up.
+    #[cfg(not(all(
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    )))]
+    pub(crate) fn enable_io_uring(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 /// Dispatches an event received from the poller to the corresponding `ScheduledIo`.
@@ -407,7 +395,7 @@ mod tests {
 
     #[test]
     fn busy_turn_takes_busy_batch() {
-        let (mut driver, handle) = Driver::new(16, Some(2), false).unwrap();
+        let (mut driver, handle) = Driver::new(16, Some(2)).unwrap();
         let mut sources = Vec::new();
         for _ in 0..5 {
             let (mut rx, mut tx) = mio::net::UnixStream::pair().unwrap();

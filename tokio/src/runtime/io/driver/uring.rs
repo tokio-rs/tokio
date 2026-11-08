@@ -206,46 +206,6 @@ impl Drop for UringContext {
     }
 }
 
-/// Sets up io_uring for a new IO driver if `enable` is set, and registers the
-/// ring's file descriptor with `registry` so completions wake the driver.
-///
-/// Returns the context together with the opcodes supported by the kernel. The
-/// probe is `None` if io_uring is disabled or unavailable, in which case file
-/// system operations fall back to the blocking thread pool.
-///
-/// An error is returned if an io_uring syscall returns an unexpected error value.
-pub(super) fn setup(
-    registry: &mio::Registry,
-    enable: bool,
-) -> io::Result<(UringContext, Option<Probe>)> {
-    let mut context = UringContext::new();
-    if !enable {
-        return Ok((context, None));
-    }
-
-    let mut probe = Probe::new();
-    match context.try_init(&mut probe) {
-        Ok(_) => {}
-        // If the system doesn't support io_uring, we set the probe to `None`.
-        Err(e) if e.raw_os_error() == Some(libc::ENOSYS) => return Ok((context, None)),
-        // If we get EPERM, io-uring syscalls may be blocked (for example, by seccomp).
-        // In this case, we fall back to spawn_blocking for all operations.
-        // See also: https://github.com/tokio-rs/tokio/issues/7691
-        Err(e) if e.raw_os_error() == Some(libc::EPERM) => return Ok((context, None)),
-        // For other system errors, we just return it.
-        Err(e) => return Err(e),
-    }
-
-    let uringfd = context.ring().as_raw_fd();
-    registry.register(
-        &mut SourceFd(&uringfd),
-        TOKEN_WAKEUP,
-        Interest::READABLE.to_mio(),
-    )?;
-
-    Ok((context, Some(probe)))
-}
-
 /// Returns `true` if the current runtime has io_uring set up and `opcode` is
 /// supported by the kernel.
 ///
@@ -264,6 +224,43 @@ pub(crate) fn uring_supports(opcode: u8) -> bool {
 }
 
 impl Handle {
+    /// Sets up io_uring for this IO driver: creates the ring, probes the
+    /// opcodes supported by the kernel, and registers the ring's file
+    /// descriptor so completions wake the driver.
+    ///
+    /// If the system doesn't support io_uring, or io_uring syscalls are
+    /// blocked, this returns early without a probe, and file system operations
+    /// fall back to the blocking thread pool.
+    ///
+    /// An error is returned if an io_uring syscall returns an unexpected error value.
+    pub(crate) fn enable_io_uring(&mut self) -> io::Result<()> {
+        let mut probe = Probe::new();
+        {
+            let mut guard = self.uring_context.lock();
+            match guard.try_init(&mut probe) {
+                Ok(_) => {}
+                // If the system doesn't support io_uring, leave the probe unset.
+                Err(e) if e.raw_os_error() == Some(libc::ENOSYS) => return Ok(()),
+                // If we get EPERM, io-uring syscalls may be blocked (for example, by seccomp).
+                // In this case, we fall back to spawn_blocking for all operations.
+                // See also: https://github.com/tokio-rs/tokio/issues/7691
+                Err(e) if e.raw_os_error() == Some(libc::EPERM) => return Ok(()),
+                // For other system errors, we just return it.
+                Err(e) => return Err(e),
+            }
+
+            let uringfd = guard.ring().as_raw_fd();
+            self.registry.register(
+                &mut SourceFd(&uringfd),
+                TOKEN_WAKEUP,
+                Interest::READABLE.to_mio(),
+            )?;
+        }
+
+        self.uring_probe = Some(probe);
+        Ok(())
+    }
+
     pub(crate) fn get_uring(&self) -> &Mutex<UringContext> {
         &self.uring_context
     }

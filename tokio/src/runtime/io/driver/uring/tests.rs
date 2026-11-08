@@ -8,7 +8,8 @@ use std::os::fd::AsRawFd;
 // Builds a driver whose io_uring context is initialized, or returns `None` when
 // io_uring is unavailable on the host.
 fn ready_handle() -> Option<(Driver, Handle)> {
-    let (driver, handle) = Driver::new(1024, None, true).ok()?;
+    let (driver, mut handle) = Driver::new(1024, None).ok()?;
+    handle.enable_io_uring().ok()?;
     handle.uring_probe.is_some().then_some((driver, handle))
 }
 
@@ -71,11 +72,11 @@ fn register_op_keeps_entry_on_submit_failure() {
     drop(broken);
 }
 
-// When io_uring is requested, the driver sets it up on creation, before any
-// operation is submitted.
+// `enable_io_uring` sets up the ring and probe before any operation is
+// submitted.
 #[test]
 #[cfg_attr(miri, ignore)]
-fn driver_sets_up_uring_on_creation() {
+fn enable_io_uring_sets_up_ring() {
     let Some((_driver, handle)) = ready_handle() else {
         return;
     };
@@ -84,11 +85,11 @@ fn driver_sets_up_uring_on_creation() {
     assert!(handle.is_uring_ready(opcode::Read::CODE));
 }
 
-// When io_uring is not requested, the driver doesn't create a ring.
+// Without `enable_io_uring`, the driver doesn't create a ring.
 #[test]
 #[cfg_attr(miri, ignore)]
-fn driver_skips_uring_when_not_enabled() {
-    let (_driver, handle) = Driver::new(1024, None, false).unwrap();
+fn driver_has_no_ring_until_enabled() {
+    let (_driver, handle) = Driver::new(1024, None).unwrap();
 
     assert!(handle.uring_probe.is_none());
     assert!(handle.get_uring().lock().uring.is_none());

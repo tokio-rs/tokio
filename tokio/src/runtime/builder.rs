@@ -61,10 +61,6 @@ pub struct Builder {
 
     /// Whether or not to enable the I/O driver
     enable_io: bool,
-
-    /// Whether or not to set up io_uring (it'll also enable I/O driver if not enabled)
-    enable_io_uring: bool,
-
     nevents: usize,
     nevents_busy: Option<usize>,
 
@@ -312,7 +308,6 @@ impl Builder {
 
             // I/O defaults to "off"
             enable_io: false,
-            enable_io_uring: false,
             nevents: 1024,
             nevents_busy: None,
 
@@ -1204,7 +1199,6 @@ impl Builder {
                 Kind::MultiThread => false,
             },
             enable_io: self.enable_io,
-            enable_io_uring: self.enable_io_uring,
             enable_time: self.enable_time,
             start_paused: self.start_paused,
             nevents: self.nevents,
@@ -1965,14 +1959,7 @@ cfg_io_uring! {
     impl Builder {
         /// Enables the tokio's io_uring driver.
         ///
-        /// Doing this enables using io_uring operations on the runtime. This
-        /// also enables the I/O driver.
-        ///
-        /// The io_uring instance is set up when the runtime is built. If the
-        /// kernel doesn't support io_uring, or io_uring syscalls are blocked
-        /// (for example, by seccomp), file system operations fall back to the
-        /// blocking thread pool.  Operations that the kernel's io_uring doesn't
-        /// support also fall back individually.
+        /// Doing this enables using io_uring operations on the runtime.
         ///
         /// # Examples
         ///
@@ -1986,8 +1973,8 @@ cfg_io_uring! {
         /// ```
         #[cfg_attr(docsrs, doc(cfg(feature = "io-uring")))]
         pub fn enable_io_uring(&mut self) -> &mut Self {
+            // Currently, the uring flag is equivalent to `enable_io`.
             self.enable_io = true;
-            self.enable_io_uring = true;
             self
         }
     }
