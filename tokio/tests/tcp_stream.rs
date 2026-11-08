@@ -17,8 +17,8 @@ use tokio_test::{assert_ok, assert_pending, assert_ready_ok};
 use futures::task::noop_waker_ref;
 use std::future::{poll_fn, Future};
 use std::io;
-use std::pin::{pin, Pin};
-use std::sync::{Arc, Mutex};
+use std::pin::pin;
+use std::sync::Arc;
 use std::task::{Context, Poll, Wake, Waker};
 #[cfg(not(target_os = "wasi"))]
 use std::time::Duration;
@@ -441,29 +441,24 @@ async fn write_closed() {
     assert!(!ready_event.is_write_closed());
 }
 
-/// Polls `fut` with a waker that owns a pending `readable()` future on
-/// `stream`, then again with a different waker. Replacing the first waker
-/// drops that future, which locks the waiter list of `stream`.
+/// Polls `fut` with a waker whose `Drop` polls readiness on `stream`, then
+/// again with a different waker.
 fn check_drop_replaced_waker(stream: &Arc<TcpStream>, fut: impl Future<Output = io::Result<()>>) {
-    struct Owner {
-        _readable: Mutex<Pin<Box<dyn Future<Output = ()> + Send>>>,
-    }
+    struct PollOnDrop(Arc<TcpStream>);
 
-    impl Wake for Owner {
+    impl Wake for PollOnDrop {
         fn wake(self: Arc<Self>) {}
     }
 
-    let stream = stream.clone();
-    let mut readable: Pin<Box<dyn Future<Output = ()> + Send>> =
-        Box::pin(async move { assert_ok!(stream.readable().await) });
-    assert_pending!(readable
-        .as_mut()
-        .poll(&mut Context::from_waker(noop_waker_ref())));
+    impl Drop for PollOnDrop {
+        fn drop(&mut self) {
+            let mut cx = Context::from_waker(noop_waker_ref());
+            assert_pending!(self.0.poll_read_ready(&mut cx));
+        }
+    }
 
     let mut fut = pin!(fut);
-    let waker = Waker::from(Arc::new(Owner {
-        _readable: Mutex::new(readable),
-    }));
+    let waker = Waker::from(Arc::new(PollOnDrop(stream.clone())));
     assert_pending!(fut.as_mut().poll(&mut Context::from_waker(&waker)));
     drop(waker);
 
