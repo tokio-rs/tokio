@@ -231,7 +231,7 @@ impl Future for Child {
 
 #[derive(Debug)]
 pub(crate) struct ChildStdin {
-    inner: PollEvented<pipe::Sender>,
+    inner: Option<PollEvented<pipe::Sender>>,
 }
 
 #[derive(Debug)]
@@ -247,7 +247,8 @@ impl TryFrom<StdChildStdin> for ChildStdin {
     fn try_from(io: StdChildStdin) -> io::Result<Self> {
         let mut pipe = pipe::Sender::from(io);
         set_nonblocking(&mut pipe, true)?;
-        PollEvented::new_with_interest(pipe, Interest::WRITABLE).map(|inner| Self { inner })
+        PollEvented::new_with_interest(pipe, Interest::WRITABLE)
+            .map(|inner| Self { inner: Some(inner) })
     }
 }
 
@@ -287,13 +288,19 @@ where
     Ok(fd)
 }
 
+#[cold]
+fn closed_err() -> io::Error {
+    io::Error::new(io::ErrorKind::BrokenPipe, "child stdin has been shut down")
+}
+
 impl ChildStdin {
     pub(super) fn into_owned_fd(self) -> io::Result<OwnedFd> {
-        convert_to_blocking_file(self.inner).map(OwnedFd::from)
+        let inner = self.inner.ok_or_else(closed_err)?;
+        convert_to_blocking_file(inner).map(OwnedFd::from)
     }
 
     pub(super) fn into_stdio(self) -> io::Result<Stdio> {
-        convert_to_blocking_file(self.inner).map(Stdio::from)
+        self.into_owned_fd().map(Stdio::from)
     }
 }
 
@@ -308,8 +315,12 @@ impl ChildStdout {
 }
 
 impl AsRawFd for ChildStdin {
+    #[track_caller]
     fn as_raw_fd(&self) -> RawFd {
-        self.inner.as_raw_fd()
+        self.inner
+            .as_ref()
+            .expect("child stdin has been shut down")
+            .as_raw_fd()
     }
 }
 
@@ -325,7 +336,10 @@ impl AsyncWrite for ChildStdin {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.inner.poll_write(cx, buf)
+        match self.inner.as_ref() {
+            Some(inner) => inner.poll_write(cx, buf),
+            None => Poll::Ready(Err(closed_err())),
+        }
     }
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -333,6 +347,7 @@ impl AsyncWrite for ChildStdin {
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        drop(self.get_mut().inner.take());
         Poll::Ready(Ok(()))
     }
 
@@ -341,7 +356,10 @@ impl AsyncWrite for ChildStdin {
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<Result<usize, io::Error>> {
-        self.inner.poll_write_vectored(cx, bufs)
+        match self.inner.as_ref() {
+            Some(inner) => inner.poll_write_vectored(cx, bufs),
+            None => Poll::Ready(Err(closed_err())),
+        }
     }
 
     fn is_write_vectored(&self) -> bool {
