@@ -454,6 +454,10 @@ impl File {
     /// # }
     /// ```
     pub async fn metadata(&self) -> io::Result<Metadata> {
+        // Wait for in-flight operations so that the returned metadata (such
+        // as the file length) reflects earlier writes.
+        self.inner.lock().await.complete_inflight().await;
+
         let std = self.std.clone();
         asyncify(move || std.metadata()).await
     }

@@ -750,7 +750,17 @@ impl LockedImpl {
 // Tells whether the error when spawning a thread is temporary.
 #[inline]
 fn is_temporary_os_thread_error(error: &io::Error) -> bool {
-    matches!(error.kind(), io::ErrorKind::WouldBlock)
+    if matches!(error.kind(), io::ErrorKind::WouldBlock) {
+        return true;
+    }
+
+    #[cfg(windows)]
+    if error.raw_os_error() == Some(1450) {
+        // Windows reports temporary resource exhaustion as ERROR_NO_SYSTEM_RESOURCES.
+        return true;
+    }
+
+    false
 }
 
 impl Inner {
