@@ -57,6 +57,22 @@ async fn duration_max_does_not_overflow() {
 }
 
 #[tokio::test]
+async fn duration_max_does_not_overflow_between_items() {
+    time::pause();
+
+    let mut stream = task::spawn(futures::stream::iter([1, 2, 3]).throttle(Duration::MAX));
+
+    assert_ready_eq!(stream.poll_next(), Some(1));
+    assert_pending!(stream.poll_next());
+
+    // Like `sleep`, the delay is clamped to roughly 30 years.
+    time::advance(Duration::from_secs(86400 * 365 * 31)).await;
+
+    assert_ready_eq!(stream.poll_next(), Some(2));
+    assert_pending!(stream.poll_next());
+}
+
+#[tokio::test]
 async fn size_hint() {
     let stream = futures::stream::iter([1, 2, 3]).throttle(Duration::from_secs(1));
 

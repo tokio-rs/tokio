@@ -193,6 +193,11 @@ impl<T> UnboundedReceiver<T> {
     /// but the channel has not yet been closed, this method will sleep
     /// until a message is sent or the channel is closed.
     ///
+    /// This method does not wait for the buffer to be populated up to
+    /// `limit`: when the queue holds any messages, the call returns
+    /// immediately with as many as are queued, up to `limit`. For example,
+    /// `limit` of 100 with 30 queued messages returns 30.
+    ///
     /// For non-zero values of `limit`, this method will never return `0` unless
     /// the channel has been closed and there are no remaining messages in the
     /// channel's queue. This indicates that no further values can ever be

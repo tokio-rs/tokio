@@ -593,25 +593,30 @@ impl Handle {
                 Some(CurrentThread(context)) if Arc::ptr_eq(self, &context.handle) => context,
                 _ => return,
             };
-            let mut maybe_core = context.core.borrow_mut();
-            let core = if let Some(core) = maybe_core.as_mut() {
-                core
-            } else {
-                return;
-            };
-            let local = &mut core.tasks;
-
             if self.shared.inject.is_closed() {
                 return;
             }
 
-            traces = trace_current_thread(&self.shared.owned, local, &self.shared.inject)
+            // Move the local queue out of the scheduler core and drop the borrow
+            // before polling anything. Tracing polls tasks, and a task that wakes
+            // itself while being polled calls `schedule`, which borrows the core
+            // again. Holding this borrow across the poll panics with
+            // "RefCell already borrowed".
+            let mut local = VecDeque::new();
+            {
+                let mut maybe_core = context.core.borrow_mut();
+                let core = if let Some(core) = maybe_core.as_mut() {
+                    core
+                } else {
+                    return;
+                };
+                local.append(&mut core.tasks);
+            }
+
+            traces = trace_current_thread(&self.shared.owned, &mut local, &self.shared.inject)
                 .into_iter()
                 .map(|(id, trace)| dump::Task::new(id, trace))
                 .collect();
-
-            // Avoid double borrow panic
-            drop(maybe_core);
 
             // Taking a taskdump could wakes every task, but we probably don't want
             // the `yield_now` vector to be that large under normal circumstances.
