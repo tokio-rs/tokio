@@ -4,6 +4,7 @@
 //! compilation.
 
 mod pool;
+#[allow(unused_imports)]
 pub(crate) use pool::{spawn_blocking, BlockingPool, Mandatory, Spawner};
 
 mod sharded;

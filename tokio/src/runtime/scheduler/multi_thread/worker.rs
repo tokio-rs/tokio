@@ -528,7 +528,8 @@ impl Launch {
 
             if let Err(error) = result {
                 for worker in std::iter::once(worker).chain(workers) {
-                    if let Some(core) = worker.core.take() {
+                    if let Some(mut core) = worker.core.take() {
+                        core.pre_shutdown(&worker);
                         worker.handle.shutdown_core(core);
                     }
                 }

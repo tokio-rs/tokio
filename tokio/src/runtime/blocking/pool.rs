@@ -625,7 +625,15 @@ impl LockedImpl {
         metrics.inc_queue_depth();
 
         if metrics.num_idle_threads() == 0 {
-            on_no_idle(&mut locked.thread_mgmt_state)?;
+            if let Err(e) = on_no_idle(&mut locked.thread_mgmt_state) {
+                let task = locked
+                    .queue
+                    .pop_back()
+                    .expect("blocking task was just pushed");
+                metrics.dec_queue_depth();
+                task.shutdown();
+                return Err(e);
+            }
         } else {
             // Notify an idle worker thread. The notification counter
             // is used to count the needed amount of notifications
