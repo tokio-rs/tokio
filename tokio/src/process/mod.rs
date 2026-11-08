@@ -1644,12 +1644,14 @@ mod sys {
             }
 
             impl AsRawFd for $type {
+                #[track_caller]
                 fn as_raw_fd(&self) -> RawFd {
                     self.inner.as_raw_fd()
                 }
             }
 
             impl AsFd for $type {
+                #[track_caller]
                 fn as_fd(&self) -> BorrowedFd<'_> {
                     unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
                 }
@@ -1679,12 +1681,14 @@ mod windows {
             }
 
             impl AsRawHandle for $type {
+                #[track_caller]
                 fn as_raw_handle(&self) -> RawHandle {
                     self.inner.as_raw_handle()
                 }
             }
 
             impl AsHandle for $type {
+                #[track_caller]
                 fn as_handle(&self) -> BorrowedHandle<'_> {
                     unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
                 }

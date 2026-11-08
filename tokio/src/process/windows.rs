@@ -208,21 +208,25 @@ impl From<ChildStdio> for ChildStdin {
     }
 }
 
+#[cold]
+fn closed_err() -> io::Error {
+    io::Error::new(io::ErrorKind::BrokenPipe, "child stdin has been shut down")
+}
+
 impl ChildStdin {
     pub(super) fn into_stdio(self) -> io::Result<Stdio> {
-        self.inner
-            .ok_or_else(|| io::Error::from(io::ErrorKind::BrokenPipe))?
+        self.inner.ok_or_else(closed_err)?
             .into_stdio()
     }
 
     pub(super) fn into_owned_handle(self) -> io::Result<OwnedHandle> {
-        self.inner
-            .ok_or_else(|| io::Error::from(io::ErrorKind::BrokenPipe))?
+        self.inner.ok_or_else(closed_err)?
             .into_owned_handle()
     }
 }
 
 impl AsRawHandle for ChildStdin {
+    #[track_caller]
     fn as_raw_handle(&self) -> RawHandle {
         self.inner
             .as_ref()
@@ -239,7 +243,7 @@ impl AsyncWrite for ChildStdin {
     ) -> Poll<io::Result<usize>> {
         match self.inner.as_mut() {
             Some(inner) => Pin::new(inner).poll_write(cx, buf),
-            None => Poll::Ready(Err(io::ErrorKind::BrokenPipe.into())),
+            None => Poll::Ready(Err(closed_err())),
         }
     }
 
@@ -250,7 +254,7 @@ impl AsyncWrite for ChildStdin {
     ) -> Poll<io::Result<usize>> {
         match self.inner.as_mut() {
             Some(inner) => Pin::new(inner).poll_write_vectored(cx, bufs),
-            None => Poll::Ready(Err(io::ErrorKind::BrokenPipe.into())),
+            None => Poll::Ready(Err(closed_err())),
         }
     }
 

@@ -247,11 +247,14 @@ where
     Ok(fd)
 }
 
+#[cold]
+fn closed_err() -> io::Error {
+    io::Error::new(io::ErrorKind::BrokenPipe, "child stdin has been shut down")
+}
+
 impl ChildStdin {
     pub(super) fn into_owned_fd(self) -> io::Result<OwnedFd> {
-        let inner = self
-            .inner
-            .ok_or_else(|| io::Error::from(io::ErrorKind::BrokenPipe))?;
+        let inner = self.inner.ok_or_else(closed_err)?;
         convert_to_blocking_file(inner).map(OwnedFd::from)
     }
 
@@ -271,6 +274,7 @@ impl ChildStdout {
 }
 
 impl AsRawFd for ChildStdin {
+    #[track_caller]
     fn as_raw_fd(&self) -> RawFd {
         self.inner
             .as_ref()
@@ -293,7 +297,7 @@ impl AsyncWrite for ChildStdin {
     ) -> Poll<io::Result<usize>> {
         match self.inner.as_ref() {
             Some(inner) => inner.poll_write(cx, buf),
-            None => Poll::Ready(Err(io::Error::from(io::ErrorKind::BrokenPipe))),
+            None => Poll::Ready(Err(closed_err())),
         }
     }
 
@@ -313,7 +317,7 @@ impl AsyncWrite for ChildStdin {
     ) -> Poll<Result<usize, io::Error>> {
         match self.inner.as_ref() {
             Some(inner) => inner.poll_write_vectored(cx, bufs),
-            None => Poll::Ready(Err(io::Error::from(io::ErrorKind::BrokenPipe))),
+            None => Poll::Ready(Err(closed_err())),
         }
     }
 

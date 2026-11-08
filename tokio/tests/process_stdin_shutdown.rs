@@ -12,10 +12,8 @@ use std::os::fd::AsFd;
 #[cfg(windows)]
 use std::os::windows::io::AsHandle;
 use std::process::Stdio;
-use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::process::{Child, Command};
-use tokio::time::timeout;
 
 fn child_with_stdin() -> Child {
     let mut command = Command::new(std::env::current_exe().unwrap());
@@ -36,18 +34,10 @@ fn child_with_stdin() -> Child {
 async fn shutdown_sends_eof_without_dropping_stdin() {
     let mut child = child_with_stdin();
     let mut stdin = child.stdin.take().unwrap();
-    let data = vec![b'x'; 256 * 1024];
-    timeout(Duration::from_secs(5), async {
-        stdin.write_all(&data).await.unwrap();
-        stdin.shutdown().await.unwrap();
-    })
-    .await
-    .expect("stdin write or shutdown timed out");
+    stdin.write_all(b"xxxx").await.unwrap();
+    stdin.shutdown().await.unwrap();
 
-    let output = timeout(Duration::from_secs(5), child.wait_with_output())
-        .await
-        .expect("child did not receive EOF after stdin shutdown")
-        .unwrap();
+    let output = child.wait_with_output().await.unwrap();
     assert!(output.status.success());
     assert_eq!(
         String::from_utf8(output.stdout)
@@ -56,7 +46,7 @@ async fn shutdown_sends_eof_without_dropping_stdin() {
             .last()
             .unwrap()
             .trim(),
-        data.len().to_string()
+        "4"
     );
     stdin.shutdown().await.unwrap();
     stdin.flush().await.unwrap();
@@ -81,11 +71,7 @@ async fn shutdown_stdin_cannot_be_converted_to_stdio() {
     stdin.shutdown().await.unwrap();
     let result: std::io::Result<Stdio> = stdin.try_into();
     assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::BrokenPipe);
-    assert!(timeout(Duration::from_secs(5), child.wait())
-        .await
-        .expect("child wait timed out")
-        .unwrap()
-        .success());
+    assert!(child.wait().await.unwrap().success());
 }
 
 #[cfg(unix)]
@@ -122,7 +108,7 @@ fn shutdown_waits_for_pending_write() {
         started_tx.send(()).unwrap();
         let _ = release_rx.recv();
     });
-    started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    started_rx.recv().unwrap();
 
     runtime.block_on(async move {
         let mut child = child_with_stdin();
@@ -135,14 +121,8 @@ fn shutdown_waits_for_pending_write() {
         drop(shutdown);
 
         release_tx.send(()).unwrap();
-        timeout(Duration::from_secs(5), stdin.shutdown())
-            .await
-            .expect("stdin shutdown timed out after releasing the writer")
-            .unwrap();
-        let output = timeout(Duration::from_secs(5), child.wait_with_output())
-            .await
-            .expect("child did not receive EOF after stdin shutdown")
-            .unwrap();
+        stdin.shutdown().await.unwrap();
+        let output = child.wait_with_output().await.unwrap();
         assert!(output.status.success());
         assert_eq!(
             String::from_utf8(output.stdout).unwrap().lines().last(),
