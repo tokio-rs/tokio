@@ -1,10 +1,13 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi does not support panic recovery
+#![cfg(any(
+    all(feature = "full", not(target_os = "wasi")), // Wasi does not support panic recovery
+    all(target_os = "emscripten", feature = "io-util")
+))]
 #![cfg(panic = "unwind")]
 
 use std::task::{Context, Poll};
 use std::{error::Error, pin::Pin};
-use tokio::io::{self, split, AsyncRead, AsyncWrite, ReadBuf};
+use tokio::io::{self, duplex, simplex, split, AsyncRead, AsyncWrite, ReadBuf, SimplexStream};
 
 mod support {
     pub mod panic;
@@ -42,7 +45,7 @@ impl AsyncWrite for RW {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "emscripten")))]
 mod unix {
     use std::os::unix::prelude::{AsRawFd, RawFd};
 
@@ -132,7 +135,89 @@ fn unsplit_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(unix)]
+fn duplex_zero_capacity_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let _ = duplex(0);
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+fn simplex_zero_capacity_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let _ = simplex(0);
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+fn new_unsplit_zero_capacity_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let _ = SimplexStream::new_unsplit(0);
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+#[cfg(all(unix, not(target_os = "emscripten")))]
+fn async_fd_register_panic_caller() -> Result<(), Box<dyn Error>> {
+    use tokio::io::unix::AsyncFd;
+    use tokio::runtime::Builder;
+
+    let panic_location_file = test_panic(|| {
+        // Runtime without `enable_io` so it has no IO driver set.
+        let rt = Builder::new_current_thread().build().unwrap();
+        rt.block_on(async {
+            let fd = unix::MockFd;
+
+            let _ = unsafe { AsyncFd::register(fd) };
+        });
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+#[cfg(all(unix, not(target_os = "emscripten")))]
+fn async_fd_register_with_interest_panic_caller() -> Result<(), Box<dyn Error>> {
+    use tokio::io::unix::AsyncFd;
+    use tokio::io::Interest;
+    use tokio::runtime::Builder;
+
+    let panic_location_file = test_panic(|| {
+        // Runtime without `enable_io` so it has no IO driver set.
+        let rt = Builder::new_current_thread().build().unwrap();
+        rt.block_on(async {
+            let fd = unix::MockFd;
+
+            let _ = unsafe { AsyncFd::register_with_interest(fd, Interest::READABLE) };
+        });
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+#[cfg(all(unix, not(target_os = "emscripten")))]
+#[allow(deprecated)]
 fn async_fd_new_panic_caller() -> Result<(), Box<dyn Error>> {
     use tokio::io::unix::AsyncFd;
     use tokio::runtime::Builder;
@@ -154,7 +239,8 @@ fn async_fd_new_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "emscripten")))]
+#[allow(deprecated)]
 fn async_fd_with_interest_panic_caller() -> Result<(), Box<dyn Error>> {
     use tokio::io::unix::AsyncFd;
     use tokio::io::Interest;
@@ -177,7 +263,8 @@ fn async_fd_with_interest_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "emscripten")))]
+#[allow(deprecated)]
 fn async_fd_try_new_panic_caller() -> Result<(), Box<dyn Error>> {
     use tokio::io::unix::AsyncFd;
     use tokio::runtime::Builder;
@@ -199,7 +286,8 @@ fn async_fd_try_new_panic_caller() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "emscripten")))]
+#[allow(deprecated)]
 fn async_fd_try_with_interest_panic_caller() -> Result<(), Box<dyn Error>> {
     use tokio::io::unix::AsyncFd;
     use tokio::io::Interest;
@@ -213,6 +301,30 @@ fn async_fd_try_with_interest_panic_caller() -> Result<(), Box<dyn Error>> {
 
             let _ = AsyncFd::try_with_interest(fd, Interest::READABLE);
         });
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+fn buf_reader_with_capacity_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let _ = io::BufReader::with_capacity(0, io::empty());
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+fn buf_stream_with_capacity_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let _ = io::BufStream::with_capacity(0, 1, io::duplex(1).0);
     });
 
     // The panic location should be in this file

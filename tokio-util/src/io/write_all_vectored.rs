@@ -24,6 +24,8 @@ pin_project! {
 /// This function writes multiple (possibly non-contiguous) buffers into the writer,
 /// using the `writev` syscall to potentially write in a single system call.
 ///
+/// Interrupted writes are retried. Other errors are returned immediately.
+///
 /// Equivalent to:
 ///
 /// ```ignore
@@ -32,7 +34,11 @@ pin_project! {
 ///     mut bufs: &mut [IoSlice<'_>]
 /// ) -> io::Result<()> {
 ///     while !bufs.is_empty() {
-///         let n = write_vectored(writer, bufs).await?;
+///         let n = match write_vectored(writer, bufs).await {
+///             Ok(n) => n,
+///             Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+///             Err(e) => return Err(e),
+///         };
 ///         if n == 0 {
 ///             return Err(io::ErrorKind::WriteZero.into());
 ///         }
@@ -115,51 +121,16 @@ where
             // drop empty buffers at the start
             *me.bufs = &mut mem::take(me.bufs)[non_empty..];
 
-            let n = ready!(Pin::new(&mut *me.writer).poll_write_vectored(cx, me.bufs))?;
+            let n = match ready!(Pin::new(&mut *me.writer).poll_write_vectored(cx, me.bufs)) {
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                res => res?,
+            };
             if n == 0 {
                 return Poll::Ready(Err(io::ErrorKind::WriteZero.into()));
             }
-            self::advance_slices(me.bufs, n);
+            IoSlice::advance_slices(me.bufs, n);
         }
 
         Poll::Ready(Ok(()))
-    }
-}
-
-// copied from `std::IoSlice::advance_slices`
-// replace with method when MSRV is 1.81.0
-fn advance_slices<'a>(bufs: &mut &mut [IoSlice<'a>], n: usize) {
-    // Number of buffers to remove.
-    let mut remove = 0;
-    // Remaining length before reaching n. This prevents overflow
-    // that could happen if the length of slices in `bufs` were instead
-    // accumulated. Those slice may be aliased and, if they are large
-    // enough, their added length may overflow a `usize`.
-    let mut left = n;
-    for buf in bufs.iter() {
-        if let Some(remainder) = left.checked_sub(buf.len()) {
-            left = remainder;
-            remove += 1;
-        } else {
-            break;
-        }
-    }
-
-    *bufs = &mut std::mem::take(bufs)[remove..];
-    if let Some(first) = bufs.first_mut() {
-        let buf = &first[left..];
-        // Necessary due to a limitation in the borrow checker,
-        // when tokio MSRV reaches 1.81.0 this entire function
-        // can be replaced with `IoSlice::advance_slices`
-        //
-        // SAFETY: transmute a sub-slice of an IoSlice<'a> back to
-        // the lifetime `'a`. This is safe because the underlying memory
-        // is guaranteed to live for 'a, we have shared access, and no
-        // underlying data is reinterpreted to a different type.
-        unsafe {
-            *first = IoSlice::new(std::mem::transmute::<&[u8], &'a [u8]>(buf));
-        }
-    } else {
-        assert!(left == 0, "advancing io slices beyond their length");
     }
 }

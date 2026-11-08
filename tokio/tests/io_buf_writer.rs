@@ -1,5 +1,13 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "macros",
+        feature = "io-util"
+    )
+))]
 
 // https://github.com/rust-lang/futures-rs/blob/1803948ff091b4eabf7f3bf39e16bbbdefca5cc8/futures/tests/io_buf_writer.rs
 
@@ -116,6 +124,21 @@ async fn buf_writer_inner_flushes() {
     w.flush().await.unwrap();
     let w = w.into_inner();
     assert_eq!(w, [0, 1]);
+}
+
+#[tokio::test]
+async fn buf_writer_flush_retries_interrupted() {
+    let inner = {
+        let mut builder = tokio_test::io::Builder::new();
+        builder
+            .write_error(io::Error::from(io::ErrorKind::Interrupted))
+            .write(b"hello");
+        builder.build()
+    };
+    let mut writer = BufWriter::with_capacity(6, inner);
+
+    assert_eq!(writer.write(b"hello").await.unwrap(), 5);
+    writer.flush().await.unwrap();
 }
 
 #[tokio::test]

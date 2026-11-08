@@ -93,7 +93,7 @@ impl Handle {
         me.task_hooks.spawn(&TaskMeta {
             id,
             spawned_at,
-            #[cfg(feature = "schedule-latency")]
+            #[cfg(all(tokio_unstable, feature = "schedule-latency"))]
             schedule_latency: None,
             _phantom: Default::default(),
         });

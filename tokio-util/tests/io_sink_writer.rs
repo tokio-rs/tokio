@@ -8,6 +8,15 @@ use tokio_util::codec::{Encoder, FramedWrite};
 use tokio_util::io::{CopyToBytes, SinkWriter};
 use tokio_util::sync::PollSender;
 
+#[test]
+fn test_pinned_sink_accessors() {
+    use std::marker::PhantomPinned;
+    use std::pin::{pin, Pin};
+
+    let mut writer = pin!(SinkWriter::new(CopyToBytes::new(PhantomPinned)));
+    let _: Pin<&mut PhantomPinned> = writer.as_mut().get_pin_mut().get_pin_mut();
+}
+
 #[tokio::test]
 async fn test_copied_sink_writer() -> Result<(), Error> {
     // Construct a channel pair to send data across and wrap a pollable sink.

@@ -54,14 +54,6 @@ impl Instant {
         Instant { std }
     }
 
-    pub(crate) fn far_future() -> Instant {
-        // Roughly 30 years from now.
-        // API does not provide a way to obtain max `Instant`
-        // or convert specific date in the future to instant.
-        // 1000 years overflows on macOS, 100 years overflows on FreeBSD.
-        Self::now() + Duration::from_secs(86400 * 365 * 30)
-    }
-
     /// Convert the value into a `std::time::Instant`.
     pub fn into_std(self) -> std::time::Instant {
         self.std
@@ -109,7 +101,7 @@ impl Instant {
     /// let new_now = Instant::now();
     /// println!("{:?}", new_now.saturating_duration_since(now));
     /// println!("{:?}", now.saturating_duration_since(new_now)); // 0ns
-    /// }
+    /// # }
     /// ```
     pub fn saturating_duration_since(&self, earlier: Instant) -> Duration {
         self.std.saturating_duration_since(earlier.std)

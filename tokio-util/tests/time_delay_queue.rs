@@ -810,6 +810,28 @@ async fn compact_change_deadline() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn cascade_into_level_zero_slot_zero() {
+    let mut queue = DelayQueue::new();
+
+    queue.insert("a", ms(64));
+    queue.insert("b", ms(65));
+
+    assert_eq!(queue.next().await.unwrap().into_inner(), "a");
+    assert_eq!(queue.next().await.unwrap().into_inner(), "b");
+}
+
+#[tokio::test(start_paused = true)]
+async fn cascade_across_levels_into_slot_zero() {
+    let mut queue = DelayQueue::new();
+
+    queue.insert("a", ms(4096));
+    queue.insert("b", ms(4160));
+
+    assert_eq!(queue.next().await.unwrap().into_inner(), "a");
+    assert_eq!(queue.next().await.unwrap().into_inner(), "b");
+}
+
+#[tokio::test(start_paused = true)]
 async fn item_expiry_greater_than_wheel() {
     // This function tests that a delay queue that has existed for at least 2^36 milliseconds won't panic when a new item is inserted.
     let mut queue = DelayQueue::new();
@@ -898,6 +920,41 @@ async fn peek() {
 
     let entry = assert_ready_some!(poll!(queue));
     assert_eq!(entry.get_ref(), &"baz");
+
+    assert!(queue.peek().is_none());
+}
+
+#[tokio::test(start_paused = true)]
+async fn peek_entries_sharing_a_wheel_slot() {
+    // Only the lowest level of the timer wheel has one deadline per slot. A
+    // level-one slot spans 64ms, so entries with different deadlines share it
+    // and are only ordered once the slot cascades down.
+    let mut queue = task::spawn(DelayQueue::new());
+
+    let now = Instant::now();
+
+    // 64ms..=127ms all fall in the same level-one slot. Entries are pushed onto
+    // the front of a slot, so inserting the later deadline second puts it at the
+    // head.
+    let early = queue.insert_at("early", now + ms(100));
+    let late = queue.insert_at("late", now + ms(120));
+
+    assert_eq!(queue.peek(), Some(early));
+
+    sleep(ms(105)).await;
+
+    assert_eq!(queue.peek(), Some(early));
+
+    let entry = assert_ready_some!(poll!(queue));
+    assert_eq!(entry.key(), early);
+    assert_eq!(entry.get_ref(), &"early");
+
+    assert_eq!(queue.peek(), Some(late));
+
+    sleep(ms(20)).await;
+
+    let entry = assert_ready_some!(poll!(queue));
+    assert_eq!(entry.key(), late);
 
     assert!(queue.peek().is_none());
 }

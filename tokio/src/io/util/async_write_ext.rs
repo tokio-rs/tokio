@@ -286,8 +286,9 @@ cfg_io_util! {
         ///
         /// This method will continuously call [`write`] until
         /// [`buf.has_remaining()`](bytes::Buf::has_remaining) returns false. This method will not
-        /// return until the entire buffer has been successfully written or an error occurs. The
-        /// first error generated will be returned.
+        /// return until the entire buffer has been successfully written or an error occurs.
+        /// Errors of kind [`ErrorKind::Interrupted`] are ignored and the write is retried. The first
+        /// other error generated will be returned.
         ///
         /// The buffer is advanced after each chunk is successfully written. After failure,
         /// `src.chunk()` will return the chunk that failed to write.
@@ -331,6 +332,7 @@ cfg_io_util! {
         /// ```
         ///
         /// [`write`]: AsyncWriteExt::write
+        /// [`ErrorKind::Interrupted`]: std::io::ErrorKind::Interrupted
         fn write_all_buf<'a, B>(&'a mut self, src: &'a mut B) -> WriteAllBuf<'a, Self, B>
         where
             Self: Sized + Unpin,
@@ -349,8 +351,9 @@ cfg_io_util! {
         ///
         /// This method will continuously call [`write`] until there is no more data
         /// to be written. This method will not return until the entire buffer
-        /// has been successfully written or such an error occurs. The first
-        /// error generated from this method will be returned.
+        /// has been successfully written or such an error occurs. Errors of kind
+        /// [`ErrorKind::Interrupted`] are ignored and the write is retried. The first
+        /// other error generated from this method will be returned.
         ///
         /// # Cancel safety
         ///
@@ -362,7 +365,8 @@ cfg_io_util! {
         ///
         /// # Errors
         ///
-        /// This function will return the first error that [`write`] returns.
+        /// This function will ignore errors of kind [`ErrorKind::Interrupted`] and
+        /// will otherwise return the first error that [`write`] returns.
         ///
         /// # Examples
         ///
@@ -384,6 +388,7 @@ cfg_io_util! {
         /// ```
         ///
         /// [`write`]: AsyncWriteExt::write
+        /// [`ErrorKind::Interrupted`]: std::io::ErrorKind::Interrupted
         fn write_all<'a>(&'a mut self, src: &'a [u8]) -> WriteAll<'a, Self>
         where
             Self: Unpin,

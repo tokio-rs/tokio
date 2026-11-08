@@ -1,4 +1,12 @@
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "macros",
+        feature = "io-util"
+    )
+))]
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt};
 
 #[tokio::test]

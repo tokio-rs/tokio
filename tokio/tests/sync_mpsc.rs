@@ -2,12 +2,12 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::test as maybe_tokio_test;
 
 use std::fmt;
@@ -1013,6 +1013,44 @@ fn dropping_rx_closes_channel_for_try() {
 }
 
 #[test]
+fn dropping_rx_drops_sender_wakers_outside_lock() {
+    use futures::task::{noop_waker_ref, waker, ArcWake};
+    use std::future::Future;
+    use std::task::{Context, Poll};
+
+    struct PermitInWaker {
+        _permit: mpsc::OwnedPermit<i32>,
+    }
+
+    impl ArcWake for PermitInWaker {
+        fn wake_by_ref(_arc_self: &Arc<Self>) {}
+    }
+
+    let (tx, rx) = mpsc::channel(2);
+    let permit = tx.clone().try_reserve_owned().unwrap();
+    tx.try_send(1).unwrap();
+
+    // The channel is full, so `reserve` waits for capacity.
+    let mut reserve = Box::pin(tx.reserve());
+    let waker = waker(Arc::new(PermitInWaker { _permit: permit }));
+    assert!(reserve
+        .as_mut()
+        .poll(&mut Context::from_waker(&waker))
+        .is_pending());
+    drop(waker);
+
+    // Closing the channel wakes `reserve`, which drops the last reference to
+    // the waker and releases the permit inside it. This shouldn't deadlock.
+    drop(rx);
+
+    let mut cx = Context::from_waker(noop_waker_ref());
+    assert!(matches!(
+        reserve.as_mut().poll(&mut cx),
+        Poll::Ready(Err(_))
+    ));
+}
+
+#[test]
 fn unconsumed_messages_are_dropped() {
     let msg = Arc::new(());
 
@@ -1687,6 +1725,38 @@ async fn test_is_empty_32_msgs() {
         receiver.recv().await.unwrap();
         assert!(receiver.is_empty(), "{value}. len: {}", receiver.len());
     }
+}
+
+#[test]
+#[cfg(panic = "unwind")]
+fn permit_send_panicking_rx_waker() {
+    use std::task::{Context, Wake, Waker};
+
+    struct PanickingWaker;
+
+    impl Wake for PanickingWaker {
+        fn wake(self: Arc<Self>) {
+            panic!("waker panicked");
+        }
+    }
+
+    let (tx, mut rx) = mpsc::channel(1);
+    let waker = Waker::from(Arc::new(PanickingWaker));
+    let mut cx = Context::from_waker(&waker);
+    assert_pending!(rx.poll_recv(&mut cx));
+
+    let permit = tx.try_reserve().unwrap();
+    assert!(panic::catch_unwind(|| permit.send(7)).is_err());
+
+    assert_eq!(tx.capacity(), 0);
+    assert_eq!(rx.len(), 1);
+
+    assert_eq!(rx.try_recv(), Ok(7));
+    assert_eq!(tx.capacity(), 1);
+    assert_eq!(tx.max_capacity(), 1);
+
+    rx.close();
+    assert_eq!(rx.try_recv(), Err(TryRecvError::Disconnected));
 }
 
 #[test]

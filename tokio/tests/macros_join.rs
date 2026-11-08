@@ -2,13 +2,13 @@
 #![allow(clippy::disallowed_names)]
 use std::sync::Arc;
 
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 #[cfg(target_pointer_width = "64")]
 use wasm_bindgen_test::wasm_bindgen_test as test;
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::test as maybe_tokio_test;
 
 use tokio::sync::{oneshot, Semaphore};
@@ -253,4 +253,30 @@ async fn caller_names_const_count() {
     // This passing demonstrates that the const in the macro is
     // not shadowing the caller-specified COUNT value
     assert_eq!(2, res);
+}
+
+// Regression test for: https://github.com/tokio-rs/tokio/issues/7031
+// An uninhabited output type must not trigger `unreachable_code` in the caller.
+#[deny(unreachable_code)]
+#[maybe_tokio_test]
+async fn uninhabited_output_type() {
+    use std::convert::Infallible;
+    use std::future::pending;
+
+    let mut join = task::spawn(async { tokio::join!(pending::<Infallible>(), async { 1 }) });
+    assert_pending!(join.poll());
+
+    let mut join =
+        task::spawn(async { tokio::join!(biased; pending::<Infallible>(), async { 1 }) });
+    assert_pending!(join.poll());
+
+    let mut join = task::spawn(async { tokio::join!(async { 1 }, pending::<Infallible>()) });
+    assert_pending!(join.poll());
+
+    let mut join =
+        task::spawn(async { tokio::join!(biased; async { 1 }, pending::<Infallible>()) });
+    assert_pending!(join.poll());
+
+    let mut join = task::spawn(async { tokio::join!(pending::<Infallible>()) });
+    assert_pending!(join.poll());
 }

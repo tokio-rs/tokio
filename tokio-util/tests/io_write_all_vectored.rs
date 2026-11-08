@@ -5,8 +5,8 @@ use tokio::io::AsyncWrite;
 use tokio_util::io::write_all_vectored;
 
 use bytes::BytesMut;
-use std::io;
 use std::io::IoSlice;
+use std::io::{self, ErrorKind};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -214,4 +214,20 @@ async fn write_all_vectored_should_continue_with_next_buffer_if_write_ends_on_bo
 
     write_all_vectored(&mut wr, buf).await.unwrap();
     assert_eq!(&wr.buf[..], b"abcd");
+}
+
+#[tokio::test]
+async fn retry_on_io_interrupted() {
+    let mut writer = tokio_test::io::Builder::new()
+        .write_error(ErrorKind::Interrupted.into())
+        .write(b"a")
+        .write_error(ErrorKind::Interrupted.into())
+        .write(b"bcd")
+        .build();
+    write_all_vectored(
+        &mut writer,
+        &mut [IoSlice::new(b""), IoSlice::new(b"ab"), IoSlice::new(b"cd")],
+    )
+    .await
+    .unwrap();
 }

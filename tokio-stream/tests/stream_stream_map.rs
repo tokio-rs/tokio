@@ -219,7 +219,7 @@ fn size_hint_without_upper() {
 
     map.insert("a", pin_box(stream::iter(vec![1])));
     map.insert("b", pin_box(stream::iter(vec![1, 2])));
-    map.insert("c", pin_box(pending()));
+    map.insert("c", pin_box(futures::stream::poll_fn(|_| Poll::Pending)));
 
     let size_hint = map.size_hint();
     assert_eq!(size_hint, (3, None));

@@ -1,5 +1,13 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "macros",
+        feature = "test-util"
+    )
+))]
 #![cfg(not(miri))] // Too slow on miri.
 
 use rand::SeedableRng;
@@ -7,7 +15,7 @@ use rand::{rngs::StdRng, Rng};
 use tokio::time::{self, Duration, Instant, Sleep};
 use tokio_test::{assert_elapsed, assert_pending, assert_ready, assert_ready_eq, task};
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(all(feature = "full", not(target_os = "wasi")))]
 use tokio_test::assert_err;
 
 use std::{
@@ -330,4 +338,45 @@ fn poll_next(interval: &mut task::Spawn<time::Interval>) -> Poll<Instant> {
 
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
+}
+
+#[cfg(all(feature = "full", unix))]
+#[tokio::test(start_paused = true)]
+async fn paused_time_join_unix_datagram_and_sleep() {
+    use tokio::net::UnixDatagram;
+
+    let time = Instant::now();
+    let (sock1, sock2) = UnixDatagram::pair().unwrap();
+    let mut buf = [0u8; 1];
+    tokio::join!(
+        async {
+            sock1.send(&[1u8]).await.unwrap();
+            time::sleep(Duration::from_millis(100)).await;
+        },
+        async {
+            sock2.recv(&mut buf).await.unwrap();
+            assert_eq!(time.elapsed(), Duration::ZERO);
+        },
+    );
+}
+
+#[cfg(all(feature = "full", unix))]
+#[tokio::test(start_paused = true)]
+async fn paused_time_spawn_unix_datagram_and_sleep() {
+    use tokio::net::UnixDatagram;
+
+    let time = Instant::now();
+    let (sock1, sock2) = UnixDatagram::pair().unwrap();
+
+    sock1.send(&[1u8]).await.unwrap();
+
+    let h = tokio::spawn(async move {
+        let mut buf = [0u8; 1];
+        sock2.recv(&mut buf).await.unwrap();
+        assert_eq!(time.elapsed(), Duration::ZERO);
+    });
+
+    time::sleep(Duration::from_millis(100)).await;
+    h.await.unwrap();
+    assert_eq!(time.elapsed(), Duration::from_millis(100));
 }

@@ -6,10 +6,10 @@ use std::{convert::Infallible, sync::Arc};
 use tokio::sync::{oneshot, Semaphore};
 use tokio_test::{assert_pending, assert_ready, task};
 
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasm_bindgen_test::wasm_bindgen_test as maybe_tokio_test;
 
-#[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use tokio::test as maybe_tokio_test;
 
 #[maybe_tokio_test]
@@ -266,4 +266,40 @@ async fn caller_names_const_count() {
     // This passing demonstrates that the const in the macro is
     // not shadowing the caller-specified COUNT value
     assert_eq!(2, res);
+}
+
+// Regression test for: https://github.com/tokio-rs/tokio/issues/7031
+// An uninhabited `Ok` or error type must not trigger `unreachable_code`
+// in the caller.
+#[deny(unreachable_code)]
+#[maybe_tokio_test]
+async fn uninhabited_ok_type() {
+    let res = tokio::try_join!(async { Err::<Infallible, _>(1) }, async { Ok(2) });
+    assert_eq!(res, Err(1));
+
+    let res = tokio::try_join!(biased; async { Err::<Infallible, _>(1) }, async { Ok(2) });
+    assert_eq!(res, Err(1));
+
+    let res = tokio::try_join!(async { Ok::<_, i32>(1) }, async { Err::<Infallible, _>(2) });
+    assert_eq!(res, Err(2));
+
+    let res =
+        tokio::try_join!(biased; async { Ok::<_, i32>(1) }, async { Err::<Infallible, _>(2) });
+    assert_eq!(res, Err(2));
+
+    let res = tokio::try_join!(async { Err::<Infallible, i32>(1) });
+    assert_eq!(res, Err(1));
+}
+
+#[deny(unreachable_code)]
+#[maybe_tokio_test]
+async fn uninhabited_err_type() {
+    let res = tokio::try_join!(async { Ok::<_, Infallible>(1) }, async { Ok(2) });
+    assert_eq!(res, Ok((1, 2)));
+
+    let res = tokio::try_join!(biased; async { Ok::<_, Infallible>(1) }, async { Ok(2) });
+    assert_eq!(res, Ok((1, 2)));
+
+    let res = tokio::try_join!(async { Ok::<_, Infallible>(1) });
+    assert_eq!(res, Ok((1,)));
 }

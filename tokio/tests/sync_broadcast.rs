@@ -2,7 +2,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "sync")]
 
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use tokio::sync::broadcast;
@@ -563,7 +563,7 @@ fn sender_len() {
 }
 
 #[test]
-#[cfg(not(all(target_family = "wasm", not(target_os = "wasi"))))]
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 fn sender_len_random() {
     let (tx, mut rx1) = broadcast::channel(16);
     let mut rx2 = tx.subscribe();
@@ -705,6 +705,48 @@ fn broadcast_sender_closed_with_extra_subscribe() {
     drop(rx4);
     assert!(task3.is_woken());
     assert_ready!(task3.poll());
+}
+
+#[test]
+fn broadcast_sender_closed_in_waker() {
+    use futures::task::ArcWake;
+    use std::future::Future;
+    use std::pin::pin;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::task::Context;
+
+    struct QueryOnWake {
+        sender: broadcast::Sender<()>,
+        woken: AtomicBool,
+    }
+
+    impl ArcWake for QueryOnWake {
+        fn wake_by_ref(arc_self: &Arc<Self>) {
+            assert_eq!(arc_self.sender.receiver_count(), 0);
+            assert_eq!(arc_self.sender.len(), 0);
+            assert!(arc_self.sender.is_empty());
+            assert!(arc_self.sender.send(()).is_err());
+            arc_self.woken.store(true, Ordering::SeqCst);
+        }
+    }
+
+    let (sender, receiver) = broadcast::channel::<()>(1);
+    sender.send(()).unwrap();
+
+    let wake_state = Arc::new(QueryOnWake {
+        sender: sender.clone(),
+        woken: AtomicBool::new(false),
+    });
+    let waker = futures::task::waker(wake_state.clone());
+    let mut cx = Context::from_waker(&waker);
+
+    let mut closed = pin!(sender.closed());
+    assert_pending!(closed.as_mut().poll(&mut cx));
+
+    drop(receiver);
+
+    assert!(wake_state.woken.load(Ordering::SeqCst));
+    assert_ready!(closed.as_mut().poll(&mut cx));
 }
 
 #[tokio::test]

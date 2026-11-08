@@ -1,10 +1,11 @@
-use crate::stream_ext::Fuse;
+use crate::stream_ext::{safe_delay, Fuse};
 use crate::Stream;
-use tokio::time::{Instant, Sleep};
+use tokio::time::{sleep, Instant, Sleep};
 
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 use std::fmt;
 use std::time::Duration;
@@ -29,13 +30,12 @@ pub struct Elapsed(());
 
 impl<S: Stream> Timeout<S> {
     pub(super) fn new(stream: S, duration: Duration) -> Self {
-        let next = Instant::now() + duration;
-        let deadline = tokio::time::sleep_until(next);
+        let deadline = sleep(duration);
 
         Timeout {
             stream: Fuse::new(stream),
             deadline,
-            duration,
+            duration: safe_delay(duration),
             poll_deadline: true,
         }
     }
@@ -50,8 +50,7 @@ impl<S: Stream> Stream for Timeout<S> {
         match me.stream.poll_next(cx) {
             Poll::Ready(v) => {
                 if v.is_some() {
-                    let next = Instant::now() + *me.duration;
-                    me.deadline.reset(next);
+                    me.deadline.reset(Instant::now() + *me.duration);
                     *me.poll_deadline = true;
                 }
                 return Poll::Ready(v.map(Ok));
@@ -81,6 +80,12 @@ impl<S: Stream> Stream for Timeout<S> {
         }
 
         (lower, twice_plus_one(upper))
+    }
+}
+
+impl<S: Stream> FusedStream for Timeout<S> {
+    fn is_terminated(&self) -> bool {
+        self.stream.is_terminated()
     }
 }
 

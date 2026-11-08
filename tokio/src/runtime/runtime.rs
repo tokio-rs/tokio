@@ -1,4 +1,4 @@
-use super::BOX_FUTURE_THRESHOLD;
+use super::AutoBox;
 use crate::runtime::blocking::BlockingPool;
 use crate::runtime::scheduler::CurrentThread;
 use crate::runtime::{context, EnterGuard, Handle};
@@ -247,7 +247,7 @@ impl Runtime {
         F::Output: Send + 'static,
     {
         let fut_size = mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
+        if AutoBox::<F>::SHOULD_BOX {
             self.handle
                 .spawn_named(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
@@ -342,7 +342,7 @@ impl Runtime {
     #[track_caller]
     pub fn block_on<F: Future>(&self, future: F) -> F::Output {
         let fut_size = mem::size_of::<F>();
-        if fut_size > BOX_FUTURE_THRESHOLD {
+        if AutoBox::<F>::SHOULD_BOX {
             self.block_on_inner(Box::pin(future), SpawnMeta::new_unnamed(fut_size))
         } else {
             self.block_on_inner(future, SpawnMeta::new_unnamed(fut_size))

@@ -1,5 +1,13 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "macros",
+        feature = "io-util"
+    )
+))]
 
 // https://github.com/rust-lang/futures-rs/blob/1803948ff091b4eabf7f3bf39e16bbbdefca5cc8/futures/tests/io_buf_reader.rs
 
@@ -128,6 +136,63 @@ async fn test_buffered_reader_seek() {
     assert_eq!(run_fill_buf!(reader).unwrap(), &[1, 2][..]);
     Pin::new(&mut reader).consume(1);
     assert_eq!(reader.seek(SeekFrom::Current(-2)).await.unwrap(), 3);
+}
+
+#[tokio::test]
+async fn seek_waits_for_pending_operation() {
+    struct PendingOperation {
+        inner: Cursor<&'static [u8]>,
+        pending: bool,
+    }
+
+    impl AsyncRead for PendingOperation {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            Pin::new(&mut self.inner).poll_read(cx, buf)
+        }
+    }
+
+    impl AsyncSeek for PendingOperation {
+        fn start_seek(mut self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
+            assert!(!self.pending, "previous operation is still pending");
+            Pin::new(&mut self.inner).start_seek(pos)
+        }
+
+        fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+            if self.pending {
+                self.pending = false;
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            } else {
+                Pin::new(&mut self.inner).poll_complete(cx)
+            }
+        }
+    }
+
+    let inner = PendingOperation {
+        inner: Cursor::new(b"abcd"),
+        pending: false,
+    };
+    let mut reader = BufReader::with_capacity(2, inner);
+    assert_eq!(reader.fill_buf().await.unwrap(), b"ab");
+    reader.get_mut().pending = true;
+
+    let mut complete = spawn(std::future::poll_fn(|cx| {
+        Pin::new(&mut reader).poll_complete(cx)
+    }));
+    assert_pending!(complete.poll());
+    assert!(complete.is_woken());
+    assert_ready!(complete.poll()).unwrap();
+    drop(complete);
+
+    assert_eq!(reader.buffer(), b"ab");
+    assert_eq!(reader.seek(SeekFrom::Current(1)).await.unwrap(), 1);
+
+    assert!(reader.buffer().is_empty());
+    assert_eq!(reader.fill_buf().await.unwrap(), b"bc");
 }
 
 #[tokio::test]
@@ -376,4 +441,44 @@ async fn test_fill_buf_wrapper() {
     assert_eq!(read.fill_buf().await.unwrap(), b"foo bar");
     read.consume(b"foo bar".len());
     assert_eq!(read.fill_buf().await.unwrap(), b"");
+}
+
+#[tokio::test]
+async fn one_byte_capacity_still_reads() {
+    let data: &[u8] = b"a\nb\nc\n";
+
+    let mut reader = BufReader::with_capacity(1, data);
+    let mut line = String::new();
+    assert_eq!(reader.read_line(&mut line).await.unwrap(), 2);
+    assert_eq!(line, "a\n");
+
+    let mut reader = BufReader::with_capacity(1, data);
+    let mut copied = Vec::new();
+    assert_eq!(
+        tokio::io::copy_buf(&mut reader, &mut copied).await.unwrap(),
+        6
+    );
+    assert_eq!(copied, data);
+}
+
+#[tokio::test]
+async fn one_byte_capacity_buf_stream_still_reads() {
+    use tokio::io::BufStream;
+
+    let mut stream = BufStream::with_capacity(1, 8, Cursor::new(b"a\nb\nc\n".to_vec()));
+    let mut line = String::new();
+    assert_eq!(stream.read_line(&mut line).await.unwrap(), 2);
+    assert_eq!(line, "a\n");
+}
+
+#[test]
+#[should_panic(expected = "capacity must be greater than zero")]
+fn zero_capacity_panics() {
+    BufReader::with_capacity(0, &b"data"[..]);
+}
+
+#[test]
+#[should_panic(expected = "capacity must be greater than zero")]
+fn zero_capacity_buf_stream_panics() {
+    tokio::io::BufStream::with_capacity(0, 8, Cursor::new(Vec::new()));
 }

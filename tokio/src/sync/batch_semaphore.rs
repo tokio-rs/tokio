@@ -72,6 +72,13 @@ pub(crate) struct Acquire<'a> {
     node: Waiter,
     semaphore: &'a Semaphore,
     num_permits: usize,
+    /// Whether `Acquire::drop` must clean up after the waiter, by removing it
+    /// from the wait queue if it is still linked and returning the permits
+    /// assigned to it to the semaphore.
+    ///
+    /// This is set as soon as `poll_acquire` assigns permits to the waiter or
+    /// links it into the wait queue, and it is only cleared once the future
+    /// completes and the permits are handed to the caller.
     queued: bool,
 }
 
@@ -250,11 +257,32 @@ impl Semaphore {
         // permit counter is closed, but the wait list is not.
         self.permits.fetch_or(Self::CLOSED, Release);
         waiters.closed = true;
-        while let Some(mut waiter) = waiters.queue.pop_back() {
-            let waker = unsafe { waiter.as_mut().waker.with_mut(|waker| (*waker).take()) };
-            if let Some(waker) = waker {
-                waker.wake();
+
+        // Wake the waiters in batches, with the lock released, because a
+        // waker may call back into the semaphore when it is woken or dropped.
+        // No new waiters are queued once `closed` is set.
+        let mut wakers = WakeList::new();
+        loop {
+            while wakers.can_push() {
+                let Some(mut waiter) = waiters.queue.pop_back() else {
+                    break;
+                };
+                // Safety: we hold the lock, so we can access the waker.
+                let waker = unsafe { waiter.as_mut().waker.with_mut(|waker| (*waker).take()) };
+                if let Some(waker) = waker {
+                    wakers.push(waker);
+                }
             }
+
+            // If the batch has room left, the queue is empty.
+            let is_empty = wakers.can_push();
+            drop(waiters);
+            wakers.wake_all();
+
+            if is_empty {
+                return;
+            }
+            waiters = self.waiters.lock();
         }
     }
 
@@ -311,11 +339,15 @@ impl Semaphore {
             let mut waiters = lock.take().unwrap_or_else(|| self.waiters.lock());
             'inner: while wakers.can_push() {
                 // Was the waiter assigned enough permits to wake it?
-                match waiters.queue.last() {
+                let _assigned = match waiters.queue.last() {
                     Some(waiter) => {
-                        if !waiter.assign_permits(&mut rem) {
+                        let (should_remove, assigned) = waiter.assign_permits(&mut rem);
+                        if !should_remove {
+                            #[cfg(all(tokio_unstable, feature = "tracing"))]
+                            waiter.trace_assigned(assigned);
                             break 'inner;
                         }
+                        assigned
                     }
                     None => {
                         is_empty = true;
@@ -330,6 +362,9 @@ impl Semaphore {
                 {
                     wakers.push(waker);
                 }
+                // Safety: we have locked the wait list.
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                unsafe { waiter.as_ref() }.trace_assigned(_assigned);
             }
 
             if rem > 0 && is_empty {
@@ -399,11 +434,11 @@ impl Semaphore {
         cx: &mut Context<'_>,
         num_permits: usize,
         node: Pin<&mut Waiter>,
-        queued: bool,
+        queued: &mut bool,
     ) -> Poll<Result<(), AcquireError>> {
         let mut acquired = 0;
 
-        let needed = if queued {
+        let needed = if *queued {
             node.state.load(Acquire) << Self::PERMIT_SHIFT
         } else {
             num_permits << Self::PERMIT_SHIFT
@@ -446,7 +481,15 @@ impl Semaphore {
                 Ok(_) => {
                     acquired += acq;
                     if remaining == 0 {
-                        if !queued {
+                        if !*queued {
+                            // The waiter now holds all of its permits. Record
+                            // this in its state and set `queued`, so that
+                            // `Acquire::drop` returns the permits if the
+                            // future is dropped before it completes, e.g.
+                            // because the tracing subscriber panics below.
+                            node.state.store(0, Release);
+                            *queued = true;
+
                             #[cfg(all(tokio_unstable, feature = "tracing"))]
                             self.resource_span.in_scope(|| {
                                 tracing::trace!(
@@ -476,16 +519,30 @@ impl Semaphore {
             return Poll::Ready(Err(AcquireError::closed()));
         }
 
+        // The waiter is about to be assigned permits or linked into the wait
+        // queue, so `Acquire::drop` must clean up after it from now on.
+        let was_queued = *queued;
+        *queued = true;
+
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        let sub_permits = acquired;
+        let (should_remove, _assigned) = node.assign_permits(&mut acquired);
+
+        // The tracing events are emitted only once the permits have been
+        // assigned to the waiter, so that `Acquire::drop` returns them if the
+        // tracing subscriber panics.
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         self.resource_span.in_scope(|| {
             tracing::trace!(
                 target: "runtime::resource::state_update",
-                permits = acquired,
+                permits = sub_permits,
                 permits.op = "sub",
             )
         });
+        #[cfg(all(tokio_unstable, feature = "tracing"))]
+        node.trace_assigned(_assigned);
 
-        if node.assign_permits(&mut acquired) {
+        if should_remove {
             self.add_permits_locked(acquired, waiters);
             return Poll::Ready(Ok(()));
         }
@@ -500,14 +557,14 @@ impl Semaphore {
             // Do we need to register the new waker?
             if waker
                 .as_ref()
-                .map_or(true, |waker| !waker.will_wake(cx.waker()))
+                .is_none_or(|waker| !waker.will_wake(cx.waker()))
             {
                 old_waker = waker.replace(cx.waker().clone());
             }
         });
 
         // If the waiter is not already in the wait queue, enqueue it.
-        if !queued {
+        if !was_queued {
             let node = unsafe {
                 let node = Pin::into_inner_unchecked(node) as *mut _;
                 NonNull::new_unchecked(node)
@@ -547,8 +604,9 @@ impl Waiter {
 
     /// Assign permits to the waiter.
     ///
-    /// Returns `true` if the waiter should be removed from the queue
-    fn assign_permits(&self, n: &mut usize) -> bool {
+    /// Returns whether the waiter should be removed from the queue, and the
+    /// number of permits that were assigned to it.
+    fn assign_permits(&self, n: &mut usize) -> (bool, usize) {
         let mut curr = self.state.load(Acquire);
         loop {
             let assign = cmp::min(curr, *n);
@@ -556,19 +614,24 @@ impl Waiter {
             match self.state.compare_exchange(curr, next, AcqRel, Acquire) {
                 Ok(_) => {
                     *n -= assign;
-                    #[cfg(all(tokio_unstable, feature = "tracing"))]
-                    self.ctx.async_op_span.in_scope(|| {
-                        tracing::trace!(
-                            target: "runtime::resource::async_op::state_update",
-                            permits_obtained = assign,
-                            permits.op = "add",
-                        );
-                    });
-                    return next == 0;
+                    return (next == 0, assign);
                 }
                 Err(actual) => curr = actual,
             }
         }
+    }
+
+    /// Emit a tracing event for `assigned` permits having been assigned to
+    /// the waiter.
+    #[cfg(all(tokio_unstable, feature = "tracing"))]
+    fn trace_assigned(&self, assigned: usize) {
+        self.ctx.async_op_span.in_scope(|| {
+            tracing::trace!(
+                target: "runtime::resource::async_op::state_update",
+                permits_obtained = assigned,
+                permits.op = "add",
+            );
+        });
     }
 }
 
@@ -576,7 +639,7 @@ impl Future for Acquire<'_> {
     type Output = Result<(), AcquireError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let _resource_span = self.node.ctx.resource_span.clone().entered();
@@ -587,39 +650,48 @@ impl Future for Acquire<'_> {
 
         let (node, semaphore, needed, queued) = self.project();
 
-        // First, ensure the current task has enough budget to proceed.
-        #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let coop = ready!(trace_poll_op!(
-            "poll_acquire",
-            crate::task::coop::poll_proceed(cx),
-        ));
-
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        let coop = ready!(crate::task::coop::poll_proceed(cx));
-
-        let result = match semaphore.poll_acquire(cx, needed, node, *queued) {
-            Poll::Pending => {
-                *queued = true;
-                Poll::Pending
-            }
+        let result = match semaphore.poll_acquire(cx, needed, node, queued) {
+            Poll::Pending => Poll::Pending,
             Poll::Ready(r) => {
-                coop.made_progress();
                 r?;
-                *queued = false;
+
+                #[cfg(all(tokio_unstable, feature = "tracing"))]
+                let coop = ready!(trace_poll_op!(
+                    "poll_acquire",
+                    crate::task::coop::poll_proceed(cx),
+                ));
+
+                #[cfg(not(all(tokio_unstable, feature = "tracing")))]
+                let coop = ready!(crate::task::coop::poll_proceed(cx));
+
+                coop.made_progress();
                 Poll::Ready(Ok(()))
             }
         };
 
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        return trace_poll_op!("poll_acquire", result);
+        let result = trace_poll_op!("poll_acquire", result);
 
-        #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-        return result;
+        // The permits are handed to the caller once the future completes, so
+        // `Acquire::drop` must no longer return them. Clear `queued` only after
+        // the last tracing event, so that the permits are still returned if
+        // the subscriber panics.
+        if result.is_ready() {
+            *queued = false;
+        }
+
+        result
     }
 }
 
 impl<'a> Acquire<'a> {
     fn new(semaphore: &'a Semaphore, num_permits: usize) -> Self {
+        assert!(
+            num_permits <= Semaphore::MAX_PERMITS,
+            "a semaphore may not have more than MAX_PERMITS permits ({})",
+            Semaphore::MAX_PERMITS
+        );
+
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
         return Self {
             node: Waiter::new(num_permits),

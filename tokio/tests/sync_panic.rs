@@ -1,5 +1,8 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))]
+#![cfg(any(
+    all(feature = "full", not(target_os = "wasi")),
+    all(target_os = "emscripten", feature = "rt", feature = "sync")
+))]
 #![cfg(panic = "unwind")]
 
 use std::{error::Error, sync::Arc};
@@ -92,6 +95,38 @@ fn rwlock_blocking_write_panic_caller() -> Result<(), Box<dyn Error>> {
         rt.block_on(async {
             let lock = RwLock::<u8>::new(0);
             let _ = lock.blocking_write();
+        });
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+fn rwlock_blocking_read_owned_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let rt = current_thread();
+        rt.block_on(async {
+            let lock = Arc::new(RwLock::<u8>::new(0));
+            let _ = lock.blocking_read_owned();
+        });
+    });
+
+    // The panic location should be in this file
+    assert_eq!(&panic_location_file.unwrap(), file!());
+
+    Ok(())
+}
+
+#[test]
+fn rwlock_blocking_write_owned_panic_caller() -> Result<(), Box<dyn Error>> {
+    let panic_location_file = test_panic(|| {
+        let rt = current_thread();
+        rt.block_on(async {
+            let lock = Arc::new(RwLock::<u8>::new(0));
+            let _ = lock.blocking_write_owned();
         });
     });
 

@@ -237,6 +237,9 @@ pub use self::dir_builder::DirBuilder;
 mod file;
 pub use self::file::File;
 
+mod file_times;
+pub use self::file_times::FileTimes;
+
 mod hard_link;
 pub use self::hard_link::hard_link;
 
@@ -324,9 +327,6 @@ where
 {
     match spawn_blocking(f).await {
         Ok(res) => res,
-        Err(_) => Err(io::Error::new(
-            io::ErrorKind::Other,
-            "background task failed",
-        )),
+        Err(_) => Err(io::Error::other("background task failed")),
     }
 }

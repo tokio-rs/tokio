@@ -14,9 +14,12 @@ use tokio::try_join;
 use tokio_test::task;
 use tokio_test::{assert_ok, assert_pending, assert_ready_ok};
 
-use std::future::poll_fn;
+use futures::task::noop_waker_ref;
+use std::future::{poll_fn, Future};
 use std::io;
-use std::task::Poll;
+use std::pin::pin;
+use std::sync::Arc;
+use std::task::{Context, Poll, Wake, Waker};
 #[cfg(not(target_os = "wasi"))]
 use std::time::Duration;
 
@@ -54,6 +57,13 @@ async fn try_read_write() {
         .unwrap();
     let (server, _) = listener.accept().await.unwrap();
     let mut written = DATA.to_vec();
+
+    // An accepted socket starts out assumed readable; a read that finds
+    // nothing clears that.
+    assert_eq!(
+        server.try_read(&mut [0; 1]).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
 
     // Track the server receiving data
     let mut readable = task::spawn(server.readable());
@@ -231,7 +241,10 @@ macro_rules! assert_not_writable_by_polling {
 async fn poll_read_ready() {
     let (mut client, mut server) = create_pair().await;
 
-    // Initial state - not readable.
+    // Initial state - an accepted socket is assumed readable until a read
+    // finds nothing.
+    assert_readable_by_polling!(server);
+    read_until_pending(&mut server);
     assert_not_readable_by_polling!(server);
 
     // There is data in the buffer - readable.
@@ -317,6 +330,13 @@ async fn try_read_buf() {
     let (server, _) = listener.accept().await.unwrap();
     let mut written = DATA.to_vec();
 
+    // An accepted socket starts out assumed readable; a read that finds
+    // nothing clears that.
+    assert_eq!(
+        server.try_read(&mut [0; 1]).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+
     // Track the server receiving data
     let mut readable = task::spawn(server.readable());
     assert_pending!(readable.poll());
@@ -372,12 +392,7 @@ async fn try_read_buf() {
 
     #[cfg(not(target_os = "wasi"))] // WASI does not yet support `POLLHUP` or `POLLRDHUP`
     {
-        let mut count = 0;
         loop {
-            count += 1;
-            if count > 100 {
-                panic!("loop 4")
-            }
             let ready = server.ready(Interest::READABLE).await.unwrap();
 
             if ready.is_read_closed() {
@@ -424,4 +439,54 @@ async fn write_closed() {
     let ready_event = assert_ok!(ready_fut.await);
 
     assert!(!ready_event.is_write_closed());
+}
+
+/// Polls `fut` with a waker whose `Drop` polls readiness on `stream`, then
+/// again with a different waker.
+fn check_drop_replaced_waker(stream: &Arc<TcpStream>, fut: impl Future<Output = io::Result<()>>) {
+    struct PollOnDrop(Arc<TcpStream>);
+
+    impl Wake for PollOnDrop {
+        fn wake(self: Arc<Self>) {}
+    }
+
+    impl Drop for PollOnDrop {
+        fn drop(&mut self) {
+            let mut cx = Context::from_waker(noop_waker_ref());
+            assert_pending!(self.0.poll_read_ready(&mut cx));
+        }
+    }
+
+    let mut fut = pin!(fut);
+    let waker = Waker::from(Arc::new(PollOnDrop(stream.clone())));
+    assert_pending!(fut.as_mut().poll(&mut Context::from_waker(&waker)));
+    drop(waker);
+
+    assert_pending!(fut
+        .as_mut()
+        .poll(&mut Context::from_waker(noop_waker_ref())));
+}
+
+#[tokio::test]
+async fn drop_replaced_poll_read_ready_waker_outside_lock() {
+    let (_client, server) = create_pair().await;
+    assert_eq!(
+        server.try_read(&mut [0; 1]).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+    let server = Arc::new(server);
+
+    check_drop_replaced_waker(&server, poll_fn(|cx| server.poll_read_ready(cx)));
+}
+
+#[tokio::test]
+async fn drop_replaced_readable_waker_outside_lock() {
+    let (_client, server) = create_pair().await;
+    assert_eq!(
+        server.try_read(&mut [0; 1]).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+    let server = Arc::new(server);
+
+    check_drop_replaced_waker(&server, server.readable());
 }

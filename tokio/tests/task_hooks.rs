@@ -180,6 +180,51 @@ fn task_hook_spawn_location_multi_thread() {
     assert_eq!(poll_starts, poll_ends.fetch_add(0, Ordering::SeqCst));
 }
 
+/// Test that task::Builder properly propagates the user call-site location.
+#[cfg(feature = "tracing")]
+#[test]
+fn task_hook_spawn_location_builder() {
+    let spawns = Arc::new(AtomicUsize::new(0));
+
+    let runtime = Builder::new_current_thread()
+        .on_task_spawn(mk_spawn_location_hook(
+            "(current_thread) task::Builder",
+            &spawns,
+        ))
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        let builder = tokio::task::Builder::new().name("builder_spawn_test");
+        builder.spawn(async {}).unwrap().await.unwrap();
+
+        let handle = tokio::runtime::Handle::current();
+        let builder = tokio::task::Builder::new().name("builder_spawn_on_test");
+        builder.spawn_on(async {}, &handle).unwrap().await.unwrap();
+    });
+    assert_eq!(spawns.load(Ordering::SeqCst), 2);
+
+    #[cfg(not(target_os = "wasi"))]
+    {
+        let spawns = Arc::new(AtomicUsize::new(0));
+
+        let mt_runtime = Builder::new_multi_thread()
+            .worker_threads(2)
+            .on_task_spawn(mk_spawn_location_hook(
+                "(multi_thread) task::Builder",
+                &spawns,
+            ))
+            .build()
+            .unwrap();
+
+        mt_runtime.block_on(async {
+            let builder = tokio::task::Builder::new().name("mt_builder_spawn");
+            builder.spawn(async {}).unwrap().await.unwrap();
+        });
+        assert_eq!(spawns.load(Ordering::SeqCst), 1);
+    }
+}
+
 #[cfg(feature = "schedule-latency")]
 #[test]
 fn task_hook_schedule_latency_non_poll_callbacks() {

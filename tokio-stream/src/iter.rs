@@ -14,11 +14,11 @@ pub struct Iter<I> {
 
 impl<I> Unpin for Iter<I> {}
 
-/// Converts an `Iterator` into a `Stream` which is always ready
-/// to yield the next value.
+/// Converts an `Iterator` into a `Stream`.
 ///
 /// Iterators in Rust don't express the ability to block, so this adapter
-/// simply always calls `iter.next()` and returns that.
+/// calls `iter.next()` to obtain the next value. It may return
+/// `Poll::Pending` to cooperate with the executor.
 ///
 /// ```
 /// # async fn dox() {

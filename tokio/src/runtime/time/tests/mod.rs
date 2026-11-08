@@ -1,6 +1,6 @@
-#![cfg(not(target_os = "wasi"))]
+#![cfg(all(not(target_os = "wasi"), not(target_os = "emscripten")))]
 
-use std::{task::Context, time::Duration};
+use std::task::Context;
 
 #[cfg(not(loom))]
 use futures::task::noop_waker_ref;
@@ -46,13 +46,11 @@ fn single_timer() {
         let rt = rt(false);
         let handle = rt.handle();
 
-        let handle_ = handle.clone();
+        let inner = handle.inner.clone();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(handle_.inner.clone());
+            let entry = TimerEntry::new(inner.clone());
             pin!(entry);
-            entry
-                .as_mut()
-                .init(handle_.inner.driver().clock().now() + Duration::from_secs(1));
+            entry.as_mut().init(inner.driver().now() + 1000);
 
             block_on(std::future::poll_fn(|cx| entry.as_mut().poll_elapsed(cx))).unwrap();
         });
@@ -75,13 +73,11 @@ fn drop_timer() {
         let rt = rt(false);
         let handle = rt.handle();
 
-        let handle_ = handle.clone();
+        let inner = handle.inner.clone();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(handle_.inner.clone());
+            let entry = TimerEntry::new(inner.clone());
             pin!(entry);
-            entry
-                .as_mut()
-                .init(handle_.inner.driver().clock().now() + Duration::from_secs(1));
+            entry.as_mut().init(inner.driver().now() + 1000);
 
             let _ = entry
                 .as_mut()
@@ -109,13 +105,11 @@ fn change_waker() {
         let rt = rt(false);
         let handle = rt.handle();
 
-        let handle_ = handle.clone();
+        let inner = handle.inner.clone();
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(handle_.inner.clone());
+            let entry = TimerEntry::new(inner.clone());
             pin!(entry);
-            entry
-                .as_mut()
-                .init(handle_.inner.driver().clock().now() + Duration::from_secs(1));
+            entry.as_mut().init(inner.driver().now() + 1000);
 
             let _ = entry
                 .as_mut()
@@ -144,20 +138,20 @@ fn reset_future() {
         let rt = rt(false);
         let handle = rt.handle();
 
-        let handle_ = handle.clone();
+        let inner = handle.clone().inner;
         let finished_early_ = finished_early.clone();
-        let start = handle.inner.driver().clock().now();
+        let start = handle.inner.driver().now();
 
         let jh = thread::spawn(move || {
-            let entry = TimerEntry::new(handle_.inner.clone());
+            let entry = TimerEntry::new(inner.clone());
             pin!(entry);
-            entry.as_mut().init(start + Duration::from_secs(1));
+            entry.as_mut().init(start + 1000);
 
             let _ = entry
                 .as_mut()
                 .poll_elapsed(&mut Context::from_waker(futures::task::noop_waker_ref()));
 
-            entry.as_mut().reset(start + Duration::from_secs(2));
+            entry.as_mut().reset(start + 2000);
 
             // shouldn't complete before 2s
             block_on(std::future::poll_fn(|cx| entry.as_mut().poll_elapsed(cx))).unwrap();
@@ -169,23 +163,40 @@ fn reset_future() {
 
         let handle = handle.inner.driver().time();
 
-        handle.process_at_time(
-            handle
-                .time_source()
-                .instant_to_tick(start + Duration::from_millis(1500)),
-        );
+        handle.process_at_time(start + 1500);
 
         assert!(!finished_early.load(Ordering::Relaxed));
 
-        handle.process_at_time(
-            handle
-                .time_source()
-                .instant_to_tick(start + Duration::from_millis(2500)),
-        );
+        handle.process_at_time(start + 2500);
 
         jh.join().unwrap();
 
         assert!(finished_early.load(Ordering::Relaxed));
+    })
+}
+
+#[test]
+fn interval_poll_tick_races_with_fire() {
+    model(|| {
+        let rt = rt(false);
+        let handle = rt.handle().clone();
+
+        let jh = thread::spawn(move || {
+            let _guard = handle.enter();
+            let mut interval = crate::time::interval_at(
+                crate::time::Instant::now() + crate::time::Duration::from_secs(1),
+                crate::time::Duration::from_secs(1),
+            );
+            let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+            let _ = interval.poll_tick(&mut cx);
+            let _ = interval.poll_tick(&mut cx);
+        });
+
+        let time = rt.handle().inner.driver().time();
+        let clock = rt.handle().inner.driver().clock();
+        time.process_at_time(time.time_source().now(clock) + 2_000_000_000);
+
+        jh.join().unwrap();
     })
 }
 
@@ -208,9 +219,7 @@ fn poll_process_levels() {
 
     for i in 0..normal_or_miri(1024, 64) {
         let mut entry = Box::pin(TimerEntry::new(handle.inner.clone()));
-        entry
-            .as_mut()
-            .init(handle.inner.driver().clock().now() + Duration::from_millis(i));
+        entry.as_mut().init(handle.inner.driver().now() + i);
 
         let _ = entry
             .as_mut()
@@ -243,8 +252,7 @@ fn poll_process_levels_targeted() {
 
     let e1 = TimerEntry::new(handle.inner.clone());
     pin!(e1);
-    e1.as_mut()
-        .init(handle.inner.driver().clock().now() + Duration::from_millis(193));
+    e1.as_mut().init(handle.inner.driver().now() + 193);
 
     let handle = handle.inner.driver().time();
 

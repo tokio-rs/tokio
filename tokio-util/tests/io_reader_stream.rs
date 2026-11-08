@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 
+use futures_core::FusedStream;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, ReadBuf};
@@ -61,5 +62,20 @@ async fn correct_behavior_on_errors() {
 
     assert!(had_error);
     assert_eq!(zeros_received, 8000);
+    assert!(stream.next().await.is_none());
+    assert!(stream.is_terminated());
+}
+
+#[tokio::test]
+async fn is_terminated_after_eof() {
+    let mut stream = tokio_util::io::ReaderStream::new(&b"hello"[..]);
+    assert!(!stream.is_terminated());
+
+    let chunk = stream.next().await.unwrap().unwrap();
+    assert_eq!(&chunk[..], b"hello");
+    assert!(!stream.is_terminated());
+
+    assert!(stream.next().await.is_none());
+    assert!(stream.is_terminated());
     assert!(stream.next().await.is_none());
 }

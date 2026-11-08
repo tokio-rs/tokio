@@ -84,7 +84,7 @@ impl BlockingRegionGuard {
         let mut cx = Context::from_waker(&waker);
 
         pin!(f);
-        let when = Instant::now() + timeout;
+        let when = Instant::now().checked_add(timeout);
 
         loop {
             if let Ready(v) = crate::task::coop::budget(|| f.as_mut().poll(&mut cx)) {
@@ -93,11 +93,15 @@ impl BlockingRegionGuard {
 
             let now = Instant::now();
 
-            if now >= when {
-                return Err(());
-            }
+            if let Some(when) = when {
+                if now >= when {
+                    return Err(());
+                }
 
-            park.park_timeout(when - now);
+                park.park_timeout(when - now);
+            } else {
+                park.park();
+            }
         }
     }
 }

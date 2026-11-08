@@ -101,6 +101,18 @@ pub fn unbounded_channel<T>() -> (UnboundedSender<T>, UnboundedReceiver<T>) {
     (tx, rx)
 }
 
+#[cfg(all(test, not(loom)))]
+pub(crate) fn unbounded_channel_from_index<T>(
+    start_index: usize,
+) -> (UnboundedSender<T>, UnboundedReceiver<T>) {
+    let (tx, rx) = chan::channel_from_index(start_index, Semaphore(AtomicUsize::new(0)));
+
+    let tx = UnboundedSender::new(tx);
+    let rx = UnboundedReceiver::new(rx);
+
+    (tx, rx)
+}
+
 /// No capacity
 #[derive(Debug)]
 pub(crate) struct Semaphore(pub(crate) AtomicUsize);
@@ -180,6 +192,11 @@ impl<T> UnboundedReceiver<T> {
     /// For `limit > 0`, if there are no messages in the channel's queue,
     /// but the channel has not yet been closed, this method will sleep
     /// until a message is sent or the channel is closed.
+    ///
+    /// This method does not wait for the buffer to be populated up to
+    /// `limit`: when the queue holds any messages, the call returns
+    /// immediately with as many as are queued, up to `limit`. For example,
+    /// `limit` of 100 with 30 queued messages returns 30.
     ///
     /// For non-zero values of `limit`, this method will never return `0` unless
     /// the channel has been closed and there are no remaining messages in the

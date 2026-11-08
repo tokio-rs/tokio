@@ -1,6 +1,6 @@
 #![cfg(feature = "sync")]
 
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 use std::sync::Arc;
@@ -114,6 +114,23 @@ fn merge_unrelated_permits() {
     p1.merge(p2)
 }
 
+#[cfg(target_pointer_width = "32")]
+#[test]
+#[should_panic(expected = "a semaphore may not have more than MAX_PERMITS permits")]
+fn acquire_many_owned_exceeds_maxpermits() {
+    let s = Arc::new(Semaphore::new(0));
+    let _ =
+        tokio_test::task::spawn(s.acquire_many_owned((Semaphore::MAX_PERMITS as u32) + 1)).poll();
+}
+
+#[cfg(target_pointer_width = "32")]
+#[test]
+#[should_panic(expected = "a semaphore may not have more than MAX_PERMITS permits")]
+fn acquire_many_owned_top_bit_exceeds_maxpermits() {
+    let s = Arc::new(Semaphore::new(0));
+    let _ = tokio_test::task::spawn(s.acquire_many_owned(1_u32 << 31)).poll();
+}
+
 #[test]
 fn split() {
     let sem = Arc::new(Semaphore::new(5));
@@ -161,4 +178,22 @@ async fn stress_test() {
     let _p4 = sem.clone().try_acquire_owned().unwrap();
     let _p5 = sem.clone().try_acquire_owned().unwrap();
     assert!(sem.try_acquire_owned().is_err());
+}
+
+#[test]
+#[cfg(target_pointer_width = "64")]
+fn merge_many_permits_owned() {
+    let sem = Arc::new(Semaphore::new(6_000_000_000));
+    let mut a = sem.clone().try_acquire_many_owned(3_000_000_000).unwrap();
+    let b = sem.clone().try_acquire_many_owned(3_000_000_000).unwrap();
+    assert_eq!(a.num_permits(), 3_000_000_000);
+    assert_eq!(b.num_permits(), 3_000_000_000);
+    assert_eq!(sem.available_permits(), 0);
+
+    a.merge(b);
+    assert_eq!(a.num_permits(), 6_000_000_000);
+    assert_eq!(sem.available_permits(), 0);
+
+    drop(a);
+    assert_eq!(sem.available_permits(), 6_000_000_000);
 }

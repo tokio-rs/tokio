@@ -1,6 +1,15 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "macros",
+        feature = "io-util"
+    )
+))]
 
+use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncReadExt, ReadBuf};
@@ -15,6 +24,20 @@ async fn read_to_end() {
     let n = assert_ok!(rd.read_to_end(&mut buf).await);
     assert_eq!(n, 11);
     assert_eq!(buf[..], b"hello world"[..]);
+}
+
+#[tokio::test]
+async fn read_to_end_retries_interrupted() {
+    let mut mock = Builder::new()
+        .read(b"hello")
+        .read_error(io::Error::from(io::ErrorKind::Interrupted))
+        .read(b" world")
+        .build();
+    let mut buf = Vec::new();
+
+    let n = mock.read_to_end(&mut buf).await.unwrap();
+    assert_eq!(n, 11);
+    assert_eq!(buf, b"hello world");
 }
 
 #[derive(Copy, Clone, Debug)]

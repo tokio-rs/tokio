@@ -1,12 +1,24 @@
 #![warn(rust_2018_idioms)]
-#![cfg(all(feature = "full", not(target_os = "wasi")))] // WASI does not support all fs operations
+#![cfg(all(
+    any(
+        feature = "full",
+        all(
+            target_os = "emscripten",
+            feature = "fs",
+            feature = "macros",
+            feature = "rt",
+            feature = "io-util"
+        )
+    ),
+    not(target_os = "wasi")
+))] // WASI does not support all fs operations
 
 use futures::future::FutureExt;
 use std::io::prelude::*;
 use std::io::IoSlice;
 use tempfile::NamedTempFile;
 use tokio::fs::File;
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader, SeekFrom};
 use tokio_test::task;
 
 const HELLO: &[u8] = b"hello world...";
@@ -99,6 +111,25 @@ async fn rewind_seek_position() {
 }
 
 #[tokio::test]
+async fn buf_reader_seek_after_write() {
+    for (seek, expected) in [
+        (SeekFrom::Start(0), 0),
+        (SeekFrom::End(-2), HELLO.len() - 2),
+        (SeekFrom::Current(-2), HELLO.len() - 2),
+    ] {
+        let file = File::from_std(tempfile().into_file());
+        let mut reader = BufReader::new(file);
+
+        reader.write_all(HELLO).await.unwrap();
+        assert_eq!(reader.seek(seek).await.unwrap(), expected as u64);
+
+        let mut contents = Vec::new();
+        reader.read_to_end(&mut contents).await.unwrap();
+        assert_eq!(contents, &HELLO[expected..]);
+    }
+}
+
+#[tokio::test]
 async fn coop() {
     let mut tempfile = tempfile();
     tempfile.write_all(HELLO).unwrap();
@@ -124,6 +155,10 @@ async fn coop() {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "emscripten libc does not implement dup()/try_clone()"
+)]
 async fn write_to_clone() {
     let tempfile = tempfile();
 
@@ -195,6 +230,29 @@ async fn empty_read() {
     assert_eq!(&buf[..n], HELLO);
 }
 
+#[cfg_attr(miri, ignore)]
+#[tokio::test]
+async fn set_times() {
+    use std::time::{Duration, SystemTime};
+
+    let tempfile = tempfile();
+
+    let file = File::create(tempfile.path()).await.unwrap();
+
+    // Whole seconds to avoid filesystem timestamp precision loss.
+    let accessed = SystemTime::UNIX_EPOCH + Duration::from_secs(1_600_000_000);
+    let modified = SystemTime::UNIX_EPOCH + Duration::from_secs(1_500_000_000);
+    let times = tokio::fs::FileTimes::new()
+        .set_accessed(accessed)
+        .set_modified(modified);
+
+    file.set_times(times).await.unwrap();
+
+    let metadata = file.metadata().await.unwrap();
+    assert_eq!(metadata.accessed().unwrap(), accessed);
+    assert_eq!(metadata.modified().unwrap(), modified);
+}
+
 fn tempfile() -> NamedTempFile {
     NamedTempFile::new().unwrap()
 }
@@ -219,6 +277,14 @@ async fn set_max_buf_size_write() {
 
     // A single write operation writes a maximum of 1 byte.
     assert_eq!(file.write(HELLO).await.unwrap(), 1);
+}
+
+#[tokio::test]
+#[should_panic(expected = "`max_buf_size` must be greater than 0")]
+async fn set_max_buf_size_panics_on_zero() {
+    let tempfile = tempfile();
+    let mut file = File::open(tempfile.path()).await.unwrap();
+    file.set_max_buf_size(0);
 }
 
 #[tokio::test]

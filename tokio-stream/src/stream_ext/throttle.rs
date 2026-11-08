@@ -1,7 +1,9 @@
 //! Slow down a stream by enforcing a delay between items.
 
+use crate::stream_ext::safe_delay;
 use crate::Stream;
-use tokio::time::{Duration, Instant, Sleep};
+use futures_core::FusedStream;
+use tokio::time::{sleep, Duration, Instant, Sleep};
 
 use std::future::Future;
 use std::pin::Pin;
@@ -14,8 +16,8 @@ where
     T: Stream,
 {
     Throttle {
-        delay: tokio::time::sleep_until(Instant::now() + duration),
-        duration,
+        delay: None,
+        duration: safe_delay(duration),
         has_delayed: true,
         stream,
     }
@@ -28,7 +30,7 @@ pin_project! {
     #[must_use = "streams do nothing unless polled"]
     pub struct Throttle<T> {
         #[pin]
-        delay: Sleep,
+        delay: Option<Sleep>,
         duration: Duration,
 
         // Set to true when `delay` has returned ready, but `stream` hasn't.
@@ -73,7 +75,9 @@ impl<T: Stream> Stream for Throttle<T> {
         let dur = *me.duration;
 
         if !*me.has_delayed && !is_zero(dur) {
-            ready!(me.delay.as_mut().poll(cx));
+            if let Some(delay) = me.delay.as_mut().as_pin_mut() {
+                ready!(delay.poll(cx));
+            }
             *me.has_delayed = true;
         }
 
@@ -81,13 +85,26 @@ impl<T: Stream> Stream for Throttle<T> {
 
         if value.is_some() {
             if !is_zero(dur) {
-                me.delay.reset(Instant::now() + dur);
+                match me.delay.as_mut().as_pin_mut() {
+                    Some(delay) => delay.reset(Instant::now() + dur),
+                    None => me.delay.set(Some(sleep(dur))),
+                }
             }
 
             *me.has_delayed = false;
         }
 
         Poll::Ready(value)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.stream.size_hint()
+    }
+}
+
+impl<T: FusedStream> FusedStream for Throttle<T> {
+    fn is_terminated(&self) -> bool {
+        (self.has_delayed || is_zero(self.duration)) && self.stream.is_terminated()
     }
 }
 

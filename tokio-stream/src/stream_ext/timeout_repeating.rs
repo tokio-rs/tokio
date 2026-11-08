@@ -4,6 +4,7 @@ use tokio::time::Interval;
 
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 
 pin_project! {
@@ -52,5 +53,11 @@ impl<S: Stream> Stream for TimeoutRepeating<S> {
 
         // The timeout stream may insert an error an infinite number of times.
         (lower, None)
+    }
+}
+
+impl<S: Stream> FusedStream for TimeoutRepeating<S> {
+    fn is_terminated(&self) -> bool {
+        self.stream.is_terminated()
     }
 }

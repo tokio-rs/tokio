@@ -4,7 +4,9 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, Notify};
 
 use criterion::measurement::WallTime;
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkGroup, Criterion};
+use criterion::{
+    black_box, criterion_group, criterion_main, BenchmarkGroup, Criterion, Throughput,
+};
 
 fn rt() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_multi_thread()
@@ -77,6 +79,38 @@ fn bench_contention(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(contention, bench_contention);
+fn bench_try_recv(c: &mut Criterion) {
+    let mut group = c.benchmark_group("try_recv");
+    const MESSAGES: usize = 256;
+
+    for receiver_count in [1usize, 4, 16] {
+        group.throughput(Throughput::Elements((MESSAGES * receiver_count) as u64));
+        group.bench_function(receiver_count.to_string(), |b| {
+            let (tx, first_rx) = broadcast::channel::<usize>(MESSAGES);
+            let mut receivers = Vec::with_capacity(receiver_count);
+            receivers.push(first_rx);
+
+            for _ in 1..receiver_count {
+                receivers.push(tx.subscribe());
+            }
+
+            b.iter(|| {
+                for message in 0..MESSAGES {
+                    tx.send(black_box(message)).unwrap();
+                }
+
+                for rx in &mut receivers {
+                    for _ in 0..MESSAGES {
+                        black_box(rx.try_recv().unwrap());
+                    }
+                }
+            });
+        });
+    }
+
+    group.finish();
+}
+
+criterion_group!(contention, bench_contention, bench_try_recv);
 
 criterion_main!(contention);

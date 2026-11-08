@@ -7,7 +7,7 @@ use std::task::{ready, Context, Poll};
 
 /// Try to read data from an `AsyncRead` into an implementer of the [`BufMut`] trait.
 ///
-/// [`BufMut`]: bytes::Buf
+/// [`BufMut`]: bytes::BufMut
 ///
 /// # Example
 ///
@@ -85,7 +85,7 @@ pub fn poll_read_buf<T: AsyncRead + ?Sized, B: BufMut>(
 ///
 /// # Examples
 ///
-/// [`File`] implements [`AsyncWrite`] and [`Cursor<&[u8]>`] implements
+/// [`File`] implements [`AsyncWrite`] and [`Cursor<&[u8]>`][`Cursor`] implements
 /// [`Buf`]:
 ///
 /// ```no_run
@@ -115,7 +115,8 @@ pub fn poll_read_buf<T: AsyncRead + ?Sized, B: BufMut>(
 ///
 /// [`Buf`]: bytes::Buf
 /// [`AsyncWrite`]: tokio::io::AsyncWrite
-/// [`File`]: tokio::fs::File
+/// [`File`]: https://docs.rs/tokio/latest/tokio/fs/struct.File.html
+/// [`Cursor`]: std::io::Cursor
 /// [vectored writes]: tokio::io::AsyncWrite::poll_write_vectored
 #[cfg_attr(not(feature = "io"), allow(unreachable_pub))]
 pub fn poll_write_buf<T: AsyncWrite + ?Sized, B: Buf>(

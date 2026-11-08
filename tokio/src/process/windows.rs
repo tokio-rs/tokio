@@ -42,8 +42,12 @@ use windows_sys::{
 
 #[must_use = "futures do nothing unless polled"]
 pub(crate) struct Child {
-    child: StdChild,
+    // Field ordering is important for drop order: `waiting` must be dropped
+    // before `child` so that `UnregisterWaitEx` cancels any pending wait and
+    // waits for any running callback to finish before `StdChild` closes the
+    // process handle.
     waiting: Option<Waiting>,
+    child: StdChild,
 }
 
 impl fmt::Debug for Child {
@@ -193,7 +197,15 @@ pub(crate) struct ChildStdio {
     io: Blocking<ArcFile>,
 }
 
+pub(crate) type ChildStdin = ChildStdio;
+pub(crate) type ChildStdout = ChildStdio;
+pub(crate) type ChildStderr = ChildStdio;
+
 impl ChildStdio {
+    pub(super) fn into_stdio(self) -> io::Result<Stdio> {
+        convert_to_file(self).map(Stdio::from)
+    }
+
     pub(super) fn into_owned_handle(self) -> io::Result<OwnedHandle> {
         convert_to_file(self).map(OwnedHandle::from)
     }
@@ -253,10 +265,6 @@ fn convert_to_file(child_stdio: ChildStdio) -> io::Result<StdFile> {
     drop(io); // Try to drop the Arc count here
 
     Arc::try_unwrap(raw).or_else(|raw| duplicate_handle(&*raw))
-}
-
-pub(crate) fn convert_to_stdio(child_stdio: ChildStdio) -> io::Result<Stdio> {
-    convert_to_file(child_stdio).map(Stdio::from)
 }
 
 fn duplicate_handle<T: AsRawHandle>(io: &T) -> io::Result<StdFile> {

@@ -24,9 +24,10 @@ pub(crate) trait ReadBuffer: Send + 'static {
 
 impl ReadBuffer for Vec<u8> {
     fn uring_read_prepare(&mut self, max_len: usize) -> (*mut u8, u32) {
-        assert!(self.spare_capacity_mut().len() >= max_len);
+        let len = u32::try_from(max_len).unwrap_or(u32::MAX);
+        assert!(self.spare_capacity_mut().len() >= len as usize);
         let ptr = self.spare_capacity_mut().as_mut_ptr().cast();
-        (ptr, max_len as u32)
+        (ptr, len)
     }
 
     unsafe fn uring_read_complete(&mut self, n: u32) {
@@ -61,7 +62,9 @@ impl<B: fmt::Debug, F> fmt::Debug for Read<B, F> {
 }
 
 impl<B: ReadBuffer, F: UringFd> Completable for Read<B, F> {
-    type Output = (io::Result<u32>, F, B);
+    // The fd and buffer are `None` only when the op was cancelled and they were
+    // kept in the driver; otherwise they are returned to the caller.
+    type Output = (io::Result<u32>, Option<F>, Option<B>);
 
     fn complete(self, cqe: CqeResult) -> Self::Output {
         let mut buf = self.buf;
@@ -69,11 +72,15 @@ impl<B: ReadBuffer, F: UringFd> Completable for Read<B, F> {
             // SAFETY: kernel wrote exactly `len` bytes into the prepared buffer.
             unsafe { buf.uring_read_complete(len) };
         }
-        (cqe.result, self.fd, buf)
+        (cqe.result, Some(self.fd), Some(buf))
     }
 
     fn complete_with_error(self, err: Error) -> Self::Output {
-        (Err(err), self.fd, self.buf)
+        (Err(err), Some(self.fd), Some(self.buf))
+    }
+
+    fn complete_after_cancel(err: Error) -> Self::Output {
+        (Err(err), None, None)
     }
 }
 

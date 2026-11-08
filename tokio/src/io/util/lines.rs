@@ -1,4 +1,4 @@
-use crate::io::util::read_line::read_line_internal;
+use crate::io::util::read_until::read_until_internal;
 use crate::io::AsyncBufRead;
 
 use pin_project_lite::pin_project;
@@ -23,9 +23,7 @@ pin_project! {
     pub struct Lines<R> {
         #[pin]
         reader: R,
-        buf: String,
-        bytes: Vec<u8>,
-        read: usize,
+        buf: Vec<u8>,
     }
 }
 
@@ -35,9 +33,7 @@ where
 {
     Lines {
         reader,
-        buf: String::new(),
-        bytes: Vec::new(),
-        read: 0,
+        buf: Vec::new(),
     }
 }
 
@@ -102,7 +98,13 @@ where
     ///  * `Poll::Pending` if the next line is not yet available.
     ///  * `Poll::Ready(Ok(Some(line)))` if the next line is available.
     ///  * `Poll::Ready(Ok(None))` if there are no more lines in this stream.
-    ///  * `Poll::Ready(Err(err))` if an IO error occurred while reading the next line.
+    ///  * `Poll::Ready(Err(err))` if an IO error occurred while reading the next line,
+    ///    or if the line was not valid UTF-8.
+    ///
+    /// A line that is not valid UTF-8 is returned as the [`FromUtf8Error`]
+    /// inside the error, and the next call reads the following line.
+    ///
+    /// [`FromUtf8Error`]: std::string::FromUtf8Error
     ///
     /// When the method returns `Poll::Pending`, the `Waker` in the provided
     /// `Context` is scheduled to receive a wakeup when more bytes become
@@ -115,22 +117,27 @@ where
     ) -> Poll<io::Result<Option<String>>> {
         let me = self.project();
 
-        let n = ready!(read_line_internal(me.reader, cx, me.buf, me.bytes, me.read))?;
-        debug_assert_eq!(*me.read, 0);
+        let mut read = 0;
+        let n = ready!(read_until_internal(me.reader, cx, b'\n', me.buf, &mut read))?;
 
         if n == 0 && me.buf.is_empty() {
             return Poll::Ready(Ok(None));
         }
 
-        if me.buf.ends_with('\n') {
-            me.buf.pop();
+        let mut bytes = mem::take(me.buf);
 
-            if me.buf.ends_with('\r') {
-                me.buf.pop();
+        if bytes.last() == Some(&b'\n') {
+            bytes.pop();
+
+            if bytes.last() == Some(&b'\r') {
+                bytes.pop();
             }
         }
 
-        Poll::Ready(Ok(Some(mem::take(me.buf))))
+        match String::from_utf8(bytes) {
+            Ok(line) => Poll::Ready(Ok(Some(line))),
+            Err(err) => Poll::Ready(Err(io::Error::new(io::ErrorKind::InvalidData, err))),
+        }
     }
 }
 

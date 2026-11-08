@@ -1,4 +1,7 @@
-use futures::{Stream, StreamExt};
+use futures::{task::noop_waker_ref, Stream, StreamExt};
+use futures_core::FusedStream;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -11,6 +14,7 @@ async fn size_hint_stream_open() {
 
     let mut stream = ReceiverStream::new(rx);
 
+    assert!(!stream.is_terminated());
     assert_eq!(stream.size_hint(), (2, None));
     stream.next().await;
     assert_eq!(stream.size_hint(), (1, None));
@@ -45,6 +49,7 @@ async fn size_hint_sender_dropped() {
     let mut stream = ReceiverStream::new(rx);
     drop(tx);
 
+    assert!(!stream.is_terminated());
     assert_eq!(stream.size_hint(), (2, Some(2)));
     stream.next().await;
     assert_eq!(stream.size_hint(), (1, Some(1)));
@@ -60,6 +65,7 @@ fn size_hint_stream_instantly_closed() {
     stream.close();
 
     assert_eq!(stream.size_hint(), (0, Some(0)));
+    assert!(stream.is_terminated());
 }
 
 #[tokio::test]
@@ -105,5 +111,24 @@ async fn size_hint_stream_closed_permits_drop() {
     assert_eq!(stream.size_hint(), (0, Some(1)));
     drop(permit2);
     assert_eq!(stream.size_hint(), (0, Some(0)));
+    assert_eq!(stream.next().await, None);
+}
+
+#[tokio::test]
+async fn fused_stream_waits_for_outstanding_permit() {
+    let (tx, rx) = mpsc::channel(1);
+    let permit = tx.reserve().await.unwrap();
+    let mut stream = ReceiverStream::new(rx);
+    stream.close();
+
+    assert!(!stream.is_terminated());
+    let mut cx = Context::from_waker(noop_waker_ref());
+    assert_eq!(Pin::new(&mut stream).poll_next(&mut cx), Poll::Pending);
+    permit.send(1);
+    assert!(!stream.is_terminated());
+    assert_eq!(stream.next().await, Some(1));
+    assert!(stream.is_terminated());
+    assert_eq!(stream.next().await, None);
+    assert!(stream.is_terminated());
     assert_eq!(stream.next().await, None);
 }

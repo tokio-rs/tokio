@@ -6,7 +6,7 @@
 
 use crate::{
     task::coop,
-    time::{error::Elapsed, sleep_until, Duration, Instant, Sleep},
+    time::{error::Elapsed, Duration, Instant, Sleep},
     util::trace,
 };
 
@@ -87,14 +87,15 @@ pub fn timeout<F>(duration: Duration, future: F) -> Timeout<F::IntoFuture>
 where
     F: IntoFuture,
 {
-    let location = trace::caller_location();
-
-    let deadline = Instant::now().checked_add(duration);
-    let delay = match deadline {
-        Some(deadline) => Sleep::new_timeout(deadline, location),
-        None => Sleep::far_future(location),
-    };
-    Timeout::new_with_delay(future.into_future(), delay)
+    // Closures don't preserve `#[track_caller]`.
+    #[allow(clippy::manual_map)]
+    Timeout {
+        value: future.into_future(),
+        delay: match Instant::now().checked_add(duration) {
+            Some(deadline) => Some(Sleep::new_timeout(deadline, trace::caller_location())),
+            None => None,
+        },
+    }
 }
 
 /// Requires a `Future` to complete before the specified instant in time.
@@ -165,8 +166,10 @@ pub fn timeout_at<F>(deadline: Instant, future: F) -> Timeout<F::IntoFuture>
 where
     F: IntoFuture,
 {
-    let delay = sleep_until(deadline);
-    Timeout::new_with_delay(future.into_future(), delay)
+    Timeout {
+        value: future.into_future(),
+        delay: Some(Sleep::new_timeout(deadline, trace::caller_location())),
+    }
 }
 
 pin_project! {
@@ -177,15 +180,11 @@ pin_project! {
         #[pin]
         value: T,
         #[pin]
-        delay: Sleep,
+        delay: Option<Sleep>,
     }
 }
 
 impl<T> Timeout<T> {
-    pub(crate) fn new_with_delay(value: T, delay: Sleep) -> Timeout<T> {
-        Timeout { value, delay }
-    }
-
     /// Gets a reference to the underlying value in this timeout.
     pub fn get_ref(&self) -> &T {
         &self.value
@@ -218,7 +217,10 @@ where
             return Poll::Ready(Ok(v));
         }
 
-        poll_delay(had_budget_before, me.delay, cx).map(Err)
+        match me.delay.as_pin_mut() {
+            Some(delay) => poll_delay(had_budget_before, delay, cx).map(Err),
+            None => Poll::Pending,
+        }
     }
 }
 

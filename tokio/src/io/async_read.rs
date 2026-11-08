@@ -89,7 +89,7 @@ where
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        crate::util::pin_as_deref_mut(self).poll_read(cx, buf)
+        self.as_deref_mut().poll_read(cx, buf)
     }
 }
 

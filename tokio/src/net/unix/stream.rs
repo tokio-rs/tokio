@@ -914,8 +914,22 @@ impl UnixStream {
         let (a, b) = mio::net::UnixStream::pair()?;
         let a = UnixStream::new(a)?;
         let b = UnixStream::new(b)?;
+        // A fresh pair has empty buffers: writable now, readable only once
+        // the peer writes.
+        a.io.registration().assume_ready(Ready::WRITABLE);
+        b.io.registration().assume_ready(Ready::WRITABLE);
 
         Ok((a, b))
+    }
+
+    /// See `TcpStream::new_accepted`.
+    pub(crate) fn new_accepted(stream: mio::net::UnixStream) -> io::Result<UnixStream> {
+        let stream = UnixStream::new(stream)?;
+        stream
+            .io
+            .registration()
+            .assume_ready(Ready::READABLE | Ready::WRITABLE);
+        Ok(stream)
     }
 
     pub(crate) fn new(stream: mio::net::UnixStream) -> io::Result<UnixStream> {
@@ -978,8 +992,16 @@ impl UnixStream {
     /// This function will cause all pending and future I/O calls on the
     /// specified portions to immediately return with an appropriate value
     /// (see the documentation of `Shutdown`).
+    ///
+    /// Remark: this function transforms `Err(std::io::ErrorKind::NotConnected)` to `Ok(())`.
+    /// It does this to abstract away OS specific logic and to prevent a race condition between
+    /// this function call and the peer closing its half of the socket (e.g. process exit).
+    /// See <https://github.com/tokio-rs/tokio/issues/8520> for more information.
     pub(super) fn shutdown_std(&self, how: Shutdown) -> io::Result<()> {
-        self.io.shutdown(how)
+        match self.io.shutdown(how) {
+            Err(err) if err.kind() == std::io::ErrorKind::NotConnected => Ok(()),
+            result => result,
+        }
     }
 
     // These lifetime markers also appear in the generated documentation, and make

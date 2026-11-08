@@ -1069,6 +1069,15 @@ rt_test! {
         assert!(now.elapsed().as_secs() < 1);
     }
 
+    #[cfg(not(target_os="wasi"))]
+    #[test]
+    #[cfg_attr(miri, ignore)] // Miri detects leaked threads (see #7010)
+    fn shutdown_timeout_max() {
+        let runtime = rt();
+
+        Arc::try_unwrap(runtime).unwrap().shutdown_timeout(Duration::MAX);
+    }
+
     #[test]
     #[cfg_attr(miri, ignore)] // Miri detects leaked threads (see #7010)
     fn shutdown_wakeup_time() {

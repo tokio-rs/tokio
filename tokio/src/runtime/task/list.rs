@@ -74,9 +74,9 @@ struct OwnedTasksInner<S: 'static> {
 
 impl<S: 'static> OwnedTasks<S> {
     pub(crate) fn new(num_cores: usize) -> Self {
-        let shard_size = Self::gen_shared_list_size(num_cores);
+        let sharded_size = Self::gen_sharded_list_size(num_cores);
         Self {
-            list: ShardedList::new(shard_size),
+            list: ShardedList::new(sharded_size),
             closed: AtomicBool::new(false),
             id: get_next_id(),
         }
@@ -224,11 +224,11 @@ impl<S: 'static> OwnedTasks<S> {
     /// nodes in the intrusive linked list will diminish. Furthermore,
     /// the construction time of the sharded list will also increase with a higher number of shards.
     ///
-    /// Due to the above reasons, we set a maximum value for the shared list size,
-    /// denoted as `MAX_SHARED_LIST_SIZE`.
-    fn gen_shared_list_size(num_cores: usize) -> usize {
-        const MAX_SHARED_LIST_SIZE: usize = 1 << 16;
-        usize::min(MAX_SHARED_LIST_SIZE, num_cores.next_power_of_two() * 4)
+    /// Due to the above reasons, we set a maximum value for the sharded list size,
+    /// denoted as `MAX_SHARDED_LIST_SIZE`.
+    fn gen_sharded_list_size(num_cores: usize) -> usize {
+        const MAX_SHARDED_LIST_SIZE: usize = 1 << 16;
+        usize::min(MAX_SHARDED_LIST_SIZE, num_cores.next_power_of_two() * 4)
     }
 }
 

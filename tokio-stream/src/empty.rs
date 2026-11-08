@@ -1,4 +1,5 @@
 use crate::Stream;
+use futures_core::FusedStream;
 
 use core::marker::PhantomData;
 use core::pin::Pin;
@@ -15,9 +16,9 @@ unsafe impl<T> Sync for Empty<T> {}
 
 /// Creates a stream that yields nothing.
 ///
-/// The returned stream is immediately ready and returns `None`. Use
-/// [`stream::pending()`](super::pending()) to obtain a stream that is never
-/// ready.
+/// The returned stream returns `None`. It may return `Poll::Pending` to
+/// cooperate with the executor. Use [`stream::pending()`](super::pending())
+/// to obtain a stream that is never ready.
 ///
 /// # Examples
 ///
@@ -54,5 +55,11 @@ impl<T> Stream for Empty<T> {
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         (0, Some(0))
+    }
+}
+
+impl<T> FusedStream for Empty<T> {
+    fn is_terminated(&self) -> bool {
+        true
     }
 }

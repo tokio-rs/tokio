@@ -1,5 +1,13 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "macros",
+        feature = "io-util"
+    )
+))]
 
 use tokio::io::{AsyncRead, AsyncReadExt, ReadBuf};
 use tokio_test::assert_ok;

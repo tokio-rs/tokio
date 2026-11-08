@@ -1,5 +1,8 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(target_os = "emscripten", feature = "rt", feature = "macros")
+))]
 
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -116,6 +119,34 @@ fn runtime_ids_different() {
     let rt2 = rt();
 
     assert_ne!(rt1.handle().id(), rt2.handle().id());
+}
+
+#[test]
+fn spawn_blocking_after_shutdown_drops_outside_lock() {
+    struct OnDrop<F: FnOnce()>(Option<F>);
+
+    impl<F: FnOnce()> Drop for OnDrop<F> {
+        fn drop(&mut self) {
+            if let Some(f) = self.0.take() {
+                f();
+            }
+        }
+    }
+
+    let rt = rt();
+    let handle = rt.handle().clone();
+    drop(rt);
+
+    let handle2 = handle.clone();
+    let guard = OnDrop(Some(move || {
+        drop(handle2.spawn_blocking(|| {}));
+    }));
+
+    let jh = handle.spawn_blocking(move || {
+        drop(guard);
+    });
+    let err = futures::executor::block_on(jh).unwrap_err();
+    assert!(err.is_cancelled());
 }
 
 fn rt() -> Runtime {

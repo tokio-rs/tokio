@@ -3,7 +3,7 @@ use tokio_test::*;
 
 const MAX_PERMITS: usize = crate::sync::Semaphore::MAX_PERMITS;
 
-#[cfg(all(target_family = "wasm", not(target_os = "wasi")))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use wasm_bindgen_test::wasm_bindgen_test as test;
 
 #[test]
@@ -180,6 +180,27 @@ fn max_permits_doesnt_panic() {
 #[cfg(not(target_family = "wasm"))] // wasm currently doesn't support unwinding
 fn validates_max_permits() {
     Semaphore::new(MAX_PERMITS + 1);
+}
+
+#[test]
+#[should_panic(expected = "a semaphore may not have more than MAX_PERMITS permits")]
+fn try_acquire_validates_max_permits() {
+    let s = Semaphore::new(0);
+    let _ = s.try_acquire(MAX_PERMITS + 1);
+}
+
+#[test]
+#[should_panic(expected = "a semaphore may not have more than MAX_PERMITS permits")]
+fn acquire_validates_max_permits() {
+    let s = Semaphore::new(0);
+    let _ = task::spawn(s.acquire(MAX_PERMITS + 1)).poll();
+}
+
+#[test]
+#[should_panic(expected = "a semaphore may not have more than MAX_PERMITS permits")]
+fn acquire_validates_top_bit_permits() {
+    let s = Semaphore::new(0);
+    let _ = task::spawn(s.acquire(1usize << (usize::BITS - 1))).poll();
 }
 
 #[test]

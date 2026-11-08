@@ -9,7 +9,7 @@
 ))]
 
 use futures::future::Future;
-use std::future::poll_fn;
+use std::future::{pending, poll_fn};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -18,8 +18,14 @@ use std::time::Duration;
 use tempfile::NamedTempFile;
 use tokio::fs::read;
 use tokio::runtime::{Builder, Runtime};
+use tokio::task::JoinSet;
 use tokio_test::assert_pending;
-use tokio_util::task::TaskTracker;
+
+use crate::support::io_uring::uring_fs_op_in_use;
+
+mod support {
+    pub(crate) mod io_uring;
+}
 
 fn multi_rt(n: usize) -> Box<dyn Fn() -> Runtime> {
     Box::new(move || {
@@ -48,12 +54,16 @@ fn rt_combinations() -> Vec<Box<dyn Fn() -> Runtime>> {
 
 #[test]
 fn shutdown_runtime_while_performing_io_uring_ops() {
+    if !uring_fs_op_in_use(io_uring::opcode::Read::CODE) {
+        return;
+    }
+
     fn run(rt: Runtime) {
         let (done_tx, done_rx) = mpsc::channel();
         let (_tmp, path) = create_tmp_files(1);
         // keep 100 permits
         const N: i32 = 100;
-        rt.spawn(async move {
+        rt.block_on(async move {
             let path = path[0].clone();
 
             // spawning a bunch of uring operations.
@@ -64,16 +74,16 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
                 let path = path.clone();
                 let mut fut = Box::pin(read(path));
 
-                poll_fn(|cx| {
-                    assert_pending!(fut.as_mut().poll(cx));
-                    Poll::<()>::Pending
-                })
-                .await;
+                // the first poll starts the open stage of fs::read
+                assert_pending!(futures::poll!(fut.as_mut()));
 
                 futs.push(fut);
             }
 
-            tokio::task::yield_now().await;
+            tokio::spawn(async move {
+                let _futs = futs;
+                pending::<()>().await;
+            });
         });
 
         std::thread::spawn(move || {
@@ -81,7 +91,7 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
             done_tx.send(()).unwrap();
         });
 
-        done_rx.recv().unwrap();
+        done_rx.recv_timeout(Duration::from_secs(5)).unwrap();
     }
 
     for rt in rt_combinations() {
@@ -97,17 +107,16 @@ fn read_many_files() {
         let (_tmp_files, paths): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(NUM_FILES);
 
         rt.block_on(async move {
-            let tracker = TaskTracker::new();
+            let mut tasks = JoinSet::new();
 
             for i in 0..10_000 {
                 let path = paths.get(i % NUM_FILES).unwrap().clone();
-                tracker.spawn(async move {
+                tasks.spawn(async move {
                     let bytes = read(path).await.unwrap();
                     assert_eq!(bytes, vec![20; 1023]);
                 });
             }
-            tracker.close();
-            tracker.wait().await;
+            tasks.join_all().await;
         });
     }
 
@@ -133,6 +142,10 @@ async fn read_small_large_files() {
 
 #[tokio::test]
 async fn cancel_op_future() {
+    if !uring_fs_op_in_use(io_uring::opcode::Read::CODE) {
+        return;
+    }
+
     let (_tmp_file, path): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(1);
     let path = path[0].clone();
 
@@ -143,7 +156,6 @@ async fn cancel_op_future() {
         tokio::pin!(fut);
 
         poll_fn(move |_| {
-            // If io_uring is enabled (and not falling back to the thread pool),
             // the first poll should return Pending.
             assert_pending!(fut.as_mut().poll(&mut Context::from_waker(Waker::noop())));
             tx.send(true).unwrap();

@@ -1,5 +1,13 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(any(
+    feature = "full",
+    all(
+        target_os = "emscripten",
+        feature = "rt",
+        feature = "macros",
+        feature = "test-util"
+    )
+))]
 #![cfg(not(miri))] // Too slow on Miri.
 
 use std::future::Future;
@@ -289,6 +297,39 @@ async fn no_out_of_bounds_close_to_max() {
     time::sleep(Duration::MAX - Duration::from_millis(1)).await;
 }
 
+#[tokio::test(start_paused = true)]
+async fn long_wait_sleep_does_not_break_other_timers() {
+    tokio::spawn(time::sleep(ms(10 << 36)));
+
+    time::advance(ms((1 << 30) - 1)).await;
+
+    let start = Instant::now();
+    time::sleep(ms(10)).await;
+    assert_elapsed!(start, ms(10));
+}
+
+#[tokio::test(start_paused = true)]
+async fn long_wait_sleep_does_not_corrupt_wheel() {
+    use futures::poll;
+
+    tokio::spawn(time::sleep(ms(10 << 36)));
+
+    time::advance(ms((1 << 30) - 1)).await;
+
+    let mut first = Box::pin(time::sleep(ms(10)));
+    assert_pending!(poll!(first.as_mut()));
+    let mut second = Box::pin(time::sleep(ms(20)));
+    assert_pending!(poll!(second.as_mut()));
+
+    time::advance(ms(30)).await;
+
+    drop(first);
+
+    time::advance(ms(1 << 31)).await;
+
+    drop(second);
+}
+
 fn ms(n: u64) -> Duration {
     Duration::from_millis(n)
 }
@@ -367,4 +408,40 @@ async fn drop_from_wake() {
             }
         }
     }
+}
+
+#[tokio::test]
+async fn drop_from_waker_drop() {
+    use std::pin::Pin;
+    use std::sync::Arc;
+    use std::task::{Context, Wake, Waker};
+    use tokio::time::Sleep;
+
+    struct TimerOwner {
+        secondary: Option<Pin<Box<Sleep>>>,
+    }
+
+    impl Wake for TimerOwner {
+        fn wake(self: Arc<Self>) {}
+    }
+
+    impl Drop for TimerOwner {
+        fn drop(&mut self) {
+            drop(self.secondary.take());
+        }
+    }
+
+    let mut secondary = Box::pin(tokio::time::sleep(Duration::from_secs(3600)));
+    assert_pending!(secondary
+        .as_mut()
+        .poll(&mut Context::from_waker(noop_waker_ref())));
+
+    let waker = Waker::from(Arc::new(TimerOwner {
+        secondary: Some(secondary),
+    }));
+    let mut primary = Box::pin(tokio::time::sleep(Duration::from_secs(3600)));
+    assert_pending!(primary.as_mut().poll(&mut Context::from_waker(&waker)));
+
+    drop(waker);
+    drop(primary);
 }
