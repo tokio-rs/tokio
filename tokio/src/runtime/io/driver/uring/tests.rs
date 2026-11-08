@@ -85,7 +85,7 @@ impl Drop for BrokenRegistry {
 
 // A failed reactor registration must not leave the ring stored. The next
 // `try_init` would otherwise see a stored ring and skip registration.
-// A second call must not replace a ring that is already stored.
+// A later call fills a new probe from that ring and does not replace it.
 #[test]
 #[cfg_attr(miri, ignore)]
 fn register_failure_does_not_store_the_ring() {
@@ -117,6 +117,10 @@ fn register_failure_does_not_store_the_ring() {
 
     let mut probe = Probe::new();
     handle.try_init(&mut probe).expect("existing ring");
+    assert!(
+        probe.is_supported(opcode::Nop::CODE),
+        "stored ring did not fill the probe"
+    );
     assert_eq!(handle.get_uring().lock().ring().as_raw_fd(), fd);
 }
 
