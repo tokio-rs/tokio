@@ -20,8 +20,8 @@ use std::time::Duration;
 use tempfile::{tempdir, NamedTempFile};
 use tokio::fs::{create_dir, metadata, set_permissions, symlink, try_exists, write};
 use tokio::runtime::{Builder, Runtime};
+use tokio::task::JoinSet;
 use tokio_test::assert_pending;
-use tokio_util::task::TaskTracker;
 
 use crate::support::io_uring::{io_uring_supported, uring_fs_op_in_use};
 
@@ -108,17 +108,16 @@ fn stat_many_files() {
         let (_tmp_files, paths): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(NUM_FILES);
 
         rt.block_on(async move {
-            let tracker = TaskTracker::new();
+            let mut tasks = JoinSet::new();
 
             for i in 0..10_000 {
                 let path = paths.get(i % NUM_FILES).unwrap().clone();
-                tracker.spawn(async move {
+                tasks.spawn(async move {
                     let exists = try_exists(path).await.unwrap();
                     assert!(exists);
                 });
             }
-            tracker.close();
-            tracker.wait().await;
+            tasks.join_all().await;
         });
     }
 

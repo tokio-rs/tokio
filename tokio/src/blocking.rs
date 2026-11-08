@@ -24,11 +24,13 @@ cfg_rt! {
         crate::task::coop::Coop<std::future::Ready<Result<T, crate::task::JoinError>>>;
 
     #[cfg(target_os = "emscripten")]
+    #[track_caller]
     pub(crate) fn spawn_blocking<F, R>(f: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
+        let _rt = crate::runtime::Handle::current();
         crate::task::coop::cooperative(std::future::ready(Ok(f())))
     }
 
@@ -36,6 +38,7 @@ cfg_rt! {
     // `fs` unit tests use the `fs::mocks` version instead, so this is unused
     // when `io-std` is disabled.
     #[allow(dead_code)]
+    #[track_caller]
     pub(crate) fn spawn_mandatory_blocking<F, R>(f: F) -> Option<JoinHandle<R>>
     where
         F: FnOnce() -> R + Send + 'static,

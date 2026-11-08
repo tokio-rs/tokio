@@ -5,11 +5,18 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(tokio_unstable, feature = "tracing", target_has_atomic = "64"))]
 
+use std::sync::Mutex;
 use tokio::sync;
 use tracing_mock::{expect, subscriber};
 
+// Serialize tests in this file so they cannot race on `tracing-core` callsite
+// interest registration.
+static TEST_MUTEX: Mutex<()> = Mutex::new(());
+
 #[test]
 fn test_barrier_creates_span() {
+    let _guard = TEST_MUTEX.lock();
+
     let barrier_span = expect::span()
         .named("runtime.resource")
         .with_target("tokio::sync::barrier");
@@ -45,6 +52,8 @@ fn test_barrier_creates_span() {
 
 #[test]
 fn test_mutex_creates_span() {
+    let _guard = TEST_MUTEX.lock();
+
     let mutex_span = expect::span()
         .named("runtime.resource")
         .with_target("tokio::sync::mutex");
@@ -89,6 +98,8 @@ fn test_mutex_creates_span() {
 
 #[test]
 fn test_oneshot_creates_span() {
+    let _guard = TEST_MUTEX.lock();
+
     let oneshot_span_id = expect::id();
     let oneshot_span = expect::span()
         .with_id(oneshot_span_id.clone())
@@ -188,6 +199,8 @@ fn test_oneshot_creates_span() {
 
 #[test]
 fn test_rwlock_creates_span() {
+    let _guard = TEST_MUTEX.lock();
+
     let rwlock_span = expect::span()
         .named("runtime.resource")
         .with_target("tokio::sync::rwlock");
@@ -244,6 +257,8 @@ fn test_rwlock_creates_span() {
 
 #[test]
 fn test_semaphore_creates_span() {
+    let _guard = TEST_MUTEX.lock();
+
     let semaphore_span = expect::span()
         .named("runtime.resource")
         .with_target("tokio::sync::semaphore");
@@ -285,6 +300,7 @@ fn test_semaphore_creates_span() {
 /// is in the middle of an operation.
 #[cfg(panic = "unwind")]
 mod subscriber_panic {
+    use super::TEST_MUTEX;
     use std::future::Future;
     use std::panic::{catch_unwind, AssertUnwindSafe};
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -336,6 +352,8 @@ mod subscriber_panic {
 
     #[test]
     fn semaphore_release() {
+        let _guard = TEST_MUTEX.lock();
+
         let sem = sync::Semaphore::new(0);
         let mut acquire = task::spawn(sem.acquire());
         assert_pending!(acquire.poll());
@@ -360,6 +378,8 @@ mod subscriber_panic {
 
     #[test]
     fn semaphore_acquire() {
+        let _guard = TEST_MUTEX.lock();
+
         // Polls `acquire` with a subscriber that panics on the event emitted
         // once the permits have been taken from the semaphore. The `Acquire`
         // future is dropped while unwinding, which must return the permits.

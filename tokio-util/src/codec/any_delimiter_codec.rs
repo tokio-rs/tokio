@@ -259,4 +259,11 @@ impl From<io::Error> for AnyDelimiterCodecError {
     }
 }
 
-impl std::error::Error for AnyDelimiterCodecError {}
+impl std::error::Error for AnyDelimiterCodecError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(err) => Some(err),
+            Self::MaxChunkLengthExceeded => None,
+        }
+    }
+}

@@ -539,6 +539,10 @@ impl Builder {
     ///
     /// The default value is the number of cores available to the system.
     ///
+    /// Currently, this is determined by calling
+    /// [`std::thread::available_parallelism`]. Please see its documentation
+    /// for caveats.
+    ///
     /// When using the `current_thread` runtime this method has no effect.
     ///
     /// # Examples

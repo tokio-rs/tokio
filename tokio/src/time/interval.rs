@@ -455,8 +455,8 @@ impl Interval {
     /// [`Context`] passed to the most recent call is scheduled to receive a
     /// wakeup.
     pub fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<Instant> {
-        // Wait for the internal timer to elapse.
-        ready!(self.delay.as_mut().poll(cx));
+        // Wait for the delay to be done
+        ready!(Pin::new(&mut self.delay).poll(cx));
 
         // Get the time when we were scheduled to tick
         let timeout = self.delay.deadline();
@@ -477,10 +477,10 @@ impl Interval {
             timeout + self.period
         };
 
-        // Do not register the internal timer yet. It should be registered with
+        // When we arrive here, the internal delay returned `Poll::Ready`.
+        // Reset the delay but do not register it. It should be registered with
         // the next call to [`poll_tick`].
-        // SAFETY: the internal timer is elapsed.
-        unsafe { self.delay.as_mut().reset_without_timer(next) }
+        self.delay.as_mut().reset_without_timer(next);
 
         // Return the time when we were scheduled to tick
         Poll::Ready(timeout)
@@ -633,5 +633,26 @@ impl Interval {
     /// Returns the period of the interval.
     pub fn period(&self) -> Duration {
         self.period
+    }
+
+    /// Returns the instant at which the next tick will complete.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio::time::{self, Instant};
+    ///
+    /// use std::time::Duration;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() {
+    /// let start = Instant::now();
+    /// let interval = time::interval_at(start, Duration::from_millis(10));
+    ///
+    /// assert_eq!(interval.deadline(), start);
+    /// # }
+    /// ```
+    pub fn deadline(&self) -> Instant {
+        self.delay.deadline()
     }
 }

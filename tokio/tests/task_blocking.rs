@@ -76,7 +76,7 @@ async fn block_in_block() {
 }
 
 #[tokio::test(flavor = "current_thread")]
-#[should_panic]
+#[should_panic = "cannot call `block_in_place` from a `current_thread` runtime or from within a `LocalSet`"]
 async fn no_block_in_current_thread_scheduler() {
     task::block_in_place(|| {});
 }
@@ -90,7 +90,13 @@ fn yes_block_in_threaded_block_on() {
 }
 
 #[test]
-#[should_panic]
+fn yes_block_outside_runtime() {
+    let out = task::block_in_place(|| "hello");
+    assert_eq!(out, "hello");
+}
+
+#[test]
+#[should_panic = "cannot call `block_in_place` from a `current_thread` runtime or from within a `LocalSet`"]
 fn no_block_in_current_thread_block_on() {
     let rt = runtime::Builder::new_current_thread().build().unwrap();
     rt.block_on(async {

@@ -849,6 +849,54 @@ fn schedule_latency_counts() {
     }
 }
 
+#[test]
+fn poll_time_histogram_records_each_lifo_poll() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    fn spawn_chain(remaining: usize, done: mpsc::Sender<()>) {
+        drop(tokio::spawn(async move {
+            if remaining > 1 {
+                spawn_chain(remaining - 1, done);
+            } else {
+                done.send(()).unwrap();
+            }
+        }));
+    }
+
+    const POLLS: usize = 10;
+
+    for disable_lifo in [false, true] {
+        let polls = Arc::new(AtomicUsize::new(0));
+        let observed = polls.clone();
+        let mut builder = tokio::runtime::Builder::new_multi_thread();
+        builder
+            .worker_threads(1)
+            .enable_metrics_poll_time_histogram()
+            .on_before_task_poll(move |_| {
+                observed.fetch_add(1, Ordering::Relaxed);
+            });
+        if disable_lifo {
+            builder.disable_lifo_slot();
+        }
+        let rt = builder.build().unwrap();
+        let metrics = rt.metrics();
+        let (done, completed) = mpsc::channel();
+        {
+            let _enter = rt.enter();
+            spawn_chain(POLLS, done);
+        }
+        completed.recv().unwrap();
+        drop(rt);
+
+        assert_eq!(polls.load(Ordering::Relaxed), POLLS);
+        assert_eq!(metrics.worker_poll_count(0), POLLS as u64);
+        let samples = (0..metrics.poll_time_histogram_num_buckets())
+            .map(|bucket| metrics.poll_time_histogram_bucket_count(0, bucket))
+            .sum::<u64>();
+        assert_eq!(samples, POLLS as u64);
+    }
+}
+
 #[cfg(feature = "schedule-latency")]
 #[test]
 fn schedule_latency_lifo_polls_are_recorded_individually() {
@@ -881,11 +929,11 @@ fn schedule_latency_lifo_polls_are_recorded_individually() {
     assert_eq!(bucket_counts.iter().sum::<u64>(), 2);
     assert!(bucket_counts.last().is_some_and(|count| *count >= 1));
 
-    assert_eq!(metrics.worker_poll_count(0), 1);
+    assert_eq!(metrics.worker_poll_count(0), 2);
     let poll_time_samples = (0..metrics.poll_time_histogram_num_buckets())
         .map(|bucket| metrics.poll_time_histogram_bucket_count(0, bucket))
         .sum::<u64>();
-    assert_eq!(poll_time_samples, 1);
+    assert_eq!(poll_time_samples, 2);
 }
 
 #[cfg(feature = "schedule-latency")]

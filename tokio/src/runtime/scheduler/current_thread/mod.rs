@@ -16,6 +16,7 @@ use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::future::{poll_fn, Future};
+use std::pin::Pin;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
@@ -592,25 +593,30 @@ impl Handle {
                 Some(CurrentThread(context)) if Arc::ptr_eq(self, &context.handle) => context,
                 _ => return,
             };
-            let mut maybe_core = context.core.borrow_mut();
-            let core = if let Some(core) = maybe_core.as_mut() {
-                core
-            } else {
-                return;
-            };
-            let local = &mut core.tasks;
-
             if self.shared.inject.is_closed() {
                 return;
             }
 
-            traces = trace_current_thread(&self.shared.owned, local, &self.shared.inject)
+            // Move the local queue out of the scheduler core and drop the borrow
+            // before polling anything. Tracing polls tasks, and a task that wakes
+            // itself while being polled calls `schedule`, which borrows the core
+            // again. Holding this borrow across the poll panics with
+            // "RefCell already borrowed".
+            let mut local = VecDeque::new();
+            {
+                let mut maybe_core = context.core.borrow_mut();
+                let core = if let Some(core) = maybe_core.as_mut() {
+                    core
+                } else {
+                    return;
+                };
+                local.append(&mut core.tasks);
+            }
+
+            traces = trace_current_thread(&self.shared.owned, &mut local, &self.shared.inject)
                 .into_iter()
                 .map(|(id, trace)| dump::Task::new(id, trace))
                 .collect();
-
-            // Avoid double borrow panic
-            drop(maybe_core);
 
             // Taking a taskdump could wakes every task, but we probably don't want
             // the `yield_now` vector to be that large under normal circumstances.
@@ -725,6 +731,7 @@ impl Schedule for Arc<Handle> {
                 if let Some(core) = core.as_mut() {
                     core.push_task(self, task);
                 }
+                self.driver.unpark_self();
             }
             _ => {
                 // Track that a task was scheduled from **outside** of the runtime.
@@ -791,7 +798,9 @@ impl Wake for Handle {
             // If we are already running on the runtime, then it's not required to wake up the
             // runtime.
             context::with_scheduler(|maybe_cx| match maybe_cx {
-                Some(CurrentThread(cx)) if Arc::ptr_eq(arc_self, &cx.handle) => {}
+                Some(CurrentThread(cx)) if Arc::ptr_eq(arc_self, &cx.handle) => {
+                    arc_self.driver.unpark_self();
+                }
                 _ => {
                     arc_self.driver.unpark();
                 }
@@ -811,12 +820,10 @@ struct CoreGuard<'a> {
 
 impl CoreGuard<'_> {
     #[track_caller]
-    fn block_on<F: Future>(self, future: F) -> F::Output {
+    fn block_on<F: Future>(self, mut future: Pin<&mut F>) -> F::Output {
         let ret = self.enter(|mut core, context| {
             let waker = Handle::waker_ref(&context.handle);
             let mut cx = std::task::Context::from_waker(&waker);
-
-            pin!(future);
 
             core.metrics.start_processing_scheduled_tasks();
 

@@ -495,3 +495,18 @@ async fn interval_doesnt_panic_max_duration_when_polling() {
     let mut timer = task::spawn(time::interval(Duration::MAX));
     assert_ready!(timer.enter(|cx, mut timer| timer.poll_tick(cx)));
 }
+
+#[tokio::test(start_paused = true)]
+async fn deadline() {
+    let start = Instant::now();
+    let mut interval = time::interval_at(start, ms(300));
+
+    assert_eq!(interval.deadline(), start);
+
+    interval.tick().await;
+    assert_eq!(interval.deadline(), start + ms(300));
+
+    time::advance(ms(300)).await;
+    interval.tick().await;
+    assert_eq!(interval.deadline(), start + ms(600));
+}

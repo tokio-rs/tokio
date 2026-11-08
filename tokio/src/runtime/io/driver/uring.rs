@@ -9,10 +9,34 @@ use crate::{io::Interest, loom::sync::Mutex};
 
 use super::{Handle, TOKEN_WAKEUP};
 
-use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::{io, mem, task::Waker};
 
 const DEFAULT_RING_SIZE: u32 = 256;
+
+fn register_probe(uring: &IoUring, probe: &mut Probe) -> io::Result<()> {
+    match uring.submitter().register_probe(probe) {
+        Ok(_) => Ok(()),
+        Err(e) if e.raw_os_error() == Some(libc::EINVAL) => {
+            // The kernel does not support IORING_REGISTER_PROBE.
+            Err(io::Error::from_raw_os_error(libc::ENOSYS))
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Outcome of registering an op with the io_uring.
+pub(crate) enum RegisterResult {
+    /// In-flight at this slab index.
+    Submitted(usize),
+
+    /// Submit failed before reaching the kernel; the slot was removed.
+    NotPushed(io::Error),
+
+    /// Submit failed after reaching the kernel; the slot is kept and the caller
+    /// must cancel it to keep its resources alive until completion.
+    Pushed { index: usize, error: io::Error },
+}
 
 pub(crate) struct UringContext {
     pub(crate) uring: Option<io_uring::IoUring>,
@@ -33,33 +57,6 @@ impl UringContext {
 
     pub(crate) fn ring_mut(&mut self) -> &mut io_uring::IoUring {
         self.uring.as_mut().expect("io_uring not initialized")
-    }
-
-    /// Perform `io_uring_setup` system call, and Returns true if this
-    /// actually initialized the io_uring.
-    ///
-    /// If the machine doesn't support io_uring, then this will return an
-    /// `ENOSYS` error.
-    pub(crate) fn try_init(&mut self, probe: &mut Probe) -> io::Result<bool> {
-        if self.uring.is_some() {
-            // Already initialized.
-            return Ok(false);
-        }
-
-        let uring = IoUring::new(DEFAULT_RING_SIZE)?;
-
-        match uring.submitter().register_probe(probe) {
-            Ok(_) => {}
-            Err(e) if e.raw_os_error() == Some(libc::EINVAL) => {
-                // The kernel does not support IORING_REGISTER_PROBE.
-                return Err(io::Error::from_raw_os_error(libc::ENOSYS));
-            }
-            Err(e) => return Err(e),
-        }
-
-        self.uring.replace(uring);
-
-        Ok(true)
     }
 
     pub(crate) fn dispatch_completions(&mut self) {
@@ -112,13 +109,16 @@ impl UringContext {
             // Errors from io_uring_enter: https://man7.org/linux/man-pages/man2/io_uring_enter.2.html#ERRORS
             match self.ring().submit() {
                 Ok(_) => {
-                    return Ok(());
+                    if self.ring_mut().submission().is_empty() {
+                        return Ok(());
+                    }
                 }
 
                 // If the submission queue is full, we dispatch completions and try again.
                 Err(ref e) if e.raw_os_error() == Some(libc::EBUSY) => {
                     self.dispatch_completions();
                 }
+                Err(ref e) if e.raw_os_error() == Some(libc::EINTR) => {}
                 // For other errors, we currently return the error as is.
                 Err(e) => {
                     return Err(e);
@@ -141,8 +141,12 @@ impl Drop for UringContext {
         }
 
         // Make sure we flush the submission queue before dropping the driver.
-        while !self.ring_mut().submission().is_empty() {
-            self.submit().expect("Internal error when dropping driver");
+        if !self.ring_mut().submission().is_empty() {
+            if let Err(error) = self.submit() {
+                // The kernel may still be using resources from previously submitted operations.
+                mem::forget(mem::take(&mut self.ops));
+                panic!("Internal error when dropping driver: {error:?}");
+            }
         }
 
         let mut ops = std::mem::take(&mut self.ops);
@@ -152,9 +156,21 @@ impl Drop for UringContext {
 
         while !ops.is_empty() {
             // Wait until at least one completion is available.
-            self.ring_mut()
-                .submit_and_wait(1)
-                .expect("Internal error when dropping driver");
+            match self.ring_mut().submit_and_wait(1) {
+                Ok(_) => {}
+                // A failed wait can still leave completions available. Drain them below
+                // before retrying, retaining resources for operations that remain pending.
+                Err(error)
+                    if matches!(
+                        error.raw_os_error(),
+                        Some(libc::EINTR | libc::EBUSY | libc::EAGAIN)
+                    ) => {}
+                Err(error) => {
+                    // The kernel may still be using the resources held by pending operations.
+                    mem::forget(ops);
+                    panic!("Internal error when dropping driver: {error:?}");
+                }
+            }
 
             for cqe in self.ring_mut().completion() {
                 let idx = cqe.user_data() as usize;
@@ -175,12 +191,6 @@ impl Drop for UringContext {
 }
 
 impl Handle {
-    fn add_uring_source(&self, uringfd: RawFd) -> io::Result<()> {
-        let mut source = SourceFd(&uringfd);
-        self.registry
-            .register(&mut source, TOKEN_WAKEUP, Interest::READABLE.to_mio())
-    }
-
     pub(crate) fn get_uring(&self) -> &Mutex<UringContext> {
         &self.uring_context
     }
@@ -242,12 +252,25 @@ impl Handle {
     }
 
     /// Initialize the io_uring context if it hasn't been initialized yet.
+    ///
+    /// The ring is stored only after the reactor accepts its fd. A failure
+    /// there drops the ring, so the following attempt can create another one.
+    /// An existing ring stays stored, and this call fills `probe` from it.
     fn try_init(&self, probe: &mut Probe) -> io::Result<()> {
         let mut guard = self.get_uring().lock();
-        if guard.try_init(probe)? {
-            self.add_uring_source(guard.ring().as_raw_fd())?;
+        if let Some(uring) = guard.uring.as_ref() {
+            // The stored ring is already registered. Fill this probe from it.
+            return register_probe(uring, probe);
         }
 
+        let uring = IoUring::new(DEFAULT_RING_SIZE)?;
+        register_probe(&uring, probe)?;
+
+        let fd = uring.as_raw_fd();
+        let mut source = SourceFd(&fd);
+        self.registry
+            .register(&mut source, TOKEN_WAKEUP, Interest::READABLE.to_mio())?;
+        guard.uring = Some(uring);
         Ok(())
     }
 
@@ -261,7 +284,7 @@ impl Handle {
     ///
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
-    pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> io::Result<usize> {
+    pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> RegisterResult {
         assert!(self.uring_probe.initialized());
 
         // Uring is initialized.
@@ -271,9 +294,10 @@ impl Handle {
         let index = ctx.ops.insert(Lifecycle::Waiting(waker));
         let entry = entry.user_data(index as u64);
 
-        let submit_or_remove = |ctx: &mut UringContext| -> io::Result<()> {
+        // `entry` has not been pushed yet, so a submit error here means it never
+        // reached the kernel and we can drop the slot before returning.
+        let submit_before_push = |ctx: &mut UringContext| -> io::Result<()> {
             if let Err(e) = ctx.submit() {
-                // Submission failed, remove the entry from the slab and return the error
                 ctx.remove_op(index);
                 return Err(e);
             }
@@ -282,8 +306,10 @@ impl Handle {
 
         // SAFETY: entry is valid for the entire duration of the operation
         while unsafe { ctx.ring_mut().submission().push(&entry).is_err() } {
-            // If the submission queue is full, flush it to the kernel
-            submit_or_remove(ctx)?;
+            // If the submission queue is full, flush it to the kernel and retry.
+            if let Err(e) = submit_before_push(ctx) {
+                return RegisterResult::NotPushed(e);
+            }
         }
 
         // Ensure that the completion queue is not full before submitting the entry.
@@ -292,9 +318,15 @@ impl Handle {
         }
 
         // Note: For now, we submit the entry immediately without utilizing batching.
-        submit_or_remove(ctx)?;
+        //
+        // `entry` is now pushed, so the kernel may already own the buffer it
+        // points at. Keep the slot on a submit error: dropping it would let the
+        // `Op` free the buffer while it is still in use.
+        if let Err(e) = ctx.submit() {
+            return RegisterResult::Pushed { index, error: e };
+        }
 
-        Ok(index)
+        RegisterResult::Submitted(index)
     }
 
     pub(crate) fn cancel_op<T: Cancellable>(&self, index: usize, data: Option<T>) {
@@ -329,3 +361,6 @@ impl Handle {
         };
     }
 }
+
+#[cfg(all(test, not(loom)))]
+mod tests;

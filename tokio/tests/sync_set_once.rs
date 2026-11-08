@@ -186,3 +186,31 @@ fn into_inner_int_empty_setonce() {
 
     assert!(val.is_none());
 }
+
+#[test]
+fn get_mut_uninit() {
+    let mut once = SetOnce::<u32>::new();
+
+    assert_eq!(once.get_mut(), None);
+}
+
+#[test]
+fn get_mut_and_mutate() {
+    let mut once = SetOnce::new();
+    once.set(5).unwrap();
+
+    let value = once.get_mut().unwrap();
+    assert_eq!(*value, 5);
+
+    *value += 1;
+
+    assert_eq!(once.get(), Some(&6));
+    assert_eq!(*once.get_mut().unwrap(), 6);
+}
+
+#[test]
+fn get_mut_from() {
+    let mut once = SetOnce::from(10);
+
+    assert_eq!(once.get_mut(), Some(&mut 10));
+}

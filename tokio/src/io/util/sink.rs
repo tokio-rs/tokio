@@ -63,6 +63,22 @@ impl AsyncWrite for Sink {
     }
 
     #[inline]
+    fn is_write_vectored(&self) -> bool {
+        true
+    }
+
+    #[inline]
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<Result<usize, io::Error>> {
+        ready!(crate::trace::trace_leaf(cx));
+        ready!(poll_proceed_and_make_progress(cx));
+        Poll::Ready(Ok(bufs.iter().map(|b| b.len()).sum()))
+    }
+
+    #[inline]
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         ready!(crate::trace::trace_leaf(cx));
         ready!(poll_proceed_and_make_progress(cx));

@@ -18,7 +18,7 @@ use tempfile::NamedTempFile;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio::runtime::{Builder, Runtime};
-use tokio_util::task::TaskTracker;
+use tokio::task::JoinSet;
 
 fn multi_rt(n: usize) -> Box<dyn Fn() -> Runtime> {
     Box::new(move || {
@@ -255,12 +255,12 @@ async fn test_file_read_concurrent() {
         })
         .collect();
 
-    let tracker = TaskTracker::new();
+    let mut tasks = JoinSet::new();
 
     for (i, (_tmp, path)) in files.iter().enumerate() {
         let path = path.clone();
         let expected: Vec<u8> = (0..1024).map(|j| ((i as u16 + j) % 256) as u8).collect();
-        tracker.spawn(async move {
+        tasks.spawn(async move {
             let mut file = File::open(&path).await.unwrap();
             let mut buf = Vec::new();
             file.read_to_end(&mut buf).await.unwrap();
@@ -268,8 +268,7 @@ async fn test_file_read_concurrent() {
         });
     }
 
-    tracker.close();
-    tracker.wait().await;
+    tasks.join_all().await;
 }
 
 #[test]

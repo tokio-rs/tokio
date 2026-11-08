@@ -225,15 +225,6 @@ pin_project! {
         #[pin]
         timer: Option<Timer>,
     }
-
-    impl PinnedDrop for Sleep {
-        fn drop(this: Pin<&mut Self>) {
-            let this = this.project();
-            if let Some(timer) = this.timer.as_pin_mut() {
-                timer.cancel(this.driver);
-            }
-        }
-    }
 }
 
 cfg_trace! {
@@ -371,11 +362,11 @@ impl Sleep {
         }
 
         match this.timer.as_mut().as_pin_mut() {
-            Some(timer) => timer.reset(handle, deadline),
+            Some(timer) => timer.reset(handle.clone(), deadline),
             None => {
-                let timer = Timer::new(handle, deadline);
+                let timer = Timer::new(handle.clone(), deadline);
                 this.timer.set(Some(timer));
-                this.timer.as_pin_mut().unwrap().init(handle, deadline);
+                this.timer.as_pin_mut().unwrap().init(deadline);
             }
         }
     }
@@ -383,11 +374,7 @@ impl Sleep {
     /// Resets the `Sleep` instance to a new deadline.
     ///
     /// Unlike [`reset`][Self::reset], this __removes__ the internal timer.
-    ///
-    /// # Safety
-    ///
-    /// The internal timer must be elapsed.
-    pub(super) unsafe fn reset_without_timer(self: Pin<&mut Self>, deadline: Instant) {
+    pub(super) fn reset_without_timer(self: Pin<&mut Self>, deadline: Instant) {
         let mut this = self.project();
         *this.deadline = deadline;
         this.timer.set(None);
@@ -414,10 +401,10 @@ impl Sleep {
         #[cfg(any(not(tokio_unstable), not(feature = "tracing")))]
         let coop = ready!(crate::task::coop::poll_proceed(cx));
 
-        let handle = this.driver;
         let timer = match this.timer.as_mut().as_pin_mut() {
             Some(timer) => timer,
             None => {
+                let handle = this.driver;
                 let time_source = handle.driver().time().time_source();
                 let deadline = time_source.deadline_to_tick(*this.deadline);
 
@@ -433,15 +420,15 @@ impl Sleep {
                     );
                 }
 
-                let timer = Timer::new(handle, deadline);
+                let timer = Timer::new(handle.clone(), deadline);
                 this.timer.set(Some(timer));
                 let mut timer = this.timer.as_pin_mut().unwrap();
-                timer.as_mut().init(handle, deadline);
+                timer.as_mut().init(deadline);
                 timer
             }
         };
 
-        let result = timer.poll_elapsed(cx, handle).map(move |r| {
+        let result = timer.poll_elapsed(cx).map(move |r| {
             coop.made_progress();
             r
         });

@@ -401,6 +401,9 @@ impl RuntimeMetrics {
         /// Returns `true` if the runtime is tracking the distribution of task poll
         /// times.
         ///
+        /// Each task poll contributes a separate sample, including tasks polled
+        /// from the multi-thread scheduler's LIFO slot.
+        ///
         /// Task poll times are not instrumented by default as doing so requires
         /// calling [`Instant::now()`] twice per task poll. The feature is enabled
         /// by calling [`enable_metrics_poll_time_histogram()`] when building the

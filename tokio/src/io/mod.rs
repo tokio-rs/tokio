@@ -257,7 +257,10 @@ cfg_net_unix! {
 
     pub mod unix {
         //! Asynchronous IO structures specific to Unix-like operating systems.
-        pub use super::async_fd::{AsyncFd, AsyncFdTryNewError, AsyncFdReadyGuard, AsyncFdReadyMutGuard, TryIoError};
+        pub use super::async_fd::{AsyncFd, AsyncFdRegisterError, AsyncFdReadyGuard, AsyncFdReadyMutGuard, TryIoError};
+        #[doc(hidden)]
+        #[allow(deprecated)]
+        pub use super::async_fd::AsyncFdTryNewError;
     }
 }
 

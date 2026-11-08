@@ -114,15 +114,6 @@ enum Inner {
     Alternative {
         /// True if the driver is being shutdown.
         is_shutdown: AtomicBool,
-
-        // When `true`, a call to `park_timeout` should immediately return and time
-        // should not advance. One reason for this to be `true` is if the task
-        // passed to `Runtime::block_on` called `task::yield_now()`.
-        //
-        // While it may look racy, it only has any effect when the clock is paused
-        // and pausing the clock is restricted to a single-threaded runtime.
-        #[cfg(feature = "test-util")]
-        did_wake: AtomicBool,
     },
 }
 
@@ -172,8 +163,6 @@ impl Driver {
             time_source,
             inner: Inner::Alternative {
                 is_shutdown: AtomicBool::new(false),
-                #[cfg(feature = "test-util")]
-                did_wake: AtomicBool::new(false),
             },
         }
     }
@@ -456,7 +445,7 @@ impl Handle {
             match &self.inner {
                 Inner::Traditional { did_wake, .. } => did_wake.swap(false, Ordering::SeqCst),
                 #[cfg(all(tokio_unstable, feature = "rt-multi-thread"))]
-                Inner::Alternative { did_wake, .. } => did_wake.swap(false, Ordering::SeqCst),
+                Inner::Alternative { .. } => false,
             }
         }
     }

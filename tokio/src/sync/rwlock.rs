@@ -530,6 +530,43 @@ impl<T: ?Sized> RwLock<T> {
         crate::future::block_on(self.read())
     }
 
+    /// Like [`RwLock::blocking_read`], but takes an [`Arc`] and returns a guard
+    /// that keeps the lock alive instead of borrowing it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called within an asynchronous execution context.
+    /// Use [`spawn_blocking`](crate::task::spawn_blocking) or
+    /// [`block_in_place`](crate::task::block_in_place) when calling from async code.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use std::sync::Arc;
+    /// use tokio::sync::RwLock;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let rwlock = Arc::new(RwLock::new(1));
+    ///
+    /// let read_lock = tokio::task::spawn_blocking(move || rwlock.blocking_read_owned())
+    ///     .await
+    ///     .unwrap();
+    ///
+    /// assert_eq!(*read_lock, 1);
+    /// # }
+    /// # }
+    /// ```
+    ///
+    /// [`Arc`]: std::sync::Arc
+    #[track_caller]
+    #[cfg(feature = "sync")]
+    pub fn blocking_read_owned(self: Arc<Self>) -> OwnedRwLockReadGuard<T> {
+        crate::future::block_on(self.read_owned())
+    }
+
     /// Locks this `RwLock` with shared read access, causing the current task
     /// to yield until the lock has been acquired.
     ///
@@ -876,6 +913,44 @@ impl<T: ?Sized> RwLock<T> {
     #[cfg(feature = "sync")]
     pub fn blocking_write(&self) -> RwLockWriteGuard<'_, T> {
         crate::future::block_on(self.write())
+    }
+
+    /// Like [`RwLock::blocking_write`], but takes an [`Arc`] and returns a guard
+    /// that keeps the lock alive instead of borrowing it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called within an asynchronous execution context.
+    /// Use [`spawn_blocking`](crate::task::spawn_blocking) or
+    /// [`block_in_place`](crate::task::block_in_place) when calling from async code.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(not(target_family = "wasm"))]
+    /// # {
+    /// use std::sync::Arc;
+    /// use tokio::sync::RwLock;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// let rwlock = Arc::new(RwLock::new(1));
+    ///
+    /// let mut write_lock = tokio::task::spawn_blocking(move || rwlock.blocking_write_owned())
+    ///     .await
+    ///     .unwrap();
+    ///
+    /// *write_lock = 2;
+    /// assert_eq!(*write_lock, 2);
+    /// # }
+    /// # }
+    /// ```
+    ///
+    /// [`Arc`]: std::sync::Arc
+    #[track_caller]
+    #[cfg(feature = "sync")]
+    pub fn blocking_write_owned(self: Arc<Self>) -> OwnedRwLockWriteGuard<T> {
+        crate::future::block_on(self.write_owned())
     }
 
     /// Locks this `RwLock` with exclusive write access, causing the current

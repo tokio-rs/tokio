@@ -534,11 +534,7 @@ impl LengthDelimitedCodec {
             let n = n as usize;
 
             // Adjust `n` with bounds checking
-            let n = if self.builder.length_adjustment < 0 {
-                n.checked_sub(-self.builder.length_adjustment as usize)
-            } else {
-                n.checked_add(self.builder.length_adjustment as usize)
-            };
+            let n = n.checked_add_signed(self.builder.length_adjustment);
 
             // Error handling
             match n {
@@ -601,6 +597,16 @@ impl Decoder for LengthDelimitedCodec {
             None => Ok(None),
         }
     }
+
+    fn decode_eof(&mut self, src: &mut BytesMut) -> io::Result<Option<BytesMut>> {
+        match self.decode(src)? {
+            Some(frame) => Ok(Some(frame)),
+            // The head has been consumed, so an empty buffer does not mean the
+            // stream ended on a frame boundary: the payload is still missing.
+            None if src.is_empty() && matches!(self.state, DecodeState::Head) => Ok(None),
+            None => Err(io::Error::other("bytes remaining on stream")),
+        }
+    }
 }
 
 impl Encoder<&[u8]> for LengthDelimitedCodec {
@@ -617,10 +623,9 @@ impl Encoder<&[u8]> for LengthDelimitedCodec {
         }
 
         // Adjust `n` with bounds checking
-        let n = if self.builder.length_adjustment < 0 {
-            n.checked_add(-self.builder.length_adjustment as usize)
-        } else {
-            n.checked_sub(self.builder.length_adjustment as usize)
+        let n = match self.builder.length_adjustment.checked_neg() {
+            Some(adjustment) => n.checked_add_signed(adjustment),
+            None => n.checked_add(isize::MIN.unsigned_abs()),
         };
 
         let n = n.ok_or_else(|| {
