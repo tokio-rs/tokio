@@ -196,7 +196,7 @@ feature! {
 /// An instance of `DirEntry` represents an entry inside of a directory on the
 /// filesystem. Each entry can be inspected via methods to learn about the full
 /// path or possibly other metadata through per-platform extension traits.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DirEntry {
     #[cfg(not(any(
         target_os = "solaris",
