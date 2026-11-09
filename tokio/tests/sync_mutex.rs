@@ -216,3 +216,45 @@ async fn mutex_coop_drop_after_take_permit() {
     drop(t_a);
     assert!(m.try_lock().is_ok());
 }
+
+#[cfg(not(target_family = "wasm"))]
+#[maybe_tokio_test(flavor = "multi_thread")]
+async fn mutex_no_deadlock_when_coop_budget_exhausted() {
+    // Regression test for #8772: a task driving a `FuturesUnordered` of
+    // futures that lock the same mutex, while locking the mutex itself
+    // between polls, must not deadlock once the coop budget is exhausted.
+    // The timeout turns a regression into a test failure instead of
+    // hanging the suite.
+    use futures::stream::{FuturesUnordered, StreamExt};
+    use std::time::Duration;
+
+    // The deadlock first bites once the coop budget runs out, around the
+    // 65th iteration, so the count must stay above that. Miri runs much
+    // slower, so use fewer iterations and a longer timeout there.
+    #[cfg(not(miri))]
+    const N: usize = 500;
+    #[cfg(miri)] // Use a lower iteration count with Miri because it's too slow otherwise.
+    const N: usize = 100;
+    #[cfg(not(miri))]
+    const TIMEOUT: Duration = Duration::from_secs(10);
+    #[cfg(miri)]
+    const TIMEOUT: Duration = Duration::from_secs(60);
+
+    let m = Arc::new(Mutex::new(0usize));
+    let m_driver = Arc::clone(&m);
+    let driver = async move {
+        let mut set: FuturesUnordered<_> = (0..N)
+            .map(|_| async {
+                *m_driver.lock().await += 1;
+            })
+            .collect();
+        while set.next().await.is_some() {
+            let _ = *m_driver.lock().await;
+        }
+        *m_driver.lock().await
+    };
+    let n = tokio::time::timeout(TIMEOUT, driver)
+        .await
+        .expect("deadlock: driver did not finish in time");
+    assert_eq!(n, N);
+}

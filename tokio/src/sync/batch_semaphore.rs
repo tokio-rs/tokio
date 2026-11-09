@@ -404,6 +404,69 @@ impl Semaphore {
         assert_eq!(rem, 0);
     }
 
+    /// Returns acquired permits and puts the waiter back in the queue
+    /// when the coop budget is exhausted.
+    ///
+    /// The waiter yields its turn and rejoins behind the waiters already
+    /// queued, so the permits reach the next waiter instead of coming
+    /// straight back to it. Alone, they do come back to it, but the task
+    /// is woken and the next poll (fresh budget) completes the acquisition.
+    ///
+    /// Returns `false` if the semaphore closed while the permits were
+    /// held: the permits are handed back and the waiter is left out of
+    /// the queue, and the caller must fail the acquisition, or the waiter
+    /// would never be woken again.
+    fn return_permits_and_requeue(
+        &self,
+        node: Pin<&mut Waiter>,
+        num_permits: usize,
+        cx: &mut Context<'_>,
+    ) -> bool {
+        let mut waiters = self.waiters.lock();
+
+        // The semaphore may have closed while the permits were held.
+        // `close` wakes only the waiters queued at the time, so joining
+        // the queue now would strand this waiter forever.
+        if waiters.closed {
+            self.add_permits_locked(num_permits, waiters);
+            return false;
+        }
+
+        // Restore the "still needs `num_permits`" state. The permits stay
+        // accounted as held by this waiter until `add_permits_locked`
+        // below hands them on.
+        node.state.store(num_permits, Release);
+
+        // Re-register the waker: it was taken when the permits were
+        // assigned to this waiter, and a later release must wake this
+        // task again.
+        node.waker.with_mut(|waker| {
+            // Safety: the wait list is locked, so we may modify the waker.
+            let waker = unsafe { &mut *waker };
+            if waker
+                .as_ref()
+                .is_none_or(|waker| !waker.will_wake(cx.waker()))
+            {
+                *waker = Some(cx.waker().clone());
+            }
+        });
+
+        // Re-enqueue behind the waiters already queued. The waiter yields
+        // its turn: keeping its place would hand the permits straight back
+        // to it, leaving it holding permits while Pending (#8772).
+        let node = unsafe {
+            let node = Pin::into_inner_unchecked(node) as *mut _;
+            NonNull::new_unchecked(node)
+        };
+        waiters.queue.push_front(node);
+
+        // Hand the permits to the next waiter in line (or back to the
+        // semaphore). The waiter just enqueued is newest, so it is last
+        // in line for these permits.
+        self.add_permits_locked(num_permits, waiters);
+        true
+    }
+
     /// Decrease a semaphore's permits by a maximum of `n`.
     ///
     /// If there are insufficient permits and it's not possible to reduce by `n`,
@@ -648,24 +711,43 @@ impl Future for Acquire<'_> {
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let _async_op_poll_span = self.node.ctx.async_op_poll_span.clone().entered();
 
-        let (node, semaphore, needed, queued) = self.project();
+        let (mut node, semaphore, needed, queued) = self.project();
 
-        let result = match semaphore.poll_acquire(cx, needed, node, queued) {
+        // Avoid taking permits when the coop budget is exhausted.
+        // Contended waiters still queue to preserve FIFO ordering.
+        if !*queued
+            && !semaphore.is_closed()
+            && semaphore.available_permits() >= needed
+            && crate::task::coop::poll_budget_available(cx).is_pending()
+        {
+            return Poll::Pending;
+        }
+
+        let result = match semaphore.poll_acquire(cx, needed, node.as_mut(), queued) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(r) => {
                 r?;
 
+                // Return acquired permits before yielding for coop budget.
                 #[cfg(all(tokio_unstable, feature = "tracing"))]
-                let coop = ready!(trace_poll_op!(
-                    "poll_acquire",
-                    crate::task::coop::poll_proceed(cx),
-                ));
+                let budget = trace_poll_op!("poll_acquire", crate::task::coop::poll_proceed(cx),);
 
                 #[cfg(not(all(tokio_unstable, feature = "tracing")))]
-                let coop = ready!(crate::task::coop::poll_proceed(cx));
+                let budget = crate::task::coop::poll_proceed(cx);
 
-                coop.made_progress();
-                Poll::Ready(Ok(()))
+                match budget {
+                    Poll::Pending => {
+                        if semaphore.return_permits_and_requeue(node, needed, cx) {
+                            Poll::Pending
+                        } else {
+                            Poll::Ready(Err(AcquireError::closed()))
+                        }
+                    }
+                    Poll::Ready(coop) => {
+                        coop.made_progress();
+                        Poll::Ready(Ok(()))
+                    }
+                }
             }
         };
 
