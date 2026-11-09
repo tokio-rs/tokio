@@ -16,7 +16,7 @@ impl RngSeed {
     /// let seed = RngSeed::from_bytes(b"make me a seed");
     /// # }
     /// ```
-    #[allow(unreachable_pub)]
+    #[cfg_attr(not(tokio_unstable), expect(unreachable_pub))]
     pub fn from_bytes(bytes: &[u8]) -> Self {
         let mut hasher = DefaultHasher::default();
         hasher.write(bytes);
