@@ -258,7 +258,7 @@ impl Handle {
 
     /// Register an operation with the io_uring.
     ///
-    /// Callers must check [`Handle::is_uring_ready`] for the entry's opcode first.
+    /// Callers must check `uring_supports` for the entry's opcode first.
     ///
     /// # Safety
     ///
