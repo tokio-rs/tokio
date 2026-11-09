@@ -514,9 +514,8 @@ fn maybe_move_runtime() -> Result<(bool, bool), &'static str> {
 impl Launch {
     pub(crate) fn launch(self) -> io::Result<()> {
         let rt = runtime::Handle::current();
-        let mut workers = self.0.into_iter();
 
-        while let Some(worker) = workers.next() {
+        for worker in &self.0 {
             let worker_to_run = worker.clone();
             let fn_size = std::mem::size_of_val(&worker_to_run);
             let (_, result) = rt.inner.blocking_spawner().spawn_blocking_inner(
@@ -527,7 +526,7 @@ impl Launch {
             );
 
             if let Err(error) = result {
-                for worker in std::iter::once(worker).chain(workers) {
+                for worker in self.0 {
                     if let Some(mut core) = worker.core.take() {
                         core.pre_shutdown(&worker);
                         worker.handle.shutdown_core(core);

@@ -621,16 +621,9 @@ impl LockedImpl {
             return Err(SpawnError::ShuttingDown);
         }
 
-        locked.queue.push_back(task);
-        metrics.inc_queue_depth();
-
         if metrics.num_idle_threads() == 0 {
             if let Err(e) = on_no_idle(&mut locked.thread_mgmt_state) {
-                let task = locked
-                    .queue
-                    .pop_back()
-                    .expect("blocking task was just pushed");
-                metrics.dec_queue_depth();
+                drop(locked);
                 task.shutdown();
                 return Err(e);
             }
@@ -644,6 +637,9 @@ impl LockedImpl {
             locked.num_notify += 1;
             self.condvar.notify_one();
         }
+
+        locked.queue.push_back(task);
+        metrics.inc_queue_depth();
 
         Ok(())
     }

@@ -111,7 +111,7 @@ impl ShardedImpl {
     /// The queue-depth metric is incremented under the shard lock so that
     /// the pop that consumes this task (whose decrement is ordered after
     /// this lock's release) can never transiently wrap the counter.
-    fn push(&self, task: Task, metrics: &SpawnerMetrics) -> Result<usize, Task> {
+    fn push(&self, task: Task, metrics: &SpawnerMetrics) -> Result<(), Task> {
         let index = self.push_shard_index();
         let mut shard = self.shards[index].lock();
         if shard.sealed {
@@ -122,7 +122,7 @@ impl ShardedImpl {
         if shard.queue.len() == 1 {
             self.non_empty_mask.fetch_or(1 << index, Ordering::Relaxed);
         }
-        Ok(index)
+        Ok(())
     }
 
     /// Pop a task, checking the worker's preferred shard first.
@@ -201,15 +201,12 @@ impl ShardedImpl {
 
         // Push before taking `coord`, so spawners don't serialize on a
         // pool-wide lock held across the queue operation.
-        let shard_index = match self.push(task, metrics) {
-            Ok(shard_index) => shard_index,
-            Err(task) => {
-                // The shard was already drained and sealed for shutdown: reject
-                // the task, exactly as if the shutdown check above had caught it.
-                task.shutdown();
-                return Err(SpawnError::ShuttingDown);
-            }
-        };
+        if let Err(task) = self.push(task, metrics) {
+            // The shard was already drained and sealed for shutdown: reject
+            // the task, exactly as if the shutdown check above had caught it.
+            task.shutdown();
+            return Err(SpawnError::ShuttingDown);
+        }
 
         let mut coord = self.coord.lock();
 
@@ -222,24 +219,7 @@ impl ShardedImpl {
         }
 
         if metrics.num_idle_threads() == 0 {
-            if let Err(e) = on_no_idle(&mut coord.thread_mgmt_state) {
-                drop(coord);
-                let task = {
-                    let mut shard = self.shards[shard_index].lock();
-                    let task = shard
-                        .queue
-                        .pop_back()
-                        .expect("blocking task was just pushed");
-                    metrics.dec_queue_depth();
-                    if shard.queue.is_empty() {
-                        self.non_empty_mask
-                            .fetch_and(!(1 << shard_index), Ordering::Relaxed);
-                    }
-                    task
-                };
-                task.shutdown();
-                return Err(e);
-            }
+            on_no_idle(&mut coord.thread_mgmt_state)?;
         } else {
             // Claim an idle worker (see `num_notify`). Signal after
             // releasing `coord` so the woken worker doesn't immediately
