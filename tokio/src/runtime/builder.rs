@@ -1145,10 +1145,9 @@ impl Builder {
     ///
     /// # Errors
     ///
-    /// Returns an error if the I/O driver or other OS resources required by the
-    /// runtime cannot be initialized.
-    /// For a multi-thread runtime, this can also happen if the operating system
-    /// cannot create a worker thread.
+    /// Returns an error if the I/O driver cannot be initialized or if the
+    /// operating system cannot create resources required by the runtime, such
+    /// as worker threads for a multi-thread runtime.
     pub fn build(&mut self) -> io::Result<Runtime> {
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_runtime(),
