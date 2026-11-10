@@ -136,6 +136,9 @@ rt_test! {
     use tokio::fs;
     // ==== spawn blocking futures ======
 
+    // With io-uring, `Handle::block_on` cannot drive the IO driver on a current_thread runtime so
+    // we ignore it.
+    #[cfg_attr(all(tokio_unstable, feature = "io-uring", target_os = "linux"), ignore)]
     #[test]
     fn basic_fs() {
         let rt = rt();
@@ -147,6 +150,8 @@ rt_test! {
         assert!(contents.contains("https://tokio.rs"));
     }
 
+    // With io-uring, fs operations hang after runtime shutdown instead of returning an error.
+    #[cfg_attr(all(tokio_unstable, feature = "io-uring", target_os = "linux"), ignore)]
     #[test]
     fn fs_shutdown_before_started() {
         let rt = rt();
