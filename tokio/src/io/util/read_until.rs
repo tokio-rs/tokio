@@ -66,8 +66,8 @@ pub(super) fn read_until_internal<R: AsyncBufRead + ?Sized>(
                 (false, available.len())
             }
         };
-        reader.as_mut().consume(used);
         *read += used;
+        reader.as_mut().consume(used);
         if done || used == 0 {
             return Poll::Ready(Ok(mem::replace(read, 0)));
         }

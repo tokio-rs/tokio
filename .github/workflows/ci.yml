@@ -316,6 +316,12 @@ jobs:
           # in order to run doctests for unstable features, we must also pass
           # the unstable cfg to RustDoc
           RUSTDOCFLAGS: --cfg tokio_unstable
+      # Run `tokio-util` with "unstable" cfg flag (needed by its task tracing tests).
+      - name: test tokio-util full --cfg unstable
+        run: cargo nextest run --features full
+        working-directory: tokio-util
+        env:
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
   # Run the test suite with the sharded `spawn_blocking` queue.
   test-sharded-blocking-queue:
