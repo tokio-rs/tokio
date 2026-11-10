@@ -583,14 +583,14 @@ jobs:
         include:
           - target: i686-unknown-linux-gnu
             os: ubuntu-latest
-            extra_features: "taskdump,parking_lot"
+            extra_features: "taskdump"
           - target: armv5te-unknown-linux-gnueabi
             os: ubuntu-latest
           - target: armv7-unknown-linux-gnueabihf
             os: ubuntu-24.04-arm
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-24.04-arm
-            extra_features: "io-uring,taskdump,parking_lot"
+            extra_features: "io-uring,taskdump"
           - target: aarch64-pc-windows-msvc
             os: windows-11-arm
     steps:
@@ -618,8 +618,8 @@ jobs:
           # We use `--features "$TOKIO_STABLE_FEATURES"` instead of `--all-features` since
           # `--all-features` includes `io_uring` and `taskdump`,
           # which is not available on all targets.
-          cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
-          cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo nextest run -p tokio --features $TOKIO_STABLE_FEATURES,parking_lot,${{ matrix.extra_features }} --target ${{ matrix.target }}
+          cargo test --doc -p tokio --features $TOKIO_STABLE_FEATURES,parking_lot,${{ matrix.extra_features }} --target ${{ matrix.target }}
         env:
           RUST_TEST_THREADS: 1
           RUSTFLAGS: --cfg tokio_unstable -Dwarnings --cfg tokio_no_tuning_tests
