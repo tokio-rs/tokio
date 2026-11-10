@@ -100,6 +100,17 @@ fn assert_ready_eq() {
 }
 
 #[test]
+fn assert_ready_eq_in_expression_position() {
+    let poll = ready();
+    match poll {
+        Poll::Ready(()) => assert_ready_eq!(poll, ()),
+        Poll::Pending => unreachable!(),
+    }
+    let check = || assert_ready_eq!(poll, (), "some message");
+    check();
+}
+
+#[test]
 #[should_panic]
 fn assert_eq_on_not_eq() {
     let poll = ready_err();
