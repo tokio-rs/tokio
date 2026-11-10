@@ -168,6 +168,18 @@ impl<T, E> FramedWrite<T, E> {
             _priv: (),
         }
     }
+
+    /// Creates the `FramedWrite` from I/O stream, the buffer
+    /// with unprocessed data, and the codec.
+    pub fn from_parts(parts: FramedParts<T, E>) -> FramedWrite<T, E> {
+        FramedWrite {
+            inner: FramedImpl {
+                inner: parts.io,
+                codec: parts.codec,
+                state: parts.write_buf.into(),
+            },
+        }
+    }
 }
 
 // This impl just defers to the underlying FramedImpl
