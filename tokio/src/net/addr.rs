@@ -7,6 +7,9 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV
 /// # DNS
 ///
 /// Implementations of `ToSocketAddrs` for string types require a DNS lookup.
+/// Those lookups run on the blocking thread pool. Dropping the future returned
+/// by a connect or [`lookup_host`](crate::net::lookup_host) call stops waiting
+/// for the result, but the lookup itself keeps running until it completes.
 ///
 /// # Calling
 ///
