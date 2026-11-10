@@ -1,5 +1,5 @@
 //! Module defining an Either type.
-use futures_core::stream::FusedStream;
+use futures_core::{future::FusedFuture, stream::FusedStream};
 use std::{
     future::Future,
     io::SeekFrom,
@@ -168,6 +168,19 @@ where
     }
 }
 
+impl<L, R> FusedFuture for Either<L, R>
+where
+    L: FusedFuture,
+    R: FusedFuture<Output = L::Output>,
+{
+    fn is_terminated(&self) -> bool {
+        match self {
+            Self::Left(l) => l.is_terminated(),
+            Self::Right(r) => r.is_terminated(),
+        }
+    }
+}
+
 impl<L, R> futures_core::stream::Stream for Either<L, R>
 where
     L: futures_core::stream::Stream,
@@ -237,6 +250,18 @@ mod tests {
         let mut either: Either<Once<u32>, Once<u32>> = Either::Left(once(1));
 
         assert_eq!(Some(1u32), either.next().await);
+    }
+
+    #[tokio::test]
+    async fn either_is_fused_future() {
+        for (mut either, expected) in [
+            (Either::Left(futures::future::ready(1u32)), 1),
+            (Either::Right(futures::future::ready(2u32)), 2),
+        ] {
+            assert!(!either.is_terminated());
+            assert_eq!((&mut either).await, expected);
+            assert!(either.is_terminated());
+        }
     }
 
     #[tokio::test]
