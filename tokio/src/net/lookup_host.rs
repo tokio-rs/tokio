@@ -14,7 +14,7 @@ cfg_net! {
     ///
     /// # Cancellation
     ///
-    /// Resolving a hostname runs on the blocking thread pool. Dropping the
+    /// Resolving a host name runs on the blocking thread pool. Dropping the
     /// returned future stops waiting for the result, but the underlying lookup
     /// continues until it finishes. That unfinished work can delay runtime
     /// shutdown.
