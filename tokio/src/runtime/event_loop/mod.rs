@@ -263,7 +263,9 @@ impl<R: Scheduler> Core<R> {
         impl Drop for AbortOnForeignUnwind {
             fn drop(&mut self) {
                 if !std::thread::panicking() {
-                    eprintln!("foreign exception unwound through an event loop tick; aborting process");
+                    eprintln!(
+                        "foreign exception unwound through an event loop tick; aborting process"
+                    );
                     std::process::abort();
                 }
             }
