@@ -159,6 +159,10 @@ pub struct Builder {
 
     /// When true, the blocking pool uses the sharded queue implementation.
     pub(super) sharded_blocking_queue: bool,
+
+    /// For an event loop: invoked when a wakeup finds the host idle.
+    #[cfg(tokio_unstable)]
+    on_work_available: Option<Callback>,
 }
 
 cfg_unstable! {
@@ -373,6 +377,9 @@ impl Builder {
             enable_eager_driver_handoff: false,
 
             sharded_blocking_queue: sharded_blocking_queue_default(),
+
+            #[cfg(tokio_unstable)]
+            on_work_available: None,
         }
     }
 
@@ -1148,6 +1155,7 @@ impl Builder {
     /// Returns an error if the I/O driver or other OS resources required by the
     /// runtime cannot be initialized.
     pub fn build(&mut self) -> io::Result<Runtime> {
+        self.assert_not_event_loop();
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_runtime(),
             #[cfg(feature = "rt-multi-thread")]
@@ -1184,10 +1192,138 @@ impl Builder {
     /// Returns an error if the I/O driver or other OS resources required by the
     /// runtime cannot be initialized.
     pub fn build_local(&mut self, _options: LocalOptions) -> io::Result<LocalRuntime> {
+        self.assert_not_event_loop();
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_local_runtime(),
             #[cfg(feature = "rt-multi-thread")]
             Kind::MultiThread => panic!("multi_thread is not supported for LocalRuntime"),
+        }
+    }
+
+    fn assert_not_event_loop(&self) {
+        #[cfg(tokio_unstable)]
+        assert!(
+            self.on_work_available.is_none(),
+            "`on_work_available` requires `build_event_loop` or `build_local_event_loop`"
+        );
+    }
+
+    cfg_event_loop! {
+        /// Creates the configured runtime as an [`EventLoop`]: a runtime
+        /// driven by a host event loop instead of by parking a thread. The
+        /// host waits on the event loop's [`event_fd`] or for
+        /// [`on_work_available`], with [`next_sleep`] as the timeout, and
+        /// calls [`tick`] when either fires.
+        ///
+        /// # Panics
+        ///
+        /// This will panic if the runtime is configured with
+        /// [`new_multi_thread()`]: only a `current_thread` runtime can be an
+        /// event loop.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the I/O driver or other OS resources required
+        /// by the runtime cannot be initialized.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime::Builder;
+        ///
+        /// let mut el = Builder::new_current_thread()
+        ///     .enable_all()
+        ///     .build_event_loop()
+        ///     .unwrap();
+        ///
+        /// let jh = el.handle().spawn(async { 1 + 1 });
+        /// while !jh.is_finished() {
+        ///     el.park(None);
+        ///     el.tick(64);
+        /// }
+        /// ```
+        ///
+        /// [`new_multi_thread()`]: Builder::new_multi_thread
+        /// [`EventLoop`]: crate::runtime::EventLoop
+        /// [`event_fd`]: crate::runtime::EventLoop::event_fd
+        /// [`on_work_available`]: Builder::on_work_available
+        /// [`next_sleep`]: crate::runtime::EventLoop::next_sleep
+        /// [`tick`]: crate::runtime::EventLoop::tick
+        pub fn build_event_loop(&mut self) -> io::Result<crate::runtime::EventLoop> {
+            self.assert_current_thread_event_loop();
+            let runtime = self.build_current_thread_runtime()?;
+            Ok(crate::runtime::EventLoop::new(runtime))
+        }
+
+        /// Creates the configured runtime as a [`LocalEventLoop`]: a
+        /// [`LocalRuntime`] driven by a host event loop instead of by parking
+        /// a thread. See [`build_event_loop`](Self::build_event_loop).
+        ///
+        /// # Panics
+        ///
+        /// This will panic if the runtime is configured with
+        /// [`new_multi_thread()`].
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the I/O driver or other OS resources required
+        /// by the runtime cannot be initialized.
+        ///
+        /// [`new_multi_thread()`]: Builder::new_multi_thread
+        /// [`LocalEventLoop`]: crate::runtime::LocalEventLoop
+        pub fn build_local_event_loop(
+            &mut self,
+            _options: LocalOptions,
+        ) -> io::Result<crate::runtime::LocalEventLoop> {
+            self.assert_current_thread_event_loop();
+            let runtime = self.build_current_thread_local_runtime()?;
+            Ok(crate::runtime::LocalEventLoop::new(runtime))
+        }
+
+        /// Sets a callback for when an event loop built from this builder has
+        /// work for the host to tick.
+        ///
+        /// It is invoked for a wakeup that arrives while the loop is not
+        /// being ticked: a spawn, a wake from another thread, a nearer timer
+        /// registered elsewhere, an [`Unparker::unpark`]. It is not invoked
+        /// for I/O readiness on a runtime with the I/O driver enabled; there
+        /// the host waits on [`event_fd`] (or in [`park`]) for I/O. It is
+        /// invoked once per idle period, for the first such wakeup after a
+        /// tick or park returns; a wakeup during a tick is reported by
+        /// [`next_sleep`] instead, so a host that ticks until that is not
+        /// `Some(ZERO)` sees each transition from idle to having work once.
+        ///
+        /// It may be invoked from any thread, from within the runtime's
+        /// scheduling and timer internals, and must not call into the runtime
+        /// or tick the loop itself: it should post a tick to the host.
+        ///
+        /// This is for a host whose wait is not descriptor-based, such as a
+        /// parent executor that sleeps on a futex, and for an event loop
+        /// without the I/O driver, which has no descriptor. A host that wants
+        /// one there signals a descriptor of its own from this callback.
+        ///
+        /// # Panics
+        ///
+        /// [`build`](Self::build) and [`build_local`](Self::build_local)
+        /// panic if this is set: only an event loop has a host to notify.
+        ///
+        /// [`Unparker::unpark`]: crate::runtime::Unparker::unpark
+        /// [`event_fd`]: crate::runtime::EventLoop::event_fd
+        /// [`park`]: crate::runtime::EventLoop::park
+        /// [`next_sleep`]: crate::runtime::EventLoop::next_sleep
+        pub fn on_work_available<F>(&mut self, f: F) -> &mut Self
+        where
+            F: Fn() + Send + Sync + 'static,
+        {
+            self.on_work_available = Some(std::sync::Arc::new(f));
+            self
+        }
+
+        fn assert_current_thread_event_loop(&self) {
+            #[cfg(feature = "rt-multi-thread")]
+            if let Kind::MultiThread = self.kind {
+                panic!("multi_thread is not supported for an event loop");
+            }
         }
     }
 
@@ -1308,6 +1444,9 @@ impl Builder {
     /// # }
     /// # }
     /// ```
+    ///
+    /// An event loop built with `build_event_loop` has no `event_interval`:
+    /// the host bounds each batch with `tick`'s `max_tasks`.
     #[track_caller]
     pub fn event_interval(&mut self, val: u32) -> &mut Self {
         assert!(val > 0, "event_interval must be greater than 0");
@@ -1787,6 +1926,8 @@ impl Builder {
                 after_unpark: self.after_unpark.clone(),
                 before_spawn: self.before_spawn.clone(),
                 #[cfg(tokio_unstable)]
+                on_work_available: self.on_work_available.clone(),
+                #[cfg(tokio_unstable)]
                 before_poll: self.before_poll.clone(),
                 #[cfg(tokio_unstable)]
                 after_poll: self.after_poll.clone(),
@@ -2209,6 +2350,8 @@ cfg_rt_multi_thread! {
                     before_park: self.before_park.clone(),
                     after_unpark: self.after_unpark.clone(),
                     before_spawn: self.before_spawn.clone(),
+                    #[cfg(tokio_unstable)]
+                    on_work_available: None,
                     #[cfg(tokio_unstable)]
                     before_poll: self.before_poll.clone(),
                     #[cfg(tokio_unstable)]

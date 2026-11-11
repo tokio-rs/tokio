@@ -25,6 +25,10 @@ use std::time::Duration;
 use std::time::Instant;
 use std::{fmt, thread};
 
+cfg_event_loop! {
+    mod event_loop;
+}
+
 /// Executes tasks on the current thread
 pub(crate) struct CurrentThread {
     /// Core scheduler data is acquired by a thread entering `block_on`.
@@ -689,6 +693,11 @@ impl Handle {
     pub(crate) fn unpark(&self) {
         if self.shared.parked.swap(false, AcqRel) {
             self.driver.unpark();
+
+            #[cfg(tokio_unstable)]
+            if let Some(f) = &self.shared.config.on_work_available {
+                f();
+            }
         }
     }
 }
