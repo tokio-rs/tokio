@@ -2,7 +2,7 @@
 #![cfg(all(feature = "full", not(target_os = "wasi")))] // Wasi doesn't support panic recovery
 #![cfg(panic = "unwind")]
 
-use parking_lot::{const_mutex, Mutex};
+use parking_lot::Mutex;
 use std::error::Error;
 use std::panic;
 use std::sync::Arc;
@@ -19,7 +19,7 @@ use tokio_util::time::DelayQueue;
 const MAX_DURATION_MS: u64 = (1 << (36)) - 1;
 
 fn test_panic<Func: FnOnce() + panic::UnwindSafe>(func: Func) -> Option<String> {
-    static PANIC_MUTEX: Mutex<()> = const_mutex(());
+    static PANIC_MUTEX: Mutex<()> = Mutex::new(());
 
     {
         let _guard = PANIC_MUTEX.lock();

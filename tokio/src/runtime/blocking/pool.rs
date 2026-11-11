@@ -459,6 +459,14 @@ impl Spawner {
             .saturating_sub(self.inner.scheduler_threads)
     }
 
+    #[cfg(all(test, not(loom), not(target_family = "wasm")))]
+    pub(super) fn sharded_queue(&self) -> (&ShardedImpl, &SpawnerMetrics) {
+        match &self.inner.inner_impl {
+            InnerImpl::Sharded(queue) => (queue, &self.inner.metrics),
+            InnerImpl::Locked(_) => panic!("expected a sharded blocking queue"),
+        }
+    }
+
     fn spawn_task(&self, task: Task, rt: &Handle) -> Result<(), SpawnError> {
         // The `on_no_idle` closure runs under the same lock as the queue
         // push, exactly like the pre-refactor code that called
@@ -621,11 +629,12 @@ impl LockedImpl {
             return Err(SpawnError::ShuttingDown);
         }
 
-        locked.queue.push_back(task);
-        metrics.inc_queue_depth();
-
         if metrics.num_idle_threads() == 0 {
-            on_no_idle(&mut locked.thread_mgmt_state)?;
+            if let Err(e) = on_no_idle(&mut locked.thread_mgmt_state) {
+                drop(locked);
+                task.shutdown();
+                return Err(e);
+            }
         } else {
             // Notify an idle worker thread. The notification counter
             // is used to count the needed amount of notifications
@@ -636,6 +645,9 @@ impl LockedImpl {
             locked.num_notify += 1;
             self.condvar.notify_one();
         }
+
+        locked.queue.push_back(task);
+        metrics.inc_queue_depth();
 
         Ok(())
     }
