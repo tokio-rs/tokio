@@ -1293,8 +1293,8 @@ impl Builder {
         ///
         /// # Errors
         ///
-        /// Returns an error if the I/O driver is not enabled, or if OS
-        /// resources required by the runtime cannot be initialized.
+        /// Returns an error if the I/O driver or other OS resources required
+        /// by the runtime cannot be initialized.
         ///
         /// [`new_multi_thread()`]: Builder::new_multi_thread
         /// [`LocalEventLoop`]: crate::runtime::LocalEventLoop
@@ -1308,18 +1308,15 @@ impl Builder {
             // while idle, ahead of the host's callback into it.
             let hold = std::sync::Arc::new(crate::runtime::event_loop::emscripten::Hold::default());
             let on_work_available = self.on_work_available.clone();
-            let hosted = std::mem::replace(
-                &mut self.on_work_available,
-                Some(std::sync::Arc::new({
-                    let hold = hold.clone();
-                    move || {
-                        hold.acquire();
-                        if let Some(f) = &on_work_available {
-                            f();
-                        }
+            let hosted = self.on_work_available.replace(std::sync::Arc::new({
+                let hold = hold.clone();
+                move || {
+                    hold.work_available();
+                    if let Some(f) = &on_work_available {
+                        f();
                     }
-                })),
-            );
+                }
+            }));
             let runtime = self.build_current_thread_local_runtime();
             self.on_work_available = hosted;
             crate::runtime::LocalEventLoop::hosted(runtime?, hold)

@@ -4,6 +4,8 @@
 //! (`emscripten_epoll_listener_add`), a host timer armed for `next_sleep`
 //! after every tick, and an immediate when `next_sleep` is zero, so a busy
 //! loop yields a host turn between batches. Each callback ticks the loop.
+//! Without the I/O driver there is no `event_fd`, and `on_work_available`
+//! schedules the immediate instead.
 //!
 //! The loop holds the Emscripten runtime alive while it has tasks, as a
 //! native one lives while `block_on` runs, so `main` may return with work in
@@ -17,7 +19,7 @@ use std::ffi::c_void;
 use std::io;
 use std::os::fd::{AsRawFd, RawFd};
 use std::rc::{Rc, Weak};
-use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering::Relaxed};
 use std::sync::Arc;
 
 type Callback = extern "C" fn(*mut c_void);
@@ -55,18 +57,31 @@ extern "C" {
 pub(crate) struct Hold {
     held: AtomicBool,
     detached: AtomicBool,
+    /// The loop to schedule a tick on for a wakeup while idle, set when it
+    /// has no readiness listener for the driver to wake it through.
+    wake: AtomicPtr<Hosted>,
 }
 
 impl Hold {
-    pub(crate) fn acquire(&self) {
-        if !self.detached.load(Relaxed) {
-            self.set(true);
+    /// A wakeup arrived while the loop was idle.
+    pub(crate) fn work_available(&self) {
+        if self.detached.load(Relaxed) {
+            return;
+        }
+        self.set(true);
+        let hosted = self.wake.load(Relaxed);
+        if !hosted.is_null() {
+            // SAFETY: set in `Hosted::attach` to the `Hosted` in its `Rc`,
+            // and cleared by `detach` in its `drop`. The target has no
+            // threads, so this is the loop's thread.
+            unsafe { &*hosted }.schedule();
         }
     }
 
     /// The final release: nothing is pushed after it.
     fn detach(&self) {
         self.detached.store(true, Relaxed);
+        self.wake.store(std::ptr::null_mut(), Relaxed);
         self.set(false);
     }
 
@@ -95,7 +110,8 @@ pub(super) struct Hosted {
     /// For a callback to hold the loop, and a deferred one to find it again.
     this: Weak<Hosted>,
     core: Weak<RefCell<Core<LocalRuntime>>>,
-    epfd: RawFd,
+    /// The reactor's epoll fd, with the I/O driver.
+    epfd: Option<RawFd>,
     /// Tasks per tick: the builder's `event_interval`.
     batch: usize,
     listening: Cell<bool>,
@@ -115,15 +131,11 @@ impl Hosted {
     ) -> io::Result<Rc<Hosted>> {
         let core_ref = core.borrow();
         let handle = core_ref.handle();
-        let Some(epfd) = handle.inner.driver().event_fd() else {
-            return Err(io::Error::other(
-                "a hosted event loop needs the I/O driver; call `enable_io` on the runtime builder",
-            ));
-        };
+        let epfd = handle.inner.driver().event_fd().map(|fd| fd.as_raw_fd());
         let hosted = Rc::new_cyclic(|this| Hosted {
             this: this.clone(),
             core: Rc::downgrade(core),
-            epfd: epfd.as_raw_fd(),
+            epfd,
             batch: handle.inner.as_current_thread().event_interval(),
             listening: Cell::new(false),
             deadline: Cell::new(None),
@@ -131,6 +143,12 @@ impl Hosted {
             hold,
         });
         drop(core_ref);
+        if epfd.is_none() {
+            hosted
+                .hold
+                .wake
+                .store(Rc::as_ptr(&hosted).cast_mut(), Relaxed);
+        }
         hosted.listen(true)?;
         Ok(hosted)
     }
@@ -179,6 +197,9 @@ impl Hosted {
     /// while the set has uncollected events, so it comes off while a tick
     /// cannot run (see [`tick`](Self::tick)).
     fn listen(&self, on: bool) -> io::Result<()> {
+        let Some(epfd) = self.epfd else {
+            return Ok(());
+        };
         if self.listening.get() == on {
             return Ok(());
         }
@@ -187,9 +208,9 @@ impl Hosted {
         // which removes the listener in `drop` before the loop drops.
         let rc = unsafe {
             if on {
-                emscripten_epoll_listener_add(self.epfd, ready, this)
+                emscripten_epoll_listener_add(epfd, ready, this)
             } else {
-                emscripten_epoll_listener_remove(self.epfd, ready, this)
+                emscripten_epoll_listener_remove(epfd, ready, this)
             }
         };
         if rc != 0 {
