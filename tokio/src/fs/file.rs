@@ -1197,36 +1197,29 @@ impl Inner {
     }
 
     fn poll_flush(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        let (op, buf) = match self.state {
-            State::Idle(_) => {
-                return match self.last_write_err.take() {
-                    Some(e) => Poll::Ready(Err(e.into())),
-                    None => Poll::Ready(Ok(())),
-                };
+        if let State::Busy(ref mut rx) = self.state {
+            let res = ready!(Pin::new(rx).poll(cx));
+            if res.is_err() {
+                // Restore a valid Idle state before returning the error.
+                self.state = State::Idle(Some(Buf::with_capacity(0)));
             }
-            State::Busy(ref mut rx) => {
-                let res = ready!(Pin::new(rx).poll(cx));
-                if res.is_err() {
-                    // Restore a valid Idle state before returning the error.
-                    self.state = State::Idle(Some(Buf::with_capacity(0)));
+            let (op, buf) = res?;
+
+            // The buffer is not used here
+            self.state = State::Idle(Some(buf));
+
+            match op {
+                Operation::Read(_) | Operation::Seek(_) => {}
+                Operation::Write(res) => {
+                    assert!(self.last_write_err.is_none());
+                    return Poll::Ready(res);
                 }
-                res?
             }
-        };
-
-        // The buffer is not used here
-        self.state = State::Idle(Some(buf));
-
-        // A write error may have been saved while this operation was in
-        // flight. Only report it once the operation has completed.
-        if let Some(e) = self.last_write_err.take() {
-            return Poll::Ready(Err(e.into()));
         }
 
-        match op {
-            Operation::Read(_) => Poll::Ready(Ok(())),
-            Operation::Write(res) => Poll::Ready(res),
-            Operation::Seek(_) => Poll::Ready(Ok(())),
+        match self.last_write_err.take() {
+            Some(e) => Poll::Ready(Err(e.into())),
+            None => Poll::Ready(Ok(())),
         }
     }
 }
