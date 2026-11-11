@@ -1,5 +1,10 @@
 #![warn(rust_2018_idioms)]
-#![cfg(feature = "full")]
+#![cfg(all(
+    feature = "net",
+    feature = "macros",
+    feature = "rt",
+    feature = "io-util"
+))]
 #![cfg(unix)]
 
 use futures::future::try_join;
@@ -75,6 +80,9 @@ async fn listen_and_stream() -> std::io::Result<()> {
 
     let ((mut server, _), mut client) = try_join(accept, connect).await?;
 
+    // node exposes no peer name for an `AF_UNIX` connection, so the accepted
+    // socket's peer address is unnamed on emscripten.
+    #[cfg(not(target_os = "emscripten"))]
     assert_eq!(
         server.peer_addr().unwrap().as_pathname().unwrap(),
         &peer_path

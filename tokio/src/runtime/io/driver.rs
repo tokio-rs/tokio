@@ -207,7 +207,7 @@ impl Driver {
             not(target_feature = "atomics"),
             feature = "rt"
         ))]
-        let polled = crate::runtime::jspi::io_wait(max_wait, || self.poll.poll(events, max_wait));
+        let polled = crate::runtime::jspi::io_wait(max_wait, |max_wait| self.poll.poll(events, max_wait));
 
         match polled {
             Ok(()) => {}
