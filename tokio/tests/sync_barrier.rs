@@ -70,6 +70,48 @@ fn tango() {
 }
 
 #[test]
+#[cfg(panic = "unwind")]
+fn panicking_waker_does_not_break_barrier() {
+    use std::future::Future;
+    use std::pin::pin;
+    use std::sync::Arc;
+    use std::task::{Context, Wake, Waker};
+
+    struct PanickingWaker;
+
+    impl Wake for PanickingWaker {
+        fn wake(self: Arc<Self>) {
+            panic!("waker panicked");
+        }
+    }
+
+    let b = Barrier::new(2);
+
+    // A waiter parks with a waker that panics when woken.
+    let waker = Waker::from(Arc::new(PanickingWaker));
+    let mut cx = Context::from_waker(&waker);
+    let mut w1 = pin!(b.wait());
+    assert_pending!(w1.as_mut().poll(&mut cx));
+
+    // The leader hits the waiter's panicking waker while releasing the
+    // barrier.
+    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut w2 = spawn(b.wait());
+        w2.poll()
+    }))
+    .is_err());
+
+    // The barrier must still hold back the next cohort until it is full.
+    let mut w3 = spawn(b.wait());
+    assert_pending!(w3.poll());
+
+    let mut w4 = spawn(b.wait());
+    let wr4 = assert_ready!(w4.poll());
+    let wr3 = assert_ready!(w3.poll());
+    assert!(wr3.is_leader() != wr4.is_leader());
+}
+
+#[test]
 fn lots() {
     let b = Barrier::new(100);
 
