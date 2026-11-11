@@ -289,6 +289,7 @@ impl Handle {
                 any(
                     // epoll
                     target_os = "android",
+                    target_os = "emscripten",
                     target_os = "illumos",
                     target_os = "linux",
                     target_os = "redox",
@@ -313,6 +314,7 @@ impl Handle {
                 not(mio_unsupported_force_poll_poll),
                 any(
                     target_os = "android",
+                    target_os = "emscripten",
                     target_os = "illumos",
                     target_os = "linux",
                     target_os = "redox",

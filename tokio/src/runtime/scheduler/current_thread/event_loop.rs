@@ -65,6 +65,12 @@ impl Handle {
         self.shared.woken.swap(true, AcqRel);
         self.unpark();
     }
+
+    /// The builder's `event_interval`: tasks per batch.
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    pub(crate) fn event_interval(&self) -> usize {
+        self.shared.config.event_interval as usize
+    }
 }
 
 /// A task panicked and the runtime is configured to shut down.

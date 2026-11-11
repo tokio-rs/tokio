@@ -147,6 +147,16 @@ impl Inner {
             return;
         }
 
+        // An event loop's driver turn must not yield: the host loop already
+        // has the turn.
+        if crate::runtime::jspi::in_host_turn() {
+            assert!(
+                dur == Some(Duration::ZERO),
+                "an event loop's driver turn cannot wait"
+            );
+            return;
+        }
+
         // If JSPI is disabled, then we cannot park on JSPI, so instead use a
         // spin loop for a timed park, and a panic for any other suspension.
         // A zero-duration park returns immediately as on native.
