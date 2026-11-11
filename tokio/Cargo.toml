@@ -203,5 +203,11 @@ allowed_external_types = [
 # guarded on `parking_lot`, it's purely an optimization flag.
 feature_no_longer_enables_feature = "allow"
 
+# `main` returns into the host event loop, which drives the spawned tasks.
+[[test]]
+name = "rt_emscripten_event_loop_main"
+path = "tests/rt_emscripten_event_loop_main.rs"
+harness = false
+
 [lints]
 workspace = true
