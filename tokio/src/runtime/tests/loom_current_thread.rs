@@ -1,3 +1,5 @@
+#[cfg(tokio_unstable)]
+mod event_loop;
 mod yield_now;
 
 use crate::loom::sync::atomic::{AtomicUsize, Ordering};
