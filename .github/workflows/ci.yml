@@ -1291,7 +1291,7 @@ jobs:
       # Without `-sJSPI` any stack suspension traps: the hosted ticks must
       # complete the roots without one.
       - name: Test tokio for emscripten (unstable, non-JSPI)
-        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,fs,io-util,io-std,test-util,net" --test rt_emscripten_event_loop --test rt_emscripten_event_loop_main
+        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,fs,io-util,io-std,test-util,net" --test rt_emscripten_event_loop --test rt_emscripten_event_loop_main --test rt_emscripten_event_loop_abort --test rt_emscripten_event_loop_tick_abort
         working-directory: tokio
         env:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node

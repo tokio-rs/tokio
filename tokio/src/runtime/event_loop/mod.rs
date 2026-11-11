@@ -249,6 +249,29 @@ impl<R: Scheduler> Core<R> {
     }
 
     fn tick(&mut self, max_tasks: usize) -> usize {
+        // A JavaScript exception thrown by an import while a task is polled
+        // unwinds the Rust frames, running their drops, but `catch_unwind`
+        // catches only Rust panics: the task harness drops the future without
+        // completing the task, which stays running with its `JoinHandle`
+        // never resolved. Whoever catches the exception gets a loop that has
+        // silently lost the task, so abort as it unwinds out of the tick. A
+        // Rust panic out of the tick propagates as documented.
+        #[cfg(target_os = "emscripten")]
+        struct AbortOnForeignUnwind;
+
+        #[cfg(target_os = "emscripten")]
+        impl Drop for AbortOnForeignUnwind {
+            fn drop(&mut self) {
+                if !std::thread::panicking() {
+                    eprintln!("foreign exception unwound through an event loop tick; aborting process");
+                    std::process::abort();
+                }
+            }
+        }
+
+        #[cfg(target_os = "emscripten")]
+        let unwinding = AbortOnForeignUnwind;
+
         let handle = self.runtime.handle();
         let tick = || {
             context::enter_runtime(&handle.inner, false, |_| {
@@ -263,6 +286,8 @@ impl<R: Scheduler> Core<R> {
         let (ran, local_ready) = crate::runtime::jspi::host_turn(tick);
         #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
         let (ran, local_ready) = tick();
+        #[cfg(target_os = "emscripten")]
+        std::mem::forget(unwinding);
         self.local_ready = local_ready;
         ran
     }
@@ -384,6 +409,10 @@ macro_rules! event_loop_methods {
         /// loop's own tasks, or if a task panicked and the runtime is
         /// configured to [shut down on unhandled panics]; the loop is then
         /// unusable, and every further tick panics the same way.
+        ///
+        /// On `wasm32-unknown-emscripten`, a JavaScript exception thrown
+        /// through a task's poll (by an import it calls) aborts the process:
+        /// it unwinds past the task without completing it.
         ///
         /// [shut down on unhandled panics]: crate::runtime::Builder::unhandled_panic
         pub fn tick(&mut self, max_tasks: usize) -> usize {
