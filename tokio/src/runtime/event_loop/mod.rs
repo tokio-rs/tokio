@@ -289,12 +289,17 @@ impl<R: Scheduler> Core<R> {
     /// it armed.
     fn next_wake(&self) -> NextWake {
         let handle = self.handle();
-        let driver = handle.inner.driver();
         if self.local_ready || handle.inner.as_current_thread().has_remote_work() {
             return NextWake::Ready;
         }
         #[cfg(feature = "time")]
-        if let Some(tick) = driver.time.as_ref().and_then(|time| time.next_expiration()) {
+        if let Some(tick) = handle
+            .inner
+            .driver()
+            .time
+            .as_ref()
+            .and_then(|time| time.next_expiration())
+        {
             return NextWake::Timer(tick);
         }
         NextWake::Never
