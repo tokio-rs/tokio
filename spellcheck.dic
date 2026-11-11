@@ -1,4 +1,4 @@
-334
+336
 &
 +
 0o777
@@ -187,6 +187,7 @@ fns
 frontend
 fs
 functionalities
+futex
 getters
 goroutines
 gzip
@@ -208,6 +209,7 @@ io_uring
 iteratively
 latencies
 libc
+libuv
 lifecycle
 lifo
 lookups

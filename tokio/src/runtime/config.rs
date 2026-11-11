@@ -24,6 +24,10 @@ pub(crate) struct Config {
     /// To run after each task is terminated.
     pub(crate) after_termination: Option<TaskCallback>,
 
+    /// Callback for a wakeup that finds an event loop's host idle.
+    #[cfg(tokio_unstable)]
+    pub(crate) on_work_available: Option<Callback>,
+
     /// To run before each poll
     #[cfg(tokio_unstable)]
     pub(crate) before_poll: Option<TaskCallback>,
