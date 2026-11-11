@@ -208,6 +208,10 @@ increases the MSRV of Tokio, we do not guarantee that this does not happen.
 However, every minor release will have some set of versions of dependencies that
 works with the MSRV of that minor release.
 
+An exception to this is the optional `parking_lot` feature, which is not
+included in `full`. Enabling the `parking_lot` feature requires the MSRV of the
+`parking_lot` crate.
+
 ## Release schedule
 
 Tokio doesn't follow a fixed release schedule, but we typically make one minor
