@@ -53,9 +53,8 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
                 Poll::Ready(Some(item)) => {
                     if me.items.is_empty() {
                         me.deadline.set(Some(sleep(*me.duration)));
-                        // `max_size` may be too large to preallocate (e.g. `usize::MAX`
-                        // to batch by time only). In that case, grow on demand instead.
-                        let _ = me.items.try_reserve_exact(*me.cap);
+                        // Limit the initial allocation for large chunks; grow on demand.
+                        let _ = me.items.try_reserve_exact(usize::min(1024, *me.cap));
                     }
                     me.items.push(item);
                     if me.items.len() >= *me.cap {
