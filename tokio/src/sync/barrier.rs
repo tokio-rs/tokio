@@ -168,13 +168,18 @@ impl Barrier {
                     is_leader = true,
                 );
                 // we are the leader for this generation
-                // wake everyone, increment the generation, and return
-                state
-                    .waker
-                    .send(state.generation)
-                    .expect("there is at least one receiver");
+                // increment the generation, wake everyone, and return
+                //
+                // The state is reset before waking: a waker can panic when
+                // woken, and unwinding with `arrived == n` and a stale
+                // generation would let every later `wait` pass the barrier
+                // immediately.
                 state.arrived = 0;
                 state.generation += 1;
+                state
+                    .waker
+                    .send(generation)
+                    .expect("there is at least one receiver");
                 return BarrierWaitResult(true);
             }
 
