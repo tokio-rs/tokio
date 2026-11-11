@@ -283,8 +283,8 @@ pub(crate) fn sleep(dur: Duration) {
 /// through [`park`].
 ///
 /// Without JSPI `epoll_wait` cannot block and returns at once, so a timed
-/// wait spins to its deadline before probing and an untimed one panics, as
-/// `ParkThread` does.
+/// wait spins to its deadline before probing and a wait with no deadline
+/// panics, as `ParkThread` does.
 #[cfg(all(feature = "rt", feature = "net"))]
 pub(crate) fn io_wait<R>(
     max_wait: Option<Duration>,
