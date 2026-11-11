@@ -268,35 +268,44 @@ pub(crate) fn sleep(dur: Duration) {
 }
 
 /// The I/O driver's `epoll_wait` of `max_wait` (`None` = no deadline) as a
-/// park.
+/// park. `wait` runs the `epoll_wait` with the timeout it is given.
 ///
 /// Under JSPI a non-zero wait suspends on the host loop until readiness or
 /// the deadline, but a zero-timeout `epoll_wait` is a synchronous probe, and
 /// the host loop is the only producer of readiness, so the scheduler's
 /// maintenance park would never let Node deliver socket events. Yield a
-/// host turn first, as the zero-duration `ParkThread` park does. Without JSPI
-/// `epoll_wait` cannot block at all and returns at once, so a real wait would
-/// spin.
+/// host turn first, as the zero-duration `ParkThread` park does.
 ///
 /// The real wait is a suspension like [`park`]'s, and clears the scheduler
 /// context for the same reason: a host activation entering tokio meanwhile
 /// must wake the driver through the reactor, not the on-runtime shortcut.
+/// The zero-timeout probe never suspends, and the host turn before it goes
+/// through [`park`].
+///
+/// Without JSPI `epoll_wait` cannot block and returns at once, so a timed
+/// wait spins to its deadline before probing and an untimed one panics, as
+/// `ParkThread` does.
 #[cfg(all(feature = "rt", feature = "net"))]
-pub(crate) fn io_wait<R>(max_wait: Option<Duration>, wait: impl FnOnce() -> R) -> R {
-    let immediate = max_wait == Some(Duration::ZERO);
+pub(crate) fn io_wait<R>(
+    max_wait: Option<Duration>,
+    wait: impl FnOnce(Option<Duration>) -> R,
+) -> R {
     if jspi_enabled() {
-        if immediate {
+        if max_wait == Some(Duration::ZERO) {
             sleep(Duration::ZERO);
-            return wait();
+            return wait(max_wait);
         }
         let _scheduler = crate::runtime::context::clear_scheduler();
-        wait()
-    } else if immediate {
-        wait()
-    } else {
-        panic!(
+        return wait(max_wait);
+    }
+    match max_wait {
+        Some(dur) => {
+            std::thread::sleep(dur);
+            wait(Some(Duration::ZERO))
+        }
+        None => panic!(
             "cannot block on wasm32-unknown-emscripten: waiting for I/O \
              readiness needs the build to link `-sJSPI`"
-        );
+        ),
     }
 }

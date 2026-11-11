@@ -494,9 +494,8 @@
 //! `net` uses the standard `mio` epoll reactor over Emscripten's sockets. The
 //! I/O driver's wait is a blocking `epoll_wait`, which needs either JSPI
 //! (suspending on the host event loop) or pthreads with `-sPROXY_TO_PTHREAD`
-//! (blocking on a worker); a wait with no deadline then suspends until
-//! readiness rather than panicking. Built with `-sNODERAWSOCKETS` (real Node
-//! sockets), [`TcpStream`](crate::net::TcpStream),
+//! (blocking on a worker). Built with `-sNODERAWSOCKETS` (real Node sockets),
+//! [`TcpStream`](crate::net::TcpStream),
 //! [`TcpListener`](crate::net::TcpListener), [`UdpSocket`](crate::net::UdpSocket),
 //! stream `AF_UNIX` sockets ([`UnixStream`](crate::net::UnixStream),
 //! [`UnixListener`](crate::net::UnixListener), [`UnixSocket`](crate::net::UnixSocket)),
