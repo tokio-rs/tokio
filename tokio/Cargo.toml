@@ -209,5 +209,16 @@ name = "rt_emscripten_event_loop_main"
 path = "tests/rt_emscripten_event_loop_main.rs"
 harness = false
 
+# A JavaScript exception through a tick; passes only by aborting.
+[[test]]
+name = "rt_emscripten_event_loop_abort"
+path = "tests/rt_emscripten_event_loop_abort.rs"
+harness = false
+
+[[test]]
+name = "rt_emscripten_event_loop_tick_abort"
+path = "tests/rt_emscripten_event_loop_tick_abort.rs"
+harness = false
+
 [lints]
 workspace = true

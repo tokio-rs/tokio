@@ -275,7 +275,7 @@ impl Hosted {
         // No Rust frame is above the host's callback to catch a panic (a
         // task panic under `UnhandledPanic::ShutdownRuntime`); it would
         // unwind into the host's JavaScript. Abort as an uncaught panic on
-        // `main` would.
+        // `main` would. (A JavaScript exception aborts in `Core::tick`.)
         let ticked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             core.borrow_mut().tick(self.batch);
             // Only the callback holds the loop once a task dropped it: it
