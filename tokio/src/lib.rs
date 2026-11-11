@@ -509,7 +509,7 @@
 //! itself, which needs neither JSPI nor pthreads: the runtime registers its
 //! reactor's readiness and its timer deadlines with the host loop
 //! (Emscripten 6.0.12 or later), and tasks run once control returns to the
-//! host. It keeps the Emscripten runtime alive while it has tasks, so `main`
+//! host. The I/O driver is optional. It keeps the Emscripten runtime alive while it has tasks, so `main`
 //! may return with work in flight. Hosted event loops are not available in
 //! pthreads builds.
 

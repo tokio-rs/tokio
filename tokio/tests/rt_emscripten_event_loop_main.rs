@@ -24,8 +24,7 @@
     tokio_unstable,
     feature = "rt",
     feature = "time",
-    feature = "sync",
-    feature = "net"
+    feature = "sync"
 ))]
 mod emscripten {
     use std::cell::RefCell;
@@ -134,6 +133,20 @@ mod emscripten {
         let el_b = event_loop();
         let (tx, rx) = tokio::sync::oneshot::channel::<u32>();
 
+        // Without the I/O driver there is no descriptor for the host to
+        // listen on: timers and host-context wakes alone tick this loop.
+        let el_time = Box::leak(Box::new(
+            Builder::new_current_thread()
+                .enable_time()
+                .build_hosted_local_event_loop(Default::default())
+                .unwrap(),
+        ));
+        let (time_tx, time_rx) = tokio::sync::oneshot::channel::<u32>();
+        root(el_time, async move {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+            assert_eq!(time_rx.await.unwrap(), 9);
+        });
+
         run_js("Module.tokioDeadline = Date.now() + 10_000");
 
         // More spawns than one batch runs: the tick the hosted loop
@@ -184,6 +197,7 @@ mod emscripten {
             // Wakes the task parked on the other loop: sent from a tick of
             // this one, picked up by the tick b schedules.
             tx.send(7).unwrap();
+            time_tx.send(9).unwrap();
         });
 
         root(el_b, async move {
@@ -204,6 +218,7 @@ mod emscripten {
             assert_eq!(OUTLIVED.load(SeqCst), 0);
         });
 
+        #[cfg(all(feature = "net", feature = "io-util"))]
         {
             use tokio::io::{AsyncReadExt, AsyncWriteExt};
             use tokio::net::{TcpListener, TcpStream};
