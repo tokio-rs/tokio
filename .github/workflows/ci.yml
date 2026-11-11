@@ -1297,6 +1297,13 @@ jobs:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
           RUSTFLAGS: "--cfg tokio_unstable -Dwarnings -Adeprecated -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sNODERAWSOCKETS -Clink-args=-sNODERAWFS -Clink-args=--pre-js=tokio/tests/rt_emscripten_pre.js"
 
+      - name: Test tokio for emscripten (unstable, non-JSPI, no I/O driver)
+        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync" --test rt_emscripten_event_loop_main
+        working-directory: tokio
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
+          RUSTFLAGS: "--cfg tokio_unstable -Dwarnings -Adeprecated -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sNODERAWSOCKETS -Clink-args=-sNODERAWFS -Clink-args=--pre-js=tokio/tests/rt_emscripten_pre.js"
+
   check-external-types:
     name: check-external-types (${{ matrix.os }})
     needs: basics
