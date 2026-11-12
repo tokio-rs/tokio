@@ -36,7 +36,14 @@ pub(crate) struct Driver {
 
     /// The system event queue.
     poll: mio::Poll,
+
+    /// Polls in a row that failed with a transient error (see `turn`).
+    transient_poll_errors: u32,
 }
+
+/// How many transient poll errors in a row `turn` waits out before it
+/// panics as for any other error: about ten seconds of them.
+const MAX_TRANSIENT_POLL_ERRORS: u32 = 10_000;
 
 /// A reference to an I/O driver.
 pub(crate) struct Handle {
@@ -130,6 +137,7 @@ impl Driver {
             events: mio::Events::with_capacity(nevents),
             events_busy: nevents_busy.map(mio::Events::with_capacity),
             poll,
+            transient_poll_errors: 0,
         };
 
         let (registrations, synced) = RegistrationSet::new();
@@ -197,8 +205,23 @@ impl Driver {
         // Block waiting for an event to happen, peeling out how many events
         // happened.
         match self.poll.poll(events, max_wait) {
-            Ok(()) => {}
+            Ok(()) => self.transient_poll_errors = 0,
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+            // The kernel fails `epoll_wait` with EAGAIN or ENOMEM while it is
+            // briefly short of memory. That passes: turn again after a moment
+            // rather than panic the runtime (and, with `panic = "abort"`, the
+            // whole process). An error that lasts is not transient, and
+            // panics below as before.
+            Err(ref e)
+                if matches!(
+                    e.kind(),
+                    io::ErrorKind::WouldBlock | io::ErrorKind::OutOfMemory
+                ) && self.transient_poll_errors < MAX_TRANSIENT_POLL_ERRORS =>
+            {
+                self.transient_poll_errors += 1;
+                std::thread::sleep(Duration::from_millis(1));
+                return;
+            }
             #[cfg(target_os = "wasi")]
             Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
                 // In case of wasm32_wasi this error happens, when trying to poll without subscriptions
