@@ -1,10 +1,14 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(feature = "full", target_os = "linux"))]
 
+use std::mem::MaybeUninit;
+use std::net::Shutdown;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use tokio::net::UdpSocket;
+use tokio::io::Interest;
+use tokio::net::{UdpSocket, UnixDatagram};
 use tokio::task::coop::{consume_budget, has_budget_remaining};
+use tokio_test::{assert_pending, task};
 
 const BUDGET: usize = 128;
 
@@ -77,6 +81,37 @@ async fn coop_budget_udp_send_recv() {
     }
 
     assert_eq!(N_ITERATIONS / (BUDGET / 2), tracker.load(Ordering::SeqCst));
+}
+
+/// Ensure that `async_io` yields when the operation keeps returning `WouldBlock` on a socket that stays ready
+///
+/// # Design
+/// A datagram socket that was shut down for reading is reported as read-closed, but `recv` on it still returns
+/// EWOULDBLOCK when its queue is empty.
+///
+/// The read-closed state is never cleared, so every retry finds the socket ready again and the only way for
+/// `async_io` to yield is through budgeting.
+#[tokio::test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
+async fn coop_budget_async_io_would_block() {
+    let (rx, _tx) = UnixDatagram::pair().unwrap();
+    rx.shutdown(Shutdown::Read).unwrap();
+    rx.readable().await.unwrap();
+
+    let sock = socket2::SockRef::from(&rx);
+    let mut calls = 0;
+    let mut recv = task::spawn(rx.async_io(Interest::READABLE, || {
+        calls += 1;
+        // Lets the test fail instead of spinning forever if `async_io` does not yield.
+        if calls > 2 * BUDGET {
+            return Ok(0);
+        }
+        sock.recv(&mut [MaybeUninit::<u8>::uninit(); 8])
+    }));
+
+    assert_pending!(recv.poll());
+    drop(recv);
+    assert_eq!(BUDGET, calls);
 }
 
 #[tokio::test]
