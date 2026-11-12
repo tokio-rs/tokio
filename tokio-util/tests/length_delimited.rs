@@ -951,8 +951,9 @@ fn flush() -> Poll<io::Result<Op>> {
 // Repro for tokio-rs/tokio#8780: LengthDelimitedCodec with num_skip(0)
 // and a zero-length frame returns empty frames forever without
 // consuming any input bytes (remote CPU exhaustion via Framed).
+// The decoder must reject the frame with InvalidData instead.
 #[test]
-fn decode_num_skip_zero_zero_length_frame_makes_progress() {
+fn decode_num_skip_zero_zero_length_frame_is_rejected() {
     let mut codec = LengthDelimitedCodec::builder()
         .length_field_offset(0)
         .length_field_type::<u32>()
@@ -962,19 +963,8 @@ fn decode_num_skip_zero_zero_length_frame_makes_progress() {
 
     let mut buf = BytesMut::from(&b"\x00\x00\x00\x00"[..]);
 
-    for _ in 0..5 {
-        match codec.decode(&mut buf) {
-            Ok(Some(frame)) => {
-                assert!(
-                    buf.len() < 4,
-                    "decoder made no progress: Ok(Some({frame:?})) with buffer_len={}",
-                    buf.len(),
-                );
-            }
-            Ok(None) => break,
-            Err(_) => break,
-        }
-    }
+    let err = codec.decode(&mut buf).unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidData);
 }
 
 // A zero-length payload is a legitimate empty frame under the default
