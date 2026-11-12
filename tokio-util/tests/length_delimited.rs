@@ -947,3 +947,46 @@ fn data(bytes: &[u8]) -> Poll<io::Result<Op>> {
 fn flush() -> Poll<io::Result<Op>> {
     Poll::Ready(Ok(Op::Flush))
 }
+
+// Repro for tokio-rs/tokio#8780: LengthDelimitedCodec with num_skip(0)
+// and a zero-length frame returns empty frames forever without
+// consuming any input bytes (remote CPU exhaustion via Framed).
+#[test]
+fn decode_num_skip_zero_zero_length_frame_makes_progress() {
+    let mut codec = LengthDelimitedCodec::builder()
+        .length_field_offset(0)
+        .length_field_type::<u32>()
+        .length_adjustment(0)
+        .num_skip(0)
+        .new_codec();
+
+    let mut buf = BytesMut::from(&b"\x00\x00\x00\x00"[..]);
+
+    for _ in 0..5 {
+        match codec.decode(&mut buf) {
+            Ok(Some(frame)) => {
+                assert!(
+                    buf.len() < 4,
+                    "decoder made no progress: Ok(Some({frame:?})) with buffer_len={}",
+                    buf.len(),
+                );
+            }
+            Ok(None) => break,
+            Err(_) => break,
+        }
+    }
+}
+
+// A zero-length payload is a legitimate empty frame under the default
+// config: the 4-byte head is consumed and one empty frame is yielded.
+// Guards against over-broad fixes for tokio-rs/tokio#8780.
+#[test]
+fn decode_zero_length_frame_default_config_still_works() {
+    let mut codec = LengthDelimitedCodec::new();
+    let mut buf = BytesMut::from(&b"\x00\x00\x00\x00"[..]);
+
+    let frame = codec.decode(&mut buf).unwrap();
+    assert_eq!(frame.unwrap().len(), 0);
+    assert!(buf.is_empty());
+    assert!(codec.decode(&mut buf).unwrap().is_none());
+}
