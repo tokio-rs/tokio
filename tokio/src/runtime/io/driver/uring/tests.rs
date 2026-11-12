@@ -203,21 +203,21 @@ fn register_op_records_index_before_completion_waker_panic() {
         )
     }));
 
+    assert!(
+        res.is_err(),
+        "expected the completion waker to panic during registration"
+    );
     let idx = recorded.load(Ordering::SeqCst);
-    if res.is_err() {
-        assert_ne!(
-            idx,
-            usize::MAX,
-            "slab index must be recorded before a completion waker panics"
-        );
-        assert!(
-            matches!(
-                handle.get_uring().lock().ops.get(idx),
-                Some(Lifecycle::Waiting(_))
-            ),
-            "in-flight slot was dropped after the waker panic"
-        );
-    } else {
-        assert_ne!(idx, usize::MAX, "after_push should run on the success path");
-    }
+    assert_ne!(
+        idx,
+        usize::MAX,
+        "slab index must be recorded before a completion waker panics"
+    );
+    assert!(
+        matches!(
+            handle.get_uring().lock().ops.get(idx),
+            Some(Lifecycle::Waiting(_))
+        ),
+        "in-flight slot was dropped after the waker panic"
+    );
 }

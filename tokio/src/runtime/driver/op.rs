@@ -188,7 +188,7 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
                 };
 
                 match result {
-                    RegisterResult::Submitted(_idx) => {}
+                    RegisterResult::Submitted => {}
 
                     // The kernel never saw the entry, so the resources go back to
                     // the caller with the error.

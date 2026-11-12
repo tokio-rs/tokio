@@ -27,8 +27,8 @@ fn register_probe(uring: &IoUring, probe: &mut Probe) -> io::Result<()> {
 
 /// Outcome of registering an op with the io_uring.
 pub(crate) enum RegisterResult {
-    /// In-flight at this slab index.
-    Submitted(usize),
+    /// In-flight; the caller already got the slab index from `after_push`.
+    Submitted,
 
     /// Submit failed before reaching the kernel; the slot was removed.
     NotPushed(io::Error),
@@ -337,7 +337,7 @@ impl Handle {
             return RegisterResult::Pushed { index, error: e };
         }
 
-        RegisterResult::Submitted(index)
+        RegisterResult::Submitted
     }
 
     pub(crate) fn cancel_op<T: Cancellable>(&self, index: usize, data: Option<T>) {
