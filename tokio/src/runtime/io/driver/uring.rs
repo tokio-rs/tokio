@@ -25,6 +25,24 @@ fn register_probe(uring: &IoUring, probe: &mut Probe) -> io::Result<()> {
     }
 }
 
+/// Creates the ring, probes the opcodes supported by the kernel, and registers
+/// the ring's file descriptor so completions wake the driver.
+///
+/// On error, the ring is dropped, so nothing is left half set up.
+fn try_setup(registry: &mio::Registry) -> io::Result<(IoUring, Probe)> {
+    let uring = IoUring::new(DEFAULT_RING_SIZE)?;
+    let mut probe = Probe::new();
+    register_probe(&uring, &mut probe)?;
+
+    let fd = uring.as_raw_fd();
+    registry.register(
+        &mut SourceFd(&fd),
+        TOKEN_WAKEUP,
+        Interest::READABLE.to_mio(),
+    )?;
+    Ok((uring, probe))
+}
+
 /// Outcome of registering an op with the io_uring.
 pub(crate) enum RegisterResult {
     /// In-flight at this slab index.
@@ -48,6 +66,25 @@ impl UringContext {
         Self {
             ops: Slab::new(),
             uring: None,
+        }
+    }
+
+    /// Sets up io_uring for an IO driver, returning the context and
+    /// the opcodes supported by the kernel.
+    ///
+    /// If io_uring can't be set up for any reason,
+    /// this returns an empty context and no probe, and file
+    /// system operations fall back to the blocking thread pool.
+    pub(crate) fn setup(registry: &mio::Registry) -> (Self, Option<Probe>) {
+        match try_setup(registry) {
+            Ok((uring, probe)) => (
+                Self {
+                    uring: Some(uring),
+                    ops: Slab::new(),
+                },
+                Some(probe),
+            ),
+            Err(_) => (Self::new(), None),
         }
     }
 
@@ -208,20 +245,6 @@ pub(crate) fn uring_supports(opcode: u8) -> bool {
 }
 
 impl Handle {
-    /// Sets up io_uring for this IO driver.
-    /// If io_uring can't be set up for any reason this returns early without
-    /// a probe, and file system operations fall back to the blocking thread pool.
-    pub(crate) fn enable_io_uring(&mut self) -> io::Result<()> {
-        let mut probe = Probe::new();
-
-        if self.try_init(&mut probe).is_err() {
-            return Ok(());
-        }
-
-        self.uring_probe = Some(probe);
-        Ok(())
-    }
-
     pub(crate) fn get_uring(&self) -> &Mutex<UringContext> {
         &self.uring_context
     }
@@ -231,29 +254,6 @@ impl Handle {
         self.uring_probe
             .as_ref()
             .is_some_and(|probe| probe.is_supported(opcode))
-    }
-
-    /// Initialize the io_uring context if it hasn't been initialized yet.
-    ///
-    /// The ring is stored only after the reactor accepts its fd. A failure
-    /// there drops the ring, so the following attempt can create another one.
-    /// An existing ring stays stored, and this call fills `probe` from it.
-    fn try_init(&self, probe: &mut Probe) -> io::Result<()> {
-        let mut guard = self.get_uring().lock();
-        if let Some(uring) = guard.uring.as_ref() {
-            // The stored ring is already registered. Fill this probe from it.
-            return register_probe(uring, probe);
-        }
-
-        let uring = IoUring::new(DEFAULT_RING_SIZE)?;
-        register_probe(&uring, probe)?;
-
-        let fd = uring.as_raw_fd();
-        let mut source = SourceFd(&fd);
-        self.registry
-            .register(&mut source, TOKEN_WAKEUP, Interest::READABLE.to_mio())?;
-        guard.uring = Some(uring);
-        Ok(())
     }
 
     /// Register an operation with the io_uring.
