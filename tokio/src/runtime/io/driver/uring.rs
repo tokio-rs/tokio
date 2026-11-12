@@ -276,15 +276,22 @@ impl Handle {
 
     /// Register an operation with the io_uring.
     ///
-    /// If this is the first io_uring operation, it will also initialize the io_uring context.
-    /// If io_uring isn't supported, this function returns an `ENOSYS` error, so the caller can
-    /// perform custom handling, such as falling back to an alternative mechanism.
+    /// `after_push` is invoked once the SQE is on the submission queue and
+    /// before any completion waker can run, so the caller can record the slab
+    /// index first. If a waker then panics, `Op::drop` can cancel the
+    /// in-flight operation instead of treating it as never registered.
     ///
     /// # Safety
     ///
-    /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
-    /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
-    pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> RegisterResult {
+    /// Callers must ensure that parameters of the entry (such as buffer) are
+    /// valid and will be valid for the entire duration of the operation,
+    /// otherwise it may cause memory problems.
+    pub(crate) unsafe fn register_op(
+        &self,
+        entry: Entry,
+        waker: Waker,
+        after_push: impl FnOnce(usize),
+    ) -> RegisterResult {
         assert!(self.uring_probe.initialized());
 
         // Uring is initialized.
@@ -311,6 +318,10 @@ impl Handle {
                 return RegisterResult::NotPushed(e);
             }
         }
+
+        // The kernel may now own the buffer this entry points at. Record the
+        // index before running completion wakers or submitting.
+        after_push(index);
 
         // Ensure that the completion queue is not full before submitting the entry.
         while ctx.ring_mut().completion().is_full() {
