@@ -2,6 +2,7 @@ use crate::io::blocking::Buf;
 use crate::io::uring::open::Open;
 use crate::io::uring::read::Read;
 use crate::io::uring::rename::Rename;
+use crate::io::uring::ring::sealed::Keep;
 use crate::io::uring::utils::ArcFd;
 use crate::io::uring::write::Write;
 
@@ -53,6 +54,8 @@ pub(crate) enum CancelData {
         any(target_env = "gnu", target_os = "android")
     )]
     Statx(Statx),
+    /// An op submitted through `tokio::io::uring::Ring`.
+    Ring(Keep),
 }
 
 #[derive(Debug)]

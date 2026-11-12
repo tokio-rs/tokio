@@ -308,5 +308,6 @@ cfg_io_blocking! {
 }
 
 cfg_io_uring! {
-    pub(crate) mod uring;
+    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "io-uring"))))]
+    pub mod uring;
 }
