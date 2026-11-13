@@ -333,7 +333,7 @@ impl Core {
     }
 
     fn next_task(&mut self, handle: &Handle) -> Option<Notified> {
-        if self.tick % self.global_queue_interval == 0 {
+        if self.tick.is_multiple_of(self.global_queue_interval) {
             handle
                 .next_remote_task()
                 .or_else(|| self.next_local_task(handle))
