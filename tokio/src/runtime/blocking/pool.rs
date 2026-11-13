@@ -8,9 +8,9 @@ use crate::runtime::blocking::{shutdown, BlockingTask};
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{AutoBox, Builder, Callback, Handle};
-use crate::util::metric_atomics::MetricAtomicUsize;
 #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
 use crate::util::metric_atomics::MetricAtomicU64;
+use crate::util::metric_atomics::MetricAtomicUsize;
 use crate::util::trace::{blocking_task, SpawnMeta};
 
 use std::collections::{HashMap, VecDeque};
@@ -200,6 +200,7 @@ pub(crate) enum BlockingTaskKind {
     #[cfg_attr(any(not(feature = "fs"), target_os = "emscripten"), allow(dead_code))]
     Mandatory,
     Regular,
+    #[cfg_attr(not(feature = "rt-multi-thread"), allow(dead_code))]
     SchedulerWorker,
 }
 
@@ -250,7 +251,9 @@ impl Task {
             task,
             kind,
             #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
-            submitted_at: if kind != BlockingTaskKind::SchedulerWorker && _metrics.track_queue_latency {
+            submitted_at: if kind != BlockingTaskKind::SchedulerWorker
+                && _metrics.track_queue_latency
+            {
                 now()
             } else {
                 None
@@ -267,8 +270,12 @@ impl Task {
         if let Some(submitted_at) = self.submitted_at {
             // These counters do not synchronize task data. They wrap on overflow,
             // and separate reads do not form an atomic snapshot.
-            _metrics.queue_latency_ns.add(duration_as_u64(submitted_at.elapsed()), Ordering::Relaxed);
-            _metrics.queue_latency_observations.add(1, Ordering::Relaxed);
+            _metrics
+                .queue_latency_ns
+                .add(duration_as_u64(submitted_at.elapsed()), Ordering::Relaxed);
+            _metrics
+                .queue_latency_observations
+                .add(1, Ordering::Relaxed);
         }
         self.task.run();
     }
@@ -281,7 +288,13 @@ impl Task {
     }
 }
 
-#[cfg(all(test, not(loom), tokio_unstable, target_has_atomic = "64"))]
+#[cfg(all(
+    test,
+    not(loom),
+    not(target_family = "wasm"),
+    tokio_unstable,
+    target_has_atomic = "64"
+))]
 mod latency_tests {
     use super::*;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -316,7 +329,10 @@ mod latency_tests {
 
         let first = rt.spawn_blocking(|| {});
         rt.block_on(first).unwrap();
-        assert_eq!(metrics.queue_latency_observations.load(Ordering::Relaxed), u64::from(enabled));
+        assert_eq!(
+            metrics.queue_latency_observations.load(Ordering::Relaxed),
+            u64::from(enabled)
+        );
 
         let (started_tx, started_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
@@ -346,7 +362,10 @@ mod latency_tests {
                 .unwrap_err();
             assert!(error.is_panic());
         });
-        assert_eq!(metrics.queue_latency_observations.load(Ordering::Relaxed), if enabled { 8 } else { 0 });
+        assert_eq!(
+            metrics.queue_latency_observations.load(Ordering::Relaxed),
+            if enabled { 8 } else { 0 }
+        );
         if enabled {
             assert!(metrics.queue_latency_ns.load(Ordering::Relaxed) > 0);
         } else {
@@ -384,11 +403,19 @@ mod latency_tests {
                         crate::spawn(async move { tx.send(()).unwrap() });
                         rx.recv().unwrap();
                     });
-                }).await.unwrap();
-                assert_eq!(metrics.queue_latency_observations.load(Ordering::Relaxed), 0);
+                })
+                .await
+                .unwrap();
+                assert_eq!(
+                    metrics.queue_latency_observations.load(Ordering::Relaxed),
+                    0
+                );
                 crate::task::spawn_blocking(|| {}).await.unwrap();
             });
-            assert_eq!(metrics.queue_latency_observations.load(Ordering::Relaxed), 1);
+            assert_eq!(
+                metrics.queue_latency_observations.load(Ordering::Relaxed),
+                1
+            );
         }
     }
 
@@ -399,10 +426,15 @@ mod latency_tests {
             let tracker = Arc::new(());
             let mut builder = Builder::new_multi_thread();
             builder.sharded_blocking_queue = sharded;
-            builder.worker_threads(1).thread_stack_size(usize::MAX).on_thread_start({
-                let tracker = tracker.clone();
-                move || { let _ = &tracker; }
-            });
+            builder
+                .worker_threads(1)
+                .thread_stack_size(usize::MAX)
+                .on_thread_start({
+                    let tracker = tracker.clone();
+                    move || {
+                        let _ = &tracker;
+                    }
+                });
             assert!(builder.build().is_err());
             drop(builder);
             assert_eq!(Arc::strong_count(&tracker), 1);
@@ -433,7 +465,10 @@ mod latency_tests {
                 delayed_task.await.unwrap();
             });
 
-            assert_eq!(metrics.queue_latency_observations.load(Ordering::Relaxed), 2);
+            assert_eq!(
+                metrics.queue_latency_observations.load(Ordering::Relaxed),
+                2
+            );
             assert!(
                 metrics.queue_latency_ns.load(Ordering::Relaxed) >= 5_000_000,
                 "expected at least 5ms, got {}ns",
@@ -470,13 +505,23 @@ mod latency_tests {
                 }
                 completed
             });
-            assert_eq!(spawner.inner.metrics.queue_latency_observations.load(Ordering::Relaxed), 1 + completed);
+            assert_eq!(
+                spawner
+                    .inner
+                    .metrics
+                    .queue_latency_observations
+                    .load(Ordering::Relaxed),
+                1 + completed
+            );
         }
     }
 
     #[test]
     fn shutdown_only_runs_and_observes_mandatory_tasks() {
-        for (kind, should_run) in [(BlockingTaskKind::Regular, false), (BlockingTaskKind::Mandatory, true)] {
+        for (kind, should_run) in [
+            (BlockingTaskKind::Regular, false),
+            (BlockingTaskKind::Mandatory, true),
+        ] {
             let metrics = SpawnerMetrics {
                 track_queue_latency: true,
                 ..SpawnerMetrics::default()
@@ -500,12 +545,18 @@ mod latency_tests {
                 task::SpawnLocation::capture(),
             );
             let task = Task::new(unowned, kind, &metrics);
-            assert_eq!(metrics.queue_latency_observations.load(Ordering::Relaxed), 0);
+            assert_eq!(
+                metrics.queue_latency_observations.load(Ordering::Relaxed),
+                0
+            );
 
             task.shutdown_or_run_if_mandatory(&metrics);
 
             assert_eq!(ran.load(Ordering::SeqCst), should_run);
-            assert_eq!(metrics.queue_latency_observations.load(Ordering::Relaxed), u64::from(should_run));
+            assert_eq!(
+                metrics.queue_latency_observations.load(Ordering::Relaxed),
+                u64::from(should_run)
+            );
             if !should_run {
                 assert_eq!(metrics.queue_latency_ns.load(Ordering::Relaxed), 0);
             }
@@ -685,6 +736,8 @@ impl Spawner {
         }
     }
 
+    #[cfg(feature = "rt-multi-thread")]
+    #[track_caller]
     pub(crate) fn spawn_scheduler_worker<F>(&self, rt: &Handle, func: F)
     where
         F: FnOnce() + Send + 'static,
