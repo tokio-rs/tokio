@@ -231,7 +231,7 @@ impl ShardedImpl {
             };
             for task in tasks {
                 metrics.dec_queue_depth();
-                task.shutdown_or_run_if_mandatory();
+                task.shutdown_or_run_if_mandatory(metrics);
             }
         }
     }
@@ -306,7 +306,7 @@ impl ShardedImpl {
             // other workers are not blocked on this worker.
             while let Some(task) = self.pop(&mut cursor) {
                 metrics.dec_queue_depth();
-                task.run();
+                task.run(metrics);
             }
 
             coord = self.coord.lock();
@@ -322,7 +322,7 @@ impl ShardedImpl {
             if let Some(task) = self.pop(&mut cursor) {
                 metrics.dec_queue_depth();
                 drop(coord);
-                task.run();
+                task.run(metrics);
                 continue 'main;
             }
 

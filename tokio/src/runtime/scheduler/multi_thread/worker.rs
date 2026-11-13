@@ -505,7 +505,9 @@ fn maybe_move_runtime() -> Result<(bool, bool), &'static str> {
         // Once the blocking task is done executing, we will attempt to
         // steal the core back.
         let worker = cx.worker.clone();
-        runtime::spawn_blocking(move || run(worker));
+        let rt = runtime::Handle::current();
+        let spawner = worker.handle.blocking_spawner.clone();
+        spawner.spawn_scheduler_worker(&rt, move || run(worker));
         Ok(())
     })?;
     Ok((had_entered, take_core))

@@ -159,6 +159,8 @@ pub struct Builder {
 
     /// When true, the blocking pool uses the sharded queue implementation.
     pub(super) sharded_blocking_queue: bool,
+
+    pub(super) track_blocking_queue_latency: bool,
 }
 
 cfg_unstable! {
@@ -373,6 +375,7 @@ impl Builder {
             enable_eager_driver_handoff: false,
 
             sharded_blocking_queue: sharded_blocking_queue_default(),
+            track_blocking_queue_latency: false,
         }
     }
 
@@ -525,6 +528,20 @@ impl Builder {
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn enable_sharded_blocking_queue(&mut self) -> &mut Self {
         self.sharded_blocking_queue = true;
+        self
+    }
+
+    /// Enables tracking the cumulative duration that tasks spend waiting in the
+    /// blocking thread pool queue before being executed.
+    ///
+    /// When enabled, tracking captures a timestamp at enqueue and measures elapsed
+    /// time at dequeue.
+    ///
+    /// Tracking is disabled by default.
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    pub fn track_blocking_queue_latency(&mut self) -> &mut Self {
+        self.track_blocking_queue_latency = true;
         self
     }
 
