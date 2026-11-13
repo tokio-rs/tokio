@@ -160,6 +160,7 @@ pub struct Builder {
     /// When true, the blocking pool uses the sharded queue implementation.
     pub(super) sharded_blocking_queue: bool,
 
+    #[cfg(tokio_unstable)]
     pub(super) track_blocking_queue_latency: bool,
 }
 
@@ -375,6 +376,7 @@ impl Builder {
             enable_eager_driver_handoff: false,
 
             sharded_blocking_queue: sharded_blocking_queue_default(),
+            #[cfg(tokio_unstable)]
             track_blocking_queue_latency: false,
         }
     }
@@ -531,13 +533,16 @@ impl Builder {
         self
     }
 
-    /// Enables tracking the cumulative duration that tasks spend waiting in the
-    /// blocking thread pool queue before being executed.
+    /// Enables tracking the time from submitting blocking work to the pool until
+    /// a worker attempts to execute it. This includes time spent acquiring queue
+    /// locks and starting a worker, but excludes the task's execution time.
     ///
-    /// When enabled, tracking captures a timestamp at enqueue and measures elapsed
-    /// time at dequeue.
+    /// Dequeued tasks are observed even if they were cancelled before running.
+    /// Mandatory tasks run during shutdown are observed; tasks discarded during
+    /// shutdown are not. Internal scheduler workers are not observed.
     ///
-    /// Tracking is disabled by default.
+    /// Tracking is disabled by default. It is unavailable on targets without
+    /// 64-bit atomics and on `wasm32-unknown-unknown`.
     #[cfg(tokio_unstable)]
     #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
     pub fn track_blocking_queue_latency(&mut self) -> &mut Self {
