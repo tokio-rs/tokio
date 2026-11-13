@@ -540,6 +540,8 @@ impl Builder {
     /// Dequeued tasks are observed even if they were cancelled before running.
     /// Mandatory tasks run during shutdown are observed; tasks discarded during
     /// shutdown are not. Internal scheduler workers are not observed.
+    /// An observation records an execution attempt, so a task may be observed
+    /// even if its submission returned an error after it was queued.
     ///
     /// Tracking is disabled by default. It is unavailable on targets without
     /// 64-bit atomics and on `wasm32-unknown-unknown`.
