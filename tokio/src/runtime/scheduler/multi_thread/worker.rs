@@ -506,7 +506,7 @@ fn maybe_move_runtime() -> Result<(bool, bool), &'static str> {
         // steal the core back.
         let worker = cx.worker.clone();
         let rt = runtime::Handle::current();
-        rt.inner.blocking_spawner().spawn_blocking(&rt, move || run(worker), true);
+        rt.inner.blocking_spawner().spawn_scheduler_worker(&rt, move || run(worker));
         Ok(())
     })?;
     Ok((had_entered, take_core))
@@ -521,10 +521,9 @@ impl Launch {
             let fn_size = std::mem::size_of_val(&worker_to_run);
             let (_, result) = rt.inner.blocking_spawner().spawn_blocking_inner(
                 move || run(worker_to_run),
-                blocking::Mandatory::NonMandatory,
+                blocking::BlockingTaskKind::SchedulerWorker,
                 SpawnMeta::new_unnamed(fn_size),
                 &rt,
-                true,
             );
 
             if let Err(error) = result {

@@ -412,7 +412,7 @@ impl ShardedImpl {
 #[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
-    use crate::runtime::blocking::pool::Mandatory;
+    use crate::runtime::blocking::pool::BlockingTaskKind;
     use crate::runtime::blocking::schedule::BlockingSchedule;
     use crate::runtime::blocking::task::BlockingTask;
     #[cfg(not(target_family = "wasm"))]
@@ -440,7 +440,7 @@ mod tests {
             id,
             task::SpawnLocation::capture(),
         );
-        Task::new(task, Mandatory::NonMandatory)
+        Task::new(task, BlockingTaskKind::Regular, &SpawnerMetrics::default())
     }
 
     // Bypass only random shard selection, leaving worker execution and its

@@ -549,7 +549,7 @@ cfg_rt! {
     pub(crate) use blocking::spawn_blocking;
 
     cfg_trace! {
-        pub(crate) use blocking::Mandatory;
+        pub(crate) use blocking::BlockingTaskKind;
     }
 
     cfg_io_blocking! {

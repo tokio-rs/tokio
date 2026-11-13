@@ -190,16 +190,17 @@ impl ThreadManagementState {
 
 pub(crate) struct Task {
     task: task::UnownedTask<BlockingSchedule>,
-    mandatory: Mandatory,
+    kind: BlockingTaskKind,
     #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
     submitted_at: Option<Instant>,
 }
 
-#[derive(PartialEq, Eq)]
-pub(crate) enum Mandatory {
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum BlockingTaskKind {
     #[cfg_attr(any(not(feature = "fs"), target_os = "emscripten"), allow(dead_code))]
     Mandatory,
-    NonMandatory,
+    Regular,
+    SchedulerWorker,
 }
 
 pub(crate) enum SpawnError {
@@ -240,24 +241,25 @@ fn duration_as_u64(dur: Duration) -> u64 {
 }
 
 impl Task {
-    pub(crate) fn new(task: task::UnownedTask<BlockingSchedule>, mandatory: Mandatory) -> Task {
+    pub(crate) fn new(
+        task: task::UnownedTask<BlockingSchedule>,
+        kind: BlockingTaskKind,
+        _metrics: &SpawnerMetrics,
+    ) -> Task {
         Task {
             task,
-            mandatory,
+            kind,
             #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
-            submitted_at: None,
+            submitted_at: if kind != BlockingTaskKind::SchedulerWorker && _metrics.track_queue_latency {
+                now()
+            } else {
+                None
+            },
         }
     }
 
     pub(super) fn shutdown(self) {
         self.task.shutdown();
-    }
-
-    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
-    fn record_submission(&mut self, metrics: &SpawnerMetrics) {
-        if metrics.track_queue_latency {
-            self.submitted_at = now();
-        }
     }
 
     pub(super) fn run(self, _metrics: &SpawnerMetrics) {
@@ -272,9 +274,9 @@ impl Task {
     }
 
     pub(super) fn shutdown_or_run_if_mandatory(self, metrics: &SpawnerMetrics) {
-        match self.mandatory {
-            Mandatory::NonMandatory => self.task.shutdown(),
-            Mandatory::Mandatory => self.run(metrics),
+        match self.kind {
+            BlockingTaskKind::Mandatory => self.run(metrics),
+            BlockingTaskKind::Regular | BlockingTaskKind::SchedulerWorker => self.task.shutdown(),
         }
     }
 }
@@ -474,7 +476,7 @@ mod latency_tests {
 
     #[test]
     fn shutdown_only_runs_and_observes_mandatory_tasks() {
-        for (mandatory, should_run) in [(Mandatory::NonMandatory, false), (Mandatory::Mandatory, true)] {
+        for (kind, should_run) in [(BlockingTaskKind::Regular, false), (BlockingTaskKind::Mandatory, true)] {
             let metrics = SpawnerMetrics {
                 track_queue_latency: true,
                 ..SpawnerMetrics::default()
@@ -497,8 +499,7 @@ mod latency_tests {
                 id,
                 task::SpawnLocation::capture(),
             );
-            let mut task = Task::new(unowned, mandatory);
-            task.record_submission(&metrics);
+            let task = Task::new(unowned, kind, &metrics);
             assert_eq!(metrics.queue_latency_observations.load(Ordering::Relaxed), 0);
 
             task.shutdown_or_run_if_mandatory(&metrics);
@@ -652,7 +653,7 @@ impl fmt::Debug for BlockingPool {
 
 impl Spawner {
     #[track_caller]
-    pub(crate) fn spawn_blocking<F, R>(&self, rt: &Handle, func: F, is_scheduler_worker: bool) -> JoinHandle<R>
+    pub(crate) fn spawn_blocking<F, R>(&self, rt: &Handle, func: F) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
@@ -661,18 +662,16 @@ impl Spawner {
         let (join_handle, spawn_result) = if AutoBox::<F>::SHOULD_BOX {
             self.spawn_blocking_inner(
                 Box::new(func),
-                Mandatory::NonMandatory,
+                BlockingTaskKind::Regular,
                 SpawnMeta::new_unnamed(fn_size),
                 rt,
-                is_scheduler_worker,
             )
         } else {
             self.spawn_blocking_inner(
                 func,
-                Mandatory::NonMandatory,
+                BlockingTaskKind::Regular,
                 SpawnMeta::new_unnamed(fn_size),
                 rt,
-                is_scheduler_worker,
             )
         };
 
@@ -683,6 +682,25 @@ impl Spawner {
             Err(SpawnError::NoThreads(e)) => {
                 panic!("OS can't spawn worker thread: {e}")
             }
+        }
+    }
+
+    pub(crate) fn spawn_scheduler_worker<F>(&self, rt: &Handle, func: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        let fn_size = std::mem::size_of::<F>();
+        let (_, spawn_result) = self.spawn_blocking_inner(
+            func,
+            BlockingTaskKind::SchedulerWorker,
+            SpawnMeta::new_unnamed(fn_size),
+            rt,
+        );
+
+        match spawn_result {
+            Ok(()) => {}
+            Err(SpawnError::ShuttingDown) => {}
+            Err(SpawnError::NoThreads(e)) => panic!("OS can't spawn worker thread: {e}"),
         }
     }
 
@@ -702,18 +720,16 @@ impl Spawner {
             let (join_handle, spawn_result) = if AutoBox::<F>::SHOULD_BOX {
                 self.spawn_blocking_inner(
                     Box::new(func),
-                    Mandatory::Mandatory,
+                    BlockingTaskKind::Mandatory,
                     SpawnMeta::new_unnamed(fn_size),
                     rt,
-                    false,
                 )
             } else {
                 self.spawn_blocking_inner(
                     func,
-                    Mandatory::Mandatory,
+                    BlockingTaskKind::Mandatory,
                     SpawnMeta::new_unnamed(fn_size),
                     rt,
-                    false,
                 )
             };
 
@@ -729,10 +745,9 @@ impl Spawner {
     pub(crate) fn spawn_blocking_inner<F, R>(
         &self,
         func: F,
-        is_mandatory: Mandatory,
+        kind: BlockingTaskKind,
         spawn_meta: SpawnMeta<'_>,
         rt: &Handle,
-        is_scheduler_worker: bool,
     ) -> (JoinHandle<R>, Result<(), SpawnError>)
     where
         F: FnOnce() -> R + Send + 'static,
@@ -749,17 +764,7 @@ impl Spawner {
             task::SpawnLocation::capture(),
         );
 
-        let task = Task::new(task, is_mandatory);
-        #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
-        let task = {
-            let mut task = task;
-            if !is_scheduler_worker {
-                task.record_submission(&self.inner.metrics);
-            }
-            task
-        };
-        #[cfg(not(all(tokio_unstable, target_has_atomic = "64")))]
-        let _ = is_scheduler_worker;
+        let task = Task::new(task, kind, &self.inner.metrics);
         let spawned = self.spawn_task(task, rt);
         (handle, spawned)
     }
