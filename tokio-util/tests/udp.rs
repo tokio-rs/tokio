@@ -13,6 +13,7 @@ use futures::future::try_join;
 use futures::future::FutureExt;
 use futures::sink::SinkExt;
 use std::io;
+use std::net::Ipv4Addr;
 use std::sync::Arc;
 
 #[cfg_attr(
@@ -98,6 +99,38 @@ impl Encoder<&[u8]> for ByteCodec {
         buf.put_slice(data);
         Ok(())
     }
+}
+
+#[tokio::test]
+async fn receive_after_decoder_discards_datagram() -> io::Result<()> {
+    struct FilteredCodec;
+
+    impl Decoder for FilteredCodec {
+        type Item = BytesMut;
+        type Error = io::Error;
+
+        fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<BytesMut>> {
+            let datagram = std::mem::take(buf);
+            if datagram.is_empty() || datagram == b"skip"[..] {
+                return Ok(None);
+            }
+            Ok(Some(datagram))
+        }
+    }
+
+    let sender = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+    let receiver = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+    let addr = receiver.local_addr()?;
+    let mut framed = UdpFramed::new(receiver, FilteredCodec);
+
+    let payload = [b'a'; 128];
+    sender.send_to(b"skip", addr).await?;
+    sender.send_to(&payload, addr).await?;
+
+    let (received, source) = framed.next().await.unwrap()?;
+    assert_eq!(&received[..], &payload);
+    assert_eq!(source, sender.local_addr()?);
+    Ok(())
 }
 
 #[tokio::test]
