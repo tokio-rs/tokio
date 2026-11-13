@@ -1966,14 +1966,13 @@ cfg_io_uring! {
     impl Builder {
         /// Enables the tokio's io_uring driver.
         ///
-        /// Doing this enables using io_uring operations on the runtime. This
-        /// also enables the I/O driver, as if [`enable_io`] was called.
+        /// This also enables the I/O driver.
         ///
         /// io_uring is set up when the runtime is built. If it can't be set
         /// up for any reason the runtime is still built, and file system
         /// operations fall back to the blocking thread pool.
         ///
-        /// # Examples
+        /// # Example
         ///
         /// ```
         /// use tokio::runtime;

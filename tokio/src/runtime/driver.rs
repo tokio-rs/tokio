@@ -170,7 +170,13 @@ cfg_io_driver! {
         assert!(!enable_io);
 
         let ret = if enable_io {
-            let (io_driver, io_handle) = crate::runtime::io::Driver::new(nevents, nevents_busy, enable_io_uring)?;
+            let (io_driver, mut io_handle) = crate::runtime::io::Driver::new(nevents, nevents_busy)?;
+
+            // A failed io_uring setup leaves io_uring disabled,
+            // file system operations fall back to the blocking pool.
+            if enable_io_uring {
+                io_handle.setup_uring();
+            }
 
             let (signal_driver, signal_handle) = create_signal_driver(io_driver, &io_handle)?;
             let process_driver = create_process_driver(signal_driver);

@@ -10,7 +10,8 @@ use std::os::fd::AsRawFd;
 // Builds a driver whose io_uring context is stored and registered, or returns
 // `None` when io_uring is unavailable on the host.
 fn ready_handle() -> Option<(Driver, Handle)> {
-    let (driver, handle) = Driver::new(1024, None, true).ok()?;
+    let (driver, mut handle) = Driver::new(1024, None).ok()?;
+    handle.setup_uring();
     handle.uring_probe.is_some().then_some((driver, handle))
 }
 
@@ -92,8 +93,8 @@ impl Drop for BrokenRegistry {
 // a context without a ring and no probe, so nothing half set up is stored.
 #[test]
 #[cfg_attr(miri, ignore)]
-fn register_failure_disables_uring() {
-    let (_driver, handle) = Driver::new(1024, None, false).unwrap();
+fn register_failure_does_not_store_the_ring() {
+    let (_driver, mut handle) = Driver::new(1024, None).unwrap();
     match io_uring::IoUring::new(super::DEFAULT_RING_SIZE) {
         Ok(_) => {}
         Err(err) if unsupported_uring(&err) => return,
@@ -110,6 +111,16 @@ fn register_failure_disables_uring() {
     let (ctx, probe) = UringContext::setup(&handle.registry);
     assert!(ctx.uring.is_none(), "failed registration stored the ring");
     assert!(probe.is_none(), "failed registration returned a probe");
+
+    handle.setup_uring();
+    assert!(
+        handle.get_uring().lock().uring.is_none(),
+        "setup_uring stored a ring after a failed registration"
+    );
+    assert!(
+        handle.uring_probe.is_none(),
+        "setup_uring stored a probe after a failed registration"
+    );
 }
 
 // Once an entry is pushed onto the submission queue the kernel may already own
@@ -141,8 +152,7 @@ fn register_op_keeps_entry_on_submit_failure() {
     drop(broken);
 }
 
-// With io_uring enabled, the driver sets up the ring and probe before any
-// operation is submitted.
+// `setup_uring` sets up the ring and probe before any operation is submitted.
 #[test]
 #[cfg_attr(miri, ignore)]
 fn driver_with_uring_sets_up_ring() {
@@ -154,11 +164,11 @@ fn driver_with_uring_sets_up_ring() {
     assert!(handle.is_uring_ready(opcode::Read::CODE));
 }
 
-// Without io_uring enabled, the driver doesn't create a ring.
+// Without `setup_uring`, the driver doesn't create a ring.
 #[test]
 #[cfg_attr(miri, ignore)]
 fn driver_without_uring_has_no_ring() {
-    let (_driver, handle) = Driver::new(1024, None, false).unwrap();
+    let (_driver, handle) = Driver::new(1024, None).unwrap();
 
     assert!(handle.uring_probe.is_none());
     assert!(handle.get_uring().lock().uring.is_none());
