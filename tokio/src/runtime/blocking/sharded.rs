@@ -552,8 +552,9 @@ mod tests {
         drop(tx);
 
         let mut cursor = PopCursor::new_for_test();
+        let metrics = SpawnerMetrics::default();
         while let Some(task) = queue.pop(&mut cursor) {
-            task.run();
+            task.run(&metrics);
         }
         rx.try_iter().collect()
     }

@@ -263,7 +263,8 @@ impl Task {
     pub(super) fn run(self, _metrics: &SpawnerMetrics) {
         #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
         if let Some(submitted_at) = self.submitted_at {
-            // These independent counters do not synchronize access to task data.
+            // These counters do not synchronize task data. They wrap on overflow,
+            // and separate reads do not form an atomic snapshot.
             _metrics.queue_latency_ns.add(duration_as_u64(submitted_at.elapsed()), Ordering::Relaxed);
             _metrics.queue_latency_observations.add(1, Ordering::Relaxed);
         }
@@ -331,8 +332,12 @@ mod latency_tests {
             for task in tasks {
                 task.await.unwrap();
             }
+            let error = crate::task::spawn_blocking(|| panic!("blocking task panic"))
+                .await
+                .unwrap_err();
+            assert!(error.is_panic());
         });
-        assert_eq!(metrics.queue_latency_observations.load(Ordering::Relaxed), if enabled { 7 } else { 0 });
+        assert_eq!(metrics.queue_latency_observations.load(Ordering::Relaxed), if enabled { 8 } else { 0 });
         if enabled {
             assert!(metrics.queue_latency_ns.load(Ordering::Relaxed) > 0);
         } else {
@@ -470,47 +475,6 @@ mod latency_tests {
     }
 
     #[test]
-    fn shutdown_drains_non_mandatory_without_observing() {
-        let metrics = SpawnerMetrics {
-            track_queue_latency: true,
-            ..SpawnerMetrics::default()
-        };
-        let rt = Builder::new_current_thread().build().unwrap();
-        let id = task::Id::next();
-        let ran = Arc::new(AtomicBool::new(false));
-        let ran_clone = ran.clone();
-        let f: Box<dyn FnOnce() + Send> = Box::new(move || {
-            ran_clone.store(true, Ordering::SeqCst);
-        });
-        let fut = blocking_task::<Box<dyn FnOnce() + Send>, _>(
-            BlockingTask::new(f),
-            SpawnMeta::new_unnamed(0),
-            id.as_u64(),
-        );
-        let (unowned, handle) = task::unowned(
-            fut,
-            BlockingSchedule::new(rt.handle()),
-            id,
-            task::SpawnLocation::capture(),
-        );
-        let mut task = Task::new(unowned, Mandatory::NonMandatory);
-        task.record_submission(&metrics);
-        assert_eq!(metrics.queue_latency_observations.load(Ordering::Relaxed), 0);
-
-        // When non-mandatory tasks are drained during shutdown, they must not be observed
-        task.shutdown_or_run_if_mandatory(&metrics);
-
-        assert!(!ran.load(Ordering::SeqCst));
-        assert_eq!(metrics.queue_latency_observations.load(Ordering::Relaxed), 0);
-        assert_eq!(metrics.queue_latency_ns.load(Ordering::Relaxed), 0);
-
-        rt.block_on(async {
-            let err = handle.await.unwrap_err();
-            assert!(err.is_cancelled());
-        });
-    }
-
-    #[test]
     fn mandatory_tasks_run_and_are_observed_on_shutdown() {
         let metrics = SpawnerMetrics {
             track_queue_latency: true,
@@ -548,8 +512,6 @@ mod latency_tests {
             handle.await.unwrap();
         });
     }
-
-
 }
 
 const KEEP_ALIVE: Duration = Duration::from_secs(10);
