@@ -323,7 +323,8 @@
 //! Beware though that this will pull in many extra dependencies that you may not
 //! need.
 //!
-//! - `full`: Enables all features listed below except `test-util` and unstable features.
+//! - `full`: Enables all features listed below except `parking_lot`, `test-util`,
+//!   and unstable features.
 //! - `rt`: Enables `tokio::spawn`, the current-thread scheduler,
 //!   and non-scheduler utilities.
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
@@ -340,11 +341,10 @@
 //! - `signal`: Enables all `tokio::signal` types.
 //! - `fs`: Enables `tokio::fs` types.
 //! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
-//! - `parking_lot`: As a potential optimization, use the [`parking_lot`] crate's
-//!   synchronization primitives internally. Also, this
-//!   dependency is necessary to construct some of our primitives
-//!   in a `const` context. `MSRV` may increase according to the
-//!   [`parking_lot`] release in use.
+//! - `parking_lot`: As a potential optimization, use the `parking_lot` crate's
+//!   synchronization primitives internally. Also, this dependency is necessary
+//!   to construct some of our primitives in a `const` context. The effective
+//!   MSRV may increase according to the `parking_lot` release in use.
 //!
 //! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
 //! always available._

@@ -2241,12 +2241,14 @@ cfg_rt_multi_thread! {
             );
 
             let handle = Handle { inner: scheduler::Handle::MultiThread(handle) };
+            let runtime =
+                Runtime::from_parts(Scheduler::MultiThread(scheduler), handle.clone(), blocking_pool);
 
             // Spawn the thread pool workers
             let _enter = handle.enter();
-            launch.launch();
+            launch.launch()?;
 
-            Ok(Runtime::from_parts(Scheduler::MultiThread(scheduler), handle, blocking_pool))
+            Ok(runtime)
         }
     }
 }
