@@ -4,6 +4,9 @@
 //! - Spawns N regular async tasks
 //! - Each task spawns M batches of B spawn_blocking tasks (no-ops)
 //! - Each batch is awaited to completion before starting the next
+//!
+//! Without `tokio_unstable`, set `TOKIO_UNSTABLE_SHARDED_BLOCKING_QUEUE=1`
+//! to benchmark the sharded queue. Leave it unset to benchmark the locked queue.
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use tokio::runtime::{self, Runtime};
@@ -66,6 +69,27 @@ fn rt() -> Runtime {
         .unwrap()
 }
 
+async fn blocking_batch(producers: usize, short_work: bool) {
+    let mut tasks = JoinSet::new();
+    for _ in 0..producers {
+        tasks.spawn(async move {
+            let mut batch = JoinSet::new();
+            for _ in 0..BATCH_SIZE {
+                batch.spawn_blocking(move || {
+                    if short_work {
+                        for _ in 0..64 {
+                            std::hint::spin_loop();
+                        }
+                    }
+                    black_box(0)
+                });
+            }
+            batch.join_all().await;
+        });
+    }
+    tasks.join_all().await;
+}
+
 fn queue_latency(c: &mut Criterion) {
     let mut group = c.benchmark_group("blocking_queue_latency");
     #[cfg(tokio_unstable)]
@@ -75,7 +99,7 @@ fn queue_latency(c: &mut Criterion) {
         .is_some_and(|value| !value.is_empty() && value != "0")];
     for sharded in queues {
         for enabled in [false, true] {
-            if enabled && !cfg!(tokio_unstable) {
+            if enabled && !cfg!(all(tokio_unstable, target_has_atomic = "64")) {
                 continue;
             }
             let mut builder = runtime::Builder::new_multi_thread();
@@ -84,7 +108,7 @@ fn queue_latency(c: &mut Criterion) {
             if sharded {
                 builder.enable_sharded_blocking_queue();
             }
-            #[cfg(tokio_unstable)]
+            #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
             if enabled {
                 builder.track_blocking_queue_latency();
             }
@@ -102,28 +126,7 @@ fn queue_latency(c: &mut Criterion) {
                         BenchmarkId::new(name, producers),
                         &producers,
                         |b, &producers| {
-                            b.iter(|| {
-                                rt.block_on(async {
-                                    let mut tasks = JoinSet::new();
-                                    for _ in 0..producers {
-                                        tasks.spawn(async move {
-                                            let mut batch = JoinSet::new();
-                                            for _ in 0..BATCH_SIZE {
-                                                batch.spawn_blocking(move || {
-                                                    if short_work {
-                                                        for _ in 0..64 {
-                                                            std::hint::spin_loop();
-                                                        }
-                                                    }
-                                                    black_box(0)
-                                                });
-                                            }
-                                            batch.join_all().await;
-                                        });
-                                    }
-                                    tasks.join_all().await;
-                                })
-                            });
+                            b.iter(|| rt.block_on(blocking_batch(producers, short_work)));
                         },
                     );
                 }

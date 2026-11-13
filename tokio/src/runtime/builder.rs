@@ -160,7 +160,7 @@ pub struct Builder {
     /// When true, the blocking pool uses the sharded queue implementation.
     pub(super) sharded_blocking_queue: bool,
 
-    #[cfg(tokio_unstable)]
+    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
     pub(super) track_blocking_queue_latency: bool,
 }
 
@@ -376,7 +376,7 @@ impl Builder {
             enable_eager_driver_handoff: false,
 
             sharded_blocking_queue: sharded_blocking_queue_default(),
-            #[cfg(tokio_unstable)]
+            #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
             track_blocking_queue_latency: false,
         }
     }
@@ -533,20 +533,17 @@ impl Builder {
         self
     }
 
-    /// Enables tracking the time from submitting blocking work to the pool until
-    /// a worker attempts to execute it. This includes time spent acquiring queue
-    /// locks and starting a worker, but excludes the task's execution time.
+    /// Tracks the time from submitting blocking work until a worker attempts to
+    /// execute it, including queue contention and worker startup but not execution.
     ///
-    /// Dequeued tasks are observed even if they were cancelled before running.
-    /// Mandatory tasks run during shutdown are observed; tasks discarded during
-    /// shutdown are not. Internal scheduler workers are not observed.
-    /// An observation records an execution attempt, so a task may be observed
-    /// even if its submission returned an error after it was queued.
+    /// Cancelled tasks are observed when dequeued, as are mandatory tasks run
+    /// during shutdown. Discarded tasks and internal scheduler workers are not
+    /// observed. A task may be observed even if its submission returned an
+    /// error after it was queued.
     ///
-    /// Tracking is disabled by default. It is unavailable on targets without
-    /// 64-bit atomics and on `wasm32-unknown-unknown`.
-    #[cfg(tokio_unstable)]
-    #[cfg_attr(docsrs, doc(cfg(tokio_unstable)))]
+    /// Tracking is disabled by default and unavailable on `wasm32-unknown-unknown`.
+    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, target_has_atomic = "64"))))]
     pub fn track_blocking_queue_latency(&mut self) -> &mut Self {
         self.track_blocking_queue_latency = true;
         self
