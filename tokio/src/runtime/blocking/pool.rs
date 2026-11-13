@@ -346,6 +346,50 @@ mod latency_tests {
         }
     }
 
+    #[cfg(feature = "rt-multi-thread")]
+    #[test]
+    fn scheduler_workers_are_not_observed() {
+        for sharded in [false, true] {
+            let mut builder = Builder::new_multi_thread();
+            builder.worker_threads(1);
+            builder.sharded_blocking_queue = sharded;
+            builder.track_blocking_queue_latency = true;
+            let rt = builder.build().unwrap();
+            let spawner = rt.handle().inner.blocking_spawner().clone();
+            let metrics = &spawner.inner.metrics;
+
+            rt.block_on(async {
+                crate::spawn(async {
+                    crate::task::block_in_place(|| {
+                        let (tx, rx) = mpsc::channel();
+                        crate::spawn(async move { tx.send(()).unwrap() });
+                        rx.recv().unwrap();
+                    });
+                }).await.unwrap();
+                assert_eq!(metrics.queue_latency_observations(), 0);
+                crate::task::spawn_blocking(|| {}).await.unwrap();
+            });
+            assert_eq!(metrics.queue_latency_observations(), 1);
+        }
+    }
+
+    #[cfg(all(feature = "rt-multi-thread", not(target_family = "wasm"), not(miri)))]
+    #[test]
+    fn scheduler_start_failure_returns_error_for_each_queue() {
+        for sharded in [false, true] {
+            let tracker = Arc::new(());
+            let mut builder = Builder::new_multi_thread();
+            builder.sharded_blocking_queue = sharded;
+            builder.worker_threads(1).thread_stack_size(usize::MAX).on_thread_start({
+                let tracker = tracker.clone();
+                move || { let _ = &tracker; }
+            });
+            assert!(builder.build().is_err());
+            drop(builder);
+            assert_eq!(Arc::strong_count(&tracker), 1);
+        }
+    }
+
     #[test]
     fn queue_latency_accumulates_delay() {
         for sharded in [false, true] {
@@ -678,7 +722,7 @@ impl fmt::Debug for BlockingPool {
 
 impl Spawner {
     #[track_caller]
-    pub(crate) fn spawn_blocking<F, R>(&self, rt: &Handle, func: F) -> JoinHandle<R>
+    pub(crate) fn spawn_blocking<F, R>(&self, rt: &Handle, func: F, is_scheduler_worker: bool) -> JoinHandle<R>
     where
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
@@ -690,6 +734,7 @@ impl Spawner {
                 Mandatory::NonMandatory,
                 SpawnMeta::new_unnamed(fn_size),
                 rt,
+                is_scheduler_worker,
             )
         } else {
             self.spawn_blocking_inner(
@@ -697,6 +742,7 @@ impl Spawner {
                 Mandatory::NonMandatory,
                 SpawnMeta::new_unnamed(fn_size),
                 rt,
+                is_scheduler_worker,
             )
         };
 
@@ -729,6 +775,7 @@ impl Spawner {
                     Mandatory::Mandatory,
                     SpawnMeta::new_unnamed(fn_size),
                     rt,
+                    false,
                 )
             } else {
                 self.spawn_blocking_inner(
@@ -736,6 +783,7 @@ impl Spawner {
                     Mandatory::Mandatory,
                     SpawnMeta::new_unnamed(fn_size),
                     rt,
+                    false,
                 )
             };
 
@@ -754,6 +802,7 @@ impl Spawner {
         is_mandatory: Mandatory,
         spawn_meta: SpawnMeta<'_>,
         rt: &Handle,
+        is_scheduler_worker: bool,
     ) -> (JoinHandle<R>, Result<(), SpawnError>)
     where
         F: FnOnce() -> R + Send + 'static,
@@ -771,31 +820,11 @@ impl Spawner {
         );
 
         let mut task = Task::new(task, is_mandatory);
-        task.record_enqueue(&self.inner.metrics);
+        if !is_scheduler_worker {
+            task.record_enqueue(&self.inner.metrics);
+        }
         let spawned = self.spawn_task(task, rt);
         (handle, spawned)
-    }
-
-    #[cfg(feature = "rt-multi-thread")]
-    pub(crate) fn spawn_scheduler_worker<F>(&self, rt: &Handle, func: F)
-    where
-        F: FnOnce() + Send + 'static,
-    {
-        let id = task::Id::next();
-        let fut = blocking_task::<F, BlockingTask<F>>(
-            BlockingTask::new(func),
-            SpawnMeta::new_unnamed(std::mem::size_of::<F>()),
-            id.as_u64(),
-        );
-        let (task, _) = task::unowned(
-            fut,
-            BlockingSchedule::new(rt),
-            id,
-            task::SpawnLocation::capture(),
-        );
-
-        let task = Task::new(task, Mandatory::NonMandatory);
-        let _ = self.spawn_task(task, rt);
     }
 
     pub(crate) fn num_blocking_threads(&self) -> usize {

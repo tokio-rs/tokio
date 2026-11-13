@@ -507,7 +507,7 @@ fn maybe_move_runtime() -> Result<(bool, bool), &'static str> {
         let worker = cx.worker.clone();
         let rt = runtime::Handle::current();
         let spawner = worker.handle.blocking_spawner.clone();
-        spawner.spawn_scheduler_worker(&rt, move || run(worker));
+        spawner.spawn_blocking(&rt, move || run(worker), true);
         Ok(())
     })?;
     Ok((had_entered, take_core))
@@ -525,6 +525,7 @@ impl Launch {
                 blocking::Mandatory::NonMandatory,
                 SpawnMeta::new_unnamed(fn_size),
                 &rt,
+                true,
             );
 
             if let Err(error) = result {

@@ -219,6 +219,7 @@ impl<'a> Builder<'a> {
                 Mandatory::NonMandatory,
                 SpawnMeta::new(self.name, fn_size),
                 handle,
+                false,
             )
         } else {
             handle.inner.blocking_spawner().spawn_blocking_inner(
@@ -226,6 +227,7 @@ impl<'a> Builder<'a> {
                 Mandatory::NonMandatory,
                 SpawnMeta::new(self.name, fn_size),
                 handle,
+                false,
             )
         };
 

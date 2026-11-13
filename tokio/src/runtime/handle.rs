@@ -236,7 +236,7 @@ impl Handle {
         F: FnOnce() -> R + Send + 'static,
         R: Send + 'static,
     {
-        self.inner.blocking_spawner().spawn_blocking(self, func)
+        self.inner.blocking_spawner().spawn_blocking(self, func, false)
     }
 
     /// Runs a future to completion on this `Handle`'s associated `Runtime`.
