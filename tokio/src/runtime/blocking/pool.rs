@@ -915,7 +915,6 @@ cfg_unstable_metrics! {
         pub(crate) fn queue_depth(&self) -> usize {
             self.inner.metrics.queue_depth()
         }
-
     }
 }
 
