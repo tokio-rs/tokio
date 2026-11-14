@@ -1,4 +1,4 @@
-334
+336
 &
 +
 0o777
@@ -112,6 +112,7 @@ WebAssembly
 ZST
 \
 accessors
+activations
 adaptor
 adaptors
 ambient
@@ -174,6 +175,7 @@ enqueue
 enqueued
 enum
 eof
+epoll
 errored
 expirations
 fcntl

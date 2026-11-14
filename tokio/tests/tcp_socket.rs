@@ -69,6 +69,10 @@ async fn bind_before_connect() {
 }
 
 #[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support `SO_LINGER`")]
+#[cfg_attr(
+    target_os = "emscripten",
+    ignore = "emscripten does not support `SO_LINGER`"
+)]
 #[tokio::test]
 #[cfg_attr(miri, ignore = "Miri doesn't support `SO_LINGER`")]
 async fn basic_linger() {
@@ -152,6 +156,10 @@ test!(
         miri,
         ignore = "Miri doesn't support reading the reuseaddr socket option"
     )]
+    #[cfg_attr(
+        target_os = "emscripten",
+        ignore = "emscripten NODERAWSOCKETS does not support the reuseaddr socket option"
+    )]
     reuseaddr,
     set_reuseaddr(true)
 );
@@ -193,6 +201,10 @@ test!(
 
 test!(
     #[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support `SO_LINGER`")]
+    #[cfg_attr(
+        target_os = "emscripten",
+        ignore = "emscripten does not support `SO_LINGER`"
+    )]
     #[cfg_attr(miri, ignore = "Miri doesn't support `SO_LINGER`")]
     #[expect(deprecated, reason = "set_linger is deprecated")]
     linger,
@@ -229,6 +241,7 @@ test!(
     target_os = "illumos",
     target_os = "haiku",
     target_os = "wasi",
+    target_os = "emscripten", // emscripten NODERAWSOCKETS does not support IP_TOS
     miri // Miri doesn't support TOS.
 )))]
 test!(IPv4 tos_v4, set_tos_v4(96));

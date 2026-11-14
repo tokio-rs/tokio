@@ -1,5 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![cfg(all(unix, feature = "full"))]
+#![cfg(not(target_os = "emscripten"))] // Every test here needs `socketpair(2)`, absent on Node.
 
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{
