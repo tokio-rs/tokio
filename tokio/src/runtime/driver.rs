@@ -218,6 +218,17 @@ cfg_io_driver! {
             }
         }
     }
+
+    impl Handle {
+        cfg_event_loop! {
+            /// The reactor's descriptor, if the I/O driver is enabled and
+            /// has one.
+            #[cfg(unix)]
+            pub(crate) fn event_fd(&self) -> Option<std::os::fd::BorrowedFd<'_>> {
+                self.io.as_ref()?.registry_fd()
+            }
+        }
+    }
 }
 
 cfg_not_io_driver! {
@@ -248,6 +259,15 @@ cfg_not_io_driver! {
         /// This is not a "real" driver, so it is not considered enabled.
         pub(crate) fn is_enabled(&self) -> bool {
             false
+        }
+    }
+
+    impl Handle {
+        cfg_event_loop! {
+            #[cfg(unix)]
+            pub(crate) fn event_fd(&self) -> Option<std::os::fd::BorrowedFd<'_>> {
+                None
+            }
         }
     }
 }

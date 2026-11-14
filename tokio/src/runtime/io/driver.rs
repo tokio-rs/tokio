@@ -265,6 +265,60 @@ impl fmt::Debug for Driver {
 }
 
 impl Handle {
+    cfg_event_loop! {
+        /// The reactor's own descriptor (`epoll`, `kqueue`), readable while
+        /// it has pending events.
+        #[cfg(unix)]
+        pub(crate) fn registry_fd(&self) -> Option<std::os::fd::BorrowedFd<'_>> {
+            #[cfg(all(
+                not(mio_unsupported_force_poll_poll),
+                any(
+                    // epoll
+                    target_os = "android",
+                    target_os = "illumos",
+                    target_os = "linux",
+                    target_os = "redox",
+                    // kqueue
+                    target_os = "dragonfly",
+                    target_os = "freebsd",
+                    target_os = "ios",
+                    target_os = "macos",
+                    target_os = "netbsd",
+                    target_os = "openbsd",
+                    target_os = "tvos",
+                    target_os = "visionos",
+                    target_os = "watchos",
+                ),
+            ))]
+            {
+                use std::os::fd::AsFd;
+                Some(self.registry.as_fd())
+            }
+
+            #[cfg(not(all(
+                not(mio_unsupported_force_poll_poll),
+                any(
+                    target_os = "android",
+                    target_os = "illumos",
+                    target_os = "linux",
+                    target_os = "redox",
+                    target_os = "dragonfly",
+                    target_os = "freebsd",
+                    target_os = "ios",
+                    target_os = "macos",
+                    target_os = "netbsd",
+                    target_os = "openbsd",
+                    target_os = "tvos",
+                    target_os = "visionos",
+                    target_os = "watchos",
+                ),
+            )))]
+            None
+        }
+    }
+}
+
+impl Handle {
     /// Forces a reactor blocked in a call to `turn` to wakeup, or otherwise
     /// makes the next call to `turn` return immediately.
     ///

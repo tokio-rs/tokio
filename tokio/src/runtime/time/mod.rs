@@ -23,7 +23,8 @@ use super::time_alt;
 
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::Mutex;
-use crate::runtime::driver::{self, IoHandle, IoStack};
+use crate::runtime::driver::{self, IoStack};
+use crate::runtime::scheduler;
 use crate::time::error::Error;
 use crate::time::{Clock, Duration};
 use crate::util::WakeList;
@@ -276,6 +277,26 @@ impl Driver {
 }
 
 impl Handle {
+    cfg_event_loop! {
+        /// Time until the wheel's next expiration, if any timer is registered.
+        ///
+        /// This is the host's wait, so it becomes `next_wake`, the bound a
+        /// timer registered from another thread is compared against to
+        /// decide on an unpark. A cancel since the last park may have moved
+        /// the wheel's next expiration past the `next_wake` that park
+        /// recorded, and a native runtime's thread wakes by it anyway; the
+        /// host only wakes by what it is told here.
+        pub(crate) fn next_timeout(&self, clock: &Clock) -> Option<Duration> {
+            let mut lock = self.inner.lock();
+            let next = lock.wheel.next_expiration_time();
+            lock.next_wake =
+                next.map(|t| NonZeroU64::new(t).unwrap_or_else(|| NonZeroU64::new(1).unwrap()));
+            drop(lock);
+            let now = self.time_source().now(clock);
+            Some(self.time_source().tick_to_duration(next?.saturating_sub(now)))
+        }
+    }
+
     pub(self) fn process(&self, clock: &Clock) {
         let now = self.time_source().now(clock);
 
@@ -388,11 +409,11 @@ impl Handle {
     /// the `TimerEntry`)
     pub(self) unsafe fn reregister(
         &self,
-        unpark: &IoHandle,
+        rt_handle: &scheduler::Handle,
         new_tick: u64,
         entry: NonNull<TimerShared>,
     ) {
-        let waker = unsafe {
+        let (waker, unpark) = unsafe {
             let mut lock = self.inner.lock();
 
             // We may have raced with a firing/deregistration, so check before
@@ -405,7 +426,10 @@ impl Handle {
             let entry = entry.as_ref().handle();
 
             if self.is_shutdown() {
-                unsafe { entry.fire(Err(crate::time::error::Error::shutdown())) }
+                (
+                    unsafe { entry.fire(Err(crate::time::error::Error::shutdown())) },
+                    false,
+                )
             } else {
                 entry.set_expiration(new_tick);
 
@@ -414,23 +438,24 @@ impl Handle {
                 // the timer entry.
                 match unsafe { lock.wheel.insert(entry) } {
                     Ok(when) => {
-                        if lock
+                        let unpark = lock
                             .next_wake
-                            .is_none_or(|next_wake| when < next_wake.get())
-                        {
-                            unpark.unpark();
-                        }
+                            .is_none_or(|next_wake| when < next_wake.get());
 
-                        None
+                        (None, unpark)
                     }
-                    Err((entry, crate::time::error::InsertError::Elapsed)) => unsafe {
-                        entry.fire(Ok(()))
-                    },
+                    Err((entry, crate::time::error::InsertError::Elapsed)) => {
+                        (unsafe { entry.fire(Ok(())) }, false)
+                    }
                 }
             }
 
             // Must release lock before invoking waker to avoid the risk of deadlock.
         };
+
+        if unpark {
+            rt_handle.unpark_timer();
+        }
 
         // The timer was fired synchronously as a result of the reregistration.
         // Wake the waker; this is needed because we might reset _after_ a poll,

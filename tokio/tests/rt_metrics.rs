@@ -147,6 +147,45 @@ fn worker_park_count() {
 }
 
 #[test]
+fn current_thread_coalesces_unparks() {
+    let rt = current_thread();
+    let metrics = rt.metrics();
+    let handle = rt.handle().clone();
+
+    let (tx1, rx1) = mpsc::channel();
+    let (tx2, rx2) = tokio::sync::oneshot::channel();
+
+    // Spawning from outside the runtime and registering a timer while the
+    // runtime is not parked must not leave stale wakeup tokens in the driver.
+    let jh = rt.spawn(async move {
+        let sleep = time::sleep(Duration::from_secs(60));
+        tokio::pin!(sleep);
+        let _ = futures::future::poll_fn(|cx| {
+            let _ = std::future::Future::poll(sleep.as_mut(), cx);
+            std::task::Poll::Ready(())
+        })
+        .await;
+
+        tx1.send(()).unwrap();
+        rx2.await.unwrap();
+    });
+
+    let th = std::thread::spawn(move || {
+        rx1.recv().unwrap();
+        while handle.metrics().worker_park_count(0) == 0 {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        tx2.send(()).unwrap();
+    });
+
+    rt.block_on(jh).unwrap();
+    th.join().unwrap();
+
+    assert_eq!(1, metrics.worker_park_count(0));
+    assert_eq!(2, metrics.worker_park_unpark_count(0));
+}
+
+#[test]
 fn worker_park_unpark_count() {
     let rt = current_thread();
     let metrics = rt.metrics();
