@@ -401,7 +401,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::error::Error as StdError;
 use std::io::{self, Cursor};
-use std::{cmp, fmt, mem};
+use std::{fmt, mem};
 
 /// Configure length delimited `LengthDelimitedCodec`s.
 ///
@@ -466,7 +466,7 @@ enum DecodeState {
 
 impl LengthDelimitedCodec {
     /// Creates a new `LengthDelimitedCodec` with the default configuration values.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             builder: Builder::new(),
             state: DecodeState::Head,
@@ -475,7 +475,7 @@ impl LengthDelimitedCodec {
 
     /// Creates a new length delimited codec builder with default configuration
     /// values.
-    pub fn builder() -> Builder {
+    pub const fn builder() -> Builder {
         Builder::new()
     }
 
@@ -483,7 +483,7 @@ impl LengthDelimitedCodec {
     ///
     /// This is the largest size this codec will accept from the wire. Larger
     /// frames will be rejected.
-    pub fn max_frame_length(&self) -> usize {
+    pub const fn max_frame_length(&self) -> usize {
         self.builder.max_frame_len
     }
 
@@ -496,7 +496,7 @@ impl LengthDelimitedCodec {
     ///
     /// If `val` is larger than what the length field can represent, it is
     /// clipped to the maximum representable value.
-    pub fn set_max_frame_length(&mut self, val: usize) {
+    pub const fn set_max_frame_length(&mut self, val: usize) {
         self.builder.max_frame_length(val);
         self.builder.adjust_max_frame_len();
     }
@@ -708,7 +708,7 @@ impl Builder {
     /// assert_eq!(&frame[..], b"hello world");
     /// # }
     /// ```
-    pub fn new() -> Builder {
+    pub const fn new() -> Builder {
         Builder {
             // Default max frame length of 8MB
             max_frame_len: 8 * 1_024 * 1_024,
@@ -749,7 +749,7 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn big_endian(&mut self) -> &mut Self {
+    pub const fn big_endian(&mut self) -> &mut Self {
         self.length_field_is_big_endian = true;
         self
     }
@@ -773,7 +773,7 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn little_endian(&mut self) -> &mut Self {
+    pub const fn little_endian(&mut self) -> &mut Self {
         self.length_field_is_big_endian = false;
         self
     }
@@ -797,7 +797,7 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn native_endian(&mut self) -> &mut Self {
+    pub const fn native_endian(&mut self) -> &mut Self {
         if cfg!(target_endian = "big") {
             self.big_endian()
         } else {
@@ -831,7 +831,7 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn max_frame_length(&mut self, val: usize) -> &mut Self {
+    pub const fn max_frame_length(&mut self, val: usize) -> &mut Self {
         self.max_frame_len = val;
         self
     }
@@ -868,7 +868,7 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn length_field_type<T: builder::LengthFieldType>(&mut self) -> &mut Self {
+    pub const fn length_field_type<T: builder::LengthFieldType>(&mut self) -> &mut Self {
         self.length_field_length(mem::size_of::<T>())
     }
 
@@ -891,7 +891,7 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn length_field_length(&mut self, val: usize) -> &mut Self {
+    pub const fn length_field_length(&mut self, val: usize) -> &mut Self {
         assert!(val > 0 && val <= 8, "invalid length field length");
         self.length_field_len = val;
         self
@@ -914,7 +914,7 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn length_field_offset(&mut self, val: usize) -> &mut Self {
+    pub const fn length_field_offset(&mut self, val: usize) -> &mut Self {
         self.length_field_offset = val;
         self
     }
@@ -935,7 +935,7 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn length_adjustment(&mut self, val: isize) -> &mut Self {
+    pub const fn length_adjustment(&mut self, val: isize) -> &mut Self {
         self.length_adjustment = val;
         self
     }
@@ -959,7 +959,7 @@ impl Builder {
     /// # }
     /// # pub fn main() {}
     /// ```
-    pub fn num_skip(&mut self, val: usize) -> &mut Self {
+    pub const fn num_skip(&mut self, val: usize) -> &mut Self {
         self.num_skip = Some(val);
         self
     }
@@ -985,7 +985,7 @@ impl Builder {
     /// assert_eq!(&frame[..], b"hello world");
     /// # }
     /// ```
-    pub fn new_codec(&self) -> LengthDelimitedCodec {
+    pub const fn new_codec(&self) -> LengthDelimitedCodec {
         let mut builder = *self;
 
         builder.adjust_max_frame_len();
@@ -1067,17 +1067,27 @@ impl Builder {
         Framed::new(inner, self.new_codec())
     }
 
-    fn num_head_bytes(&self) -> usize {
+    const fn num_head_bytes(&self) -> usize {
         let num = self.length_field_offset + self.length_field_len;
-        cmp::max(num, self.num_skip.unwrap_or_default())
+        let skip = match self.num_skip {
+            Some(s) => s,
+            None => 0,
+        };
+        if num > skip {
+            num
+        } else {
+            skip
+        }
     }
 
-    fn get_num_skip(&self) -> usize {
-        self.num_skip
-            .unwrap_or(self.length_field_offset + self.length_field_len)
+    const fn get_num_skip(&self) -> usize {
+        match self.num_skip {
+            Some(s) => s,
+            None => self.length_field_offset + self.length_field_len,
+        }
     }
 
-    fn adjust_max_frame_len(&mut self) {
+    const fn adjust_max_frame_len(&mut self) {
         let max_allowed_len = self.max_allowed_frame_len();
 
         if self.max_frame_len > max_allowed_len {
@@ -1085,15 +1095,19 @@ impl Builder {
         }
     }
 
-    fn max_allowed_frame_len(&self) -> usize {
+    const fn max_allowed_frame_len(&self) -> usize {
         let max_allowed_len = self
             .max_length_field_value()
             .saturating_add_signed(self.length_adjustment as i64);
 
-        usize::try_from(max_allowed_len).unwrap_or(usize::MAX)
+        if max_allowed_len > usize::MAX as u64 {
+            usize::MAX
+        } else {
+            max_allowed_len as usize
+        }
     }
 
-    fn max_length_field_value(&self) -> u64 {
+    const fn max_length_field_value(&self) -> u64 {
         match 1u64.checked_shl((8 * self.length_field_len) as u32) {
             Some(shl) => shl - 1,
             None => u64::MAX,

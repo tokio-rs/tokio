@@ -23,12 +23,12 @@ pin_project! {
 
 impl<S> CopyToBytes<S> {
     /// Creates a new [`CopyToBytes`].
-    pub fn new(inner: S) -> Self {
+    pub const fn new(inner: S) -> Self {
         Self { inner }
     }
 
     /// Gets a reference to the underlying sink.
-    pub fn get_ref(&self) -> &S {
+    pub const fn get_ref(&self) -> &S {
         &self.inner
     }
 
