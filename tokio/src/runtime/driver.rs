@@ -88,6 +88,13 @@ impl Handle {
         self.io.unpark();
     }
 
+    pub(crate) fn unpark_self(&self) {
+        #[cfg(feature = "time")]
+        if let Some(handle) = &self.time {
+            handle.unpark();
+        }
+    }
+
     cfg_io_driver! {
         #[track_caller]
         pub(crate) fn io(&self) -> &crate::runtime::io::Handle {

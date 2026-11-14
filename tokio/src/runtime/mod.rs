@@ -167,8 +167,10 @@
 //! The multi-thread scheduler executes futures on a _thread pool_, using a
 //! work-stealing strategy. By default, it will start a worker thread for each
 //! CPU core available on the system. This tends to be the ideal configuration
-//! for most applications. The multi-thread scheduler requires the `rt-multi-thread`
-//! feature flag, and is selected by default:
+//! for most applications, but see the docs of
+//! [`std::thread::available_parallelism`] for caveats. The multi-thread
+//! scheduler requires the `rt-multi-thread` feature flag, and is selected by
+//! default:
 //! ```
 //! # #[cfg(not(target_family = "wasm"))]
 //! # {
@@ -418,6 +420,9 @@ pub(crate) mod context;
 
 pub(crate) mod park;
 
+#[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+pub(crate) mod jspi;
+
 pub(crate) mod driver;
 
 pub(crate) mod scheduler;
@@ -547,12 +552,9 @@ cfg_rt! {
         pub(crate) use blocking::Mandatory;
     }
 
-    cfg_fs! {
-        // Non-pthread emscripten uses the inline shim in `crate::blocking`.
-        #[cfg_attr(
-            all(target_os = "emscripten", not(target_feature = "atomics")),
-            allow(unused_imports)
-        )]
+    cfg_io_blocking! {
+        // Emscripten uses the inline shim in `crate::blocking`.
+        #[cfg_attr(target_os = "emscripten", allow(unused_imports))]
         pub(crate) use blocking::spawn_mandatory_blocking;
     }
 

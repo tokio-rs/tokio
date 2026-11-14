@@ -42,13 +42,15 @@ pub async fn try_exists(path: impl AsRef<Path>) -> io::Result<bool> {
         any(target_env = "gnu", target_os = "android")
     ))]
     {
-        let handle = crate::runtime::Handle::current();
-        let driver_handle = handle.inner.driver().io();
-        if driver_handle
-            .check_and_init(io_uring::opcode::Statx::CODE)
-            .await?
-        {
-            return try_exists_uring(path).await;
+        if let Ok(handle) = crate::runtime::Handle::try_current() {
+            if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
+                if driver_handle
+                    .check_and_init(io_uring::opcode::Statx::CODE)
+                    .await?
+                {
+                    return try_exists_uring(path).await;
+                }
+            }
         }
     }
 
@@ -82,8 +84,5 @@ cfg_io_uring! {
 
 async fn try_exists_spawn_blocking(path: &Path) -> io::Result<bool> {
     let path = path.to_owned();
-    // FIXME: When MSRV is 1.81, change this to
-    // std::fs::exists() to be consistent with
-    // all other tokio::fs operations
-    asyncify(move || path.try_exists()).await
+    asyncify(move || std::fs::exists(path)).await
 }

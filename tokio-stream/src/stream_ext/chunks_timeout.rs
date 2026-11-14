@@ -5,6 +5,7 @@ use tokio::time::{sleep, Sleep};
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{ready, Context, Poll};
+use futures_core::FusedStream;
 use pin_project_lite::pin_project;
 use std::time::Duration;
 
@@ -29,7 +30,7 @@ impl<S: Stream> ChunksTimeout<S> {
             stream: Fuse::new(stream),
             deadline: None,
             duration,
-            items: Vec::with_capacity(max_size),
+            items: Vec::new(),
             cap: max_size,
         }
     }
@@ -56,10 +57,14 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
                     }
                     me.items.push(item);
                     if me.items.len() >= *me.cap {
+                        // The timer no longer applies to a completed chunk.
+                        me.deadline.set(None);
                         return Poll::Ready(Some(std::mem::take(me.items)));
                     }
                 }
                 Poll::Ready(None) => {
+                    // No more input can arrive, so the deadline is no longer needed.
+                    me.deadline.set(None);
                     // Returning Some here is only correct because we fuse the inner stream.
                     let last = if me.items.is_empty() {
                         None
@@ -73,9 +78,10 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
         }
 
         if !me.items.is_empty() {
-            if let Some(deadline) = me.deadline.as_pin_mut() {
+            if let Some(deadline) = me.deadline.as_mut().as_pin_mut() {
                 ready!(deadline.poll(cx));
             }
+            me.deadline.set(None);
             return Poll::Ready(Some(std::mem::take(me.items)));
         }
 
@@ -88,5 +94,11 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
         let lower = (lower / self.cap).saturating_add(chunk_len);
         let upper = upper.and_then(|x| x.checked_add(chunk_len));
         (lower, upper)
+    }
+}
+
+impl<S: Stream> FusedStream for ChunksTimeout<S> {
+    fn is_terminated(&self) -> bool {
+        self.items.is_empty() && self.stream.is_terminated()
     }
 }

@@ -76,6 +76,108 @@ fn add_permits_closed() {
 }
 
 #[test]
+fn close_drops_wakers_outside_lock() {
+    use futures::task::{waker, ArcWake};
+    use std::future::Future;
+    use std::task::Context;
+    use tokio::sync::OwnedSemaphorePermit;
+
+    struct ReleaseOnDrop {
+        _permit: OwnedSemaphorePermit,
+    }
+
+    impl ArcWake for ReleaseOnDrop {
+        fn wake_by_ref(_arc_self: &Arc<Self>) {}
+    }
+
+    let sem = Arc::new(Semaphore::new(1));
+
+    let mut fut = Box::pin(async {
+        let _ = sem.acquire().await;
+    });
+
+    let waker = waker(Arc::new(ReleaseOnDrop {
+        _permit: sem.clone().try_acquire_owned().unwrap(),
+    }));
+    let mut cx = Context::from_waker(&waker);
+    assert!(fut.as_mut().poll(&mut cx).is_pending());
+    drop(waker);
+
+    // Waking the waiter drops the last reference to the waker, which releases
+    // a permit. This shouldn't deadlock.
+    sem.close();
+    assert_eq!(sem.available_permits(), 1);
+}
+
+#[test]
+fn close_wakes_waiters_outside_lock() {
+    use futures::task::{waker, ArcWake};
+    use std::future::Future;
+    use std::task::Context;
+
+    struct ReleaseOnWake(Arc<Semaphore>);
+
+    impl ArcWake for ReleaseOnWake {
+        fn wake_by_ref(arc_self: &Arc<Self>) {
+            arc_self.0.add_permits(1);
+        }
+    }
+
+    let sem = Arc::new(Semaphore::new(0));
+
+    let mut fut = Box::pin(async {
+        let _ = sem.acquire().await;
+    });
+
+    let waker = waker(Arc::new(ReleaseOnWake(sem.clone())));
+    let mut cx = Context::from_waker(&waker);
+    assert!(fut.as_mut().poll(&mut cx).is_pending());
+
+    // The waker releases a permit when it is woken. This shouldn't deadlock.
+    sem.close();
+    assert_eq!(sem.available_permits(), 1);
+}
+
+#[test]
+fn close_wakes_all_waiters() {
+    use futures::task::{waker, ArcWake};
+    use std::future::Future;
+    use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
+    use std::task::{Context, Poll};
+
+    // More waiters than are woken in one batch.
+    const WAITERS: usize = 100;
+
+    struct CountWakes(AtomicUsize);
+
+    impl ArcWake for CountWakes {
+        fn wake_by_ref(arc_self: &Arc<Self>) {
+            arc_self.0.fetch_add(1, SeqCst);
+        }
+    }
+
+    let sem = Semaphore::new(0);
+    let wakes = Arc::new(CountWakes(AtomicUsize::new(0)));
+    let waker = waker(wakes.clone());
+    let mut cx = Context::from_waker(&waker);
+
+    let mut acquires: Vec<_> = (0..WAITERS).map(|_| Box::pin(sem.acquire())).collect();
+    for acquire in &mut acquires {
+        assert!(acquire.as_mut().poll(&mut cx).is_pending());
+    }
+
+    sem.close();
+    assert_eq!(wakes.0.load(SeqCst), WAITERS);
+
+    for acquire in &mut acquires {
+        assert!(matches!(
+            acquire.as_mut().poll(&mut cx),
+            Poll::Ready(Err(_))
+        ));
+    }
+}
+
+#[test]
 fn forget() {
     let sem = Arc::new(Semaphore::new(1));
     {
@@ -228,6 +330,22 @@ fn add_more_than_max_amount_permits2() {
 #[should_panic]
 fn panic_when_exceeds_maxpermits() {
     let _ = Semaphore::new(Semaphore::MAX_PERMITS + 1);
+}
+
+#[cfg(target_pointer_width = "32")]
+#[test]
+#[should_panic(expected = "a semaphore may not have more than MAX_PERMITS permits")]
+fn acquire_many_exceeds_maxpermits() {
+    let s = Semaphore::new(0);
+    let _ = tokio_test::task::spawn(s.acquire_many((Semaphore::MAX_PERMITS as u32) + 1)).poll();
+}
+
+#[cfg(target_pointer_width = "32")]
+#[test]
+#[should_panic(expected = "a semaphore may not have more than MAX_PERMITS permits")]
+fn acquire_many_top_bit_exceeds_maxpermits() {
+    let s = Semaphore::new(0);
+    let _ = tokio_test::task::spawn(s.acquire_many(1_u32 << 31)).poll();
 }
 
 #[test]

@@ -539,6 +539,10 @@ impl Builder {
     ///
     /// The default value is the number of cores available to the system.
     ///
+    /// Currently, this is determined by calling
+    /// [`std::thread::available_parallelism`]. Please see its documentation
+    /// for caveats.
+    ///
     /// When using the `current_thread` runtime this method has no effect.
     ///
     /// # Examples
@@ -782,7 +786,7 @@ impl Builder {
     ///
     /// ```
     /// # #[cfg(not(target_family = "wasm"))]
-    /// {
+    /// # {
     /// # use tokio::runtime;
     /// # pub fn main() {
     /// let runtime = runtime::Builder::new_multi_thread()
@@ -2226,12 +2230,14 @@ cfg_rt_multi_thread! {
             );
 
             let handle = Handle { inner: scheduler::Handle::MultiThread(handle) };
+            let runtime =
+                Runtime::from_parts(Scheduler::MultiThread(scheduler), handle.clone(), blocking_pool);
 
             // Spawn the thread pool workers
             let _enter = handle.enter();
-            launch.launch();
+            launch.launch()?;
 
-            Ok(Runtime::from_parts(Scheduler::MultiThread(scheduler), handle, blocking_pool))
+            Ok(runtime)
         }
     }
 }

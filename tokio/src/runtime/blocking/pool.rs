@@ -185,13 +185,7 @@ pub(crate) struct Task {
 
 #[derive(PartialEq, Eq)]
 pub(crate) enum Mandatory {
-    #[cfg_attr(
-        any(
-            not(feature = "fs"),
-            all(target_os = "emscripten", not(target_feature = "atomics"))
-        ),
-        allow(dead_code)
-    )]
+    #[cfg_attr(any(not(feature = "fs"), target_os = "emscripten"), allow(dead_code))]
     Mandatory,
     NonMandatory,
 }
@@ -207,9 +201,7 @@ pub(crate) enum SpawnError {
 impl From<SpawnError> for io::Error {
     fn from(e: SpawnError) -> Self {
         match e {
-            SpawnError::ShuttingDown => {
-                io::Error::new(io::ErrorKind::Other, "blocking pool shutting down")
-            }
+            SpawnError::ShuttingDown => io::Error::other("blocking pool shutting down"),
             SpawnError::NoThreads(e) => e,
         }
     }
@@ -252,11 +244,11 @@ where
     rt.spawn_blocking(func)
 }
 
-cfg_fs! {
+cfg_io_blocking! {
     #[cfg_attr(any(
         all(loom, not(test)), // the function is covered by loom tests
         test,
-        all(target_os = "emscripten", not(target_feature = "atomics")), // fs uses the inline shim
+        target_os = "emscripten", // fs and io-std use the inline shim
     ), allow(dead_code))]
     /// Runs the provided function on an executor dedicated to blocking
     /// operations. Tasks will be scheduled as mandatory, meaning they are
@@ -396,12 +388,12 @@ impl Spawner {
         }
     }
 
-    cfg_fs! {
+    cfg_io_blocking! {
         #[track_caller]
         #[cfg_attr(any(
             all(loom, not(test)), // the function is covered by loom tests
             test,
-            all(target_os = "emscripten", not(target_feature = "atomics")), // fs uses the inline shim
+            target_os = "emscripten", // fs and io-std use the inline shim
         ), allow(dead_code))]
         pub(crate) fn spawn_mandatory_blocking<F, R>(&self, rt: &Handle, func: F) -> Option<JoinHandle<R>>
         where
@@ -465,6 +457,14 @@ impl Spawner {
             .metrics
             .num_threads()
             .saturating_sub(self.inner.scheduler_threads)
+    }
+
+    #[cfg(all(test, not(loom), not(target_family = "wasm")))]
+    pub(super) fn sharded_queue(&self) -> (&ShardedImpl, &SpawnerMetrics) {
+        match &self.inner.inner_impl {
+            InnerImpl::Sharded(queue) => (queue, &self.inner.metrics),
+            InnerImpl::Locked(_) => panic!("expected a sharded blocking queue"),
+        }
     }
 
     fn spawn_task(&self, task: Task, rt: &Handle) -> Result<(), SpawnError> {
@@ -620,6 +620,8 @@ impl LockedImpl {
         let mut locked = self.mutex.lock();
 
         if locked.thread_mgmt_state.shutdown {
+            drop(locked);
+
             // Shutdown the task: it's fine to shutdown this task
             // (even if mandatory) because it was scheduled after the
             // shutdown of the runtime began.
@@ -627,11 +629,12 @@ impl LockedImpl {
             return Err(SpawnError::ShuttingDown);
         }
 
-        locked.queue.push_back(task);
-        metrics.inc_queue_depth();
-
         if metrics.num_idle_threads() == 0 {
-            on_no_idle(&mut locked.thread_mgmt_state)?;
+            if let Err(e) = on_no_idle(&mut locked.thread_mgmt_state) {
+                drop(locked);
+                task.shutdown();
+                return Err(e);
+            }
         } else {
             // Notify an idle worker thread. The notification counter
             // is used to count the needed amount of notifications
@@ -642,6 +645,9 @@ impl LockedImpl {
             locked.num_notify += 1;
             self.condvar.notify_one();
         }
+
+        locked.queue.push_back(task);
+        metrics.inc_queue_depth();
 
         Ok(())
     }
@@ -756,7 +762,17 @@ impl LockedImpl {
 // Tells whether the error when spawning a thread is temporary.
 #[inline]
 fn is_temporary_os_thread_error(error: &io::Error) -> bool {
-    matches!(error.kind(), io::ErrorKind::WouldBlock)
+    if matches!(error.kind(), io::ErrorKind::WouldBlock) {
+        return true;
+    }
+
+    #[cfg(windows)]
+    if error.raw_os_error() == Some(1450) {
+        // Windows reports temporary resource exhaustion as ERROR_NO_SYSTEM_RESOURCES.
+        return true;
+    }
+
+    false
 }
 
 impl Inner {

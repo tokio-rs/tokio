@@ -4,9 +4,9 @@ use crate::io::interest::Interest;
 use crate::runtime::io::{Direction, Handle, ReadyEvent, ScheduledIo};
 use crate::runtime::scheduler;
 
+use crate::loom::sync::Arc;
 use mio::event::Source;
 use std::io;
-use std::sync::Arc;
 use std::task::{ready, Context, Poll};
 
 cfg_io_driver! {
@@ -157,7 +157,7 @@ impl Registration {
         cx: &mut Context<'_>,
         direction: Direction,
     ) -> Poll<io::Result<ReadyEvent>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
         // Keep track of task budget
         let coop = ready!(crate::task::coop::poll_proceed(cx));
         let ev = ready!(self.shared.poll_readiness(cx, direction));
@@ -263,8 +263,5 @@ impl Drop for Registration {
 }
 
 fn gone() -> io::Error {
-    io::Error::new(
-        io::ErrorKind::Other,
-        crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR,
-    )
+    io::Error::other(crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR)
 }

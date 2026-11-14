@@ -6,7 +6,7 @@ name = "tokio-stream"
 # - Create "tokio-stream-0.1.x" git tag.
 version = "0.1.19"
 edition = "2021"
-rust-version = "1.71"
+rust-version = "1.85"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
@@ -40,12 +40,13 @@ signal = ["tokio/signal"]
 [dependencies]
 futures-core = { version = "0.3.0" }
 pin-project-lite = "0.2.11"
-tokio = { version = "1.38.0", features = ["sync"] }
+tokio = { version = "1.47.0", features = ["sync"] }
 tokio-util = { version = "0.7.0", optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.38.0", features = ["full", "test-util"] }
+tokio = { version = "1.47.0", features = ["full", "test-util"] }
 async-stream = "0.3"
+# Kept back compared to `tokio`'s non-dev equivalent to simplify CI.
 parking_lot = "0.12.0"
 tokio-test = "0.4"
 futures = { version = "0.3", default-features = false }

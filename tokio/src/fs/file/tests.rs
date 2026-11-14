@@ -867,6 +867,41 @@ fn sync_data_err_ordered_after_write() {
 }
 
 #[test]
+fn metadata_ordered_after_write() {
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_write()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(HELLO))
+        .returning(|_| Ok(HELLO.len()));
+    // `std::fs::Metadata` cannot be constructed here, so return an error.
+    file.expect_metadata()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|| Err(io::ErrorKind::Other.into()));
+
+    let mut file = File::from_std(file);
+    let mut t = task::spawn(file.write(HELLO));
+    assert_ready_ok!(t.poll());
+
+    let mut t = task::spawn(file.metadata());
+    assert_pending!(t.poll());
+
+    assert_eq!(1, pool::len());
+    pool::run_one();
+
+    assert!(t.is_woken());
+    assert_pending!(t.poll());
+
+    assert_eq!(1, pool::len());
+    pool::run_one();
+
+    assert!(t.is_woken());
+    assert_ready_err!(t.poll());
+}
+
+#[test]
 fn open_set_len_ok() {
     let mut file = MockFile::default();
     file.expect_set_len().with(eq(123)).returning(|_| Ok(()));
@@ -965,7 +1000,7 @@ fn busy_file_seek_error() {
         .in_sequence(&mut seq)
         .returning(|_| Err(io::ErrorKind::Other.into()));
 
-    let mut file = crate::io::BufReader::new(File::from_std(file));
+    let mut file = File::from_std(file);
     {
         let mut t = task::spawn(file.write(HELLO));
         assert_ready_ok!(t.poll());
@@ -973,6 +1008,42 @@ fn busy_file_seek_error() {
 
     pool::run_one();
 
-    let mut t = task::spawn(file.seek(SeekFrom::Start(0)));
+    // Call start_seek directly, without first completing the pending write.
+    assert!(Pin::new(&mut file).start_seek(SeekFrom::Start(0)).is_err());
+}
+
+#[test]
+fn incomplete_read_followed_by_overflowing_relative_seek() {
+    let mut file = MockFile::default();
+    let mut seq = Sequence::new();
+    file.expect_inner_read()
+        .once()
+        .in_sequence(&mut seq)
+        .returning(|buf| {
+            buf[0..HELLO.len()].copy_from_slice(HELLO);
+            Ok(HELLO.len())
+        });
+    file.expect_inner_seek()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(SeekFrom::Current(-(HELLO.len() as i64))))
+        .returning(|_| Ok(0));
+    file.expect_inner_seek()
+        .once()
+        .in_sequence(&mut seq)
+        .with(eq(SeekFrom::Current(i64::MIN)))
+        .returning(|_| Err(io::ErrorKind::InvalidInput.into()));
+
+    let mut file = File::from_std(file);
+    let mut buf = [0; 32];
+
+    let mut t = task::spawn(file.read(&mut buf));
+    assert_pending!(t.poll());
+
+    pool::run_one();
+
+    let mut t = task::spawn(file.seek(SeekFrom::Current(i64::MIN)));
+    assert_pending!(t.poll());
+    pool::run_one();
     assert_ready_err!(t.poll());
 }

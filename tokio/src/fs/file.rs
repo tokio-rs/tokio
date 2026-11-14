@@ -2,7 +2,7 @@
 //!
 //! [`File`]: File
 
-use crate::fs::{asyncify, OpenOptions};
+use crate::fs::{asyncify, FileTimes, OpenOptions};
 use crate::io::blocking::{Buf, DEFAULT_MAX_BUF_SIZE};
 use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use crate::sync::Mutex;
@@ -454,6 +454,10 @@ impl File {
     /// # }
     /// ```
     pub async fn metadata(&self) -> io::Result<Metadata> {
+        // Wait for in-flight operations so that the returned metadata (such
+        // as the file length) reflects earlier writes.
+        self.inner.lock().await.complete_inflight().await;
+
         let std = self.std.clone();
         asyncify(move || std.metadata()).await
     }
@@ -566,6 +570,45 @@ impl File {
         asyncify(move || std.set_permissions(perm)).await
     }
 
+    /// Changes the timestamps on the underlying file.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the user lacks permission to change
+    /// timestamps on the underlying file. It may also return an error in other
+    /// os-specific unspecified cases.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::{File, FileTimes};
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::open("foo.txt").await?;
+    /// let times = FileTimes::new()
+    ///     .set_accessed(std::time::SystemTime::now())
+    ///     .set_modified(std::time::SystemTime::now());
+    /// file.set_times(times).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn set_times(&self, times: FileTimes) -> io::Result<()> {
+        // Wait for in-flight reads/writes like `sync_all` does, so they
+        // cannot complete after us and overwrite the timestamps.
+        self.inner.lock().await.complete_inflight().await;
+
+        let std = self.std.clone();
+        let std_times = times.into_std();
+        asyncify(move || std.set_times(std_times)).await
+    }
+
+    /// Changes the modification timestamp on the underlying file.
+    ///
+    /// This is equivalent to `set_times` with only the modification time set.
+    pub async fn set_modified(&self, time: std::time::SystemTime) -> io::Result<()> {
+        self.set_times(FileTimes::new().set_modified(time)).await
+    }
+
     /// Set the maximum buffer size for the underlying [`AsyncRead`] / [`AsyncWrite`] operation.
     ///
     /// Although Tokio uses a sensible default value for this buffer size, this function would be
@@ -612,7 +655,7 @@ impl AsyncRead for File {
         cx: &mut Context<'_>,
         dst: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
 
         let me = self.get_mut();
         let inner = me.inner.get_mut();
@@ -684,26 +727,39 @@ impl AsyncSeek for File {
         let inner = me.inner.get_mut();
 
         match inner.state {
-            State::Busy(_) => Err(io::Error::new(
-                io::ErrorKind::Other,
+            State::Busy(_) => Err(io::Error::other(
                 "other file operation is pending, call poll_complete before start_seek",
             )),
             State::Idle(ref mut buf_cell) => {
                 let mut buf = buf_cell.take().unwrap();
 
                 // Factor in any unread data from the buf
-                if !buf.is_empty() {
+                let extra_seek = if !buf.is_empty() {
                     let n = buf.discard_read();
 
                     if let SeekFrom::Current(ref mut offset) = pos {
-                        *offset += n;
+                        match offset.checked_add(n) {
+                            Some(new_offset) => {
+                                *offset = new_offset;
+                                None
+                            }
+                            None => Some(SeekFrom::Current(n)),
+                        }
+                    } else {
+                        None
                     }
-                }
+                } else {
+                    None
+                };
 
                 let std = me.std.clone();
 
                 inner.state = State::Busy(spawn_blocking(move || {
-                    let res = (&*std).seek(pos);
+                    let res = if let Some(extra_seek) = extra_seek {
+                        (&*std).seek(extra_seek).and_then(|_| (&*std).seek(pos))
+                    } else {
+                        (&*std).seek(pos)
+                    };
                     (Operation::Seek(res), buf)
                 }));
                 Ok(())
@@ -712,7 +768,7 @@ impl AsyncSeek for File {
     }
 
     fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
         let inner = self.inner.get_mut();
 
         loop {
@@ -753,7 +809,7 @@ impl AsyncWrite for File {
         cx: &mut Context<'_>,
         src: &[u8],
     ) -> Poll<io::Result<usize>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
         let me = self.get_mut();
         let inner = me.inner.get_mut();
 
@@ -784,7 +840,7 @@ impl AsyncWrite for File {
 
                         (Operation::Write(res), buf)
                     })
-                    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "background task failed"));
+                    .ok_or_else(|| io::Error::other("background task failed"));
 
                     if res.is_err() {
                         // Restore a valid Idle state before returning the error.
@@ -833,7 +889,7 @@ impl AsyncWrite for File {
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<Result<usize, io::Error>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
         let me = self.get_mut();
         let inner = me.inner.get_mut();
 
@@ -864,7 +920,7 @@ impl AsyncWrite for File {
 
                         (Operation::Write(res), buf)
                     })
-                    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "background task failed"));
+                    .ok_or_else(|| io::Error::other("background task failed"));
 
                     if res.is_err() {
                         // Restore a valid Idle state before returning the error.
@@ -913,13 +969,13 @@ impl AsyncWrite for File {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
         let inner = self.inner.get_mut();
         inner.poll_flush(cx)
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
         self.poll_flush(cx)
     }
 }
@@ -1023,20 +1079,20 @@ impl Inner {
         ))]
         {
             if let Ok(handle) = crate::runtime::Handle::try_current() {
-                let driver_handle = handle.inner.driver().io();
+                if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
+                    if driver_handle.is_uring_ready(io_uring::opcode::Read::CODE) {
+                        // Fast path: uring already initialized and Read supported.
+                        let fd: crate::io::uring::utils::ArcFd = std;
+                        return Ok(spawn(Self::uring_read(fd, buf, max_buf_size)));
+                    }
 
-                if driver_handle.is_uring_ready(io_uring::opcode::Read::CODE) {
-                    // Fast path: uring already initialized and Read supported.
-                    let fd: crate::io::uring::utils::ArcFd = std;
-                    return Ok(spawn(Self::uring_read(fd, buf, max_buf_size)));
+                    if !driver_handle.is_uring_probed() {
+                        // Not yet probed: lazy init inside an async task so
+                        // `File::from_std()` can still benefit from io-uring.
+                        return Ok(spawn(Self::lazy_init_read(std, buf, max_buf_size)));
+                    }
                 }
-
-                if !driver_handle.is_uring_probed() {
-                    // Not yet probed: lazy init inside an async task so
-                    // `File::from_std()` can still benefit from io-uring.
-                    return Ok(spawn(Self::lazy_init_read(std, buf, max_buf_size)));
-                }
-                // Probed but unsupported: fall through to spawn_blocking.
+                // No IO driver or probed but unsupported: fall through to spawn_blocking.
             }
         }
 
@@ -1065,14 +1121,21 @@ impl Inner {
             let (res, r_fd, r_buf) =
                 // u64::MAX to use and advance the file position
                 Op::read_at(fd, buf, max_buf_size, u64::MAX).await;
-            match res {
-                Err(e) if e.kind() == io::ErrorKind::Interrupted => {
+            match (res, r_fd, r_buf) {
+                // Retry an interrupted read with the resources the op handed back.
+                (Err(e), Some(r_fd), Some(r_buf)) if e.kind() == io::ErrorKind::Interrupted => {
                     buf = r_buf;
                     fd = r_fd;
                     continue;
                 }
-                Err(e) => break (Operation::Read(Err(e)), r_buf),
-                Ok(n) => break (Operation::Read(Ok(n as usize)), r_buf),
+                // A cancelled op keeps its buffer in the driver, so the idle slot
+                // gets a fresh empty `Buf` instead.
+                (Err(e), _, r_buf) => {
+                    let buf = r_buf.unwrap_or_else(|| Buf::with_capacity(0));
+                    break (Operation::Read(Err(e)), buf);
+                }
+                (Ok(n), _, Some(r_buf)) => break (Operation::Read(Ok(n as usize)), r_buf),
+                (Ok(_), ..) => unreachable!("a successful read returns its buffer"),
             }
         }
     }
@@ -1089,23 +1152,25 @@ impl Inner {
         target_os = "linux",
     ))]
     async fn lazy_init_read(std: Arc<StdFile>, buf: Buf, max_buf_size: usize) -> (Operation, Buf) {
-        let handle = crate::runtime::Handle::current();
-        let driver_handle = handle.inner.driver().io();
-        if driver_handle
-            .check_and_init(io_uring::opcode::Read::CODE)
-            .await
-            .unwrap_or_default()
-        {
-            let fd: crate::io::uring::utils::ArcFd = std;
-            Self::uring_read(fd, buf, max_buf_size).await
-        } else {
-            match Self::spawn_blocking_read(buf, std, max_buf_size).await {
-                Ok(result) => result,
-                Err(e) => (
-                    Operation::Read(Err(io::Error::new(io::ErrorKind::Other, e))),
-                    Buf::with_capacity(0),
-                ),
+        if let Ok(handle) = crate::runtime::Handle::try_current() {
+            if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
+                if driver_handle
+                    .check_and_init(io_uring::opcode::Read::CODE)
+                    .await
+                    .unwrap_or_default()
+                {
+                    let fd: crate::io::uring::utils::ArcFd = std;
+                    return Self::uring_read(fd, buf, max_buf_size).await;
+                }
             }
+        }
+
+        match Self::spawn_blocking_read(buf, std, max_buf_size).await {
+            Ok(result) => result,
+            Err(e) => (
+                Operation::Read(Err(io::Error::other(e))),
+                Buf::with_capacity(0),
+            ),
         }
     }
 
@@ -1131,7 +1196,7 @@ impl Inner {
     }
 
     fn poll_complete_inflight(&mut self, cx: &mut Context<'_>) -> Poll<()> {
-        ready!(crate::trace::trace_leaf());
+        ready!(crate::trace::trace_leaf(cx));
         match self.poll_flush(cx) {
             Poll::Ready(Err(e)) => {
                 self.last_write_err = Some(e.kind());

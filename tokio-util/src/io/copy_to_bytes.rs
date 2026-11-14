@@ -37,6 +37,11 @@ impl<S> CopyToBytes<S> {
         &mut self.inner
     }
 
+    /// Gets a pinned mutable reference to the underlying sink.
+    pub fn get_pin_mut(self: Pin<&mut Self>) -> Pin<&mut S> {
+        self.project().inner
+    }
+
     /// Consumes this [`CopyToBytes`], returning the underlying sink.
     pub fn into_inner(self) -> S {
         self.inner

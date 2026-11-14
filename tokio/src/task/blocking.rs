@@ -67,9 +67,11 @@ cfg_rt_multi_thread! {
     ///
     /// # Panics
     ///
-    /// This function panics if called from a [`current_thread`] runtime.
+    /// This function panics if called from a [`current_thread`] runtime or from
+    /// within a [`LocalSet`].
     ///
     /// [`current_thread`]: fn@crate::runtime::Builder::new_current_thread
+    /// [`LocalSet`]: struct@crate::task::LocalSet
     #[track_caller]
     pub fn block_in_place<F, R>(f: F) -> R
     where
@@ -166,7 +168,7 @@ cfg_rt! {
     /// [`thread::spawn`]: fn@std::thread::spawn
     /// [`shutdown_timeout`]: fn@crate::runtime::Runtime::shutdown_timeout
     /// [bridgesync]: https://tokio.rs/tokio/topics/bridging
-    /// [`AtomicBool`]: struct@std::sync::atomic::AtomicBool
+    /// [`AtomicBool`]: std::sync::atomic::AtomicBool
     /// [`abort`]: crate::task::JoinHandle::abort
     ///
     /// # Examples

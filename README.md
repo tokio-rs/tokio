@@ -56,7 +56,7 @@ Make sure you enable the full features of the tokio crate on Cargo.toml:
 
 ```toml
 [dependencies]
-tokio = { version = "1.53.1", features = ["full"] }
+tokio = { version = "1.54.1", features = ["full"] }
 ```
 Then, on your main.rs:
 
@@ -132,6 +132,8 @@ project.
 In addition to the crates in this repository, the Tokio project also maintains
 several other libraries, including:
 
+* [`toasty`]: An async ORM for Rust supporting both SQL and NoSQL databases.
+
 * [`axum`]: A web application framework that focuses on ergonomics and modularity.
 
 * [`hyper`]: A fast and correct HTTP/1.1 and HTTP/2 implementation for Rust.
@@ -150,6 +152,7 @@ several other libraries, including:
 
 * [`loom`]: A testing tool for concurrent Rust code.
 
+[`toasty`]: https://github.com/tokio-rs/toasty
 [`axum`]: https://github.com/tokio-rs/axum
 [`warp`]: https://github.com/seanmonstar/warp
 [`hyper`]: https://github.com/hyperium/hyper
@@ -186,12 +189,13 @@ When updating this, also update:
 
 Tokio will keep a rolling MSRV (minimum supported rust version) policy of **at
 least** 6 months. When increasing the MSRV, the new Rust version must have been
-released at least six months ago. The current MSRV is 1.71.
+released at least six months ago. The current MSRV is 1.85.
 
 Note that the MSRV is not increased automatically, and only as part of a minor
 release. The MSRV history for past minor releases can be found below:
 
- * 1.48 to now  - Rust 1.71
+ * 1.54 to now  - Rust 1.85
+ * 1.48 to 1.53 - Rust 1.71
  * 1.39 to 1.47 - Rust 1.70
  * 1.30 to 1.38 - Rust 1.63
  * 1.27 to 1.29 - Rust 1.56
@@ -203,6 +207,10 @@ Note that although we try to avoid the situation where a dependency transitively
 increases the MSRV of Tokio, we do not guarantee that this does not happen.
 However, every minor release will have some set of versions of dependencies that
 works with the MSRV of that minor release.
+
+An exception to this is the optional `parking_lot` feature, which is not
+included in `full`. Enabling the `parking_lot` feature requires the MSRV of the
+`parking_lot` crate.
 
 ## Release schedule
 

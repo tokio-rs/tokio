@@ -904,7 +904,8 @@ impl TcpSocket {
     /// }
     /// ```
     pub fn listen(self, backlog: u32) -> io::Result<TcpListener> {
-        self.inner.listen(backlog as i32)?;
+        self.inner
+            .listen(i32::try_from(backlog).unwrap_or(i32::MAX))?;
         #[cfg(not(windows))]
         let mio = {
             use std::os::fd::{FromRawFd, IntoRawFd};

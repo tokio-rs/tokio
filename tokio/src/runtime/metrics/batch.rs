@@ -264,40 +264,6 @@ impl MetricsBatch {
         }
     }
 
-    cfg_metrics_variant! {
-        stable: {
-            /// Record the schedule latency of an additional task polled as part
-            /// of the current poll operation.
-            #[cfg(feature = "rt-multi-thread")]
-            pub(crate) fn record_schedule_latency(
-                &mut self,
-                _schedule_latency_context: Option<ScheduleLatencyContext>,
-            ) -> Option<Duration> {
-                None
-            }
-        },
-        unstable: {
-            /// Record the schedule latency of an additional task polled as part
-            /// of the current poll operation.
-            #[cfg(feature = "rt-multi-thread")]
-            pub(crate) fn record_schedule_latency(
-                &mut self,
-                schedule_latency_context: Option<ScheduleLatencyContext>,
-            ) -> Option<Duration> {
-                #[cfg(all(tokio_unstable, feature = "schedule-latency"))]
-                {
-                    self.record_schedule_latency_at(schedule_latency_context, None)
-                }
-
-                #[cfg(not(all(tokio_unstable, feature = "schedule-latency")))]
-                {
-                    let _ = schedule_latency_context;
-                    None
-                }
-            }
-        }
-    }
-
     #[cfg(all(tokio_unstable, feature = "schedule-latency"))]
     fn record_schedule_latency_at(
         &mut self,

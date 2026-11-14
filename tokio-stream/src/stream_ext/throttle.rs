@@ -1,7 +1,9 @@
 //! Slow down a stream by enforcing a delay between items.
 
+use crate::stream_ext::safe_delay;
 use crate::Stream;
-use tokio::time::{sleep, Duration, Sleep};
+use futures_core::FusedStream;
+use tokio::time::{sleep, Duration, Instant, Sleep};
 
 use std::future::Future;
 use std::pin::Pin;
@@ -15,7 +17,7 @@ where
 {
     Throttle {
         delay: None,
-        duration,
+        duration: safe_delay(duration),
         has_delayed: true,
         stream,
     }
@@ -83,7 +85,10 @@ impl<T: Stream> Stream for Throttle<T> {
 
         if value.is_some() {
             if !is_zero(dur) {
-                me.delay.set(Some(sleep(dur)));
+                match me.delay.as_mut().as_pin_mut() {
+                    Some(delay) => delay.reset(Instant::now() + dur),
+                    None => me.delay.set(Some(sleep(dur))),
+                }
             }
 
             *me.has_delayed = false;
@@ -94,6 +99,12 @@ impl<T: Stream> Stream for Throttle<T> {
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.stream.size_hint()
+    }
+}
+
+impl<T: FusedStream> FusedStream for Throttle<T> {
+    fn is_terminated(&self) -> bool {
+        (self.has_delayed || is_zero(self.duration)) && self.stream.is_terminated()
     }
 }
 

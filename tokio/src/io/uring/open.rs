@@ -37,6 +37,10 @@ impl Completable for Open {
     fn complete_with_error(self, err: Error) -> Self::Output {
         Err(OpenError::Submission(err))
     }
+
+    fn complete_after_cancel(err: Error) -> Self::Output {
+        Err(OpenError::Submission(err))
+    }
 }
 
 impl Cancellable for Open {

@@ -8,10 +8,9 @@
     target_os = "linux"
 ))]
 
-use futures::future::Future;
 use futures::future::FutureExt;
 use libc::PATH_MAX;
-use std::future::poll_fn;
+use std::future::{pending, poll_fn};
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
@@ -21,8 +20,8 @@ use std::time::Duration;
 use tempfile::{tempdir, NamedTempFile};
 use tokio::fs::{create_dir, metadata, set_permissions, symlink, try_exists, write};
 use tokio::runtime::{Builder, Runtime};
+use tokio::task::JoinSet;
 use tokio_test::assert_pending;
-use tokio_util::task::TaskTracker;
 
 use crate::support::io_uring::{io_uring_supported, uring_fs_op_in_use};
 
@@ -66,7 +65,7 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
         let (_tmp, path) = create_tmp_files(1);
         // keep 100 permits
         const N: i32 = 100;
-        rt.spawn(async move {
+        rt.block_on(async move {
             let path = path[0].clone();
 
             // spawning a bunch of uring operations.
@@ -77,16 +76,15 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
                 let path = path.clone();
                 let mut fut = Box::pin(try_exists(path));
 
-                poll_fn(|cx| {
-                    assert_pending!(fut.as_mut().poll(cx));
-                    Poll::<()>::Pending
-                })
-                .await;
+                assert_pending!(futures::poll!(fut.as_mut()));
 
                 futs.push(fut);
             }
 
-            tokio::task::yield_now().await;
+            tokio::spawn(async move {
+                let _futs = futs;
+                pending::<()>().await;
+            });
         });
 
         std::thread::spawn(move || {
@@ -94,7 +92,7 @@ fn shutdown_runtime_while_performing_io_uring_ops() {
             done_tx.send(()).unwrap();
         });
 
-        done_rx.recv().unwrap();
+        done_rx.recv_timeout(Duration::from_secs(5)).unwrap();
     }
 
     for rt in rt_combinations() {
@@ -110,17 +108,16 @@ fn stat_many_files() {
         let (_tmp_files, paths): (Vec<NamedTempFile>, Vec<PathBuf>) = create_tmp_files(NUM_FILES);
 
         rt.block_on(async move {
-            let tracker = TaskTracker::new();
+            let mut tasks = JoinSet::new();
 
             for i in 0..10_000 {
                 let path = paths.get(i % NUM_FILES).unwrap().clone();
-                tracker.spawn(async move {
+                tasks.spawn(async move {
                     let exists = try_exists(path).await.unwrap();
                     assert!(exists);
                 });
             }
-            tracker.close();
-            tracker.wait().await;
+            tasks.join_all().await;
         });
     }
 

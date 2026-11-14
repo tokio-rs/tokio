@@ -3,6 +3,9 @@ use std::path::Path;
 
 use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
+use crate::net::unix::Permissions;
+
 use crate::net::{UnixDatagram, UnixListener, UnixStream};
 
 cfg_net_unix! {
@@ -170,13 +173,13 @@ impl UnixSocket {
     /// [`new_datagram`]: `UnixSocket::new_datagram`
     pub fn listen(self, backlog: u32) -> io::Result<UnixListener> {
         if self.ty() == socket2::Type::DGRAM {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(io::Error::other(
                 "listen cannot be called on a datagram socket",
             ));
         }
 
-        self.inner.listen(backlog as i32)?;
+        self.inner
+            .listen(i32::try_from(backlog).unwrap_or(i32::MAX))?;
         let mio = {
             use std::os::unix::io::{FromRawFd, IntoRawFd};
 
@@ -200,8 +203,7 @@ impl UnixSocket {
     /// [`new_datagram`]: `UnixSocket::new_datagram`
     pub async fn connect(self, path: impl AsRef<Path>) -> io::Result<UnixStream> {
         if self.ty() == socket2::Type::DGRAM {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(io::Error::other(
                 "connect cannot be called on a datagram socket",
             ));
         }
@@ -229,8 +231,7 @@ impl UnixSocket {
     /// [`new_stream`]: `UnixSocket::new_stream`
     pub fn datagram(self) -> io::Result<UnixDatagram> {
         if self.ty() == socket2::Type::STREAM {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(io::Error::other(
                 "datagram cannot be called on a stream socket",
             ));
         }
@@ -242,6 +243,34 @@ impl UnixSocket {
         };
 
         UnixDatagram::from_mio(mio)
+    }
+
+    /// Sets the mode that [`bind`] creates the socket file with (subject to the
+    /// process `umask`).
+    ///
+    /// Calling this function on a socket that has already been bound will return an error.
+    ///
+    /// This calls the `fchmod(2)` operating-system function.
+    ///
+    /// [`bind`]: `UnixSocket::bind`
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    pub fn set_permissions(&self, perm: Permissions) -> io::Result<()> {
+        let is_bound = self.inner.local_addr()?.as_pathname().is_some();
+        if is_bound {
+            // Too late: socket file already created
+            return Err(io::Error::other(
+                "set_permissions cannot be called on a bound socket",
+            ));
+        }
+
+        // Safety: calling `fchmod` on an open fd is safe
+        let ret = unsafe { libc::fchmod(self.as_raw_fd(), perm.mode()) };
+
+        if ret == -1 {
+            return Err(io::Error::last_os_error());
+        }
+
+        Ok(())
     }
 }
 

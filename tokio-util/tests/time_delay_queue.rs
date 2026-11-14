@@ -810,6 +810,28 @@ async fn compact_change_deadline() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn cascade_into_level_zero_slot_zero() {
+    let mut queue = DelayQueue::new();
+
+    queue.insert("a", ms(64));
+    queue.insert("b", ms(65));
+
+    assert_eq!(queue.next().await.unwrap().into_inner(), "a");
+    assert_eq!(queue.next().await.unwrap().into_inner(), "b");
+}
+
+#[tokio::test(start_paused = true)]
+async fn cascade_across_levels_into_slot_zero() {
+    let mut queue = DelayQueue::new();
+
+    queue.insert("a", ms(4096));
+    queue.insert("b", ms(4160));
+
+    assert_eq!(queue.next().await.unwrap().into_inner(), "a");
+    assert_eq!(queue.next().await.unwrap().into_inner(), "b");
+}
+
+#[tokio::test(start_paused = true)]
 async fn item_expiry_greater_than_wheel() {
     // This function tests that a delay queue that has existed for at least 2^36 milliseconds won't panic when a new item is inserted.
     let mut queue = DelayQueue::new();

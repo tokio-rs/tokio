@@ -40,12 +40,7 @@ pub(crate) fn memchr(needle: u8, haystack: &[u8]) -> Option<usize> {
     //         or `memchr_inner` None which is guarded by the `?` operator above
     //         therefore the index must **always** point to an element in the array
     //         and so this indexing operation is safe
-    // TODO(MSRV 1.81): When bumping MSRV, switch to `std::hint::assert_unchecked(haystack.get(..=index).is_some());`
-    unsafe {
-        if haystack.get(..=index).is_none() {
-            std::hint::unreachable_unchecked()
-        }
-    }
+    unsafe { std::hint::assert_unchecked(haystack.get(..=index).is_some()) };
 
     Some(index)
 }

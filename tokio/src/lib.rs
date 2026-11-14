@@ -323,7 +323,8 @@
 //! Beware though that this will pull in many extra dependencies that you may not
 //! need.
 //!
-//! - `full`: Enables all features listed below except `test-util` and unstable features.
+//! - `full`: Enables all features listed below except `parking_lot`, `test-util`,
+//!   and unstable features.
 //! - `rt`: Enables `tokio::spawn`, the current-thread scheduler,
 //!   and non-scheduler utilities.
 //! - `rt-multi-thread`: Enables the heavier, multi-threaded, work-stealing scheduler.
@@ -340,11 +341,10 @@
 //! - `signal`: Enables all `tokio::signal` types.
 //! - `fs`: Enables `tokio::fs` types.
 //! - `test-util`: Enables testing based infrastructure for the Tokio runtime.
-//! - `parking_lot`: As a potential optimization, use the [`parking_lot`] crate's
-//!   synchronization primitives internally. Also, this
-//!   dependency is necessary to construct some of our primitives
-//!   in a `const` context. `MSRV` may increase according to the
-//!   [`parking_lot`] release in use.
+//! - `parking_lot`: As a potential optimization, use the `parking_lot` crate's
+//!   synchronization primitives internally. Also, this dependency is necessary
+//!   to construct some of our primitives in a `const` context. The effective
+//!   MSRV may increase according to the `parking_lot` release in use.
 //!
 //! _Note: `AsyncRead` and `AsyncWrite` traits do not require any features and are
 //! always available._
@@ -476,6 +476,20 @@
 //! `test-util` features. The `rt-multi-thread` feature is additionally
 //! supported when building with Emscripten pthreads (`-pthread`). The `net`,
 //! `process`, and `signal` features are not supported.
+//!
+//! Emscripten's filesystem is synchronous, so `tokio::fs` and `io-std` run
+//! their operations inline on the calling thread rather than on the blocking
+//! pool, in pthreads builds too.
+//!
+//! When the build links WebAssembly JavaScript Promise Integration (JSPI), a
+//! wait that would block suspends on the host event loop rather than blocking.
+//! This requires Emscripten 6.0.10 or later. Builds without JSPI will spin on
+//! timed parks, and panic otherwise.
+//!
+//! Suspension requires the current export to have been wrapped with
+//! `WebAssembly.promising`. A wait from any other activation throws
+//! `WebAssembly.SuspendError`. That is a foreign exception rather than a Rust
+//! panic, so it can't be caught by `catch_unwind`.
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at
 // least 32 bits, which a lot of components in Tokio currently assumes.
@@ -620,14 +634,14 @@ mod trace {
     cfg_not_taskdump! {
         #[inline(always)]
         #[allow(dead_code)]
-        pub(crate) fn trace_leaf() -> std::task::Poll<()> {
+        pub(crate) fn trace_leaf(_: &mut std::task::Context<'_>) -> std::task::Poll<()> {
             std::task::Poll::Ready(())
         }
     }
 
     #[cfg_attr(not(feature = "sync"), allow(dead_code))]
     pub(crate) async fn async_trace_leaf() {
-        std::future::poll_fn(|_cx| trace_leaf()).await
+        std::future::poll_fn(trace_leaf).await
     }
 }
 

@@ -101,7 +101,7 @@ impl Instant {
     /// let new_now = Instant::now();
     /// println!("{:?}", new_now.saturating_duration_since(now));
     /// println!("{:?}", now.saturating_duration_since(new_now)); // 0ns
-    /// }
+    /// # }
     /// ```
     pub fn saturating_duration_since(&self, earlier: Instant) -> Duration {
         self.std.saturating_duration_since(earlier.std)

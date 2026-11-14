@@ -30,6 +30,7 @@ use reap::Reaper;
 #[cfg(all(target_os = "linux", feature = "rt"))]
 mod pidfd_reaper;
 
+use crate::io::interest::Interest;
 use crate::io::{AsyncRead, AsyncWrite, PollEvented, ReadBuf};
 use crate::process::kill::Kill;
 use crate::process::SpawnedChild;
@@ -37,14 +38,17 @@ use crate::runtime::signal::Handle as SignalHandle;
 use crate::signal::unix::{signal, Signal, SignalKind};
 
 use mio::event::Source;
-use mio::unix::SourceFd;
+use mio::unix::pipe;
 use std::fmt;
 use std::fs::File;
 use std::future::Future;
 use std::io;
-use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
+use std::os::unix::io::{AsRawFd, OwnedFd, RawFd};
 use std::pin::Pin;
-use std::process::{Child as StdChild, ExitStatus, Stdio};
+use std::process::{
+    Child as StdChild, ChildStderr as StdChildStderr, ChildStdin as StdChildStdin,
+    ChildStdout as StdChildStdout, ExitStatus, Stdio,
+};
 use std::task::Context;
 use std::task::Poll;
 
@@ -102,6 +106,26 @@ impl OrphanQueue<StdChild> for GlobalOrphanQueue {
     }
 }
 
+/// After the OS has already created a process, failures while wrapping it for
+/// Tokio (stdio registration, pidfd, SIGCHLD listener) must not drop the
+/// `StdChild` handle without reaping or enqueuing. Otherwise the process can
+/// become an unreapable zombie until this process exits.
+///
+/// If `try_wait` reports that the child has already exited, it has been reaped
+/// and nothing else is needed. Otherwise push onto the orphan queue so the
+/// process driver can reap it later.
+fn orphan_child_on_error<W, Q>(mut child: W, orphan_queue: Q, err: io::Error) -> io::Error
+where
+    W: Wait,
+    Q: OrphanQueue<W>,
+{
+    match child.try_wait() {
+        Ok(Some(_)) => {}
+        Ok(None) | Err(_) => orphan_queue.push_orphan(child),
+    }
+    err
+}
+
 #[must_use = "futures do nothing unless polled"]
 pub(crate) enum Child {
     SignalReaper(Reaper<StdChild, GlobalOrphanQueue, Signal>),
@@ -116,9 +140,25 @@ impl fmt::Debug for Child {
 }
 
 pub(crate) fn build_child(mut child: StdChild) -> io::Result<SpawnedChild> {
-    let stdin = child.stdin.take().map(stdio).transpose()?;
-    let stdout = child.stdout.take().map(stdio).transpose()?;
-    let stderr = child.stderr.take().map(stdio).transpose()?;
+    // Take every pipe before registering one. On a registration error the
+    // remaining pipes drop here. Leaving them on the orphaned child keeps
+    // the parent end open, so the child can block on a full pipe.
+    let stdin_pipe = child.stdin.take();
+    let stdout_pipe = child.stdout.take();
+    let stderr_pipe = child.stderr.take();
+
+    let stdin = match stdin_pipe.map(stdio).transpose() {
+        Ok(io) => io,
+        Err(e) => return Err(orphan_child_on_error(child, GlobalOrphanQueue, e)),
+    };
+    let stdout = match stdout_pipe.map(stdio).transpose() {
+        Ok(io) => io,
+        Err(e) => return Err(orphan_child_on_error(child, GlobalOrphanQueue, e)),
+    };
+    let stderr = match stderr_pipe.map(stdio).transpose() {
+        Ok(io) => io,
+        Err(e) => return Err(orphan_child_on_error(child, GlobalOrphanQueue, e)),
+    };
 
     #[cfg(all(target_os = "linux", feature = "rt"))]
     match pidfd_reaper::PidfdReaper::new(child, GlobalOrphanQueue) {
@@ -130,11 +170,16 @@ pub(crate) fn build_child(mut child: StdChild) -> io::Result<SpawnedChild> {
                 stderr,
             })
         }
-        Err((Some(err), _child)) => return Err(err),
+        Err((Some(err), child)) => {
+            return Err(orphan_child_on_error(child, GlobalOrphanQueue, err));
+        }
         Err((None, child_returned)) => child = child_returned,
     }
 
-    let signal = signal(SignalKind::child())?;
+    let signal = match signal(SignalKind::child()) {
+        Ok(signal) => signal,
+        Err(e) => return Err(orphan_child_on_error(child, GlobalOrphanQueue, e)),
+    };
 
     Ok(SpawnedChild {
         child: Child::SignalReaper(Reaper::new(child, GlobalOrphanQueue, signal)),
@@ -185,53 +230,54 @@ impl Future for Child {
 }
 
 #[derive(Debug)]
-pub(crate) struct Pipe {
-    // Actually a pipe is not a File. However, we are reusing `File` to get
-    // close on drop. This is a similar trick as `mio`.
-    fd: File,
+pub(crate) struct ChildStdin {
+    inner: Option<PollEvented<pipe::Sender>>,
 }
 
-impl<T: IntoRawFd> From<T> for Pipe {
-    fn from(fd: T) -> Self {
-        let fd = unsafe { File::from_raw_fd(fd.into_raw_fd()) };
-        Self { fd }
-    }
+#[derive(Debug)]
+pub(crate) struct ChildStdout {
+    inner: PollEvented<pipe::Receiver>,
 }
 
-impl io::Read for &Pipe {
-    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
-        (&self.fd).read(bytes)
-    }
-}
+pub(crate) type ChildStderr = ChildStdout;
 
-impl io::Write for &Pipe {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        (&self.fd).write(bytes)
-    }
+impl TryFrom<StdChildStdin> for ChildStdin {
+    type Error = io::Error;
 
-    fn flush(&mut self) -> io::Result<()> {
-        (&self.fd).flush()
-    }
-
-    fn write_vectored(&mut self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
-        (&self.fd).write_vectored(bufs)
+    fn try_from(io: StdChildStdin) -> io::Result<Self> {
+        let mut pipe = pipe::Sender::from(io);
+        set_nonblocking(&mut pipe, true)?;
+        PollEvented::new_with_interest(pipe, Interest::WRITABLE)
+            .map(|inner| Self { inner: Some(inner) })
     }
 }
 
-impl AsRawFd for Pipe {
-    fn as_raw_fd(&self) -> RawFd {
-        self.fd.as_raw_fd()
+impl TryFrom<StdChildStdout> for ChildStdout {
+    type Error = io::Error;
+
+    fn try_from(io: StdChildStdout) -> io::Result<Self> {
+        let mut pipe = pipe::Receiver::from(io);
+        set_nonblocking(&mut pipe, true)?;
+        PollEvented::new_with_interest(pipe, Interest::READABLE).map(|inner| Self { inner })
     }
 }
 
-impl AsFd for Pipe {
-    fn as_fd(&self) -> BorrowedFd<'_> {
-        unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+impl TryFrom<StdChildStderr> for ChildStdout {
+    type Error = io::Error;
+
+    fn try_from(io: StdChildStderr) -> io::Result<Self> {
+        let mut pipe = pipe::Receiver::from(io);
+        set_nonblocking(&mut pipe, true)?;
+        PollEvented::new_with_interest(pipe, Interest::READABLE).map(|inner| Self { inner })
     }
 }
 
-fn convert_to_blocking_file(io: ChildStdio) -> io::Result<File> {
-    let mut fd = io.inner.into_inner()?.fd;
+fn convert_to_blocking_file<T>(io: PollEvented<T>) -> io::Result<File>
+where
+    T: Source + Into<OwnedFd>,
+{
+    let fd: OwnedFd = io.into_inner()?.into();
+    let mut fd = File::from(fd);
 
     // Ensure that the fd to be inherited is set to *blocking* mode, as this
     // is the default that virtually all programs expect to have. Those
@@ -242,69 +288,58 @@ fn convert_to_blocking_file(io: ChildStdio) -> io::Result<File> {
     Ok(fd)
 }
 
-pub(crate) fn convert_to_stdio(io: ChildStdio) -> io::Result<Stdio> {
-    convert_to_blocking_file(io).map(Stdio::from)
+#[cold]
+fn closed_err() -> io::Error {
+    io::Error::new(io::ErrorKind::BrokenPipe, "child stdin has been shut down")
 }
 
-impl Source for Pipe {
-    fn register(
-        &mut self,
-        registry: &mio::Registry,
-        token: mio::Token,
-        interest: mio::Interest,
-    ) -> io::Result<()> {
-        SourceFd(&self.as_raw_fd()).register(registry, token, interest)
-    }
-
-    fn reregister(
-        &mut self,
-        registry: &mio::Registry,
-        token: mio::Token,
-        interest: mio::Interest,
-    ) -> io::Result<()> {
-        SourceFd(&self.as_raw_fd()).reregister(registry, token, interest)
-    }
-
-    fn deregister(&mut self, registry: &mio::Registry) -> io::Result<()> {
-        SourceFd(&self.as_raw_fd()).deregister(registry)
-    }
-}
-
-pub(crate) struct ChildStdio {
-    inner: PollEvented<Pipe>,
-}
-
-impl ChildStdio {
+impl ChildStdin {
     pub(super) fn into_owned_fd(self) -> io::Result<OwnedFd> {
-        convert_to_blocking_file(self).map(OwnedFd::from)
+        let inner = self.inner.ok_or_else(closed_err)?;
+        convert_to_blocking_file(inner).map(OwnedFd::from)
+    }
+
+    pub(super) fn into_stdio(self) -> io::Result<Stdio> {
+        self.into_owned_fd().map(Stdio::from)
     }
 }
 
-impl fmt::Debug for ChildStdio {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(fmt)
+impl ChildStdout {
+    pub(super) fn into_owned_fd(self) -> io::Result<OwnedFd> {
+        convert_to_blocking_file(self.inner).map(OwnedFd::from)
+    }
+
+    pub(super) fn into_stdio(self) -> io::Result<Stdio> {
+        convert_to_blocking_file(self.inner).map(Stdio::from)
     }
 }
 
-impl AsRawFd for ChildStdio {
+impl AsRawFd for ChildStdin {
+    #[track_caller]
+    fn as_raw_fd(&self) -> RawFd {
+        self.inner
+            .as_ref()
+            .expect("child stdin has been shut down")
+            .as_raw_fd()
+    }
+}
+
+impl AsRawFd for ChildStdout {
     fn as_raw_fd(&self) -> RawFd {
         self.inner.as_raw_fd()
     }
 }
 
-impl AsFd for ChildStdio {
-    fn as_fd(&self) -> BorrowedFd<'_> {
-        unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
-    }
-}
-
-impl AsyncWrite for ChildStdio {
+impl AsyncWrite for ChildStdin {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
-        self.inner.poll_write(cx, buf)
+        match self.inner.as_ref() {
+            Some(inner) => inner.poll_write(cx, buf),
+            None => Poll::Ready(Err(closed_err())),
+        }
     }
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -312,6 +347,7 @@ impl AsyncWrite for ChildStdio {
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        drop(self.get_mut().inner.take());
         Poll::Ready(Ok(()))
     }
 
@@ -320,7 +356,10 @@ impl AsyncWrite for ChildStdio {
         cx: &mut Context<'_>,
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<Result<usize, io::Error>> {
-        self.inner.poll_write_vectored(cx, bufs)
+        match self.inner.as_ref() {
+            Some(inner) => inner.poll_write_vectored(cx, bufs),
+            None => Poll::Ready(Err(closed_err())),
+        }
     }
 
     fn is_write_vectored(&self) -> bool {
@@ -328,14 +367,14 @@ impl AsyncWrite for ChildStdio {
     }
 }
 
-impl AsyncRead for ChildStdio {
+impl AsyncRead for ChildStdout {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        // Safety: pipes support reading into uninitialized memory
-        unsafe { self.inner.poll_read(cx, buf) }
+        // SAFETY: Receiver reads into the buffer without inspecting uninitialized bytes.
+        unsafe { self.inner.poll_read_pipe(cx, buf) }
     }
 }
 
@@ -362,13 +401,118 @@ fn set_nonblocking<T: AsRawFd>(fd: &mut T, nonblocking: bool) -> io::Result<()> 
     Ok(())
 }
 
-pub(super) fn stdio<T>(io: T) -> io::Result<ChildStdio>
+pub(super) fn stdio<T, U>(io: T) -> io::Result<U>
 where
-    T: IntoRawFd,
+    U: TryFrom<T, Error = io::Error>,
 {
-    // Set the fd to nonblocking before we pass it to the event loop
-    let mut pipe = Pipe::from(io);
-    set_nonblocking(&mut pipe, true)?;
+    U::try_from(io)
+}
 
-    PollEvented::new(pipe).map(|inner| ChildStdio { inner })
+#[cfg(all(test, not(loom)))]
+mod orphan_on_error_tests {
+    use super::orphan_child_on_error;
+    use crate::process::unix::orphan::test::MockQueue;
+    use crate::process::unix::orphan::Wait;
+    use std::io;
+    use std::os::unix::process::ExitStatusExt;
+    use std::process::ExitStatus;
+
+    struct MockWait {
+        total_waits: usize,
+        /// Number of `try_wait` calls that return `Ok(None)` before reporting exit.
+        still_running_waits: usize,
+    }
+
+    impl MockWait {
+        fn still_running() -> Self {
+            Self {
+                total_waits: 0,
+                still_running_waits: 1,
+            }
+        }
+
+        fn already_exited() -> Self {
+            Self {
+                total_waits: 0,
+                still_running_waits: 0,
+            }
+        }
+    }
+
+    impl Wait for MockWait {
+        fn id(&self) -> u32 {
+            42
+        }
+
+        fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
+            let waits = self.total_waits;
+            self.total_waits += 1;
+            if waits < self.still_running_waits {
+                Ok(None)
+            } else {
+                Ok(Some(ExitStatus::from_raw(0)))
+            }
+        }
+    }
+
+    #[test]
+    fn orphan_child_on_error_enqueues_when_still_running() {
+        let queue = MockQueue::new();
+        let err = io::Error::from_raw_os_error(libc::EMFILE);
+        let returned = orphan_child_on_error(MockWait::still_running(), &queue, err);
+        assert_eq!(returned.raw_os_error(), Some(libc::EMFILE));
+        assert_eq!(queue.all_enqueued.borrow().len(), 1);
+    }
+
+    #[test]
+    fn orphan_child_on_error_skips_queue_when_already_exited() {
+        let queue = MockQueue::new();
+        let err = io::Error::from_raw_os_error(libc::EMFILE);
+        let returned = orphan_child_on_error(MockWait::already_exited(), &queue, err);
+        assert_eq!(returned.raw_os_error(), Some(libc::EMFILE));
+        assert!(queue.all_enqueued.borrow().is_empty());
+    }
+
+    /// `orphan_child_on_error` never sees the stdio pipes, so those tests stay
+    /// green if a failed registration leaves the other parent ends open.
+    #[cfg(all(feature = "rt", not(miri)))]
+    #[test]
+    fn build_child_closes_remaining_pipes_when_stdio_registration_fails() {
+        use std::process::{Command, Stdio};
+
+        let rt = crate::runtime::Builder::new_current_thread()
+            .enable_io()
+            .build()
+            .expect("runtime");
+        let handle = rt.handle().clone();
+        // `add_source` fails once the driver is shut down, on every OS.
+        drop(rt);
+
+        // The child writes to stdout and stderr until both pipes close.
+        // If `build_child` left `child.stdout` or `child.stderr` on the
+        // orphaned `StdChild`, `orphan.wait()` below would hang on the full pipe.
+        let child = Command::new("sh")
+            .args([
+                "-c",
+                "while echo x 2>/dev/null; do :; done; while echo x >&2; do :; done",
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn sh");
+        let _enter = handle.enter();
+
+        let err = match super::build_child(child) {
+            Ok(_spawned) => panic!("stdio registration should fail"),
+            Err(err) => err,
+        };
+        assert!(
+            crate::runtime::is_rt_shutdown_err(&err),
+            "expected the shut-down runtime error, got {err:?}"
+        );
+        for mut orphan in super::get_orphan_queue().drain_for_test() {
+            orphan.wait().expect("wait orphan");
+        }
+    }
 }

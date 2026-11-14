@@ -35,7 +35,7 @@ async fn lines_inherent() {
 async fn lines_keeps_partial_line_after_io_error() {
     let mock = tokio_test::io::Builder::new()
         .read(b"abc")
-        .read_error(Error::new(ErrorKind::Other, "boom"))
+        .read_error(Error::other("boom"))
         .read(b"def\nghi\n")
         .build();
     let mut lines = BufReader::new(mock).lines();
@@ -52,7 +52,7 @@ async fn lines_keeps_partial_line_after_io_error() {
 async fn lines_keeps_truncated_multibyte_char_after_io_error() {
     let mock = tokio_test::io::Builder::new()
         .read(b"ab\xc3")
-        .read_error(Error::new(ErrorKind::Other, "boom"))
+        .read_error(Error::other("boom"))
         .read(b"\xa9cd\nghi\n")
         .build();
     let mut lines = BufReader::new(mock).lines();

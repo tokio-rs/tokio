@@ -67,11 +67,27 @@ impl<T> OrphanQueueImpl<T> {
         self.queue.lock().len()
     }
 
-    pub(crate) fn push_orphan(&self, orphan: T)
+    #[cfg(all(test, not(loom), feature = "rt", not(miri)))]
+    pub(super) fn drain_for_test(&self) -> Vec<T> {
+        std::mem::take(&mut *self.queue.lock())
+    }
+
+    pub(crate) fn push_orphan(&self, mut orphan: T)
     where
         T: Wait,
     {
-        self.queue.lock().push(orphan);
+        let mut queue = self.queue.lock();
+        // The child may have exited after the caller's last `try_wait`, and a
+        // concurrent `reap_orphans` may already have consumed its SIGCHLD
+        // while the queue was still empty. Check again while holding the
+        // queue lock: `drain_orphan_queue` takes the same lock, so the
+        // re-check and the push are atomic with respect to draining. If the
+        // child has already exited, reap it here instead of enqueueing it.
+        // `try_wait` reaps the child as a side effect when it reports
+        // `Ok(Some(_))`, so only a still-running child is queued.
+        if let Ok(None) = orphan.try_wait() {
+            queue.push(orphan);
+        }
     }
 
     /// Attempts to reap every process in the queue, ignoring any errors and
@@ -174,10 +190,10 @@ pub(crate) mod test {
             }
         }
 
-        fn with_err() -> Self {
+        fn with_err(num_wait_until_status: usize) -> Self {
             Self {
                 total_waits: Rc::new(Cell::new(0)),
-                num_wait_until_status: 0,
+                num_wait_until_status,
                 return_err: true,
             }
         }
@@ -195,7 +211,7 @@ pub(crate) mod test {
                 if self.return_err {
                     Ok(Some(ExitStatus::from_raw(0)))
                 } else {
-                    Err(io::Error::new(io::ErrorKind::Other, "mock err"))
+                    Err(io::Error::other("mock err"))
                 }
             } else {
                 Ok(None)
@@ -207,11 +223,27 @@ pub(crate) mod test {
     }
 
     #[test]
+    fn push_orphan_reaps_already_exited_child() {
+        let orphanage = OrphanQueueImpl::new();
+
+        // Already exited: reaped inline, never queued, so a SIGCHLD consumed
+        // before the push cannot strand it as a zombie.
+        orphanage.push_orphan(MockWait::with_err(0));
+        assert_eq!(orphanage.len(), 0);
+
+        // Still running: queued as before.
+        orphanage.push_orphan(MockWait::new(1));
+        assert_eq!(orphanage.len(), 1);
+    }
+
+    #[test]
     fn drain_attempts_a_single_reap_of_all_queued_orphans() {
-        let first_orphan = MockWait::new(0);
-        let second_orphan = MockWait::new(1);
-        let third_orphan = MockWait::new(2);
-        let fourth_orphan = MockWait::with_err();
+        // Each mock is waited on once by `push_orphan`, so the number of waits
+        // until a status is reported is one more than the number of drains.
+        let first_orphan = MockWait::new(1);
+        let second_orphan = MockWait::new(2);
+        let third_orphan = MockWait::new(3);
+        let fourth_orphan = MockWait::with_err(1);
 
         let first_waits = first_orphan.total_waits.clone();
         let second_waits = second_orphan.total_waits.clone();
@@ -228,24 +260,24 @@ pub(crate) mod test {
 
         drain_orphan_queue(orphanage.queue.lock());
         assert_eq!(orphanage.len(), 2);
-        assert_eq!(first_waits.get(), 1);
-        assert_eq!(second_waits.get(), 1);
-        assert_eq!(third_waits.get(), 1);
-        assert_eq!(fourth_waits.get(), 1);
+        assert_eq!(first_waits.get(), 2);
+        assert_eq!(second_waits.get(), 2);
+        assert_eq!(third_waits.get(), 2);
+        assert_eq!(fourth_waits.get(), 2);
 
         drain_orphan_queue(orphanage.queue.lock());
         assert_eq!(orphanage.len(), 1);
-        assert_eq!(first_waits.get(), 1);
-        assert_eq!(second_waits.get(), 2);
-        assert_eq!(third_waits.get(), 2);
-        assert_eq!(fourth_waits.get(), 1);
+        assert_eq!(first_waits.get(), 2);
+        assert_eq!(second_waits.get(), 3);
+        assert_eq!(third_waits.get(), 3);
+        assert_eq!(fourth_waits.get(), 2);
 
         drain_orphan_queue(orphanage.queue.lock());
         assert_eq!(orphanage.len(), 0);
-        assert_eq!(first_waits.get(), 1);
-        assert_eq!(second_waits.get(), 2);
-        assert_eq!(third_waits.get(), 3);
-        assert_eq!(fourth_waits.get(), 1);
+        assert_eq!(first_waits.get(), 2);
+        assert_eq!(second_waits.get(), 3);
+        assert_eq!(third_waits.get(), 4);
+        assert_eq!(fourth_waits.get(), 2);
 
         // Safe to reap when empty
         drain_orphan_queue(orphanage.queue.lock());
@@ -264,15 +296,18 @@ pub(crate) mod test {
         let waits = orphan.total_waits.clone();
         orphanage.push_orphan(orphan);
 
-        orphanage.reap_orphans(&handle);
-        assert_eq!(waits.get(), 0);
+        // `push_orphan` waits on the orphan once.
+        assert_eq!(waits.get(), 1);
 
         orphanage.reap_orphans(&handle);
-        assert_eq!(waits.get(), 0);
+        assert_eq!(waits.get(), 1);
+
+        orphanage.reap_orphans(&handle);
+        assert_eq!(waits.get(), 1);
 
         tx.send(()).unwrap();
         orphanage.reap_orphans(&handle);
-        assert_eq!(waits.get(), 1);
+        assert_eq!(waits.get(), 2);
     }
 
     #[test]
@@ -286,8 +321,11 @@ pub(crate) mod test {
         let waits = orphan.total_waits.clone();
         orphanage.push_orphan(orphan);
 
+        // `push_orphan` waits on the orphan once.
+        assert_eq!(waits.get(), 1);
+
         orphanage.reap_orphans(&handle);
-        assert_eq!(waits.get(), 0);
+        assert_eq!(waits.get(), 1);
 
         drop(signal_guard);
     }
@@ -312,7 +350,8 @@ pub(crate) mod test {
 
         orphanage.reap_orphans(&handle);
         assert!(orphanage.sigchild.lock().is_some());
-        assert_eq!(waits.get(), 1); // Eager reap when registering listener
+        // One wait in `push_orphan`, one in the eager reap on registration.
+        assert_eq!(waits.get(), 2);
     }
 
     #[test]
@@ -326,9 +365,10 @@ pub(crate) mod test {
         let waits = orphan.total_waits.clone();
         orphanage.push_orphan(orphan);
 
-        // Signal handler has "gone away", nothing to register or reap
+        // Signal handler has "gone away", nothing to register or reap, and the
+        // only wait is the one in `push_orphan`.
         orphanage.reap_orphans(&handle);
         assert!(orphanage.sigchild.lock().is_none());
-        assert_eq!(waits.get(), 0);
+        assert_eq!(waits.get(), 1);
     }
 }

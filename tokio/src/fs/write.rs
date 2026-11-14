@@ -35,13 +35,15 @@ pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Re
         target_os = "linux"
     ))]
     {
-        let handle = crate::runtime::Handle::current();
-        let driver_handle = handle.inner.driver().io();
-        if driver_handle
-            .check_and_init(io_uring::opcode::Write::CODE)
-            .await?
-        {
-            return write_uring(path, contents).await;
+        if let Ok(handle) = crate::runtime::Handle::try_current() {
+            if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
+                if driver_handle
+                    .check_and_init(io_uring::opcode::Write::CODE)
+                    .await?
+                {
+                    return write_uring(path, contents).await;
+                }
+            }
         }
     }
 
@@ -75,7 +77,13 @@ async fn write_uring(path: &Path, mut buf: OwnedBuf) -> io::Result<()> {
     let mut buf_offset: usize = 0;
     let mut file_offset: u64 = 0;
     while buf_offset < total {
-        let (res, _buf, _fd) = Op::write_at(fd, buf, buf_offset, file_offset)?.await;
+        let (res, r_buf, r_fd) = Op::write_at(fd, buf, buf_offset, file_offset)?.await;
+
+        // A cancelled op returns no resources to continue with, so its error is
+        // terminal; otherwise an interrupted write retries from where it stopped.
+        let (Some(r_buf), Some(r_fd)) = (r_buf, r_fd) else {
+            return Err(res.expect_err("a cancelled op completes with an error"));
+        };
 
         let n = match res {
             Ok(0) => return Err(io::ErrorKind::WriteZero.into()),
@@ -84,8 +92,8 @@ async fn write_uring(path: &Path, mut buf: OwnedBuf) -> io::Result<()> {
             Err(e) => return Err(e),
         };
 
-        buf = _buf;
-        fd = _fd;
+        buf = r_buf;
+        fd = r_fd;
         buf_offset += n as usize;
         file_offset += n as u64;
     }

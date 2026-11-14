@@ -267,3 +267,39 @@ async fn caller_names_const_count() {
     // not shadowing the caller-specified COUNT value
     assert_eq!(2, res);
 }
+
+// Regression test for: https://github.com/tokio-rs/tokio/issues/7031
+// An uninhabited `Ok` or error type must not trigger `unreachable_code`
+// in the caller.
+#[deny(unreachable_code)]
+#[maybe_tokio_test]
+async fn uninhabited_ok_type() {
+    let res = tokio::try_join!(async { Err::<Infallible, _>(1) }, async { Ok(2) });
+    assert_eq!(res, Err(1));
+
+    let res = tokio::try_join!(biased; async { Err::<Infallible, _>(1) }, async { Ok(2) });
+    assert_eq!(res, Err(1));
+
+    let res = tokio::try_join!(async { Ok::<_, i32>(1) }, async { Err::<Infallible, _>(2) });
+    assert_eq!(res, Err(2));
+
+    let res =
+        tokio::try_join!(biased; async { Ok::<_, i32>(1) }, async { Err::<Infallible, _>(2) });
+    assert_eq!(res, Err(2));
+
+    let res = tokio::try_join!(async { Err::<Infallible, i32>(1) });
+    assert_eq!(res, Err(1));
+}
+
+#[deny(unreachable_code)]
+#[maybe_tokio_test]
+async fn uninhabited_err_type() {
+    let res = tokio::try_join!(async { Ok::<_, Infallible>(1) }, async { Ok(2) });
+    assert_eq!(res, Ok((1, 2)));
+
+    let res = tokio::try_join!(biased; async { Ok::<_, Infallible>(1) }, async { Ok(2) });
+    assert_eq!(res, Ok((1, 2)));
+
+    let res = tokio::try_join!(async { Ok::<_, Infallible>(1) });
+    assert_eq!(res, Ok((1,)));
+}

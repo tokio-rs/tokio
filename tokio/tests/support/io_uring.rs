@@ -46,6 +46,10 @@ pub fn uring_fs_op_in_use(opcode: u8) -> bool {
     if !cfg!(any(target_env = "gnu", target_os = "android")) {
         return false;
     }
+    uring_op_supported(opcode)
+}
+
+pub fn uring_op_supported(opcode: u8) -> bool {
     let Ok(ring) = IoUring::new(2) else {
         return false;
     };

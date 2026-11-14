@@ -18,7 +18,7 @@ use std::io::prelude::*;
 use std::io::IoSlice;
 use tempfile::NamedTempFile;
 use tokio::fs::File;
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader, SeekFrom};
 use tokio_test::task;
 
 const HELLO: &[u8] = b"hello world...";
@@ -108,6 +108,25 @@ async fn rewind_seek_position() {
     file.rewind().await.unwrap();
 
     assert_eq!(file.stream_position().await.unwrap(), 0);
+}
+
+#[tokio::test]
+async fn buf_reader_seek_after_write() {
+    for (seek, expected) in [
+        (SeekFrom::Start(0), 0),
+        (SeekFrom::End(-2), HELLO.len() - 2),
+        (SeekFrom::Current(-2), HELLO.len() - 2),
+    ] {
+        let file = File::from_std(tempfile().into_file());
+        let mut reader = BufReader::new(file);
+
+        reader.write_all(HELLO).await.unwrap();
+        assert_eq!(reader.seek(seek).await.unwrap(), expected as u64);
+
+        let mut contents = Vec::new();
+        reader.read_to_end(&mut contents).await.unwrap();
+        assert_eq!(contents, &HELLO[expected..]);
+    }
 }
 
 #[tokio::test]
@@ -209,6 +228,29 @@ async fn empty_read() {
 
     assert_eq!(n, HELLO.len());
     assert_eq!(&buf[..n], HELLO);
+}
+
+#[cfg_attr(miri, ignore)]
+#[tokio::test]
+async fn set_times() {
+    use std::time::{Duration, SystemTime};
+
+    let tempfile = tempfile();
+
+    let file = File::create(tempfile.path()).await.unwrap();
+
+    // Whole seconds to avoid filesystem timestamp precision loss.
+    let accessed = SystemTime::UNIX_EPOCH + Duration::from_secs(1_600_000_000);
+    let modified = SystemTime::UNIX_EPOCH + Duration::from_secs(1_500_000_000);
+    let times = tokio::fs::FileTimes::new()
+        .set_accessed(accessed)
+        .set_modified(modified);
+
+    file.set_times(times).await.unwrap();
+
+    let metadata = file.metadata().await.unwrap();
+    assert_eq!(metadata.accessed().unwrap(), accessed);
+    assert_eq!(metadata.modified().unwrap(), modified);
 }
 
 fn tempfile() -> NamedTempFile {

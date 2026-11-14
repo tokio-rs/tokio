@@ -22,12 +22,15 @@ struct Inner {
     state: AtomicUsize,
     mutex: Mutex<()>,
     condvar: Condvar,
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    jspi: crate::runtime::jspi::Slot,
 }
 
 const EMPTY: usize = 0;
 const PARKED: usize = 1;
 const NOTIFIED: usize = 2;
 
+#[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
 tokio_thread_local! {
     static CURRENT_PARKER: ParkThread = ParkThread::new();
 }
@@ -47,6 +50,8 @@ impl ParkThread {
                 state: AtomicUsize::new(EMPTY),
                 mutex: Mutex::new(()),
                 condvar: Condvar::new(),
+                #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+                jspi: crate::runtime::jspi::Slot::new(),
             }),
         }
     }
@@ -76,6 +81,7 @@ impl ParkThread {
 // ==== impl Inner ====
 
 impl Inner {
+    #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
     fn park(&self) {
         // If we were previously notified then we consume this notification and
         // return quickly.
@@ -123,7 +129,71 @@ impl Inner {
         }
     }
 
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    fn park(&self) {
+        self.park_jspi(None);
+    }
+
+    /// Parks the activation until unparked or `dur` elapses, if given.
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    fn park_jspi(&self, dur: Option<Duration>) {
+        // If we were previously notified then we consume this notification and
+        // return quickly.
+        if self
+            .state
+            .compare_exchange(NOTIFIED, EMPTY, SeqCst, SeqCst)
+            .is_ok()
+        {
+            return;
+        }
+
+        // If JSPI is disabled, then we cannot park on JSPI, so instead use a
+        // spin loop for a timed park, and a panic for any other suspension.
+        // A zero-duration park returns immediately as on native.
+        if !crate::runtime::jspi::jspi_enabled() {
+            match dur {
+                Some(Duration::ZERO) => return,
+                Some(dur) => {
+                    std::thread::sleep(dur);
+                    return;
+                }
+                None => panic!(
+                    "cannot block on wasm32-unknown-emscripten: this wait would \
+                     suspend on the host event loop, which needs the build to \
+                     link `-sJSPI`"
+                ),
+            }
+        }
+
+        // Suspend until a host timer fires or a later activation (a host
+        // callback entering tokio) unparks us. A zero-duration park still
+        // takes a host turn so timers and microtasks run mid-drive (the
+        // scheduler's maintenance yield). No threads: nothing runs between
+        // here and the suspension, so an unpark can only land while parked,
+        // where it settles the promise.
+        let old = self.state.swap(PARKED, SeqCst);
+        debug_assert_eq!(old, EMPTY, "inconsistent park state");
+
+        // Consume any notification delivered during the park so the token
+        // does not leak into the next one. A `SuspendError` unwinding out of
+        // the import must also leave the parker `EMPTY` for its next park.
+        struct Unpark<'a>(&'a Inner);
+        impl Drop for Unpark<'_> {
+            fn drop(&mut self) {
+                match self.0.state.swap(EMPTY, SeqCst) {
+                    NOTIFIED => {} // got a notification, hurray!
+                    PARKED => {}   // timer deadline, alas
+                    n => debug_assert!(false, "inconsistent park state: {n}"),
+                }
+            }
+        }
+        let _unpark = Unpark(self);
+
+        crate::runtime::jspi::park(&self.jspi, dur);
+    }
+
     /// Parks the current thread for at most `dur`.
+    #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
     fn park_timeout(&self, dur: Duration) {
         // Like `park` above we have a fast path for an already-notified thread,
         // and afterwards we start coordinating for a sleep. Return quickly.
@@ -153,15 +223,24 @@ impl Inner {
             Err(actual) => panic!("inconsistent park_timeout state; actual = {actual}"),
         }
 
-        #[cfg(not(all(target_family = "wasm", not(target_feature = "atomics"))))]
+        #[cfg(not(all(
+            target_family = "wasm",
+            not(target_feature = "atomics"),
+            not(all(target_os = "wasi", not(target_env = "p1")))
+        )))]
         // Wait with a timeout, and if we spuriously wake up or otherwise wake up
         // from a notification, we just want to unconditionally set the state back to
         // empty, either consuming a notification or un-flagging ourselves as
         // parked.
         let (_m, _result) = self.condvar.wait_timeout(m, dur).unwrap();
 
-        #[cfg(all(target_family = "wasm", not(target_feature = "atomics")))]
-        // Wasm without atomics doesn't have threads, so just sleep.
+        #[cfg(all(
+            target_family = "wasm",
+            not(target_feature = "atomics"),
+            not(all(target_os = "wasi", not(target_env = "p1")))
+        ))]
+        // Wasm without atomics doesn't have threads (except modern WASI targets like
+        // wasip2/wasip3 with component-model threading), so just sleep.
         {
             let _m = m;
             std::thread::sleep(dur);
@@ -172,6 +251,11 @@ impl Inner {
             PARKED => {}   // no notification, alas
             n => panic!("inconsistent park_timeout state: {n}"),
         }
+    }
+
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    fn park_timeout(&self, dur: Duration) {
+        self.park_jspi(Some(dur));
     }
 
     fn unpark(&self) {
@@ -186,6 +270,10 @@ impl Inner {
             PARKED => {}        // gotta go wake someone up
             _ => panic!("inconsistent state in unpark"),
         }
+
+        // The parked activation is suspended in the host; settle its promise.
+        #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+        crate::runtime::jspi::unpark(&self.jspi);
 
         // There is a period between when the parked thread sets `state` to
         // `PARKED` (or last checked `state` in the case of a spurious wake
@@ -231,6 +319,12 @@ use std::task::{RawWaker, RawWakerVTable, Waker};
 /// Blocks the current thread using a condition variable.
 #[derive(Debug)]
 pub(crate) struct CachedParkThread {
+    // While a suspended stack is parked, host callbacks can still run tokio
+    // code on this thread, and a shared thread-local parker would hand this
+    // stack's notification token to that code. Each blocking call gets its
+    // own parker instead.
+    #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+    park: ParkThread,
     _anchor: PhantomData<Rc<()>>,
 }
 
@@ -241,6 +335,8 @@ impl CachedParkThread {
     /// the thread that the caller intends to park.
     pub(crate) fn new() -> CachedParkThread {
         CachedParkThread {
+            #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+            park: ParkThread::new(),
             _anchor: PhantomData,
         }
     }
@@ -268,7 +364,12 @@ impl CachedParkThread {
     where
         F: FnOnce(&ParkThread) -> R,
     {
-        CURRENT_PARKER.try_with(|inner| f(inner))
+        #[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
+        return CURRENT_PARKER.try_with(|inner| f(inner));
+
+        // See the comment on the `park` field.
+        #[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+        return Ok(f(&self.park));
     }
 
     pub(crate) fn block_on<F: Future>(&mut self, f: F) -> Result<F::Output, AccessError> {

@@ -4,16 +4,13 @@
 //! compilation.
 
 mod pool;
-pub(crate) use pool::{spawn_blocking, BlockingPool, Spawner};
+#[allow(unused_imports)]
+pub(crate) use pool::{spawn_blocking, BlockingPool, Mandatory, Spawner};
 
 mod sharded;
 
-cfg_fs! {
+cfg_io_blocking! {
     pub(crate) use pool::spawn_mandatory_blocking;
-}
-
-cfg_trace! {
-    pub(crate) use pool::Mandatory;
 }
 
 mod schedule;

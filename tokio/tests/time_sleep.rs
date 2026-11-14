@@ -409,3 +409,39 @@ async fn drop_from_wake() {
         }
     }
 }
+
+#[tokio::test]
+async fn drop_from_waker_drop() {
+    use std::pin::Pin;
+    use std::sync::Arc;
+    use std::task::{Context, Wake, Waker};
+    use tokio::time::Sleep;
+
+    struct TimerOwner {
+        secondary: Option<Pin<Box<Sleep>>>,
+    }
+
+    impl Wake for TimerOwner {
+        fn wake(self: Arc<Self>) {}
+    }
+
+    impl Drop for TimerOwner {
+        fn drop(&mut self) {
+            drop(self.secondary.take());
+        }
+    }
+
+    let mut secondary = Box::pin(tokio::time::sleep(Duration::from_secs(3600)));
+    assert_pending!(secondary
+        .as_mut()
+        .poll(&mut Context::from_waker(noop_waker_ref())));
+
+    let waker = Waker::from(Arc::new(TimerOwner {
+        secondary: Some(secondary),
+    }));
+    let mut primary = Box::pin(tokio::time::sleep(Duration::from_secs(3600)));
+    assert_pending!(primary.as_mut().poll(&mut Context::from_waker(&waker)));
+
+    drop(waker);
+    drop(primary);
+}

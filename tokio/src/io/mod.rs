@@ -257,7 +257,10 @@ cfg_net_unix! {
 
     pub mod unix {
         //! Asynchronous IO structures specific to Unix-like operating systems.
-        pub use super::async_fd::{AsyncFd, AsyncFdTryNewError, AsyncFdReadyGuard, AsyncFdReadyMutGuard, TryIoError};
+        pub use super::async_fd::{AsyncFd, AsyncFdRegisterError, AsyncFdReadyGuard, AsyncFdReadyMutGuard, TryIoError};
+        #[doc(hidden)]
+        #[allow(deprecated)]
+        pub use super::async_fd::AsyncFdTryNewError;
     }
 }
 
@@ -299,6 +302,7 @@ cfg_io_blocking! {
     mod sys {
         // TODO: don't rename
         pub(crate) use crate::blocking::spawn_blocking as run;
+        pub(crate) use crate::blocking::spawn_mandatory_blocking;
         pub(crate) use crate::blocking::JoinHandle as Blocking;
     }
 }

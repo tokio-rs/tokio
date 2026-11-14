@@ -707,6 +707,48 @@ fn broadcast_sender_closed_with_extra_subscribe() {
     assert_ready!(task3.poll());
 }
 
+#[test]
+fn broadcast_sender_closed_in_waker() {
+    use futures::task::ArcWake;
+    use std::future::Future;
+    use std::pin::pin;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::task::Context;
+
+    struct QueryOnWake {
+        sender: broadcast::Sender<()>,
+        woken: AtomicBool,
+    }
+
+    impl ArcWake for QueryOnWake {
+        fn wake_by_ref(arc_self: &Arc<Self>) {
+            assert_eq!(arc_self.sender.receiver_count(), 0);
+            assert_eq!(arc_self.sender.len(), 0);
+            assert!(arc_self.sender.is_empty());
+            assert!(arc_self.sender.send(()).is_err());
+            arc_self.woken.store(true, Ordering::SeqCst);
+        }
+    }
+
+    let (sender, receiver) = broadcast::channel::<()>(1);
+    sender.send(()).unwrap();
+
+    let wake_state = Arc::new(QueryOnWake {
+        sender: sender.clone(),
+        woken: AtomicBool::new(false),
+    });
+    let waker = futures::task::waker(wake_state.clone());
+    let mut cx = Context::from_waker(&waker);
+
+    let mut closed = pin!(sender.closed());
+    assert_pending!(closed.as_mut().poll(&mut cx));
+
+    drop(receiver);
+
+    assert!(wake_state.woken.load(Ordering::SeqCst));
+    assert_ready!(closed.as_mut().poll(&mut cx));
+}
+
 #[tokio::test]
 async fn broadcast_sender_new_must_be_closed() {
     let capacity = 1;
