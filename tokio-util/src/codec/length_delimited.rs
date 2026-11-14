@@ -548,17 +548,14 @@ impl LengthDelimitedCodec {
             }
         };
 
-        // A decode that consumes no bytes at all would loop forever:
-        // with `num_skip == 0` the head is retained in the frame, so a
-        // zero-length payload makes `decode_data` return an empty frame
-        // without advancing the buffer, and the same head is read again
-        // on the next call. Reject it instead of spinning — an
-        // unauthenticated peer could otherwise pin a worker thread at
-        // 100% CPU with a single four-byte frame.
-        if n == 0 && self.builder.get_num_skip() == 0 {
+        // Reject the frame if the frame ends before its own length field.
+        //
+        // In the worst case, this can lead to infinite loops if not
+        // rejected.
+        if n.saturating_add(self.builder.get_num_skip()) < head_len {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                "zero-length frame with num_skip(0) would not consume any input",
+                "the frame is shorter than its own length field",
             ));
         }
 
