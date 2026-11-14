@@ -1130,7 +1130,7 @@ jobs:
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
           CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
           # in order to run doctests for unstable features, we must also pass
           # the unstable cfg to RustDoc
           RUSTDOCFLAGS: --cfg tokio_unstable
@@ -1140,15 +1140,14 @@ jobs:
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
           CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
-          RUSTDOCFLAGS: -C link-args=--max-memory=67108864
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
       - name: WASI test tokio-stream
         run: cargo test --manifest-path=tokio-stream/Cargo.toml --target ${{ matrix.target }} --features time,net,io-util,sync
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
           CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
       - name: test tests-integration --features wasi-rt
         # TODO: this should become: `cargo hack wasi test --each-feature`
@@ -1157,7 +1156,7 @@ jobs:
         working-directory: tests-integration
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: "wasmtime run --"
-          RUSTFLAGS: -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
+          RUSTFLAGS: -Dwarnings
 
       - name: test tests-integration --features wasi-threads-rt
         run: cargo test --target ${{ matrix.target }} --features wasi-threads-rt
@@ -1165,7 +1164,7 @@ jobs:
         working-directory: tests-integration
         env:
           CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER: "wasmtime run -W bulk-memory=y -W threads=y -W shared-memory=y -S threads=y --"
-          RUSTFLAGS: --cfg tokio_unstable -Dwarnings -C target-feature=+atomics,+bulk-memory -C link-args=--max-memory=67108864
+          RUSTFLAGS: --cfg tokio_unstable -Dwarnings
 
   wasm32-wasip2:
     name: test tokio for wasm32-wasip2
