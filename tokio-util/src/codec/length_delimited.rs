@@ -548,6 +548,17 @@ impl LengthDelimitedCodec {
             }
         };
 
+        // Reject the frame if the frame ends before its own length field.
+        //
+        // In the worst case, this can lead to infinite loops if not
+        // rejected.
+        if n.saturating_add(self.builder.get_num_skip()) < head_len {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "the frame is shorter than its own length field",
+            ));
+        }
+
         src.advance(self.builder.get_num_skip());
 
         // Ensure that the buffer has enough space to read the incoming
