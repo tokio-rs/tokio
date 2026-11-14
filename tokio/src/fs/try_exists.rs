@@ -30,6 +30,7 @@ pub async fn try_exists(path: impl AsRef<Path>) -> io::Result<bool> {
         feature = "io-uring",
         feature = "rt",
         feature = "fs",
+        target_os = "linux",
         // libc::statx is only supported on these platforms
         // FIXME: Add musl target env when our minimum supported
         // rust version is 1.93. To clarify, statx support is
