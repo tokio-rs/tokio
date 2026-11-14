@@ -56,6 +56,14 @@ cfg_io_util! {
 /// # }
 /// ```
 ///
+/// Reading to the end only returns once every copy of the writing end is
+/// closed, and a [`Command`] keeps its copy until the `Command` itself is
+/// dropped, like [`std::process::Command`]. In the example above the `Command`
+/// is a temporary, so it is dropped before the read. If you keep it in a
+/// variable, drop it before reading, or the read never sees EOF.
+///
+/// [`Command`]: crate::process::Command
+///
 /// # Panics
 ///
 /// This function panics if it is not called from within a runtime with
