@@ -64,6 +64,9 @@ pub struct Builder {
     nevents: usize,
     nevents_busy: Option<usize>,
 
+    /// Whether or not to set up io_uring in the I/O driver
+    enable_io_uring: bool,
+
     /// Whether or not to enable the time driver
     enable_time: bool,
 
@@ -310,6 +313,9 @@ impl Builder {
             enable_io: false,
             nevents: 1024,
             nevents_busy: None,
+
+            // io_uring defaults to "off"
+            enable_io_uring: false,
 
             // Time defaults to "off"
             enable_time: false,
@@ -1199,6 +1205,7 @@ impl Builder {
                 Kind::MultiThread => false,
             },
             enable_io: self.enable_io,
+            enable_io_uring: self.enable_io_uring,
             enable_time: self.enable_time,
             start_paused: self.start_paused,
             nevents: self.nevents,
@@ -1959,9 +1966,13 @@ cfg_io_uring! {
     impl Builder {
         /// Enables the tokio's io_uring driver.
         ///
-        /// Doing this enables using io_uring operations on the runtime.
+        /// This also enables the I/O driver.
         ///
-        /// # Examples
+        /// io_uring is set up when the runtime is built. If it can't be set
+        /// up for any reason the runtime is still built, and file system
+        /// operations fall back to the blocking thread pool.
+        ///
+        /// # Example
         ///
         /// ```
         /// use tokio::runtime;
@@ -1973,8 +1984,8 @@ cfg_io_uring! {
         /// ```
         #[cfg_attr(docsrs, doc(cfg(feature = "io-uring")))]
         pub fn enable_io_uring(&mut self) -> &mut Self {
-            // Currently, the uring flag is equivalent to `enable_io`.
             self.enable_io = true;
+            self.enable_io_uring = true;
             self
         }
     }

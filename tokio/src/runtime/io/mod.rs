@@ -6,7 +6,7 @@ mod driver;
 use driver::{Direction, Tick};
 pub(crate) use driver::{Driver, Handle, ReadyEvent};
 cfg_io_uring! {
-    pub(crate) use driver::RegisterResult;
+    pub(crate) use driver::{uring_supports, RegisterResult};
 }
 
 mod registration;

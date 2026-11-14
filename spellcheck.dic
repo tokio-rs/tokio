@@ -1,4 +1,4 @@
-334
+335
 &
 +
 0o777
@@ -233,6 +233,7 @@ ntasks
 ok
 oneshot
 opcode
+opcodes
 os
 parker
 parsers

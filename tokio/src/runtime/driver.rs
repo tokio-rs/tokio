@@ -36,6 +36,7 @@ pub(crate) struct Handle {
 
 pub(crate) struct Cfg {
     pub(crate) enable_io: bool,
+    pub(crate) enable_io_uring: bool,
     pub(crate) enable_time: bool,
     pub(crate) enable_pause_time: bool,
     pub(crate) start_paused: bool,
@@ -46,8 +47,12 @@ pub(crate) struct Cfg {
 
 impl Driver {
     pub(crate) fn new(cfg: Cfg) -> io::Result<(Self, Handle)> {
-        let (io_stack, io_handle, signal_handle) =
-            create_io_stack(cfg.enable_io, cfg.nevents, cfg.nevents_busy)?;
+        let (io_stack, io_handle, signal_handle) = create_io_stack(
+            cfg.enable_io,
+            cfg.enable_io_uring,
+            cfg.nevents,
+            cfg.nevents_busy,
+        )?;
 
         let clock = create_clock(cfg.enable_pause_time, cfg.start_paused);
 
@@ -160,12 +165,18 @@ cfg_io_driver! {
         Disabled(UnparkThread),
     }
 
-    fn create_io_stack(enabled: bool, nevents: usize, nevents_busy: Option<usize>) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
+    fn create_io_stack(enable_io: bool, enable_io_uring: bool, nevents: usize, nevents_busy: Option<usize>) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
         #[cfg(loom)]
-        assert!(!enabled);
+        assert!(!enable_io);
 
-        let ret = if enabled {
-            let (io_driver, io_handle) = crate::runtime::io::Driver::new(nevents, nevents_busy)?;
+        let ret = if enable_io {
+            let (io_driver, mut io_handle) = crate::runtime::io::Driver::new(nevents, nevents_busy)?;
+
+            // A failed io_uring setup leaves io_uring disabled,
+            // file system operations fall back to the blocking pool.
+            if enable_io_uring {
+                io_handle.setup_uring();
+            }
 
             let (signal_driver, signal_handle) = create_signal_driver(io_driver, &io_handle)?;
             let process_driver = create_process_driver(signal_driver);
@@ -226,7 +237,7 @@ cfg_not_io_driver! {
     #[derive(Debug)]
     pub(crate) struct IoStack(ParkThread);
 
-    fn create_io_stack(_enabled: bool, _nevents: usize, _nevents_busy: Option<usize>) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
+    fn create_io_stack(_enable_io: bool, _enable_io_uring: bool, _nevents: usize, _nevents_busy: Option<usize>) -> io::Result<(IoStack, IoHandle, SignalHandle)> {
         let park_thread = ParkThread::new();
         let unpark_thread = park_thread.unpark();
         Ok((IoStack(park_thread), unpark_thread, Default::default()))

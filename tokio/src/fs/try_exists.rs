@@ -42,15 +42,10 @@ pub async fn try_exists(path: impl AsRef<Path>) -> io::Result<bool> {
         any(target_env = "gnu", target_os = "android")
     ))]
     {
-        if let Ok(handle) = crate::runtime::Handle::try_current() {
-            if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
-                if driver_handle
-                    .check_and_init(io_uring::opcode::Statx::CODE)
-                    .await?
-                {
-                    return try_exists_uring(path).await;
-                }
-            }
+        use crate::runtime::io::uring_supports;
+
+        if uring_supports(io_uring::opcode::Statx::CODE) {
+            return try_exists_uring(path).await;
         }
     }
 

@@ -91,6 +91,9 @@ pub(crate) struct Op<T: Cancellable> {
 }
 
 impl<T: Cancellable> Op<T> {
+    /// Callers must check [`crate::runtime::io::uring_supports`] for the entry's
+    /// opcode first, and fall back to a blocking implementation if it returns `false`.
+    ///
     /// # Safety
     ///
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will

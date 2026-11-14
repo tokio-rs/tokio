@@ -5,8 +5,7 @@ cfg_signal_internal_and_unix! {
 cfg_io_uring! {
     mod uring;
     use uring::UringContext;
-    pub(crate) use uring::RegisterResult;
-    use crate::sync::OnceCell;
+    pub(crate) use uring::{uring_supports, RegisterResult};
 }
 
 use crate::io::interest::Interest;
@@ -72,7 +71,9 @@ pub(crate) struct Handle {
         feature = "fs",
         target_os = "linux",
     ))]
-    pub(crate) uring_probe: OnceCell<Option<io_uring::Probe>>,
+    /// Opcodes supported by the kernel, or `None` if io_uring is not enabled
+    /// or unavailable. Set by `Handle::setup_uring`.
+    pub(crate) uring_probe: Option<io_uring::Probe>,
 }
 
 #[derive(Debug)]
@@ -156,7 +157,7 @@ impl Driver {
                 feature = "fs",
                 target_os = "linux",
             ))]
-            uring_probe: OnceCell::new(),
+            uring_probe: None,
         };
 
         Ok((driver, handle))
@@ -334,6 +335,28 @@ impl Handle {
         self.metrics.dec_fd_count();
 
         Ok(())
+    }
+
+    /// Sets up io_uring for this driver and stores the context and the
+    /// opcodes supported by the kernel.
+    ///
+    /// Called once, right after the driver is created, when the runtime is
+    /// built with `enable_io_uring`. If io_uring can't be set up for
+    /// any reason, it stays disabled, and file system operations fall back to
+    /// the blocking thread pool.
+    pub(crate) fn setup_uring(&mut self) {
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
+        {
+            let (context, probe) = UringContext::setup(&self.registry);
+            self.uring_context = Mutex::new(context);
+            self.uring_probe = probe;
+        }
     }
 
     fn release_pending_registrations(&self) {
