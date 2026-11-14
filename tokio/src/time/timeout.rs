@@ -173,7 +173,7 @@ where
 }
 
 pin_project! {
-    /// Future returned by [`timeout`](timeout) and [`timeout_at`](timeout_at).
+    /// Future returned by [`timeout`] and [`timeout_at`].
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     #[derive(Debug)]
     pub struct Timeout<T> {
@@ -198,6 +198,24 @@ impl<T> Timeout<T> {
     /// Consumes this timeout, returning the underlying value.
     pub fn into_inner(self) -> T {
         self.value
+    }
+
+    /// Returns the instant at which the future will time out, if the
+    /// deadline could be represented as an [`Instant`].
+    ///
+    /// This mirrors [`Sleep::deadline`], since `Timeout` is backed by a
+    /// `Sleep` internally. This is useful for introspecting the remaining
+    /// time on a timeout, e.g. for logging or metrics.
+    ///
+    /// Returns `None` only in the case where [`timeout`] was used
+    /// to construct this `Timeout` and `Instant::now() + duration` overflowed
+    /// the range that [`Instant`] can represent. [`timeout_at`]
+    /// always produces a `Some` deadline, since it is given the `Instant`
+    /// directly.
+    ///
+    /// [`Sleep::deadline`]: crate::time::Sleep::deadline
+    pub fn deadline(&self) -> Option<Instant> {
+        self.delay.as_ref().map(Sleep::deadline)
     }
 }
 
