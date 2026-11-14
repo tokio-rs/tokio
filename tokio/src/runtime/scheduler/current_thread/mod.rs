@@ -95,6 +95,10 @@ struct Shared {
     /// Indicates whether the blocked on thread was woken.
     woken: AtomicBool,
 
+    /// Indicates whether the thread is currently parked in the driver so
+    /// remote wakeups are coalesced.
+    parked: AtomicBool,
+
     /// Scheduler configuration options
     config: Config,
 
@@ -169,6 +173,7 @@ impl CurrentThread {
                 inject: Inject::new(),
                 owned: OwnedTasks::new(1),
                 woken: AtomicBool::new(false),
+                parked: AtomicBool::new(false),
                 config,
                 scheduler_metrics: SchedulerMetrics::new(),
                 worker_metrics,
@@ -413,15 +418,37 @@ impl Context {
             core = c;
         }
 
+        // Check for pending work before setting `parked` to avoid an atomic
+        // swap if work was already scheduled (e.g. by `before_park`).
         if !self.has_pending_work(&core) {
-            // Park until the thread is signaled
-            core.metrics.about_to_park();
-            core.submit_metrics(handle);
+            // Mark the scheduler as parked before re-checking for pending work.
+            // Using `swap` (an RMW) ensures a total modification order with the
+            // `swap` in `Handle::unpark`, so either `unpark` observes
+            // `parked == true` and unparks the driver, or our `swap` reads from
+            // the release sequence headed by `unpark`'s `swap(false, AcqRel)`
+            // and the second `has_pending_work` check below observes the work
+            // queued before `unpark`.
+            handle.shared.parked.swap(true, AcqRel);
 
-            core = self.park_internal(core, handle, &mut driver, None);
+            if !self.has_pending_work(&core) {
+                // Park until the thread is signaled
+                core.metrics.about_to_park();
+                core.submit_metrics(handle);
 
-            core.metrics.unparked();
-            core.submit_metrics(handle);
+                core = self.park_internal(core, handle, &mut driver, None);
+
+                handle.shared.parked.swap(false, AcqRel);
+
+                core.metrics.unparked();
+                core.submit_metrics(handle);
+            } else {
+                handle.shared.parked.swap(false, AcqRel);
+
+                core.submit_metrics(handle);
+
+                core =
+                    self.park_internal(core, handle, &mut driver, Some(Duration::from_millis(0)));
+            }
         } else {
             // `before_park` scheduled work (e.g. an `on_thread_park` hook that woke the
             // `block_on` future), so we don't block. We must still poll the driver once
@@ -455,7 +482,10 @@ impl Context {
     }
 
     fn has_pending_work(&self, core: &Core) -> bool {
-        !core.tasks.is_empty() || !self.defer.is_empty() || self.handle.shared.woken.load(Acquire)
+        !core.tasks.is_empty()
+            || !self.defer.is_empty()
+            || self.handle.shared.woken.load(Acquire)
+            || !self.handle.shared.inject.is_empty()
     }
 
     fn park_internal(
@@ -655,6 +685,12 @@ impl Handle {
         assert_eq!(0, worker);
         &self.shared.worker_metrics
     }
+
+    pub(crate) fn unpark(&self) {
+        if self.shared.parked.swap(false, AcqRel) {
+            self.driver.unpark();
+        }
+    }
 }
 
 cfg_unstable_metrics! {
@@ -739,7 +775,7 @@ impl Schedule for Arc<Handle> {
 
                 // Schedule the task
                 self.shared.inject.push(task);
-                self.driver.unpark();
+                self.unpark();
             }
         });
     }
@@ -802,7 +838,7 @@ impl Wake for Handle {
                     arc_self.driver.unpark_self();
                 }
                 _ => {
-                    arc_self.driver.unpark();
+                    arc_self.unpark();
                 }
             });
         }
