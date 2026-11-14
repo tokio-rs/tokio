@@ -290,6 +290,42 @@ fn completion_waker_panic_preserves_uring() {
     }
 }
 
+#[test]
+fn drop_cancelled_waker_outside_lock() {
+    use std::sync::{Arc, Mutex};
+    use std::task::{Context, Wake, Waker};
+
+    struct Owner<F> {
+        _other: Mutex<F>,
+    }
+    impl<F: Send + 'static> Wake for Owner<F> {
+        fn wake(self: Arc<Self>) {
+            drop(self);
+        }
+    }
+
+    if io_uring::IoUring::new(2).is_err() {
+        return;
+    }
+    let rt = Builder::new_current_thread().enable_all().build().unwrap();
+    // Initialize io_uring on the runtime.
+    rt.block_on(tokio::fs::File::open("/dev/null")).unwrap();
+    let _enter = rt.enter();
+
+    let mut other = Box::pin(tokio::fs::File::open("/dev/null"));
+    let mut cx = Context::from_waker(Waker::noop());
+    tokio_test::assert_pending!(other.as_mut().poll_unpin(&mut cx));
+
+    let waker = Waker::from(Arc::new(Owner {
+        _other: Mutex::new(other),
+    }));
+    let mut open = Box::pin(tokio::fs::File::open("/dev/null"));
+    tokio_test::assert_pending!(open.as_mut().poll_unpin(&mut Context::from_waker(&waker)));
+    drop(waker);
+    // Cancelling `open` drops the last waker, which cancels `other`.
+    drop(open);
+}
+
 fn create_tmp_files(num_files: usize) -> (Vec<NamedTempFile>, Vec<PathBuf>) {
     let mut files = Vec::with_capacity(num_files);
     for _ in 0..num_files {

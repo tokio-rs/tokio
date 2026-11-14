@@ -343,10 +343,16 @@ impl Handle {
 
         let cancel_data = data.expect("Data should be present").cancel();
         match mem::replace(lifecycle, Lifecycle::Cancelled(cancel_data)) {
-            Lifecycle::Submitted | Lifecycle::Waiting(_) => (),
+            previous @ (Lifecycle::Submitted | Lifecycle::Waiting(_)) => {
+                drop(guard);
+                // A waker destructor may cancel another filesystem operation.
+                drop(previous);
+            }
             // The driver saw the completion, but it was never polled.
             Lifecycle::Completed(cqe) => {
-                if let Lifecycle::Cancelled(CancelData::Open(_)) = lifecycle {
+                let cancelled = ops.remove(index);
+                drop(guard);
+                if let Lifecycle::Cancelled(CancelData::Open(_)) = &cancelled {
                     if let Ok(fd) = CqeResult::from(cqe).result {
                         // SAFETY: the successful CQE result provides
                         // a non-negative integer, and the event is
@@ -354,10 +360,13 @@ impl Handle {
                         unsafe { OwnedFd::from_raw_fd(fd as i32) };
                     }
                 }
-                // We can safely remove the entry from the slab, as it has already been completed.
-                ops.remove(index);
+                // A `Bytes` buffer can run its owner's destructor on release.
+                drop(cancelled);
             }
-            prev => panic!("Unexpected state: {prev:?}"),
+            prev => {
+                drop(guard);
+                panic!("Unexpected state: {prev:?}");
+            }
         };
     }
 }
