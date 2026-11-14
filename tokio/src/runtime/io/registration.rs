@@ -230,16 +230,18 @@ impl Registration {
         loop {
             let event = self.readiness(interest).await?;
 
-            let coop = std::future::poll_fn(crate::task::coop::poll_proceed).await;
+            // Every call to `f` is charged, including the ones that return
+            // `WouldBlock`: closed states are never cleared, so on a closed
+            // resource this loop would otherwise never yield.
+            std::future::poll_fn(crate::task::coop::poll_proceed)
+                .await
+                .made_progress();
 
             match f() {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     self.clear_readiness(event);
                 }
-                x => {
-                    coop.made_progress();
-                    return x;
-                }
+                x => return x,
             }
         }
     }
