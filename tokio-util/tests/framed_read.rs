@@ -119,6 +119,71 @@ fn read_multi_frame_in_packet_after_codec_changed() {
 }
 
 #[test]
+fn read_partial_frame_after_codec_changed() {
+    let mut task = task::spawn(());
+    let mock = mock! {
+        Ok(b"\x00\x00\x00\x04".to_vec()),
+        Err(io::Error::new(io::ErrorKind::WouldBlock, "")),
+        Err(io::Error::new(io::ErrorKind::WouldBlock, "")),
+    };
+    let mut framed = FramedRead::new(mock, U64Decoder);
+
+    task.enter(|cx, _| {
+        assert!(pin!(framed).poll_next(cx).is_pending());
+
+        let mut framed = framed.map_decoder(|_| U32Decoder);
+        assert_read!(pin!(framed).poll_next(cx), 4);
+    });
+}
+
+#[test]
+fn map_decoder_preserves_paused_eof() {
+    struct EofDecoder {
+        eof_calls: usize,
+    }
+
+    impl Decoder for EofDecoder {
+        type Item = u64;
+        type Error = io::Error;
+
+        fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<u64>> {
+            U64Decoder.decode(buf)
+        }
+
+        fn decode_eof(&mut self, _buf: &mut BytesMut) -> io::Result<Option<u64>> {
+            self.eof_calls += 1;
+            Ok(None)
+        }
+    }
+
+    let mut task = task::spawn(());
+    let mock = mock! {
+        Ok(b"\x00\x00\x00\x00".to_vec()),
+        Ok(b"".to_vec()),
+        Ok(b"".to_vec()),
+        Err(io::Error::new(io::ErrorKind::WouldBlock, "")),
+        Ok(b"\x00\x00\x00\x01".to_vec()),
+    };
+    let mut framed = FramedRead::new(mock, EofDecoder { eof_calls: 0 });
+
+    task.enter(|cx, _| {
+        assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
+        assert_eq!(framed.read_buffer().len(), 4);
+        assert_eq!(framed.decoder().eof_calls, 1);
+
+        let mut framed = framed.map_decoder(|codec| codec);
+        assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
+        assert_eq!(framed.decoder().eof_calls, 1);
+        assert!(pin!(framed).poll_next(cx).is_pending());
+        assert_eq!(framed.decoder().eof_calls, 1);
+
+        assert_read!(pin!(framed).poll_next(cx), 1);
+        assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
+        assert_eq!(framed.decoder().eof_calls, 2);
+    });
+}
+
+#[test]
 fn read_not_ready() {
     let mut task = task::spawn(());
     let mock = mock! {
