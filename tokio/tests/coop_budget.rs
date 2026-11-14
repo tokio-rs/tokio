@@ -5,6 +5,7 @@ use std::mem::MaybeUninit;
 use std::net::Shutdown;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::io::Interest;
 use tokio::net::{UdpSocket, UnixDatagram};
 use tokio::task::coop::{consume_budget, has_budget_remaining};
@@ -112,6 +113,34 @@ async fn coop_budget_async_io_would_block() {
     assert_pending!(recv.poll());
     drop(recv);
     assert_eq!(BUDGET, calls);
+}
+
+/// Ensure that a timeout around a read on a read-closed socket fires
+///
+/// # Design
+/// Same socket as in `coop_budget_async_io_would_block`, read through the public `recv`. Without yielding, `recv`
+/// spins inside a single poll and `timeout` never gets to check its timer (#6971).
+///
+/// The runtime runs on its own thread so that a regression fails the test instead of hanging it.
+#[test]
+#[cfg_attr(miri, ignore)] // No `socket` on miri.
+fn coop_budget_timeout_fires_on_read_closed_socket() {
+    let (done_tx, done_rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let res = rt.block_on(async {
+            let (rx, _tx) = UnixDatagram::pair().unwrap();
+            rx.shutdown(Shutdown::Read).unwrap();
+            let mut buf = [0; 8];
+            tokio::time::timeout(Duration::from_millis(10), rx.recv(&mut buf)).await
+        });
+        let _ = done_tx.send(res.is_err());
+    });
+
+    assert_eq!(Ok(true), done_rx.recv_timeout(Duration::from_secs(10)));
 }
 
 #[tokio::test]
