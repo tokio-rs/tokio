@@ -1,6 +1,3 @@
-#[cfg(any(feature = "io-util", feature = "process"))]
-pub(crate) mod coop;
-
 cfg_io_driver! {
     pub(crate) mod bit;
 }

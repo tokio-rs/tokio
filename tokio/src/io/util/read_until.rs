@@ -52,11 +52,8 @@ pub(super) fn read_until_internal<R: AsyncBufRead + ?Sized>(
     read: &mut usize,
 ) -> Poll<io::Result<usize>> {
     loop {
-        let coop = ready!(crate::util::coop::poll_proceed(cx));
         let (done, used) = {
-            let result = ready!(reader.as_mut().poll_fill_buf(cx));
-            coop.made_progress();
-            let available = match result {
+            let available = match ready!(reader.as_mut().poll_fill_buf(cx)) {
                 Ok(available) => available,
                 Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
                 Err(e) => return Poll::Ready(Err(e)),

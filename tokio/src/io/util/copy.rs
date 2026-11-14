@@ -40,12 +40,7 @@ impl CopyBuffer {
         buf.set_filled(me.cap);
 
         let res = loop {
-            let coop = ready!(crate::util::coop::poll_proceed(cx));
-            let result = reader.as_mut().poll_read(cx, &mut buf);
-            if result.is_ready() {
-                coop.made_progress();
-            }
-            match result {
+            match reader.as_mut().poll_read(cx, &mut buf) {
                 Poll::Ready(Err(e)) if e.kind() == io::ErrorKind::Interrupted => continue,
                 res => break res,
             }
@@ -70,15 +65,7 @@ impl CopyBuffer {
     {
         let me = &mut *self;
         loop {
-            let result = {
-                let coop = ready!(crate::util::coop::poll_proceed(cx));
-                let result = writer.as_mut().poll_write(cx, &me.buf[me.pos..me.cap]);
-                if result.is_ready() {
-                    coop.made_progress();
-                }
-                result
-            };
-            match result {
+            match writer.as_mut().poll_write(cx, &me.buf[me.pos..me.cap]) {
                 Poll::Ready(Err(e)) if e.kind() == io::ErrorKind::Interrupted => continue,
                 Poll::Pending => {
                     // Top up the buffer towards full if we can read a bit more
@@ -104,13 +91,48 @@ impl CopyBuffer {
         W: AsyncWrite + ?Sized,
     {
         ready!(crate::trace::trace_leaf());
+        #[cfg(any(
+            feature = "fs",
+            feature = "io-std",
+            feature = "net",
+            feature = "process",
+            feature = "rt",
+            feature = "signal",
+            feature = "sync",
+            feature = "time",
+        ))]
+        // Keep track of task budget
+        let coop = ready!(crate::task::coop::poll_proceed(cx));
         loop {
             // If there is some space left in our buffer, then we try to read some
             // data to continue, thus maximizing the chances of a large write.
             if self.cap < self.buf.len() && !self.read_done {
                 match self.poll_fill_buf(cx, reader.as_mut()) {
-                    Poll::Ready(Ok(())) => {}
+                    Poll::Ready(Ok(())) => {
+                        #[cfg(any(
+                            feature = "fs",
+                            feature = "io-std",
+                            feature = "net",
+                            feature = "process",
+                            feature = "rt",
+                            feature = "signal",
+                            feature = "sync",
+                            feature = "time",
+                        ))]
+                        coop.made_progress();
+                    }
                     Poll::Ready(Err(err)) => {
+                        #[cfg(any(
+                            feature = "fs",
+                            feature = "io-std",
+                            feature = "net",
+                            feature = "process",
+                            feature = "rt",
+                            feature = "signal",
+                            feature = "sync",
+                            feature = "time",
+                        ))]
+                        coop.made_progress();
                         return Poll::Ready(Err(err));
                     }
                     Poll::Pending => {
@@ -121,6 +143,17 @@ impl CopyBuffer {
                             // when the reader depends on buffered writer.
                             if self.need_flush {
                                 ready!(writer.as_mut().poll_flush(cx))?;
+                                #[cfg(any(
+                                    feature = "fs",
+                                    feature = "io-std",
+                                    feature = "net",
+                                    feature = "process",
+                                    feature = "rt",
+                                    feature = "signal",
+                                    feature = "sync",
+                                    feature = "time",
+                                ))]
+                                coop.made_progress();
                                 self.need_flush = false;
                             }
 
@@ -133,6 +166,17 @@ impl CopyBuffer {
             // If our buffer has some data, let's write it out!
             while self.pos < self.cap {
                 let i = ready!(self.poll_write_buf(cx, reader.as_mut(), writer.as_mut()))?;
+                #[cfg(any(
+                    feature = "fs",
+                    feature = "io-std",
+                    feature = "net",
+                    feature = "process",
+                    feature = "rt",
+                    feature = "signal",
+                    feature = "sync",
+                    feature = "time",
+                ))]
+                coop.made_progress();
                 if i == 0 {
                     return Poll::Ready(Err(io::Error::new(
                         io::ErrorKind::WriteZero,
@@ -161,6 +205,17 @@ impl CopyBuffer {
             // data and finish the transfer.
             if self.read_done {
                 ready!(writer.as_mut().poll_flush(cx))?;
+                #[cfg(any(
+                    feature = "fs",
+                    feature = "io-std",
+                    feature = "net",
+                    feature = "process",
+                    feature = "rt",
+                    feature = "signal",
+                    feature = "sync",
+                    feature = "time",
+                ))]
+                coop.made_progress();
                 return Poll::Ready(Ok(self.amt));
             }
         }

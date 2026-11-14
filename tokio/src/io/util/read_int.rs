@@ -55,12 +55,7 @@ macro_rules! reader {
                 while *me.read < $bytes as u8 {
                     let mut buf = ReadBuf::new(&mut me.buf[*me.read as usize..]);
 
-                    let coop = std::task::ready!(crate::util::coop::poll_proceed(cx));
-                    let result = me.src.as_mut().poll_read(cx, &mut buf);
-                    if result.is_ready() {
-                        coop.made_progress();
-                    }
-                    *me.read += match result {
+                    *me.read += match me.src.as_mut().poll_read(cx, &mut buf) {
                         Poll::Pending => return Poll::Pending,
                         Poll::Ready(Err(e)) if e.kind() == io::ErrorKind::Interrupted => continue,
                         Poll::Ready(Err(e)) => return Poll::Ready(Err(e.into())),
@@ -119,12 +114,7 @@ macro_rules! reader8 {
                 let mut buf = [0; 1];
                 let mut buf = ReadBuf::new(&mut buf);
                 loop {
-                    let coop = std::task::ready!(crate::util::coop::poll_proceed(cx));
-                    let result = me.reader.as_mut().poll_read(cx, &mut buf);
-                    if result.is_ready() {
-                        coop.made_progress();
-                    }
-                    match result {
+                    match me.reader.as_mut().poll_read(cx, &mut buf) {
                         Poll::Pending => return Poll::Pending,
                         Poll::Ready(Err(e)) if e.kind() == io::ErrorKind::Interrupted => continue,
                         Poll::Ready(Err(e)) => return Poll::Ready(Err(e.into())),

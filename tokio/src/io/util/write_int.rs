@@ -54,15 +54,11 @@ macro_rules! writer {
                 }
 
                 while *me.written < $bytes as u8 {
-                    let coop = std::task::ready!(crate::util::coop::poll_proceed(cx));
-                    let result = me
+                    *me.written += match me
                         .dst
                         .as_mut()
-                        .poll_write(cx, &me.buf[*me.written as usize..]);
-                    if result.is_ready() {
-                        coop.made_progress();
-                    }
-                    *me.written += match result {
+                        .poll_write(cx, &me.buf[*me.written as usize..])
+                    {
                         Poll::Pending => return Poll::Pending,
                         Poll::Ready(Err(e)) if e.kind() == io::ErrorKind::Interrupted => continue,
                         Poll::Ready(Err(e)) => return Poll::Ready(Err(e.into())),
@@ -115,12 +111,7 @@ macro_rules! writer8 {
                 let buf = [*me.byte as u8];
 
                 loop {
-                    let coop = std::task::ready!(crate::util::coop::poll_proceed(cx));
-                    let result = me.dst.as_mut().poll_write(cx, &buf[..]);
-                    if result.is_ready() {
-                        coop.made_progress();
-                    }
-                    match result {
+                    match me.dst.as_mut().poll_write(cx, &buf[..]) {
                         Poll::Pending => return Poll::Pending,
                         Poll::Ready(Err(e)) if e.kind() == io::ErrorKind::Interrupted => continue,
                         Poll::Ready(Err(e)) => return Poll::Ready(Err(e.into())),
