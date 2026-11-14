@@ -25,17 +25,20 @@ fn register_probe(uring: &IoUring, probe: &mut Probe) -> io::Result<()> {
     }
 }
 
-/// Outcome of registering an op with the io_uring.
-pub(crate) enum RegisterResult {
+/// Outcome of registering ops with the io_uring.
+///
+/// `I` is the slab index of the op, or the slab indices of the ops passed to
+/// `register_ops`.
+pub(crate) enum RegisterResult<I = usize> {
     /// In-flight at this slab index.
-    Submitted(usize),
+    Submitted(I),
 
-    /// Submit failed before reaching the kernel; the slot was removed.
+    /// Submit failed before reaching the kernel; no slot is kept.
     NotPushed(io::Error),
 
     /// Submit failed after reaching the kernel; the slot is kept and the caller
     /// must cancel it to keep its resources alive until completion.
-    Pushed { index: usize, error: io::Error },
+    Pushed { index: I, error: io::Error },
 }
 
 pub(crate) struct UringContext {
@@ -324,6 +327,88 @@ impl Handle {
         // `Op` free the buffer while it is still in use.
         if let Err(e) = ctx.submit() {
             return RegisterResult::Pushed { index, error: e };
+        }
+
+        RegisterResult::Submitted(index)
+    }
+
+    /// Register several operations with the io_uring and submit them together.
+    ///
+    /// When `linked` is true the entries form a chain. A link only reaches the
+    /// next entry in the submission queue, so the whole chain is pushed back to
+    /// back. Otherwise the entries are pushed as far as there is room, flushing
+    /// the queue in between, so a batch can hold more entries than the queue.
+    ///
+    /// Entries are pushed in order. On `Pushed`, the slots belong to the first
+    /// `index.len()` entries, and the other entries never reached the queue.
+    ///
+    /// # Safety
+    ///
+    /// The same as for [`Handle::register_op`], for every entry.
+    pub(crate) unsafe fn register_ops(
+        &self,
+        entries: &[Entry],
+        linked: bool,
+        waker: &Waker,
+    ) -> RegisterResult<Vec<usize>> {
+        assert!(self.uring_probe.is_some());
+
+        let mut guard = self.get_uring().lock();
+        let ctx = &mut *guard;
+
+        if linked && entries.len() > ctx.ring_mut().submission().capacity() {
+            return RegisterResult::NotPushed(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "linked operations don't fit in the io_uring submission queue",
+            ));
+        }
+
+        let mut index = Vec::with_capacity(entries.len());
+        while index.len() < entries.len() {
+            let rest = &entries[index.len()..];
+            let room = {
+                let sq = ctx.ring_mut().submission();
+                sq.capacity() - sq.len()
+            };
+
+            // A chain must fit in one piece. A batch only needs room for one entry.
+            let needed = if linked { rest.len() } else { 1 };
+            if room < needed {
+                // Flush the queue to the kernel to make room.
+                if let Err(error) = ctx.submit() {
+                    return if index.is_empty() {
+                        RegisterResult::NotPushed(error)
+                    } else {
+                        RegisterResult::Pushed { index, error }
+                    };
+                }
+                continue;
+            }
+
+            let UringContext { uring, ops } = &mut *ctx;
+            let mut sq = uring
+                .as_mut()
+                .expect("io_uring not initialized")
+                .submission();
+            for entry in &rest[..room.min(rest.len())] {
+                let slot = ops.insert(Lifecycle::Waiting(waker.clone()));
+                let entry = entry.clone().user_data(slot as u64);
+                // SAFETY: the queue has room for this entry, and the caller keeps
+                // its parameters valid for the entire duration of the operation.
+                unsafe { sq.push(&entry) }.expect("the submission queue has room");
+                index.push(slot);
+            }
+        }
+
+        // Ensure that the completion queue is not full before submitting the entries.
+        while ctx.ring_mut().completion().is_full() {
+            ctx.dispatch_completions();
+        }
+
+        // The entries are pushed, so the kernel may already own the memory they
+        // point at. Keep the slots on a submit error, as `register_op` does.
+        if let Err(error) = ctx.submit() {
+            return RegisterResult::Pushed { index, error };
         }
 
         RegisterResult::Submitted(index)
