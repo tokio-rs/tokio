@@ -367,3 +367,105 @@ async fn poll_write_vectored_4() {
     let n = assert_ready!(tx.poll_write_vectored(&mut noop_context(), io_slices)).unwrap();
     assert_eq!(n, 0);
 }
+
+#[cfg(feature = "rt")]
+#[tokio::test]
+async fn reads_after_eof_are_cooperative() {
+    let (tx, mut rx) = simplex::new(16);
+    drop(tx);
+    let mut task = spawn(async {
+        for _ in 0..256 {
+            assert_eq!(rx.read(&mut [0]).await.unwrap(), 0);
+        }
+    });
+
+    // Repeated EOF reads must yield.
+    assert_pending!(task.poll());
+    task.await;
+}
+
+#[cfg(feature = "rt")]
+#[tokio::test]
+async fn empty_reads_are_cooperative() {
+    let (_tx, mut rx) = simplex::new(16);
+    let mut task = spawn(async {
+        for _ in 0..256 {
+            assert_eq!(rx.read(&mut []).await.unwrap(), 0);
+        }
+    });
+
+    // Repeated empty reads must yield.
+    assert_pending!(task.poll());
+    task.await;
+}
+
+#[cfg(feature = "rt")]
+#[tokio::test]
+async fn empty_writes_are_cooperative() {
+    let (mut tx, _rx) = simplex::new(16);
+    let mut task = spawn(async {
+        for _ in 0..256 {
+            assert_eq!(tx.write(&[]).await.unwrap(), 0);
+        }
+    });
+
+    // Repeated empty writes must yield.
+    assert_pending!(task.poll());
+    task.await;
+}
+
+#[cfg(feature = "rt")]
+#[tokio::test]
+async fn empty_vectored_writes_are_cooperative() {
+    let (mut tx, _rx) = simplex::new(16);
+    let mut task = spawn(async {
+        for _ in 0..256 {
+            assert_eq!(tx.write_vectored(&[IoSlice::new(&[])]).await.unwrap(), 0);
+        }
+    });
+
+    // Repeated empty vectored writes must yield.
+    assert_pending!(task.poll());
+    task.await;
+}
+
+#[cfg(feature = "rt")]
+#[tokio::test]
+async fn writes_to_closed_receiver_are_cooperative() {
+    let (mut tx, rx) = simplex::new(16);
+    drop(rx);
+    let mut task = spawn(async {
+        for _ in 0..256 {
+            assert_eq!(
+                tx.write(b"x").await.unwrap_err().kind(),
+                std::io::ErrorKind::BrokenPipe
+            );
+        }
+    });
+
+    // Repeated BrokenPipe errors must yield.
+    assert_pending!(task.poll());
+    task.await;
+}
+
+#[cfg(feature = "rt")]
+#[tokio::test]
+async fn vectored_writes_to_closed_receiver_are_cooperative() {
+    let (mut tx, rx) = simplex::new(16);
+    drop(rx);
+    let mut task = spawn(async {
+        for _ in 0..256 {
+            assert_eq!(
+                tx.write_vectored(&[IoSlice::new(b"x")])
+                    .await
+                    .unwrap_err()
+                    .kind(),
+                std::io::ErrorKind::BrokenPipe
+            );
+        }
+    });
+
+    // Repeated vectored BrokenPipe errors must yield.
+    assert_pending!(task.poll());
+    task.await;
+}
