@@ -1,4 +1,4 @@
-334
+338
 &
 +
 0o777
@@ -112,6 +112,7 @@ WebAssembly
 ZST
 \
 accessors
+activations
 adaptor
 adaptors
 ambient
@@ -174,6 +175,7 @@ enqueue
 enqueued
 enum
 eof
+epoll
 errored
 expirations
 fcntl
@@ -187,6 +189,7 @@ fns
 frontend
 fs
 functionalities
+futex
 getters
 goroutines
 gzip
@@ -208,6 +211,7 @@ io_uring
 iteratively
 latencies
 libc
+libuv
 lifecycle
 lifo
 lookups

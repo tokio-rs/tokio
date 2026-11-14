@@ -1,3 +1,5 @@
+#[cfg(tokio_unstable)]
+mod event_loop;
 mod yield_now;
 
 use crate::loom::sync::atomic::{AtomicUsize, Ordering};
@@ -157,6 +159,41 @@ fn drop_jh_during_schedule() {
 
         assert_eq!(waker_refcnt.load(Ordering::Relaxed), 0);
         drop(task_refcnt);
+    });
+}
+
+#[test]
+fn remote_wake_block_on() {
+    loom::model(|| {
+        let rt = Builder::new_current_thread().build().unwrap();
+        let (tx, rx) = oneshot::channel();
+
+        let th = thread::spawn(move || {
+            tx.send(42).unwrap();
+        });
+
+        let out = rt.block_on(rx).unwrap();
+        assert_eq!(out, 42);
+        th.join().unwrap();
+    });
+}
+
+#[test]
+fn remote_spawn_wakes_park() {
+    loom::model(|| {
+        let rt = Builder::new_current_thread().build().unwrap();
+        let handle = rt.handle().clone();
+        let (tx, rx) = oneshot::channel();
+
+        let th = thread::spawn(move || {
+            handle.spawn(async move {
+                tx.send(42).unwrap();
+            });
+        });
+
+        let out = rt.block_on(rx).unwrap();
+        assert_eq!(out, 42);
+        th.join().unwrap();
     });
 }
 
