@@ -93,6 +93,7 @@ fn safe_delay(duration: Duration) -> Duration {
 mod clock;
 pub(crate) use self::clock::Clock;
 cfg_test_util! {
+    pub(crate) use clock::ClockState;
     pub use clock::{advance, pause, resume};
 }
 

@@ -32,12 +32,135 @@ fn model(f: impl Fn() + Send + Sync + 'static) {
     f();
 }
 
+#[cfg(feature = "test-util")]
+fn paused_driver() -> (
+    crate::runtime::driver::Driver,
+    Arc<crate::runtime::driver::Handle>,
+) {
+    use crate::runtime::driver::{Cfg, Driver};
+
+    let (driver, handle) = Driver::new(Cfg {
+        enable_io: false,
+        enable_time: true,
+        enable_pause_time: true,
+        start_paused: true,
+        nevents: 1,
+        nevents_busy: None,
+        timer_flavor: crate::runtime::TimerFlavor::Traditional,
+    })
+    .unwrap();
+    (driver, Arc::new(handle))
+}
+
 fn rt(start_paused: bool) -> crate::runtime::Runtime {
     crate::runtime::Builder::new_current_thread()
         .enable_time()
         .start_paused(start_paused)
         .build()
         .unwrap()
+}
+
+#[test]
+#[cfg(feature = "test-util")]
+fn inhibited_clock_bounds_timer_wait() {
+    assert_eq!(
+        super::park_timeout_duration(
+            crate::time::ClockState::PausedInhibited,
+            std::time::Duration::from_nanos(1),
+            None,
+        ),
+        std::time::Duration::from_millis(1),
+    );
+}
+
+#[test]
+#[cfg(feature = "test-util")]
+fn park_timeout_preserves_precision_and_limits() {
+    use crate::time::ClockState::{Paused, PausedInhibited, Running};
+    use std::time::Duration;
+
+    let zero = Duration::ZERO;
+    let short = Duration::from_nanos(1);
+    let limit = Duration::from_nanos(100);
+    let tick = Duration::from_millis(1);
+    let long = Duration::from_micros(1500);
+    let cases = [
+        (Running, short, None, short),
+        (Paused, short, None, short),
+        (PausedInhibited, short, None, tick),
+        (Running, zero, None, zero),
+        (Paused, zero, None, zero),
+        (PausedInhibited, zero, None, zero),
+        (PausedInhibited, long, None, long),
+        (PausedInhibited, short, Some(zero), zero),
+        (PausedInhibited, short, Some(limit), limit),
+        (PausedInhibited, long, Some(limit), limit),
+        (PausedInhibited, short, Some(short), short),
+        (Running, long, Some(limit), limit),
+        (Paused, long, Some(limit), limit),
+    ];
+
+    for (state, duration, limit, expected) in cases {
+        assert_eq!(
+            super::park_timeout_duration(state, duration, limit),
+            expected,
+            "state: {state:?}, duration: {duration:?}, limit: {limit:?}",
+        );
+    }
+}
+
+#[test]
+#[cfg(feature = "test-util")]
+fn clock_state_tracks_nested_inhibition() {
+    model(|| {
+        use crate::time::{Clock, ClockState};
+
+        let clock = Clock::new(true, false);
+        assert_eq!(clock.state(), ClockState::Running);
+
+        clock.inhibit_auto_advance();
+        assert_eq!(clock.state(), ClockState::Running);
+
+        clock.pause().unwrap();
+        assert_eq!(clock.state(), ClockState::PausedInhibited);
+
+        clock.inhibit_auto_advance();
+        clock.allow_auto_advance();
+        assert_eq!(clock.state(), ClockState::PausedInhibited);
+
+        clock.allow_auto_advance();
+        assert_eq!(clock.state(), ClockState::Paused);
+    });
+}
+
+#[test]
+#[cfg(feature = "test-util")]
+fn inhibition_release_unparks_after_clock_snapshot() {
+    model(|| {
+        use crate::time::ClockState;
+
+        let (mut driver, handle) = paused_driver();
+        handle.clock().inhibit_auto_advance();
+        handle.clock().inhibit_auto_advance();
+
+        for state in [ClockState::PausedInhibited, ClockState::Paused] {
+            let release_handle = handle.clone();
+            let release = thread::spawn(move || {
+                release_handle.clock().allow_auto_advance();
+                release_handle.unpark();
+            });
+
+            if handle.clock().state() == ClockState::PausedInhibited {
+                driver.park(&handle);
+            }
+
+            release.join().unwrap();
+            assert_eq!(handle.clock().state(), state);
+            assert!(handle.time().did_wake());
+        }
+
+        driver.shutdown(&handle);
+    });
 }
 
 #[test]
