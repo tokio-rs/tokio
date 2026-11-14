@@ -1208,29 +1208,29 @@ impl Inner {
     }
 
     fn poll_flush(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        if let Some(e) = self.last_write_err.take() {
-            return Poll::Ready(Err(e.into()));
+        if let State::Busy(ref mut rx) = self.state {
+            let res = ready!(Pin::new(rx).poll(cx));
+            if res.is_err() {
+                // Restore a valid Idle state before returning the error.
+                self.state = State::Idle(Some(Buf::with_capacity(0)));
+            }
+            let (op, buf) = res?;
+
+            // The buffer is not used here
+            self.state = State::Idle(Some(buf));
+
+            match op {
+                Operation::Read(_) | Operation::Seek(_) => {}
+                Operation::Write(res) => {
+                    assert!(self.last_write_err.is_none());
+                    return Poll::Ready(res);
+                }
+            }
         }
 
-        let (op, buf) = match self.state {
-            State::Idle(_) => return Poll::Ready(Ok(())),
-            State::Busy(ref mut rx) => {
-                let res = ready!(Pin::new(rx).poll(cx));
-                if res.is_err() {
-                    // Restore a valid Idle state before returning the error.
-                    self.state = State::Idle(Some(Buf::with_capacity(0)));
-                }
-                res?
-            }
-        };
-
-        // The buffer is not used here
-        self.state = State::Idle(Some(buf));
-
-        match op {
-            Operation::Read(_) => Poll::Ready(Ok(())),
-            Operation::Write(res) => Poll::Ready(res),
-            Operation::Seek(_) => Poll::Ready(Ok(())),
+        match self.last_write_err.take() {
+            Some(e) => Poll::Ready(Err(e.into())),
+            None => Poll::Ready(Ok(())),
         }
     }
 }
