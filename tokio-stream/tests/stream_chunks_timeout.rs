@@ -36,3 +36,33 @@ async fn empty_stream_does_not_allocate_large_chunk_buffer() {
 
     assert_eq!(chunked.next().await, None);
 }
+
+#[tokio::test(start_paused = true)]
+async fn large_max_size_does_not_panic() {
+    let chunked = stream::iter([1u8, 2, 3]).chunks_timeout(usize::MAX, Duration::from_secs(1));
+    tokio::pin!(chunked);
+
+    assert_eq!(chunked.next().await, Some(vec![1, 2, 3]));
+    assert_eq!(chunked.next().await, None);
+}
+
+#[tokio::test(start_paused = true)]
+async fn large_max_size_limits_initial_allocation() {
+    let chunked = stream::iter([1u8, 2, 3]).chunks_timeout(4096, Duration::from_secs(1));
+    tokio::pin!(chunked);
+
+    let chunk = chunked.next().await.unwrap();
+    assert!(chunk.capacity() <= 1024, "capacity: {}", chunk.capacity());
+    assert_eq!(chunk, vec![1, 2, 3]);
+    assert_eq!(chunked.next().await, None);
+}
+
+#[tokio::test(start_paused = true)]
+async fn chunks_grow_past_initial_allocation() {
+    let chunked = stream::iter(0..2051).chunks_timeout(2048, Duration::from_secs(1));
+    tokio::pin!(chunked);
+
+    assert_eq!(chunked.next().await, Some((0..2048).collect()));
+    assert_eq!(chunked.next().await, Some(vec![2048, 2049, 2050]));
+    assert_eq!(chunked.next().await, None);
+}
