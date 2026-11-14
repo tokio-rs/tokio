@@ -9,7 +9,7 @@ use crate::sync::Mutex;
 
 use std::cmp;
 use std::fmt;
-use std::fs::{Metadata, Permissions};
+use std::fs::{Metadata, Permissions, TryLockError};
 use std::future::Future;
 use std::io::{self, Seek, SeekFrom};
 use std::path::Path;
@@ -607,6 +607,122 @@ impl File {
     /// This is equivalent to `set_times` with only the modification time set.
     pub async fn set_modified(&self, time: std::time::SystemTime) -> io::Result<()> {
         self.set_times(FileTimes::new().set_modified(time)).await
+    }
+
+    /// Acquires an exclusive lock on the file, waiting until it is available.
+    ///
+    /// No other handle to the file can acquire a lock while this one is held.
+    /// Depending on the platform the lock may be advisory or mandatory, and
+    /// it is released when [`unlock`] is called or when this handle and every
+    /// handle duplicated from it are closed. The wait happens on the blocking
+    /// thread pool, so the task yields instead of blocking a runtime thread.
+    /// See [`std::fs::File::lock`] for the guarantees and the
+    /// platform-specific behavior.
+    ///
+    /// [`unlock`]: File::unlock
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::create("foo.lock").await?;
+    /// file.lock().await?;
+    /// // Only this handle can lock `foo.lock` until it is unlocked.
+    /// file.unlock().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn lock(&self) -> io::Result<()> {
+        let std = self.std.clone();
+        asyncify(move || std.lock()).await
+    }
+
+    /// Acquires a shared lock on the file, waiting until it is available.
+    ///
+    /// Other handles may hold shared locks at the same time, but not an
+    /// exclusive one. See [`std::fs::File::lock_shared`] for the guarantees
+    /// and the platform-specific behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::open("foo.lock").await?;
+    /// file.lock_shared().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn lock_shared(&self) -> io::Result<()> {
+        let std = self.std.clone();
+        asyncify(move || std.lock_shared()).await
+    }
+
+    /// Tries to acquire an exclusive lock on the file without waiting.
+    ///
+    /// Returns [`TryLockError::WouldBlock`] if another handle holds a lock on
+    /// the file. Unlike most methods on `File` this is not `async`, because
+    /// the underlying call never blocks. See [`std::fs::File::try_lock`] for
+    /// the guarantees and the platform-specific behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::fs::TryLockError;
+    /// use tokio::fs::File;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::create("foo.lock").await?;
+    /// match file.try_lock() {
+    ///     Ok(()) => println!("locked"),
+    ///     Err(TryLockError::WouldBlock) => println!("held elsewhere"),
+    ///     Err(TryLockError::Error(err)) => return Err(err),
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn try_lock(&self) -> Result<(), TryLockError> {
+        self.std.try_lock()
+    }
+
+    /// Tries to acquire a shared lock on the file without waiting.
+    ///
+    /// Returns [`TryLockError::WouldBlock`] if another handle holds an
+    /// exclusive lock on the file. Like [`try_lock`], this never blocks. See
+    /// [`std::fs::File::try_lock_shared`] for the guarantees and the
+    /// platform-specific behavior.
+    ///
+    /// [`try_lock`]: File::try_lock
+    pub fn try_lock_shared(&self) -> Result<(), TryLockError> {
+        self.std.try_lock_shared()
+    }
+
+    /// Releases all locks on the file.
+    ///
+    /// Reads and writes still in flight complete first, so they stay covered
+    /// by the lock. See [`std::fs::File::unlock`] for the platform-specific
+    /// behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use tokio::fs::File;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// let file = File::create("foo.lock").await?;
+    /// file.lock().await?;
+    /// file.unlock().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn unlock(&self) -> io::Result<()> {
+        self.inner.lock().await.complete_inflight().await;
+
+        let std = self.std.clone();
+        asyncify(move || std.unlock()).await
     }
 
     /// Set the maximum buffer size for the underlying [`AsyncRead`] / [`AsyncWrite`] operation.

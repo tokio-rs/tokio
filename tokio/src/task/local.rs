@@ -781,7 +781,7 @@ impl LocalSet {
         let tick = self.tick.get();
         self.tick.set(tick.wrapping_add(1));
 
-        let task = if tick % REMOTE_FIRST_INTERVAL == 0 {
+        let task = if tick.is_multiple_of(REMOTE_FIRST_INTERVAL) {
             self.context
                 .shared
                 .queue

@@ -14,6 +14,7 @@
 ))] // WASI does not support all fs operations
 
 use futures::future::FutureExt;
+use std::fs::TryLockError;
 use std::io::prelude::*;
 use std::io::IoSlice;
 use tempfile::NamedTempFile;
@@ -255,6 +256,54 @@ async fn set_times() {
 
 fn tempfile() -> NamedTempFile {
     NamedTempFile::new().unwrap()
+}
+
+#[tokio::test]
+async fn exclusive_lock_excludes_other_handles() {
+    let tempfile = tempfile();
+    let holder = File::open(tempfile.path()).await.unwrap();
+    let other = File::open(tempfile.path()).await.unwrap();
+
+    holder.lock().await.unwrap();
+    assert!(matches!(other.try_lock(), Err(TryLockError::WouldBlock)));
+    assert!(matches!(
+        other.try_lock_shared(),
+        Err(TryLockError::WouldBlock)
+    ));
+
+    holder.unlock().await.unwrap();
+    other.try_lock().unwrap();
+}
+
+#[tokio::test]
+async fn shared_locks_coexist_but_exclude_an_exclusive_one() {
+    let tempfile = tempfile();
+    let first = File::open(tempfile.path()).await.unwrap();
+    let second = File::open(tempfile.path()).await.unwrap();
+    let exclusive = File::open(tempfile.path()).await.unwrap();
+
+    first.lock_shared().await.unwrap();
+    second.try_lock_shared().unwrap();
+    assert!(matches!(
+        exclusive.try_lock(),
+        Err(TryLockError::WouldBlock)
+    ));
+}
+
+#[cfg_attr(miri, ignore)] // Miri doesn't support a `flock` that blocks.
+#[tokio::test]
+async fn lock_waits_until_the_holder_unlocks() {
+    let tempfile = tempfile();
+    let holder = File::open(tempfile.path()).await.unwrap();
+    let waiter = File::open(tempfile.path()).await.unwrap();
+
+    holder.lock().await.unwrap();
+    let waiting = tokio::spawn(async move { waiter.lock().await });
+    tokio::task::yield_now().await;
+    assert!(!waiting.is_finished());
+
+    holder.unlock().await.unwrap();
+    waiting.await.unwrap().unwrap();
 }
 
 #[tokio::test]
