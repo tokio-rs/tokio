@@ -132,6 +132,7 @@ fn internal_interval_at(
     };
 
     Interval {
+        timer_elapsed: false,
         delay: Box::pin(sleep_until(start)),
         period: safe_delay(period),
         missed_tick_behavior: MissedTickBehavior::default(),
@@ -384,6 +385,9 @@ impl Default for MissedTickBehavior {
 /// [`sleep`]: crate::time::sleep()
 #[derive(Debug)]
 pub struct Interval {
+    /// Whether or not the timer is elapsed.
+    timer_elapsed: bool,
+
     /// Future that completes the next time the `Interval` yields a value.
     delay: Pin<Box<Sleep>>,
 
@@ -455,35 +459,34 @@ impl Interval {
     /// [`Context`] passed to the most recent call is scheduled to receive a
     /// wakeup.
     pub fn poll_tick(&mut self, cx: &mut Context<'_>) -> Poll<Instant> {
-        // Wait for the delay to be done
-        ready!(Pin::new(&mut self.delay).poll(cx));
+        let scheduled_deadline = self.delay.deadline();
 
-        // Get the time when we were scheduled to tick
-        let timeout = self.delay.deadline();
+        if self.timer_elapsed {
+            self.reset_at(scheduled_deadline);
+        }
 
-        let now = Instant::now();
+        ready!(self.delay.as_mut().poll(cx));
 
         // If a tick was not missed, and thus we are being called before the
         // next tick is due, just schedule the next tick normally, one `period`
-        // after `timeout`
+        // later.
         //
         // However, if a tick took excessively long and we are now behind,
         // schedule the next tick according to how the user specified with
         // `MissedTickBehavior`
-        let next = if now > timeout + Duration::from_millis(5) {
+        let now = Instant::now();
+        let next_deadline = if now > scheduled_deadline + Duration::from_millis(5) {
             self.missed_tick_behavior
-                .next_timeout(timeout, now, self.period)
+                .next_timeout(scheduled_deadline, now, self.period)
         } else {
-            timeout + self.period
+            scheduled_deadline + self.period
         };
 
-        // When we arrive here, the internal delay returned `Poll::Ready`.
-        // Reset the delay but do not register it. It should be registered with
-        // the next call to [`poll_tick`].
-        self.delay.as_mut().reset_without_timer(next);
+        // Defer timer registration until the next call to [`poll_tick`].
+        self.delay.as_mut().set_deadline(next_deadline);
+        self.timer_elapsed = true;
 
-        // Return the time when we were scheduled to tick
-        Poll::Ready(timeout)
+        Poll::Ready(scheduled_deadline)
     }
 
     /// Resets the interval to complete one period after the current time.
@@ -515,7 +518,7 @@ impl Interval {
     /// # }
     /// ```
     pub fn reset(&mut self) {
-        self.delay.as_mut().reset(Instant::now() + self.period);
+        self.reset_at(Instant::now() + self.period);
     }
 
     /// Resets the interval immediately.
@@ -547,7 +550,7 @@ impl Interval {
     /// # }
     /// ```
     pub fn reset_immediately(&mut self) {
-        self.delay.as_mut().reset(Instant::now());
+        self.reset_at(Instant::now());
     }
 
     /// Resets the interval after the specified [`std::time::Duration`].
@@ -580,8 +583,7 @@ impl Interval {
     /// # }
     /// ```
     pub fn reset_after(&mut self, after: Duration) {
-        let deadline = Instant::now() + safe_delay(after);
-        self.delay.as_mut().reset(deadline);
+        self.reset_at(Instant::now() + safe_delay(after));
     }
 
     /// Resets the interval to a [`crate::time::Instant`] deadline.
@@ -618,6 +620,7 @@ impl Interval {
     /// ```
     pub fn reset_at(&mut self, deadline: Instant) {
         self.delay.as_mut().reset(deadline);
+        self.timer_elapsed = false;
     }
 
     /// Returns the [`MissedTickBehavior`] strategy currently being used.
