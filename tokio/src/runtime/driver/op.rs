@@ -2,7 +2,7 @@ use crate::io::blocking::Buf;
 use crate::io::uring::open::Open;
 use crate::io::uring::read::Read;
 use crate::io::uring::rename::Rename;
-use crate::io::uring::ring::{Fsync, Nop};
+use crate::io::uring::ring::RingOp;
 use crate::io::uring::utils::ArcFd;
 use crate::io::uring::write::Write;
 
@@ -37,10 +37,8 @@ use std::task::{Context, Poll, Waker};
 pub(crate) enum CancelData {
     Open(Open),
     Write(Write),
-    WriteArc(Write<ArcFd>),
     Rename(Rename),
     ReadVec(Read<Vec<u8>, OwnedFd>),
-    ReadVecArc(Read<Vec<u8>, ArcFd>),
     ReadBuf(Read<Buf, ArcFd>),
     #[cfg(
         // libc::statx is only supported on these platforms
@@ -55,9 +53,8 @@ pub(crate) enum CancelData {
         any(target_env = "gnu", target_os = "android")
     )]
     Statx(Statx),
-    Fsync(Fsync),
-    /// Holds no memory, but keeps the slot until the op completes.
-    Nop(Nop),
+    /// An op submitted through `tokio::io::uring::Ring`.
+    Ring(RingOp),
 }
 
 #[derive(Debug)]

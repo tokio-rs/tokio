@@ -117,12 +117,6 @@ impl Cancellable for Read<Buf, ArcFd> {
     }
 }
 
-impl Cancellable for Read<Vec<u8>, ArcFd> {
-    fn cancel(self) -> CancelData {
-        CancelData::ReadVecArc(self)
-    }
-}
-
 impl<B, F> Op<Read<B, F>>
 where
     B: ReadBuffer + fmt::Debug,

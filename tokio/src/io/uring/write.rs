@@ -1,4 +1,4 @@
-use crate::io::uring::utils::{ArcFd, UringFd};
+use crate::io::uring::utils::UringFd;
 use crate::runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op};
 use crate::util::as_ref::OwnedBuf;
 
@@ -16,11 +16,6 @@ pub(crate) struct Write<F = OwnedFd> {
 impl<F: UringFd> Write<F> {
     pub(crate) fn new(fd: F, buf: OwnedBuf) -> Self {
         Write { buf, fd }
-    }
-
-    /// The length of the buffer.
-    pub(crate) fn len(&self) -> usize {
-        self.buf.as_ref().len()
     }
 
     /// Builds the entry that writes the buffer, starting at `buf_offset`, to
@@ -71,12 +66,6 @@ impl<F: UringFd> Completable for Write<F> {
 impl Cancellable for Write {
     fn cancel(self) -> CancelData {
         CancelData::Write(self)
-    }
-}
-
-impl Cancellable for Write<ArcFd> {
-    fn cancel(self) -> CancelData {
-        CancelData::WriteArc(self)
     }
 }
 

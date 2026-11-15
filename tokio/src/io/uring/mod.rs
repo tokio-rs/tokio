@@ -1,7 +1,7 @@
 //! Operations submitted directly to the runtime's io_uring instance.
 //!
-//! [`Ring`] submits several operations at once, either as a batch of
-//! independent operations or as a chain of operations linked in order.
+//! [`Ring`] collects operations and submits them at once. They run
+//! independently, unless they are linked to run in order.
 //!
 //! This module is only available on Linux, when Tokio is built with
 //! `--cfg tokio_unstable` and the `io-uring` feature, and only works on runtimes
@@ -15,4 +15,4 @@ pub(crate) mod statx;
 pub(crate) mod utils;
 pub(crate) mod write;
 
-pub use ring::{Chain, Fsync, Nop, Read, Ring, RingFd, RingOp, Submit, Write};
+pub use ring::{Ring, Submit};

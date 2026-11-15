@@ -8,36 +8,37 @@ use crate::util::as_ref::OwnedBuf;
 use io_uring::squeue::{Entry, Flags};
 use io_uring::{opcode, types};
 use std::fmt;
-use std::future::{Future, IntoFuture};
+use std::future::Future;
 use std::io;
 use std::mem;
-use std::os::fd::OwnedFd;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
-/// The offset that makes a read or write use, and advance, the file position.
-const CURRENT_POSITION: u64 = u64::MAX;
+/// The completion of one operation: its result, and the buffer of a read or
+/// a write.
+type Completion = (io::Result<usize>, Option<Vec<u8>>);
 
-/// The io_uring instance of a Tokio runtime.
+/// Operations to submit to the io_uring instance of a Tokio runtime.
 ///
-/// Describe operations with [`read`], [`write`], [`fsync`] and [`nop`], then
-/// submit several of them at once:
+/// Add operations with [`read`], [`write`], [`sync_all`], [`sync_data`] and
+/// [`nop`], then submit all of them at once with [`submit`]. They are
+/// submitted to the runtime that polls the [`Submit`] future.
 ///
-/// - [`batch`] submits operations that don't depend on each other. They may run
-///   in parallel and complete in any order.
-/// - [`chain`] links operations, so each one starts only after the previous one
-///   completed.
+/// Operations don't depend on each other: they may run in parallel and
+/// complete in any order. [`then`] and [`always`] link the last operation to
+/// the next one, so the next one starts only after the last one completed.
 ///
 /// An operation keeps its buffer and file descriptor until the kernel is done
 /// with them, even if the future is dropped before the operation completes.
 ///
 /// [`read`]: Ring::read
 /// [`write`]: Ring::write
-/// [`fsync`]: Ring::fsync
+/// [`sync_all`]: Ring::sync_all
+/// [`sync_data`]: Ring::sync_data
 /// [`nop`]: Ring::nop
-/// [`batch`]: Ring::batch
-/// [`chain`]: Ring::chain
+/// [`submit`]: Ring::submit
+/// [`then`]: Ring::then
+/// [`always`]: Ring::always
 ///
 /// # Examples
 ///
@@ -50,18 +51,15 @@ const CURRENT_POSITION: u64 = u64::MAX;
 /// # async fn dox() -> std::io::Result<()> {
 /// const CHUNK: usize = 64 * 1024;
 ///
-/// let ring = Ring::current()?;
 /// let file = Arc::new(std::fs::File::open("data.bin")?);
+/// let mut ring = Ring::new();
+/// for i in 0..4 {
+///     ring.read(file.clone(), Vec::with_capacity(CHUNK), i * CHUNK as u64);
+/// }
 ///
-/// let chunks = ring
-///     .batch((0..4).map(|i| {
-///         ring.read(&file, Vec::with_capacity(CHUNK))
-///             .at(i * CHUNK as u64)
-///     }))
-///     .await;
-///
-/// for chunk in chunks {
-///     println!("read {} bytes", chunk?.len());
+/// for (read, buf) in ring.submit().await {
+///     read?;
+///     println!("read {} bytes", buf.unwrap().len());
 /// }
 /// # Ok(())
 /// # }
@@ -74,462 +72,276 @@ const CURRENT_POSITION: u64 = u64::MAX;
 /// use tokio::io::uring::Ring;
 ///
 /// # async fn dox() -> std::io::Result<()> {
-/// let ring = Ring::current()?;
 /// let file = Arc::new(std::fs::File::create("log.txt")?);
 ///
-/// let (written, synced) = ring
-///     .chain(ring.write(&file, b"hello\n".to_vec()))
-///     .then(ring.fsync(&file))
+/// let done = Ring::new()
+///     .write(file.clone(), b"hello\n".to_vec(), 0)
+///     .then()
+///     .sync_all(file)
+///     .submit()
 ///     .await;
 ///
-/// written?;
-/// synced?;
+/// for (res, _) in done {
+///     res?;
+/// }
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Default)]
 pub struct Ring {
-    handle: Handle,
+    /// The operations to submit next, in order.
+    ops: Vec<Pending>,
+}
+
+/// An operation added to a [`Ring`], with its entry.
+///
+/// The entry points into heap memory owned by `op`, so it stays valid when
+/// `op` is moved, until `op` is dropped.
+struct Pending {
+    op: RingOp,
+    entry: Entry,
+    /// The link from this operation to the next one, if any.
+    link: Flags,
 }
 
 impl Ring {
-    /// Returns the io_uring instance of the current runtime.
+    /// Creates a ring with no operations.
     ///
-    /// # Errors
-    ///
-    /// Returns an [`Unsupported`] error if the runtime has no io_uring
-    /// instance, for example because it was built without
-    /// [`enable_io_uring`], or because the kernel doesn't support io_uring or
-    /// blocks it.
-    ///
-    /// # Panics
-    ///
-    /// Panics if called outside of a Tokio runtime.
-    ///
-    /// [`Unsupported`]: std::io::ErrorKind::Unsupported
-    /// [`enable_io_uring`]: crate::runtime::Builder::enable_io_uring
-    pub fn current() -> io::Result<Ring> {
-        let handle = Handle::current();
-        let ready = handle
-            .inner
-            .driver()
-            .io
-            .as_ref()
-            .is_some_and(|io| io.uring_probe.is_some());
-
-        if !ready {
-            return Err(io::Error::new(
-                io::ErrorKind::Unsupported,
-                "io_uring is not available on this runtime",
-            ));
-        }
-
-        Ok(Ring { handle })
+    /// This doesn't need a runtime. The operations are submitted to the
+    /// runtime that polls the [`Submit`] future.
+    pub fn new() -> Ring {
+        Ring::default()
     }
 
-    /// Reads from `file` into the spare capacity of `buf`.
+    /// Adds a read from `fd` at `offset` into the spare capacity of `buf`.
     ///
-    /// The read starts at the file's current position, or at the offset set
-    /// with [`Read::at`], and reads at most `buf.capacity() - buf.len()` bytes.
-    /// It completes with `buf`, with the bytes read appended.
-    pub fn read<F: RingFd>(&self, file: &F, buf: Vec<u8>) -> Read {
-        Read {
-            len: buf.capacity() - buf.len(),
-            op: read::Read::new(file.ring_fd(), buf),
-            offset: CURRENT_POSITION,
-        }
+    /// The read reads at most `buf.capacity() - buf.len()` bytes. It completes
+    /// with the number of bytes read, and gives back `buf` with those bytes
+    /// appended. An `offset` of `u64::MAX` reads from, and advances, the
+    /// file's current position.
+    pub fn read(&mut self, fd: ArcFd, buf: Vec<u8>, offset: u64) -> &mut Ring {
+        let len = buf.capacity() - buf.len();
+        let mut read = read::Read::new(fd, buf);
+        let entry = read.sqe(len, offset);
+        self.push(RingOp::Read(read), entry)
     }
 
-    /// Writes `buf` to `file`.
+    /// Adds a write of `buf` to `fd` at `offset`.
     ///
-    /// The write starts at the file's current position, or at the offset set
-    /// with [`Write::at`]. It completes with the number of bytes written, which
-    /// may be less than `buf.len()`.
-    pub fn write<F: RingFd>(&self, file: &F, buf: Vec<u8>) -> Write {
-        Write {
-            op: write::Write::new(file.ring_fd(), OwnedBuf::Vec(buf)),
-            offset: CURRENT_POSITION,
-        }
+    /// The write completes with the number of bytes written, which may be less
+    /// than `buf.len()`, and gives back `buf`. An `offset` of `u64::MAX` writes
+    /// at, and advances, the file's current position.
+    pub fn write(&mut self, fd: ArcFd, buf: Vec<u8>, offset: u64) -> &mut Ring {
+        let write = write::Write::new(fd, OwnedBuf::Vec(buf));
+        let entry = write.sqe(0, offset);
+        self.push(RingOp::Write(write), entry)
     }
 
-    /// Flushes the data and metadata of `file` to disk, like
+    /// Adds a flush of the data and metadata of `fd` to disk, like
     /// [`File::sync_all`].
     ///
     /// [`File::sync_all`]: std::fs::File::sync_all
-    pub fn fsync<F: RingFd>(&self, file: &F) -> Fsync {
-        Fsync {
-            fd: file.ring_fd(),
-            flags: types::FsyncFlags::empty(),
-        }
+    pub fn sync_all(&mut self, fd: ArcFd) -> &mut Ring {
+        self.fsync(fd, types::FsyncFlags::empty())
     }
 
-    /// An operation that does nothing and completes successfully.
-    pub fn nop(&self) -> Nop {
-        Nop { _private: () }
-    }
-
-    /// Submits `ops` together, without linking them.
-    ///
-    /// The operations don't depend on each other: they may run in parallel and
-    /// complete in any order. The output has one result per operation, in the
-    /// order of `ops`.
-    ///
-    /// `ops` can be any iterator, so it can be built with iterator adapters such
-    /// as `map` and `filter`.
-    pub fn batch<I>(&self, ops: I) -> Submit<Vec<I::Item>>
-    where
-        I: IntoIterator,
-        I::Item: RingOp,
-    {
-        Submit::new(self.handle.clone(), ops.into_iter().collect(), Links::None)
-    }
-
-    /// Starts a chain with `op`.
-    ///
-    /// Add operations with [`Chain::then`] and [`Chain::always`], then await
-    /// the chain to submit it.
-    pub fn chain<O: RingOp>(&self, op: O) -> Chain<(O,)> {
-        Chain {
-            handle: self.handle.clone(),
-            ops: (op,),
-            hard: 0,
-        }
-    }
-}
-
-/// An operation that [`Ring::batch`] and [`Ring::chain`] can submit.
-///
-/// This trait is sealed. Operations are created by the methods of [`Ring`].
-pub trait RingOp: sealed::Op {}
-
-/// A file descriptor that [`Ring`] operations can use.
-///
-/// An operation keeps a clone of the `Arc`, so the descriptor stays open until
-/// the kernel is done with it, even if the future is dropped first.
-///
-/// This trait is sealed. It is implemented for `Arc<std::fs::File>` and
-/// `Arc<OwnedFd>`.
-pub trait RingFd: sealed::Fd {}
-
-// Only std types: the driver may drop the last clone while holding its lock,
-// and the destructor of a user type could lock the driver again.
-impl RingFd for Arc<std::fs::File> {}
-impl RingFd for Arc<OwnedFd> {}
-
-impl sealed::Fd for Arc<std::fs::File> {
-    fn ring_fd(&self) -> ArcFd {
-        self.clone()
-    }
-}
-
-impl sealed::Fd for Arc<OwnedFd> {
-    fn ring_fd(&self) -> ArcFd {
-        self.clone()
-    }
-}
-
-/// Reads from a file. Created by [`Ring::read`].
-///
-/// Completes with `io::Result<Vec<u8>>`: the buffer, with the bytes read
-/// appended. If the read fails, the buffer is dropped.
-#[must_use = "operations do nothing until submitted with `Ring::batch` or `Ring::chain`"]
-pub struct Read {
-    op: read::Read<Vec<u8>, ArcFd>,
-    /// The spare capacity of the buffer, which is the most the read can read.
-    len: usize,
-    offset: u64,
-}
-
-impl Read {
-    /// Reads at `offset` instead of the file's current position.
-    pub fn at(mut self, offset: u64) -> Read {
-        self.offset = offset;
-        self
-    }
-}
-
-impl fmt::Debug for Read {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Read")
-            .field("offset", &self.offset)
-            .finish_non_exhaustive()
-    }
-}
-
-impl RingOp for Read {}
-
-impl sealed::Op for Read {
-    type Output = io::Result<Vec<u8>>;
-
-    fn entry(&mut self) -> Entry {
-        self.op.sqe(self.len, self.offset)
-    }
-
-    fn complete(self, result: io::Result<u32>) -> Self::Output {
-        let (result, _, buf) = self.op.complete(CqeResult { result });
-        result.map(|_| buf.expect("a completed read returns its buffer"))
-    }
-
-    fn keep(self) -> sealed::Keep {
-        sealed::Keep(self.op.cancel())
-    }
-
-    fn failed(error: io::Error) -> Self::Output {
-        Err(error)
-    }
-}
-
-/// Writes to a file. Created by [`Ring::write`].
-///
-/// Completes with `io::Result<usize>`: the number of bytes written.
-#[must_use = "operations do nothing until submitted with `Ring::batch` or `Ring::chain`"]
-pub struct Write {
-    op: write::Write<ArcFd>,
-    offset: u64,
-}
-
-impl Write {
-    /// Writes at `offset` instead of the file's current position.
-    pub fn at(mut self, offset: u64) -> Write {
-        self.offset = offset;
-        self
-    }
-}
-
-impl fmt::Debug for Write {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Write")
-            .field("len", &self.op.len())
-            .field("offset", &self.offset)
-            .finish_non_exhaustive()
-    }
-}
-
-impl RingOp for Write {}
-
-impl sealed::Op for Write {
-    type Output = io::Result<usize>;
-
-    fn entry(&mut self) -> Entry {
-        self.op.sqe(0, self.offset)
-    }
-
-    fn complete(self, result: io::Result<u32>) -> Self::Output {
-        let (result, ..) = self.op.complete(CqeResult { result });
-        result.map(|n| n as usize)
-    }
-
-    fn keep(self) -> sealed::Keep {
-        sealed::Keep(self.op.cancel())
-    }
-
-    fn failed(error: io::Error) -> Self::Output {
-        Err(error)
-    }
-}
-
-/// Flushes a file to disk. Created by [`Ring::fsync`].
-///
-/// Completes with `io::Result<()>`.
-#[must_use = "operations do nothing until submitted with `Ring::batch` or `Ring::chain`"]
-pub struct Fsync {
-    fd: ArcFd,
-    flags: types::FsyncFlags,
-}
-
-impl Fsync {
-    /// Flushes only the data, and the metadata needed to read it back, like
-    /// [`File::sync_data`].
+    /// Adds a flush of the data of `fd` to disk, and of the metadata needed to
+    /// read it back, like [`File::sync_data`].
     ///
     /// [`File::sync_data`]: std::fs::File::sync_data
-    pub fn data_only(mut self) -> Fsync {
-        self.flags = types::FsyncFlags::DATASYNC;
+    pub fn sync_data(&mut self, fd: ArcFd) -> &mut Ring {
+        self.fsync(fd, types::FsyncFlags::DATASYNC)
+    }
+
+    /// Adds an operation that does nothing and completes successfully.
+    pub fn nop(&mut self) -> &mut Ring {
+        self.push(RingOp::Nop, opcode::Nop::new().build())
+    }
+
+    /// Links the last operation to the next one, which then runs only if the
+    /// last one succeeded.
+    ///
+    /// If the last operation fails, the next one and every operation linked
+    /// after it complete with an `ECANCELED` error. A read or write that
+    /// transfers fewer bytes than requested counts as a failure.
+    ///
+    /// Does nothing if no operation was added yet. A link from the last
+    /// operation of a submission is ignored.
+    pub fn then(&mut self) -> &mut Ring {
+        self.link(Flags::IO_LINK)
+    }
+
+    /// Links the last operation to the next one, which then runs after the
+    /// last one even if it failed.
+    ///
+    /// This only covers the last operation. If an earlier link was broken, the
+    /// next one completes with an `ECANCELED` error too.
+    ///
+    /// Does nothing if no operation was added yet. A link from the last
+    /// operation of a submission is ignored.
+    pub fn always(&mut self) -> &mut Ring {
+        self.link(Flags::IO_HARDLINK)
+    }
+
+    /// Submits the operations added since the last submission, and waits until
+    /// all of them completed.
+    ///
+    /// The operations are submitted to the io_uring instance of the current
+    /// runtime when the returned future is first polled. The output has one
+    /// completion per operation, in the order the operations were added.
+    ///
+    /// # Errors
+    ///
+    /// If the operations can't be submitted, each one completes with the
+    /// error, and gives back its buffer unless the kernel may still use it.
+    /// This happens if the future is first polled:
+    ///
+    /// - outside of a Tokio runtime.
+    /// - on a runtime without an io_uring instance, which fails with an
+    ///   [`Unsupported`] error. For example, the runtime was built without
+    ///   [`enable_io_uring`], or the kernel doesn't support io_uring or blocks
+    ///   it.
+    ///
+    /// Operations that are linked must fit in the io_uring submission queue
+    /// together, so a submission with links fails with an [`InvalidInput`]
+    /// error if it has more operations than the queue has entries.
+    ///
+    /// [`Unsupported`]: std::io::ErrorKind::Unsupported
+    /// [`enable_io_uring`]: crate::runtime::Builder::enable_io_uring
+    /// [`InvalidInput`]: std::io::ErrorKind::InvalidInput
+    pub fn submit(&mut self) -> Submit {
+        Submit {
+            ops: mem::take(&mut self.ops),
+            state: State::Idle,
+        }
+    }
+
+    fn fsync(&mut self, fd: ArcFd, flags: types::FsyncFlags) -> &mut Ring {
+        let entry = opcode::Fsync::new(types::Fd(fd.as_raw_fd()))
+            .flags(flags)
+            .build();
+        self.push(RingOp::Fsync(fd), entry)
+    }
+
+    fn push(&mut self, op: RingOp, entry: Entry) -> &mut Ring {
+        self.ops.push(Pending {
+            op,
+            entry,
+            link: Flags::empty(),
+        });
+        self
+    }
+
+    fn link(&mut self, link: Flags) -> &mut Ring {
+        if let Some(last) = self.ops.last_mut() {
+            last.link = link;
+        }
         self
     }
 }
 
-impl fmt::Debug for Fsync {
+impl fmt::Debug for Ring {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Fsync")
-            .field(
-                "data_only",
-                &self.flags.contains(types::FsyncFlags::DATASYNC),
-            )
-            .finish_non_exhaustive()
-    }
-}
-
-impl RingOp for Fsync {}
-
-impl sealed::Op for Fsync {
-    type Output = io::Result<()>;
-
-    fn entry(&mut self) -> Entry {
-        opcode::Fsync::new(types::Fd(self.fd.as_raw_fd()))
-            .flags(self.flags)
-            .build()
-    }
-
-    fn complete(self, res: io::Result<u32>) -> Self::Output {
-        res.map(drop)
-    }
-
-    fn keep(self) -> sealed::Keep {
-        sealed::Keep(CancelData::Fsync(self))
-    }
-
-    fn failed(error: io::Error) -> Self::Output {
-        Err(error)
-    }
-}
-
-/// Does nothing. Created by [`Ring::nop`].
-///
-/// Completes with `io::Result<()>`.
-#[derive(Debug)]
-#[must_use = "operations do nothing until submitted with `Ring::batch` or `Ring::chain`"]
-pub struct Nop {
-    _private: (),
-}
-
-impl RingOp for Nop {}
-
-impl sealed::Op for Nop {
-    type Output = io::Result<()>;
-
-    fn entry(&mut self) -> Entry {
-        opcode::Nop::new().build()
-    }
-
-    fn complete(self, res: io::Result<u32>) -> Self::Output {
-        res.map(drop)
-    }
-
-    fn keep(self) -> sealed::Keep {
-        sealed::Keep(CancelData::Nop(self))
-    }
-
-    fn failed(error: io::Error) -> Self::Output {
-        Err(error)
-    }
-}
-
-/// Operations that run one after another. Created by [`Ring::chain`].
-///
-/// Each operation starts only after the previous one completed. Awaiting the
-/// chain submits it. The output is a tuple with one result per operation, in
-/// order. A chain holds up to 8 operations.
-#[must_use = "a chain does nothing unless awaited"]
-pub struct Chain<L> {
-    handle: Handle,
-    ops: L,
-    /// Bit `i` is set if operation `i` is hard linked to operation `i + 1`.
-    hard: u8,
-}
-
-impl<L: sealed::Ops> Chain<L> {
-    /// Adds `op`, which runs only if the previous operation succeeded.
-    ///
-    /// If the previous operation fails, `op` and every operation after it
-    /// complete with an `ECANCELED` error. A read or write that transfers fewer
-    /// bytes than requested counts as a failure.
-    pub fn then<O: RingOp>(self, op: O) -> Chain<L::Out>
-    where
-        L: sealed::Append<O>,
-    {
-        self.push(op, false)
-    }
-
-    /// Adds `op`, which runs after the previous operation even if it failed.
-    ///
-    /// This only covers the previous operation. If an earlier link was broken,
-    /// `op` completes with an `ECANCELED` error too.
-    pub fn always<O: RingOp>(self, op: O) -> Chain<L::Out>
-    where
-        L: sealed::Append<O>,
-    {
-        self.push(op, true)
-    }
-
-    fn push<O>(self, op: O, hard: bool) -> Chain<L::Out>
-    where
-        L: sealed::Append<O>,
-    {
-        // The new link goes from the current last operation to `op`.
-        let link = self.ops.len() - 1;
-        Chain {
-            handle: self.handle,
-            ops: self.ops.append(op),
-            hard: self.hard | (u8::from(hard) << link),
-        }
-    }
-}
-
-impl<L: sealed::Ops> fmt::Debug for Chain<L> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Chain")
+        f.debug_struct("Ring")
             .field("len", &self.ops.len())
             .finish_non_exhaustive()
     }
 }
 
-impl<L: sealed::Ops> IntoFuture for Chain<L> {
-    type Output = L::Output;
-    type IntoFuture = Submit<L>;
-
-    fn into_future(self) -> Submit<L> {
-        Submit::new(self.handle, self.ops, Links::Chain { hard: self.hard })
-    }
+/// An operation of a [`Ring`]. It owns the memory its entry points into.
+pub(crate) enum RingOp {
+    Read(read::Read<Vec<u8>, ArcFd>),
+    Write(write::Write<ArcFd>),
+    // The descriptor is only kept open until the op completes, so the field
+    // isn't read.
+    Fsync(#[allow(dead_code)] ArcFd),
+    Nop,
 }
 
-/// How the operations of a submission are linked.
-#[derive(Clone, Copy)]
-enum Links {
-    /// A batch: the operations don't depend on each other.
-    None,
-    /// A chain: each operation is linked to the next one. Bit `i` of `hard` is
-    /// set if the link from operation `i` is a hard link.
-    Chain { hard: u8 },
-}
-
-impl Links {
-    /// Sets the link flag on `entry`, the entry of operation `i` out of `len`.
-    fn apply(self, i: usize, len: usize, entry: Entry) -> Entry {
+impl RingOp {
+    /// The completion from the result of the entry.
+    fn complete(self, result: io::Result<u32>) -> Completion {
+        let cqe = CqeResult { result };
         match self {
-            // The last operation of a chain isn't linked to anything.
-            Links::Chain { hard } if i + 1 < len => {
-                if hard & (1 << i) != 0 {
-                    entry.flags(Flags::IO_HARDLINK)
-                } else {
-                    entry.flags(Flags::IO_LINK)
-                }
+            RingOp::Read(read) => {
+                let (result, _, buf) = read.complete(cqe);
+                (widen(result), buf)
             }
-            _ => entry,
+            RingOp::Write(write) => {
+                let (result, buf, _) = write.complete(cqe);
+                (widen(result), buf.map(into_vec))
+            }
+            RingOp::Fsync(_) | RingOp::Nop => (widen(cqe.result), None),
+        }
+    }
+
+    /// The completion when the entry never reached the io_uring, which gives
+    /// back the buffer.
+    fn complete_with_error(self, error: io::Error) -> Completion {
+        match self {
+            RingOp::Read(read) => {
+                let (result, _, buf) = read.complete_with_error(error);
+                (widen(result), buf)
+            }
+            RingOp::Write(write) => {
+                let (result, buf, _) = write.complete_with_error(error);
+                (widen(result), buf.map(into_vec))
+            }
+            RingOp::Fsync(_) | RingOp::Nop => (Err(error), None),
         }
     }
 }
 
-/// Submits operations and waits until all of them completed.
+impl Cancellable for RingOp {
+    fn cancel(self) -> CancelData {
+        CancelData::Ring(self)
+    }
+}
+
+impl fmt::Debug for RingOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            RingOp::Read(_) => "Read",
+            RingOp::Write(_) => "Write",
+            RingOp::Fsync(_) => "Fsync",
+            RingOp::Nop => "Nop",
+        })
+    }
+}
+
+fn widen(result: io::Result<u32>) -> io::Result<usize> {
+    result.map(|n| n as usize)
+}
+
+/// The `Vec` that [`Ring::write`] wrapped.
+fn into_vec(buf: OwnedBuf) -> Vec<u8> {
+    match buf {
+        OwnedBuf::Vec(vec) => vec,
+        #[cfg(feature = "io-util")]
+        OwnedBuf::Bytes(_) => unreachable!("`Ring::write` only takes a `Vec`"),
+    }
+}
+
+/// Submits the operations of a [`Ring`] and waits until all of them completed.
 ///
-/// Returned by [`Ring::batch`], and by awaiting a [`Chain`].
+/// Returned by [`Ring::submit`].
 ///
 /// Dropping it doesn't cancel operations that were already submitted. They
 /// keep their buffers and file descriptors until they complete.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct Submit<L: sealed::Ops> {
-    handle: Handle,
-    /// `None` once the output was returned, or the operations moved into the
+pub struct Submit {
+    /// Empty once the output was returned, or the operations moved into the
     /// driver.
-    ops: Option<L>,
+    ops: Vec<Pending>,
     state: State,
 }
 
 enum State {
     /// Not submitted yet.
-    Idle(Links),
-    /// Submitted. `slots[i]` tracks the entry of operation `i`, and only the
-    /// operations that have a slot were pushed to the io_uring.
-    Submitted(Vec<Slot>),
+    Idle,
+    /// Submitted to the io_uring of `handle`. `slots[i]` tracks the entry of
+    /// operation `i`, and only the operations that have a slot were pushed.
+    Submitted { handle: Handle, slots: Vec<Slot> },
     Done,
 }
 
@@ -550,47 +362,58 @@ impl Slot {
     }
 }
 
-impl<L: sealed::Ops> Submit<L> {
-    fn new(handle: Handle, ops: L, links: Links) -> Submit<L> {
-        Submit {
-            handle,
-            ops: Some(ops),
-            state: State::Idle(links),
-        }
-    }
-
-    /// Pushes the entries of every operation to the io_uring.
+impl Submit {
+    /// Pushes the entry of every operation to the io_uring.
     ///
     /// Returns the output if the operations can't be submitted.
-    fn submit(&mut self, links: Links, waker: &Waker) -> Option<L::Output> {
-        let Submit { handle, ops, state } = self;
-        let ops = ops
-            .as_mut()
-            .expect("operations are present until completion");
-        let len = ops.len();
-
-        if len == 0 {
-            *state = State::Done;
-            return self.ops.take().map(|ops| ops.complete(std::iter::empty()));
+    fn submit(&mut self, waker: &Waker) -> Option<Vec<Completion>> {
+        if self.ops.is_empty() {
+            self.state = State::Done;
+            return Some(Vec::new());
         }
+
+        let handle = match uring_handle() {
+            Ok(handle) => handle,
+            Err(error) => {
+                // Nothing was pushed, so every operation gives back its buffer.
+                self.state = State::Done;
+                let completions = mem::take(&mut self.ops)
+                    .into_iter()
+                    .map(|pending| pending.op.complete_with_error(copy_error(&error)))
+                    .collect();
+                return Some(completions);
+            }
+        };
+
+        let Submit { ops, state } = self;
+        let len = ops.len();
 
         // The slots are part of the state before any entry is pushed, so if
         // this panics midway, `Drop` still keeps the pushed operations alive.
-        *state = State::Submitted(Vec::with_capacity(len));
-        let State::Submitted(slots) = state else {
+        *state = State::Submitted {
+            handle,
+            slots: Vec::with_capacity(len),
+        };
+        let State::Submitted { handle, slots } = state else {
             unreachable!()
         };
 
-        let entries = ops
-            .entries()
-            .enumerate()
-            .map(|(i, entry)| links.apply(i, len, entry));
-        let linked = matches!(links, Links::Chain { .. });
+        // The last operation has nothing to link to.
+        let last = len - 1;
+        let linked = ops[..last].iter().any(|pending| !pending.link.is_empty());
+        let entries = ops.iter().enumerate().map(|(i, pending)| {
+            let link = if i < last {
+                pending.link
+            } else {
+                Flags::empty()
+            };
+            pending.entry.clone().flags(link)
+        });
         let driver = handle.inner.driver().io();
 
         // SAFETY: every entry points into heap memory owned by its operation
-        // (see `sealed::Op::entry`). The operations stay in `self.ops` until
-        // their entries complete, or move into the driver with `cancel_op`.
+        // (see `Pending`). The operations stay in `self.ops` until their
+        // entries complete, or move into the driver with `cancel_op`.
         let result = unsafe {
             driver.register_ops(entries, linked, waker, |index| {
                 slots.push(Slot::Pending(index));
@@ -600,82 +423,109 @@ impl<L: sealed::Ops> Submit<L> {
         let error = result.err()?;
 
         // The pushed entries may still reach the kernel, so their operations
-        // move into the driver until they complete. The others are dropped.
-        let State::Submitted(slots) = mem::replace(&mut self.state, State::Done) else {
+        // move into the driver until they complete. The other operations give
+        // back their buffers.
+        let State::Submitted { handle, slots } = mem::replace(&mut self.state, State::Done) else {
             unreachable!()
         };
-        let ops = self
-            .ops
-            .take()
-            .expect("operations are present until completion");
-        ops.cancel(&sealed::Submitted::new(driver, &slots));
-        Some(L::failed(len, &error))
+        let driver = handle.inner.driver().io();
+        let completions = mem::take(&mut self.ops)
+            .into_iter()
+            .enumerate()
+            .map(|(i, pending)| match slots.get(i) {
+                Some(&Slot::Pending(index)) => {
+                    driver.cancel_op(index, Some(pending.op));
+                    (Err(copy_error(&error)), None)
+                }
+                _ => pending.op.complete_with_error(copy_error(&error)),
+            })
+            .collect();
+        Some(completions)
     }
 }
 
-impl<L: sealed::Ops> Future for Submit<L> {
-    type Output = L::Output;
+impl Future for Submit {
+    type Output = Vec<Completion>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<L::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Vec<Completion>> {
         let this = self.get_mut();
 
         match &mut this.state {
-            State::Idle(links) => {
-                let links = *links;
-                match this.submit(links, cx.waker()) {
-                    Some(output) => Poll::Ready(output),
-                    None => Poll::Pending,
-                }
-            }
-            State::Submitted(slots) => {
-                let driver = this.handle.inner.driver().io();
+            State::Idle => match this.submit(cx.waker()) {
+                Some(output) => Poll::Ready(output),
+                None => Poll::Pending,
+            },
+            State::Submitted { handle, slots } => {
+                let driver = handle.inner.driver().io();
                 if !poll_slots(driver, slots, cx.waker()) {
                     return Poll::Pending;
                 }
 
-                let State::Submitted(slots) = mem::replace(&mut this.state, State::Done) else {
+                let State::Submitted { slots, .. } = mem::replace(&mut this.state, State::Done) else {
                     unreachable!()
                 };
-                let ops = this
-                    .ops
-                    .take()
-                    .expect("operations are present until completion");
-                Poll::Ready(ops.complete(slots.into_iter().map(Slot::into_result)))
+                let completions = mem::take(&mut this.ops)
+                    .into_iter()
+                    .zip(slots)
+                    .map(|(pending, slot)| pending.op.complete(slot.into_result()))
+                    .collect();
+                Poll::Ready(completions)
             }
             State::Done => panic!("`Submit` polled after completion"),
         }
     }
 }
 
-impl<L: sealed::Ops> Unpin for Submit<L> {}
-
-impl<L: sealed::Ops> Drop for Submit<L> {
+impl Drop for Submit {
     fn drop(&mut self) {
-        let State::Submitted(slots) = &self.state else {
-            return;
-        };
-        let Some(ops) = self.ops.take() else {
+        let State::Submitted { handle, slots } = &self.state else {
             return;
         };
 
-        // The kernel may still use the memory of the pending operations, so
-        // the driver keeps them until they complete.
-        let driver = self.handle.inner.driver().io();
-        ops.cancel(&sealed::Submitted::new(driver, slots));
+        // The kernel may still use the memory of the operations in flight, so
+        // the driver keeps them until they complete. The operations that
+        // completed, or were never pushed, are dropped.
+        let driver = handle.inner.driver().io();
+        for (pending, slot) in mem::take(&mut self.ops).into_iter().zip(slots) {
+            if let Slot::Pending(index) = *slot {
+                driver.cancel_op(index, Some(pending.op));
+            }
+        }
     }
 }
 
-impl<L: sealed::Ops> fmt::Debug for Submit<L> {
+impl fmt::Debug for Submit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let state = match self.state {
-            State::Idle(_) => "idle",
-            State::Submitted(_) => "submitted",
+            State::Idle => "idle",
+            State::Submitted { .. } => "submitted",
             State::Done => "done",
         };
         f.debug_struct("Submit")
+            .field("len", &self.ops.len())
             .field("state", &state)
             .finish_non_exhaustive()
     }
+}
+
+/// Returns the handle of the current runtime, if it has io_uring set up.
+fn uring_handle() -> io::Result<Handle> {
+    let handle = Handle::try_current().map_err(io::Error::other)?;
+    let ready = handle
+        .inner
+        .driver()
+        .io
+        .as_ref()
+        .is_some_and(|io| io.uring_probe.is_some());
+
+    if !ready {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "io_uring is not available on this runtime",
+        ));
+    }
+
+    Ok(handle)
 }
 
 /// Takes the results of the operations that completed, and makes `waker` the
@@ -712,197 +562,5 @@ fn copy_error(error: &io::Error) -> io::Error {
     match error.raw_os_error() {
         Some(code) => io::Error::from_raw_os_error(code),
         None => io::Error::new(error.kind(), error.to_string()),
-    }
-}
-
-impl<O: RingOp> sealed::Ops for Vec<O> {
-    type Output = Vec<O::Output>;
-
-    fn len(&self) -> usize {
-        Vec::len(self)
-    }
-
-    fn entries(&mut self) -> impl ExactSizeIterator<Item = Entry> + '_ {
-        self.iter_mut().map(sealed::Op::entry)
-    }
-
-    fn complete(self, results: impl Iterator<Item = io::Result<u32>>) -> Self::Output {
-        self.into_iter()
-            .zip(results)
-            .map(|(op, res)| op.complete(res))
-            .collect()
-    }
-
-    fn failed(len: usize, error: &io::Error) -> Self::Output {
-        (0..len).map(|_| O::failed(copy_error(error))).collect()
-    }
-
-    fn cancel(self, submitted: &sealed::Submitted<'_>) {
-        for (i, op) in self.into_iter().enumerate() {
-            submitted.cancel(i, op);
-        }
-    }
-}
-
-macro_rules! impl_ops {
-    ($($op:ident $i:tt),+) => {
-        impl<$($op: RingOp),+> sealed::Ops for ($($op,)+) {
-            type Output = ($($op::Output,)+);
-
-            fn len(&self) -> usize {
-                [$($i),+].len()
-            }
-
-            fn entries(&mut self) -> impl ExactSizeIterator<Item = Entry> + '_ {
-                [$(self.$i.entry()),+].into_iter()
-            }
-
-            fn complete(self, results: impl Iterator<Item = io::Result<u32>>) -> Self::Output {
-                let mut results = results;
-                ($(self.$i.complete(results.next().expect("one result per operation")),)+)
-            }
-
-            fn failed(_len: usize, error: &io::Error) -> Self::Output {
-                ($($op::failed(copy_error(error)),)+)
-            }
-
-            fn cancel(self, submitted: &sealed::Submitted<'_>) {
-                $(submitted.cancel($i, self.$i);)+
-            }
-        }
-    };
-}
-
-impl_ops!(A 0);
-impl_ops!(A 0, B 1);
-impl_ops!(A 0, B 1, C 2);
-impl_ops!(A 0, B 1, C 2, D 3);
-impl_ops!(A 0, B 1, C 2, D 3, E 4);
-impl_ops!(A 0, B 1, C 2, D 3, E 4, F 5);
-impl_ops!(A 0, B 1, C 2, D 3, E 4, F 5, G 6);
-impl_ops!(A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7);
-
-macro_rules! impl_append {
-    ($($op:ident $i:tt),+) => {
-        impl<$($op: RingOp,)+ Next: RingOp> sealed::Append<Next> for ($($op,)+) {
-            type Out = ($($op,)+ Next,);
-
-            fn append(self, op: Next) -> Self::Out {
-                ($(self.$i,)+ op,)
-            }
-        }
-    };
-}
-
-impl_append!(A 0);
-impl_append!(A 0, B 1);
-impl_append!(A 0, B 1, C 2);
-impl_append!(A 0, B 1, C 2, D 3);
-impl_append!(A 0, B 1, C 2, D 3, E 4);
-impl_append!(A 0, B 1, C 2, D 3, E 4, F 5);
-impl_append!(A 0, B 1, C 2, D 3, E 4, F 5, G 6);
-
-pub(crate) mod sealed {
-    //! The internals of the ring API. They are not part of its public
-    //! interface.
-
-    use super::*;
-
-    /// One io_uring operation.
-    pub trait Op: Send + 'static {
-        /// The value the operation completes with.
-        type Output;
-
-        /// Builds the entry of the operation.
-        ///
-        /// Every pointer in the entry points into heap memory owned by `self`,
-        /// so it stays valid when `self` is moved, until `self` is dropped.
-        fn entry(&mut self) -> Entry;
-
-        /// Builds the output from the result of the entry.
-        fn complete(self, res: io::Result<u32>) -> Self::Output;
-
-        /// The output when the operation could not be submitted.
-        fn failed(error: io::Error) -> Self::Output;
-
-        /// The memory the entry points into, for the driver to keep alive
-        /// until the kernel is done with it.
-        fn keep(self) -> Keep;
-    }
-
-    /// The operations of one batch or chain, in order.
-    pub trait Ops: Send + 'static {
-        /// One output per operation.
-        type Output;
-
-        /// The number of operations.
-        fn len(&self) -> usize;
-
-        /// One entry per operation.
-        fn entries(&mut self) -> impl ExactSizeIterator<Item = Entry> + '_;
-
-        /// Builds the outputs from one result per operation.
-        fn complete(self, results: impl Iterator<Item = io::Result<u32>>) -> Self::Output;
-
-        /// The outputs when `len` operations could not be submitted.
-        fn failed(len: usize, error: &io::Error) -> Self::Output;
-
-        /// Moves each operation whose entry is still in flight into the
-        /// driver, which keeps its memory alive until it completes. The other
-        /// operations are dropped.
-        fn cancel(self, submitted: &Submitted<'_>);
-    }
-
-    /// Adds an operation to the end of a chain.
-    pub trait Append<O> {
-        /// The operations of the longer chain.
-        type Out: Ops;
-
-        /// Adds `op` after the other operations.
-        fn append(self, op: O) -> Self::Out;
-    }
-
-    /// A file descriptor that operations keep open until they complete.
-    pub trait Fd {
-        /// A clone that keeps the descriptor open.
-        fn ring_fd(&self) -> ArcFd;
-    }
-
-    /// The memory of an operation whose entry may still be used by the kernel.
-    #[derive(Debug)]
-    pub struct Keep(pub(super) CancelData);
-
-    impl Cancellable for Keep {
-        fn cancel(self) -> CancelData {
-            self.0
-        }
-    }
-
-    /// The entries of a submission that were pushed to the io_uring.
-    pub struct Submitted<'a> {
-        driver: &'a driver::Handle,
-        slots: &'a [Slot],
-    }
-
-    impl fmt::Debug for Submitted<'_> {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            f.debug_struct("Submitted")
-                .field("len", &self.slots.len())
-                .finish_non_exhaustive()
-        }
-    }
-
-    impl<'a> Submitted<'a> {
-        pub(super) fn new(driver: &'a driver::Handle, slots: &'a [Slot]) -> Self {
-            Submitted { driver, slots }
-        }
-
-        /// Moves operation `i` into the driver if its entry is still in
-        /// flight, and drops it otherwise.
-        pub(super) fn cancel<O: Op>(&self, i: usize, op: O) {
-            if let Some(&Slot::Pending(index)) = self.slots.get(i) {
-                self.driver.cancel_op(index, Some(op.keep()));
-            }
-        }
     }
 }
