@@ -2,6 +2,7 @@ use crate::io::blocking::Buf;
 use crate::io::uring::utils::{ArcFd, UringFd};
 use crate::runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op};
 
+use io_uring::squeue::Entry;
 use io_uring::{opcode, types};
 use std::fmt;
 use std::io::{self, Error};
@@ -53,6 +54,26 @@ pub(crate) struct Read<B, F = ArcFd> {
     buf: B,
 }
 
+impl<B: ReadBuffer, F: UringFd> Read<B, F> {
+    pub(crate) fn new(fd: F, buf: B) -> Self {
+        Read { fd, buf }
+    }
+
+    /// Builds the entry that reads at most `max_len` bytes into the buffer.
+    ///
+    /// `offset` is the file offset; use `u64::MAX` for the current cursor.
+    ///
+    /// The entry points into the heap memory of the buffer, which doesn't move
+    /// when `self` does, so it stays valid until `self` is dropped.
+    pub(crate) fn sqe(&mut self, max_len: usize, offset: u64) -> Entry {
+        let (ptr, len) = self.buf.uring_read_prepare(max_len);
+
+        opcode::Read::new(types::Fd(UringFd::as_raw_fd(&self.fd)), ptr, len)
+            .offset(offset)
+            .build()
+    }
+}
+
 impl<B: fmt::Debug, F> fmt::Debug for Read<B, F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Read")
@@ -96,6 +117,12 @@ impl Cancellable for Read<Buf, ArcFd> {
     }
 }
 
+impl Cancellable for Read<Vec<u8>, ArcFd> {
+    fn cancel(self) -> CancelData {
+        CancelData::ReadVecArc(self)
+    }
+}
+
 impl<B, F> Op<Read<B, F>>
 where
     B: ReadBuffer + fmt::Debug,
@@ -106,16 +133,13 @@ where
     ///
     /// `max_len` is the maximum number of bytes to read.
     /// `offset` is the file offset; use `u64::MAX` for the current cursor.
-    pub(crate) fn read_at(fd: F, mut buf: B, max_len: usize, offset: u64) -> Self {
-        let (ptr, len) = buf.uring_read_prepare(max_len);
-
-        let sqe = opcode::Read::new(types::Fd(UringFd::as_raw_fd(&fd)), ptr, len)
-            .offset(offset)
-            .build();
+    pub(crate) fn read_at(fd: F, buf: B, max_len: usize, offset: u64) -> Self {
+        let mut read = Read::new(fd, buf);
+        let sqe = read.sqe(max_len, offset);
 
         // SAFETY: `fd` and `buf`, which owns the heap buffer, are moved into `Read`,
         // which is held by the `Op` for the entire duration of the io-uring operation.
         // The buffer pointer remains valid because Vec heap data doesn't move.
-        unsafe { Op::new(sqe, Read { fd, buf }) }
+        unsafe { Op::new(sqe, read) }
     }
 }

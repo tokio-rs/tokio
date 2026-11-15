@@ -1,4 +1,4 @@
-use io_uring::{squeue::Entry, IoUring, Probe};
+use io_uring::{cqueue, squeue::Entry, IoUring, Probe};
 use mio::unix::SourceFd;
 use slab::Slab;
 
@@ -25,20 +25,31 @@ fn register_probe(uring: &IoUring, probe: &mut Probe) -> io::Result<()> {
     }
 }
 
-/// Outcome of registering ops with the io_uring.
-///
-/// `I` is the slab index of the op, or the slab indices of the ops passed to
-/// `register_ops`.
-pub(crate) enum RegisterResult<I = usize> {
+/// Outcome of registering an op with the io_uring.
+pub(crate) enum RegisterResult {
     /// In-flight at this slab index.
-    Submitted(I),
+    Submitted(usize),
 
-    /// Submit failed before reaching the kernel; no slot is kept.
+    /// Submit failed before reaching the kernel; the slot was removed.
     NotPushed(io::Error),
 
     /// Submit failed after reaching the kernel; the slot is kept and the caller
     /// must cancel it to keep its resources alive until completion.
-    Pushed { index: I, error: io::Error },
+    Pushed { index: usize, error: io::Error },
+}
+
+/// Outcome of polling an op with [`UringContext::poll_op`].
+pub(crate) enum PollOp {
+    /// The op completed, and its slot was removed.
+    Ready(cqueue::Entry),
+
+    /// The op is still in flight, and wakes the waker given to `poll_op` when
+    /// it completes.
+    ///
+    /// Holds the waker that was replaced, if any. Drop it only after releasing
+    /// the lock, as its destructor may cancel another op, which locks the
+    /// driver again.
+    Pending(Option<Waker>),
 }
 
 pub(crate) struct UringContext {
@@ -132,6 +143,38 @@ impl UringContext {
 
     pub(crate) fn remove_op(&mut self, index: usize) -> Lifecycle {
         self.ops.remove(index)
+    }
+
+    /// Takes the completion of the op at `index`, or makes `waker` its waker
+    /// if it is still in flight.
+    pub(crate) fn poll_op(&mut self, index: usize, waker: &Waker) -> PollOp {
+        let lifecycle = self.ops.get_mut(index).expect("Lifecycle must be present");
+
+        match mem::replace(lifecycle, Lifecycle::Submitted) {
+            // Only replace the stored waker if it wouldn't wake the new one
+            Lifecycle::Waiting(prev) if !prev.will_wake(waker) => {
+                *lifecycle = Lifecycle::Waiting(waker.clone());
+                PollOp::Pending(Some(prev))
+            }
+
+            Lifecycle::Waiting(prev) => {
+                *lifecycle = Lifecycle::Waiting(prev);
+                PollOp::Pending(None)
+            }
+
+            Lifecycle::Completed(cqe) => {
+                self.ops.remove(index);
+                PollOp::Ready(cqe)
+            }
+
+            Lifecycle::Submitted => {
+                unreachable!("Submitted lifecycle should never be seen here");
+            }
+
+            Lifecycle::Cancelled(_) => {
+                unreachable!("Cancelled lifecycle should never be seen here");
+            }
+        }
     }
 }
 
@@ -339,49 +382,45 @@ impl Handle {
     /// back. Otherwise the entries are pushed as far as there is room, flushing
     /// the queue in between, so a batch can hold more entries than the queue.
     ///
-    /// Entries are pushed in order. On `Pushed`, the slots belong to the first
-    /// `index.len()` entries, and the other entries never reached the queue.
+    /// Entries are pushed in order, and `pushed` is called with the slab index
+    /// of each one right after it is pushed. On error, the entries passed to
+    /// `pushed` may have reached the kernel, so the caller must cancel them to
+    /// keep their resources alive until completion. The other entries never
+    /// reached the queue.
     ///
     /// # Safety
     ///
     /// The same as for [`Handle::register_op`], for every entry.
     pub(crate) unsafe fn register_ops(
         &self,
-        entries: &[Entry],
+        mut entries: impl ExactSizeIterator<Item = Entry>,
         linked: bool,
         waker: &Waker,
-    ) -> RegisterResult<Vec<usize>> {
+        mut pushed: impl FnMut(usize),
+    ) -> io::Result<()> {
         assert!(self.uring_probe.is_some());
 
         let mut guard = self.get_uring().lock();
         let ctx = &mut *guard;
 
         if linked && entries.len() > ctx.ring_mut().submission().capacity() {
-            return RegisterResult::NotPushed(io::Error::new(
+            return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "linked operations don't fit in the io_uring submission queue",
             ));
         }
 
-        let mut index = Vec::with_capacity(entries.len());
-        while index.len() < entries.len() {
-            let rest = &entries[index.len()..];
+        while entries.len() > 0 {
             let room = {
                 let sq = ctx.ring_mut().submission();
                 sq.capacity() - sq.len()
             };
 
             // A chain must fit in one piece. A batch only needs room for one entry.
-            let needed = if linked { rest.len() } else { 1 };
+            let needed = if linked { entries.len() } else { 1 };
             if room < needed {
                 // Flush the queue to the kernel to make room.
-                if let Err(error) = ctx.submit() {
-                    return if index.is_empty() {
-                        RegisterResult::NotPushed(error)
-                    } else {
-                        RegisterResult::Pushed { index, error }
-                    };
-                }
+                ctx.submit()?;
                 continue;
             }
 
@@ -390,13 +429,18 @@ impl Handle {
                 .as_mut()
                 .expect("io_uring not initialized")
                 .submission();
-            for entry in &rest[..room.min(rest.len())] {
-                let slot = ops.insert(Lifecycle::Waiting(waker.clone()));
-                let entry = entry.clone().user_data(slot as u64);
+            for entry in entries.by_ref().take(room) {
+                // The slot is filled only once the entry is pushed, so nothing
+                // between the two can leave a slot without an entry.
+                let waker = waker.clone();
+                let slot = ops.vacant_entry();
+                let index = slot.key();
                 // SAFETY: the queue has room for this entry, and the caller keeps
                 // its parameters valid for the entire duration of the operation.
-                unsafe { sq.push(&entry) }.expect("the submission queue has room");
-                index.push(slot);
+                unsafe { sq.push(&entry.user_data(index as u64)) }
+                    .expect("the submission queue has room");
+                slot.insert(Lifecycle::Waiting(waker));
+                pushed(index);
             }
         }
 
@@ -406,12 +450,9 @@ impl Handle {
         }
 
         // The entries are pushed, so the kernel may already own the memory they
-        // point at. Keep the slots on a submit error, as `register_op` does.
-        if let Err(error) = ctx.submit() {
-            return RegisterResult::Pushed { index, error };
-        }
-
-        RegisterResult::Submitted(index)
+        // point at. The caller keeps the slots on a submit error, as
+        // `register_op` does.
+        ctx.submit()
     }
 
     pub(crate) fn cancel_op<T: Cancellable>(&self, index: usize, data: Option<T>) {

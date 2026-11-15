@@ -9,6 +9,7 @@
 ))]
 
 use std::fs::File;
+use std::future::IntoFuture;
 use std::io::{self, Write as _};
 use std::sync::Arc;
 use tokio::io::uring::{Nop, Ring};
@@ -181,6 +182,43 @@ async fn dropping_a_submitted_batch_keeps_its_operations() {
 
     // The driver keeps the dropped reads until they complete, and the ring
     // keeps working.
+    let (res,) = ring.chain(ring.nop()).await;
+    res.unwrap();
+}
+
+#[tokio::test]
+async fn always_then_then_runs_after_a_failure() {
+    let Some(ring) = ring() else { return };
+    let file = read_only_file();
+
+    let (written, second, third) = ring
+        .chain(ring.write(&file, b"x".to_vec()))
+        .always(ring.nop())
+        .then(ring.nop())
+        .await;
+
+    assert_eq!(os_error(written), libc::EBADF);
+    second.unwrap();
+    third.unwrap();
+}
+
+#[tokio::test]
+async fn dropping_a_submitted_chain_keeps_each_kind_of_operation() {
+    let Some(ring) = ring() else { return };
+    let file = file_with(&[7; 4096]);
+
+    let mut chain = task::spawn(
+        ring.chain(ring.read(&file, Vec::with_capacity(4096)).at(0))
+            .then(ring.write(&file, vec![1; 4096]).at(0))
+            .then(ring.fsync(&file))
+            .then(ring.nop())
+            .into_future(),
+    );
+    assert!(chain.poll().is_pending());
+    drop(chain);
+
+    // The driver keeps the dropped operations until they complete, and the
+    // ring keeps working.
     let (res,) = ring.chain(ring.nop()).await;
     res.unwrap();
 }

@@ -154,8 +154,8 @@ fn register_op_keeps_entry_on_submit_failure() {
     drop(broken);
 }
 
-fn nops(count: usize) -> Vec<io_uring::squeue::Entry> {
-    (0..count).map(|_| opcode::Nop::new().build()).collect()
+fn nops(count: usize) -> impl ExactSizeIterator<Item = io_uring::squeue::Entry> {
+    (0..count).map(|_| opcode::Nop::new().build())
 }
 
 // A link only reaches the next entry in the submission queue, so a chain that
@@ -168,13 +168,14 @@ fn register_ops_refuses_chain_larger_than_queue() {
     };
 
     let capacity = handle.get_uring().lock().ring_mut().submission().capacity();
+    let mut index = Vec::new();
     // SAFETY: no-op entries do not reference any buffer.
-    let res = unsafe { handle.register_ops(&nops(capacity + 1), true, Waker::noop()) };
+    let res =
+        unsafe { handle.register_ops(nops(capacity + 1), true, Waker::noop(), |i| index.push(i)) };
 
-    let RegisterResult::NotPushed(err) = res else {
-        panic!("expected NotPushed for a chain larger than the queue");
-    };
+    let err = res.expect_err("a chain larger than the queue is refused");
     assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+    assert!(index.is_empty());
     assert!(handle.get_uring().lock().ops.is_empty());
 }
 
@@ -188,34 +189,32 @@ fn register_ops_splits_batch_larger_than_queue() {
 
     let capacity = handle.get_uring().lock().ring_mut().submission().capacity();
     let count = capacity + capacity / 2;
+    let mut index = Vec::new();
     // SAFETY: no-op entries do not reference any buffer.
-    let res = unsafe { handle.register_ops(&nops(count), false, Waker::noop()) };
+    let res = unsafe { handle.register_ops(nops(count), false, Waker::noop(), |i| index.push(i)) };
 
-    let RegisterResult::Submitted(index) = res else {
-        panic!("expected Submitted for a batch larger than the queue");
-    };
+    res.expect("a batch larger than the queue is submitted");
     assert_eq!(index.len(), count);
     let ctx = handle.get_uring().lock();
     assert!(index.iter().all(|&i| ctx.ops.contains(i)));
 }
 
-// When the submit fails after the entries were pushed, the slots of the pushed
-// entries are kept, so the caller keeps their memory alive until they complete.
+// When the submit fails after the entries were pushed, every pushed entry is
+// reported, so the caller keeps their memory alive until they complete.
 #[test]
 #[cfg_attr(miri, ignore)]
-fn register_ops_keeps_pushed_entries_on_submit_failure() {
+fn register_ops_reports_pushed_entries_on_submit_failure() {
     let Some((_driver, handle)) = ready_handle() else {
         return;
     };
 
     let broken = BrokenRing::new(&handle);
 
+    let mut index = Vec::new();
     // SAFETY: no-op entries do not reference any buffer.
-    let res = unsafe { handle.register_ops(&nops(3), true, Waker::noop()) };
+    let res = unsafe { handle.register_ops(nops(3), true, Waker::noop(), |i| index.push(i)) };
 
-    let RegisterResult::Pushed { index, .. } = res else {
-        panic!("expected Pushed after a post-push submit failure");
-    };
+    res.expect_err("the submit fails after the push");
     assert_eq!(index.len(), 3);
     let ctx = handle.get_uring().lock();
     for i in index {
@@ -227,10 +226,10 @@ fn register_ops_keeps_pushed_entries_on_submit_failure() {
 }
 
 // A batch larger than the queue fills it, and then the flush fails. Only the
-// entries that were pushed keep a slot.
+// entries that were pushed are reported and keep a slot.
 #[test]
 #[cfg_attr(miri, ignore)]
-fn register_ops_keeps_only_pushed_entries_when_flush_fails() {
+fn register_ops_reports_only_pushed_entries_when_flush_fails() {
     let Some((_driver, handle)) = ready_handle() else {
         return;
     };
@@ -238,12 +237,12 @@ fn register_ops_keeps_only_pushed_entries_when_flush_fails() {
     let capacity = handle.get_uring().lock().ring_mut().submission().capacity();
     let broken = BrokenRing::new(&handle);
 
+    let mut index = Vec::new();
     // SAFETY: no-op entries do not reference any buffer.
-    let res = unsafe { handle.register_ops(&nops(capacity + 1), false, Waker::noop()) };
+    let res =
+        unsafe { handle.register_ops(nops(capacity + 1), false, Waker::noop(), |i| index.push(i)) };
 
-    let RegisterResult::Pushed { index, .. } = res else {
-        panic!("expected Pushed when the flush fails");
-    };
+    res.expect_err("the flush fails");
     assert_eq!(index.len(), capacity);
     assert_eq!(handle.get_uring().lock().ops.len(), capacity);
 
