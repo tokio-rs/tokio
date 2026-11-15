@@ -10,7 +10,8 @@ use std::os::fd::AsRawFd;
 // Builds a driver whose io_uring context is stored and registered, or returns
 // `None` when io_uring is unavailable on the host.
 fn ready_handle() -> Option<(Driver, Handle)> {
-    let (driver, handle) = Driver::new(1024, None, true).ok()?;
+    let (driver, mut handle) = Driver::new(1024, None).ok()?;
+    handle.setup_uring();
     handle.uring_probe.is_some().then_some((driver, handle))
 }
 
@@ -93,7 +94,7 @@ impl Drop for BrokenRegistry {
 #[test]
 #[cfg_attr(miri, ignore)]
 fn register_failure_disables_uring() {
-    let (_driver, handle) = Driver::new(1024, None, false).unwrap();
+    let (_driver, handle) = Driver::new(1024, None).unwrap();
     match io_uring::IoUring::new(super::DEFAULT_RING_SIZE) {
         Ok(_) => {}
         Err(err) if unsupported_uring(&err) => return,
@@ -158,7 +159,7 @@ fn driver_with_uring_sets_up_ring() {
 #[test]
 #[cfg_attr(miri, ignore)]
 fn driver_without_uring_has_no_ring() {
-    let (_driver, handle) = Driver::new(1024, None, false).unwrap();
+    let (_driver, handle) = Driver::new(1024, None).unwrap();
 
     assert!(handle.uring_probe.is_none());
     assert!(handle.get_uring().lock().uring.is_none());

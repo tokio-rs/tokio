@@ -120,41 +120,11 @@ fn _assert_kinds() {
 impl Driver {
     /// Creates a new event loop, returning any error that happened during the
     /// creation.
-    ///
-    /// If `enable_io_uring` is set, io_uring is set up as well. A failed
-    /// io_uring setup doesn't fail the driver: file system operations fall
-    /// back to the blocking thread pool instead.
-    pub(crate) fn new(
-        nevents: usize,
-        nevents_busy: Option<usize>,
-        enable_io_uring: bool,
-    ) -> io::Result<(Driver, Handle)> {
+    pub(crate) fn new(nevents: usize, nevents_busy: Option<usize>) -> io::Result<(Driver, Handle)> {
         let poll = mio::Poll::new()?;
         #[cfg(not(target_os = "wasi"))]
         let waker = mio::Waker::new(poll.registry(), TOKEN_WAKEUP)?;
         let registry = poll.registry().try_clone()?;
-
-        #[cfg(all(
-            tokio_unstable,
-            feature = "io-uring",
-            feature = "rt",
-            feature = "fs",
-            target_os = "linux",
-        ))]
-        let (uring_context, uring_probe) = if enable_io_uring {
-            UringContext::setup(&registry)
-        } else {
-            (UringContext::new(), None)
-        };
-
-        #[cfg(not(all(
-            tokio_unstable,
-            feature = "io-uring",
-            feature = "rt",
-            feature = "fs",
-            target_os = "linux",
-        )))]
-        let _ = enable_io_uring;
 
         let driver = Driver {
             signal_ready: false,
@@ -179,7 +149,7 @@ impl Driver {
                 feature = "fs",
                 target_os = "linux",
             ))]
-            uring_context: Mutex::new(uring_context),
+            uring_context: Mutex::new(UringContext::new()),
             #[cfg(all(
                 tokio_unstable,
                 feature = "io-uring",
@@ -187,7 +157,7 @@ impl Driver {
                 feature = "fs",
                 target_os = "linux",
             ))]
-            uring_probe,
+            uring_probe: None,
         };
 
         Ok((driver, handle))
@@ -310,6 +280,26 @@ impl Handle {
         self.waker.wake().expect("failed to wake I/O driver");
     }
 
+    /// Sets up io_uring for this driver. Called only when the runtime is
+    /// built with io_uring enabled.
+    ///
+    /// A failed setup leaves io_uring disabled, and file system operations
+    /// fall back to the blocking thread pool.
+    pub(crate) fn setup_uring(&mut self) {
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
+        {
+            let (context, probe) = UringContext::setup(&self.registry);
+            self.uring_context = Mutex::new(context);
+            self.uring_probe = probe;
+        }
+    }
+
     /// Registers an I/O resource with the reactor for a given `mio::Ready` state.
     ///
     /// The registration token is returned.
@@ -413,7 +403,7 @@ mod tests {
 
     #[test]
     fn busy_turn_takes_busy_batch() {
-        let (mut driver, handle) = Driver::new(16, Some(2), false).unwrap();
+        let (mut driver, handle) = Driver::new(16, Some(2)).unwrap();
         let mut sources = Vec::new();
         for _ in 0..5 {
             let (mut rx, mut tx) = mio::net::UnixStream::pair().unwrap();
