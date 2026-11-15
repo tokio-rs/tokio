@@ -53,7 +53,7 @@ pub(crate) async fn read_uring(path: &Path) -> io::Result<Vec<u8>> {
     read_to_end_uring(fd, buf).await
 }
 
-async fn read_to_end_uring(mut fd: OwnedFd, mut buf: Vec<u8>) -> io::Result<Vec<u8>> {
+pub(crate) async fn read_to_end_uring(mut fd: OwnedFd, mut buf: Vec<u8>) -> io::Result<Vec<u8>> {
     let mut offset = 0;
     let start_cap = buf.capacity();
 
