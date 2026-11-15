@@ -31,7 +31,7 @@ type ReadToEndFuture = Pin<Box<dyn Future<Output = io::Result<Vec<u8>>> + Send>>
 /// submitted to the runtime that polls the [`Submit`] future.
 ///
 /// Operations don't depend on each other: they may run in parallel and
-/// complete in any order. [`then`] and [`always`] link the last operation to
+/// complete in any order. [`link`] and [`hard_link`] link the last operation to
 /// the next one, so the next one starts only after the last one completed.
 ///
 /// An operation keeps its buffer and file descriptor until the kernel is done
@@ -45,8 +45,8 @@ type ReadToEndFuture = Pin<Box<dyn Future<Output = io::Result<Vec<u8>>> + Send>>
 /// [`nop`]: Ring::nop
 /// [`batch`]: Ring::batch
 /// [`submit`]: Ring::submit
-/// [`then`]: Ring::then
-/// [`always`]: Ring::always
+/// [`link`]: Ring::link
+/// [`hard_link`]: Ring::hard_link
 ///
 /// # Examples
 ///
@@ -84,7 +84,7 @@ type ReadToEndFuture = Pin<Box<dyn Future<Output = io::Result<Vec<u8>>> + Send>>
 ///
 /// let done = Ring::new()
 ///     .write_at(file.clone(), b"hello\n".to_vec(), 0)
-///     .then()
+///     .link()
 ///     .sync_all(file)
 ///     .submit()
 ///     .await;
@@ -201,12 +201,12 @@ impl Ring {
     /// a submission, is ignored.
     ///
     /// [`read_to_end`]: Ring::read_to_end
-    pub fn then(&mut self) -> &mut Ring {
-        self.link(Flags::IO_LINK)
+    pub fn link(&mut self) -> &mut Ring {
+        self.set_link(Flags::IO_LINK)
     }
 
-    /// Links the last operation to the next one, which then runs after the
-    /// last one even if it failed.
+    /// Hard links the last operation to the next one, which then runs after
+    /// the last one even if it failed.
     ///
     /// This only covers the last operation. If an earlier link was broken, the
     /// next one completes with an `ECANCELED` error too.
@@ -216,14 +216,14 @@ impl Ring {
     /// a submission, is ignored.
     ///
     /// [`read_to_end`]: Ring::read_to_end
-    pub fn always(&mut self) -> &mut Ring {
-        self.link(Flags::IO_HARDLINK)
+    pub fn hard_link(&mut self) -> &mut Ring {
+        self.set_link(Flags::IO_HARDLINK)
     }
 
     /// Calls `add` with each item of `items`, in order, to add its operations.
     ///
     /// The operations don't depend on each other unless `add` links them with
-    /// [`then`] or [`always`]. A link from the last operation of an item
+    /// [`link`] or [`hard_link`]. A link from the last operation of an item
     /// reaches the first operation of the next item.
     ///
     /// # Examples
@@ -256,8 +256,8 @@ impl Ring {
     /// # }
     /// ```
     ///
-    /// [`then`]: Ring::then
-    /// [`always`]: Ring::always
+    /// [`link`]: Ring::link
+    /// [`hard_link`]: Ring::hard_link
     pub fn batch<I, F>(&mut self, items: I, mut add: F) -> &mut Ring
     where
         I: IntoIterator,
@@ -321,7 +321,7 @@ impl Ring {
         self
     }
 
-    fn link(&mut self, link: Flags) -> &mut Ring {
+    fn set_link(&mut self, link: Flags) -> &mut Ring {
         if let Some(Pending::Entry { link: last, .. }) = self.ops.last_mut() {
             *last = link;
         }

@@ -168,7 +168,7 @@ async fn batch_links_across_items() {
     // failure cancels the rest.
     let done = ring
         .batch(0..3, |ring, _| {
-            ring.write_at(file.clone(), b"x".to_vec(), CURRENT).then()
+            ring.write_at(file.clone(), b"x".to_vec(), CURRENT).link()
         })
         .submit()
         .await;
@@ -247,7 +247,7 @@ async fn write_then_sync() {
 
     let [(written, buf), (synced, _)] = completions(
         ring.write_at(file.clone(), b"hello".to_vec(), 0)
-            .then()
+            .link()
             .sync_data(file.clone())
             .submit()
             .await,
@@ -263,12 +263,12 @@ async fn write_then_sync() {
 }
 
 #[tokio::test]
-async fn then_is_cancelled_after_a_failure() {
+async fn link_is_cancelled_after_a_failure() {
     let Some(mut ring) = ring().await else { return };
 
     let [(written, _), (next, _)] = completions(
         ring.write_at(read_only_file(), b"x".to_vec(), CURRENT)
-            .then()
+            .link()
             .nop()
             .submit()
             .await,
@@ -279,12 +279,12 @@ async fn then_is_cancelled_after_a_failure() {
 }
 
 #[tokio::test]
-async fn always_runs_after_a_failure() {
+async fn hard_link_runs_after_a_failure() {
     let Some(mut ring) = ring().await else { return };
 
     let [(written, _), (next, _)] = completions(
         ring.write_at(read_only_file(), b"x".to_vec(), CURRENT)
-            .always()
+            .hard_link()
             .nop()
             .submit()
             .await,
@@ -295,14 +295,14 @@ async fn always_runs_after_a_failure() {
 }
 
 #[tokio::test]
-async fn always_only_covers_the_previous_operation() {
+async fn hard_link_only_covers_the_previous_operation() {
     let Some(mut ring) = ring().await else { return };
 
     let [(written, _), (second, _), (third, _)] = completions(
         ring.write_at(read_only_file(), b"x".to_vec(), CURRENT)
-            .then()
+            .link()
             .nop()
-            .always()
+            .hard_link()
             .nop()
             .submit()
             .await,
@@ -314,14 +314,14 @@ async fn always_only_covers_the_previous_operation() {
 }
 
 #[tokio::test]
-async fn always_then_then_runs_after_a_failure() {
+async fn hard_link_then_link_runs_after_a_failure() {
     let Some(mut ring) = ring().await else { return };
 
     let [(written, _), (second, _), (third, _)] = completions(
         ring.write_at(read_only_file(), b"x".to_vec(), CURRENT)
-            .always()
+            .hard_link()
             .nop()
-            .then()
+            .link()
             .nop()
             .submit()
             .await,
@@ -339,7 +339,7 @@ async fn short_read_breaks_a_link() {
 
     let [(read, buf), (next, _)] = completions(
         ring.read_at(file, Vec::with_capacity(16), 0)
-            .then()
+            .link()
             .nop()
             .submit()
             .await,
@@ -356,7 +356,7 @@ async fn link_from_the_last_operation_is_ignored() {
 
     let [(res, _)] = completions(
         ring.write_at(read_only_file(), b"x".to_vec(), CURRENT)
-            .then()
+            .link()
             .submit()
             .await,
     );
@@ -391,11 +391,11 @@ async fn dropping_a_submitted_chain_keeps_each_kind_of_operation() {
     let file = file_with(&[7; 4096]);
 
     ring.read_at(file.clone(), Vec::with_capacity(4096), 0)
-        .then()
+        .link()
         .write_at(file.clone(), vec![1; 4096], 0)
-        .then()
+        .link()
         .sync_all(file)
-        .then()
+        .link()
         .nop();
     let mut submit = task::spawn(ring.submit());
     assert!(submit.poll().is_pending());
@@ -516,9 +516,9 @@ async fn links_to_and_from_read_to_end_are_ignored() {
 
     let [(written, _), (read, _), (next, _)] = completions(
         ring.write_at(read_only_file(), b"x".to_vec(), CURRENT)
-            .then()
+            .link()
             .read_to_end(file_with(b"abc"), Vec::new())
-            .then()
+            .link()
             .nop()
             .submit()
             .await,
