@@ -139,6 +139,59 @@ async fn reads_complete_in_order() {
 }
 
 #[tokio::test]
+async fn batch_adds_the_operations_of_each_item() {
+    let Some(mut ring) = ring().await else { return };
+    let data: Vec<u8> = (0..4u8).flat_map(|i| [i; 1024]).collect();
+    let file = file_with(&data);
+
+    let done = ring
+        .batch((0..4096).step_by(1024), |ring, offset| {
+            ring.read(file.clone(), Vec::with_capacity(1024), offset)
+        })
+        .submit()
+        .await;
+
+    let mut contents = Vec::new();
+    for (read, buf) in done {
+        assert_eq!(read.unwrap(), 1024);
+        contents.extend_from_slice(&buf.unwrap());
+    }
+    assert_eq!(contents, data);
+}
+
+#[tokio::test]
+async fn batch_links_across_items() {
+    let Some(mut ring) = ring().await else { return };
+    let file = read_only_file();
+
+    // Each item links its write to the next item's write, so the first
+    // failure cancels the rest.
+    let done = ring
+        .batch(0..3, |ring, _| {
+            ring.write(file.clone(), b"x".to_vec(), CURRENT).then()
+        })
+        .submit()
+        .await;
+
+    let [(first, _), (second, _), (third, _)] = completions(done);
+    assert_eq!(os_error(first), libc::EBADF);
+    assert_eq!(os_error(second), libc::ECANCELED);
+    assert_eq!(os_error(third), libc::ECANCELED);
+}
+
+#[tokio::test]
+async fn batch_of_no_items_adds_nothing() {
+    let Some(mut ring) = ring().await else { return };
+
+    let done = ring
+        .batch(std::iter::empty::<u64>(), |ring, _| ring.nop())
+        .submit()
+        .await;
+
+    assert!(done.is_empty());
+}
+
+#[tokio::test]
 async fn read_appends_to_buffer() {
     let Some(mut ring) = ring().await else { return };
     let file = file_with(b"world");

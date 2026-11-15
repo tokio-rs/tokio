@@ -21,7 +21,8 @@ type Completion = (io::Result<usize>, Option<Vec<u8>>);
 /// Operations to submit to the io_uring instance of a Tokio runtime.
 ///
 /// Add operations with [`read`], [`write`], [`sync_all`], [`sync_data`] and
-/// [`nop`], then submit all of them at once with [`submit`]. They are
+/// [`nop`], or one per item of an iterator with [`batch`], then submit all of
+/// them at once with [`submit`]. They are
 /// submitted to the runtime that polls the [`Submit`] future.
 ///
 /// Operations don't depend on each other: they may run in parallel and
@@ -36,6 +37,7 @@ type Completion = (io::Result<usize>, Option<Vec<u8>>);
 /// [`sync_all`]: Ring::sync_all
 /// [`sync_data`]: Ring::sync_data
 /// [`nop`]: Ring::nop
+/// [`batch`]: Ring::batch
 /// [`submit`]: Ring::submit
 /// [`then`]: Ring::then
 /// [`always`]: Ring::always
@@ -181,6 +183,58 @@ impl Ring {
     /// operation of a submission is ignored.
     pub fn always(&mut self) -> &mut Ring {
         self.link(Flags::IO_HARDLINK)
+    }
+
+    /// Calls `add` with each item of `items`, in order, to add its operations.
+    ///
+    /// The operations don't depend on each other unless `add` links them with
+    /// [`then`] or [`always`]. A link from the last operation of an item
+    /// reaches the first operation of the next item.
+    ///
+    /// # Examples
+    ///
+    /// Read a whole file in parallel chunks:
+    ///
+    /// ```no_run
+    /// use std::sync::Arc;
+    /// use tokio::io::uring::Ring;
+    ///
+    /// # async fn dox() -> std::io::Result<()> {
+    /// const CHUNK: usize = 64 * 1024;
+    ///
+    /// let file = Arc::new(std::fs::File::open("data.bin")?);
+    /// let len = file.metadata()?.len();
+    ///
+    /// let done = Ring::new()
+    ///     .batch((0..len).step_by(CHUNK), |ring, offset| {
+    ///         ring.read(file.clone(), Vec::with_capacity(CHUNK), offset)
+    ///     })
+    ///     .submit()
+    ///     .await;
+    ///
+    /// let mut contents = Vec::new();
+    /// for (read, buf) in done {
+    ///     read?;
+    ///     contents.extend_from_slice(&buf.unwrap());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// [`then`]: Ring::then
+    /// [`always`]: Ring::always
+    pub fn batch<I, F>(&mut self, items: I, mut add: F) -> &mut Ring
+    where
+        I: IntoIterator,
+        F: FnMut(&mut Ring, I::Item) -> &mut Ring,
+    {
+        let items = items.into_iter();
+        // Most callers add one operation per item.
+        self.ops.reserve(items.size_hint().0);
+        for item in items {
+            add(self, item);
+        }
+        self
     }
 
     /// Submits the operations added since the last submission, and waits until
