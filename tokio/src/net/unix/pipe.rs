@@ -1309,7 +1309,7 @@ impl Receiver {
             .try_io(Interest::READABLE, || (&*self.io).read_vectored(bufs))
     }
 
-    /// Tries to read to the socket using a user-provided IO operation.
+    /// Tries to read from the socket using a user-provided IO operation.
     ///
     /// If the socket is ready, the provided closure is called. The closure
     /// should attempt to perform IO operation on the socket by manually
