@@ -2,6 +2,8 @@
 
 use tokio::pin;
 use tokio::sync::oneshot;
+#[cfg(all(panic = "unwind", not(target_os = "wasi")))]
+use tokio::time::{timeout, Duration};
 use tokio_util::sync::{CancellationToken, WaitForCancellationFuture};
 
 use core::future::Future;
@@ -447,6 +449,96 @@ fn derives_send_sync() {
 
     assert_send::<WaitForCancellationFuture<'static>>();
     assert_sync::<WaitForCancellationFuture<'static>>();
+}
+
+#[test]
+#[cfg(all(panic = "unwind", not(target_os = "wasi")))]
+fn panic_guard_cancels_token_and_descendants() {
+    let parent = CancellationToken::new();
+    let token = parent.child_token();
+    let child = token.child_token();
+
+    let result = std::panic::catch_unwind(|| {
+        let _guard = token.clone().panic_guard();
+        panic!("worker failed");
+    });
+
+    assert!(result.is_err());
+    assert!(token.is_cancelled());
+    assert!(child.is_cancelled());
+    assert!(!parent.is_cancelled());
+}
+
+#[test]
+fn panic_guard_normal_drop_and_error_return_do_not_cancel() {
+    fn work(token: CancellationToken, result: Result<(), ()>) -> Result<(), ()> {
+        let _guard = token.panic_guard();
+        result?;
+        Ok(())
+    }
+
+    let token = CancellationToken::new();
+    let guard = token.clone().panic_guard();
+    assert_eq!(guard.token(), &token);
+    drop(guard);
+    assert!(!token.is_cancelled());
+
+    assert_eq!(work(token.clone(), Err(())), Err(()));
+    assert!(!token.is_cancelled());
+}
+
+#[test]
+#[cfg(all(panic = "unwind", not(target_os = "wasi")))]
+fn panic_guard_disarm_prevents_cancellation() {
+    let token = CancellationToken::new();
+    let disarmed = token.clone().panic_guard().disarm();
+    assert_eq!(disarmed, token);
+
+    let result = std::panic::catch_unwind(move || {
+        let _token = disarmed;
+        panic!("worker failed");
+    });
+
+    assert!(result.is_err());
+    assert!(!token.is_cancelled());
+}
+
+#[tokio::test]
+#[cfg(all(panic = "unwind", not(target_os = "wasi")))]
+async fn panic_guard_worker_panic_cancels_waiting_peer() {
+    let token = CancellationToken::new();
+    let peer_token = token.child_token();
+    let (started, ready) = oneshot::channel();
+    let peer = tokio::spawn(async move {
+        started.send(()).unwrap();
+        peer_token.cancelled().await;
+    });
+    ready.await.unwrap();
+    let guard = token.panic_guard();
+    let worker = tokio::spawn(async move {
+        let _guard = guard;
+        panic!("worker failed");
+    });
+    assert!(worker.await.unwrap_err().is_panic());
+    let result = timeout(Duration::from_secs(5), peer).await.unwrap();
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn panic_guard_worker_abort_does_not_cancel() {
+    let token = CancellationToken::new();
+    let worker_token = token.clone();
+    let (started, ready) = oneshot::channel();
+    let worker = tokio::spawn(async move {
+        let _guard = worker_token.panic_guard();
+        started.send(()).unwrap();
+        std::future::pending::<()>().await;
+    });
+    ready.await.unwrap();
+
+    worker.abort();
+    assert!(worker.await.unwrap_err().is_cancelled());
+    assert!(!token.is_cancelled());
 }
 
 #[test]

@@ -2,6 +2,7 @@
 //! The token allows to signal a cancellation request to one or more tasks.
 pub(crate) mod guard;
 pub(crate) mod guard_ref;
+pub(crate) mod panic_guard;
 mod tree_node;
 
 use crate::loom::sync::Arc;
@@ -12,6 +13,7 @@ use core::task::{Context, Poll};
 
 use guard::DropGuard;
 use guard_ref::DropGuardRef;
+use panic_guard::PanicGuard;
 use pin_project_lite::pin_project;
 
 /// A token which can be used to signal a cancellation request to one or more
@@ -282,6 +284,29 @@ impl CancellationToken {
     /// unless disarmed.
     pub fn drop_guard_ref(&self) -> DropGuardRef<'_> {
         DropGuardRef { inner: Some(self) }
+    }
+
+    /// Creates a [`PanicGuard`] for this token.
+    ///
+    /// The returned guard cancels this token (and all its children) if it is
+    /// dropped while the current thread is unwinding from a panic, unless
+    /// disarmed. Dropping the guard normally does not request cancellation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use tokio_util::sync::CancellationToken;
+    ///
+    /// let token = CancellationToken::new();
+    /// let guard = token.clone().panic_guard();
+    ///
+    /// // A panic unwinding through the guard would cancel the token.
+    /// // Dropping it normally leaves the token active.
+    /// drop(guard);
+    /// assert!(!token.is_cancelled());
+    /// ```
+    pub fn panic_guard(self) -> PanicGuard {
+        PanicGuard { inner: Some(self) }
     }
 
     /// Runs a future to completion and returns its result wrapped inside of an `Option`
