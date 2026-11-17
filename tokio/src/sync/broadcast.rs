@@ -598,7 +598,7 @@ impl<T> Sender<T> {
         });
 
         let shared = Arc::new(Shared {
-             #[cfg(loom)]
+            #[cfg(loom)]
             next_shard: AtomicUsize::new(0),
             buffer: buffer.collect(),
             mask: capacity - 1,
@@ -1712,12 +1712,9 @@ impl<'a, T> Drop for Recv<'a, T> {
         // If the waiter is queued, we need to unlink it from the waiters list.
         // If not, no further synchronization is required, since the waiter
         // is not in the list and, as such, is not shared with any other threads.
-         if queued {
-            let shard = self
-                .waiter
-                .0
-                .with(|ptr| unsafe { (*ptr).shard });
-             let mut waiters = self.receiver.shared.waiters[shard].lock();
+        if queued {
+            let shard = self.waiter.0.with(|ptr| unsafe { (*ptr).shard });
+            let mut waiters = self.receiver.shared.waiters[shard].lock();
 
             let queued = self
                 .waiter
