@@ -22,6 +22,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 cfg_io_util! {
+    use crate::net::recv;
     use bytes::BufMut;
 }
 
@@ -506,23 +507,17 @@ impl UnixStream {
         /// }
         /// ```
         pub fn try_read_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
-            self.io.registration().try_io(Interest::READABLE, || {
-                use std::io::Read;
+            // Safety: `socket2::Socket::recv` only writes initialized bytes and
+            // returns the count written into `dst`.
+            unsafe {
+                recv::try_read_buf_uninit(&self.io, buf, |dst| {
+                    self.io.try_io(|| self.as_socket().recv(dst)).map(|n| (n, n))
+                })
+            }
+        }
 
-                let dst = buf.chunk_mut();
-                let dst =
-                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
-
-                // Safety: We trust `UnixStream::read` to have filled up `n` bytes in the
-                // buffer.
-                let n = (&*self.io).read(dst)?;
-
-                unsafe {
-                    buf.advance_mut(n);
-                }
-
-                Ok(n)
-            })
+        fn as_socket(&self) -> socket2::SockRef<'_> {
+            socket2::SockRef::from(self)
         }
     }
 

@@ -36,6 +36,10 @@ cfg_not_wasip1! {
 pub use addr::ToSocketAddrs;
 
 cfg_net! {
+    cfg_not_wasip1! {
+        mod recv;
+    }
+
     mod lookup_host;
     pub use lookup_host::lookup_host;
 

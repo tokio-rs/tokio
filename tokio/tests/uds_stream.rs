@@ -17,6 +17,11 @@ use tokio_test::{assert_ok, assert_pending, assert_ready_ok, task};
 
 use futures::future::{poll_fn, try_join};
 
+mod support {
+    pub(crate) mod uninit_buf;
+}
+use support::uninit_buf::UninitBuf;
+
 #[tokio::test]
 async fn accept_read_write() -> std::io::Result<()> {
     let dir = tempfile::Builder::new()
@@ -516,5 +521,50 @@ async fn pair_starts_writable() -> io::Result<()> {
     // The peer's bytes still arrive through the normal event path.
     a.readable().await?;
     assert_eq!(a.try_read(&mut [0u8; 8])?, 2);
+    Ok(())
+}
+
+#[tokio::test]
+async fn try_read_buf_uninit_partial_and_wouldblock() -> io::Result<()> {
+    let (client, server) = UnixStream::pair()?;
+    let mut buf = UninitBuf::<32>::new(4);
+
+    assert_eq!(
+        server.try_read_buf(&mut buf).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+    assert_eq!(buf.advance_calls, 0);
+
+    let mut readable = task::spawn(server.readable());
+    assert_pending!(readable.poll());
+
+    client.writable().await?;
+    assert_eq!(client.try_write(b"abc")?, 3);
+    while !readable.is_woken() {
+        tokio::task::yield_now().await;
+    }
+    assert_ready_ok!(readable.poll());
+    assert_eq!(server.try_read_buf(&mut buf)?, 3);
+    assert_eq!(buf.initialized(), b"abc");
+
+    assert_eq!(
+        server.try_read_buf(&mut buf).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+    let calls_before = buf.advance_calls;
+
+    client.writable().await?;
+    assert_eq!(client.try_write(b"defghij")?, 7);
+    while buf.initialized().len() < 10 {
+        server.readable().await?;
+        match server.try_read_buf(&mut buf) {
+            Ok(0) => panic!("unexpected EOF"),
+            Ok(n) => assert!(n <= 4),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    assert_eq!(buf.initialized(), b"abcdefghij");
+    assert!(buf.advance_calls >= calls_before + 2);
     Ok(())
 }

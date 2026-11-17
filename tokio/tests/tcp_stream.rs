@@ -23,6 +23,11 @@ use std::task::{Context, Poll, Wake, Waker};
 #[cfg(not(target_os = "wasi"))]
 use std::time::Duration;
 
+mod support {
+    pub(crate) mod uninit_buf;
+}
+use support::uninit_buf::UninitBuf;
+
 #[tokio::test]
 #[cfg(not(target_os = "wasi"))] // WASI does not yet support `SO_LINGER`
 #[cfg_attr(miri, ignore = "Miri doesn't support `SO_LINGER`")]
@@ -489,4 +494,62 @@ async fn drop_replaced_readable_waker_outside_lock() {
     let server = Arc::new(server);
 
     check_drop_replaced_waker(&server, server.readable());
+}
+
+#[tokio::test]
+async fn uninit_read_and_peek_partial_and_wouldblock() {
+    let (mut client, server) = create_pair().await;
+
+    #[cfg(not(target_os = "wasi"))]
+    {
+        use std::mem::MaybeUninit;
+        use tokio::io::ReadBuf;
+
+        let mut raw = [MaybeUninit::<u8>::uninit(); 16];
+        let mut read = ReadBuf::uninit(&mut raw);
+        let mut peek = task::spawn(poll_fn(|cx| server.poll_peek(cx, &mut read)));
+        assert_pending!(peek.poll());
+
+        client.write_all(b"ab").await.unwrap();
+        while !peek.is_woken() {
+            tokio::task::yield_now().await;
+        }
+        let n = assert_ready_ok!(peek.poll());
+        assert!(n > 0 && n <= 2);
+        assert!(b"ab".starts_with(read.filled()));
+    }
+
+    let mut buf = UninitBuf::<32>::new(4);
+    #[cfg(target_os = "wasi")]
+    client.write_all(b"ab").await.unwrap();
+
+    while buf.initialized().len() < 2 {
+        server.readable().await.unwrap();
+        match server.try_read_buf(&mut buf) {
+            Ok(0) => panic!("unexpected EOF"),
+            Ok(_) => {}
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+            Err(e) => panic!("unexpected error: {e:?}"),
+        }
+    }
+    assert_eq!(buf.initialized(), b"ab");
+
+    assert_eq!(
+        server.try_read_buf(&mut buf).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+    let calls_before = buf.advance_calls;
+
+    client.write_all(b"cdefghi").await.unwrap();
+    while buf.initialized().len() < 9 {
+        server.readable().await.unwrap();
+        match server.try_read_buf(&mut buf) {
+            Ok(0) => panic!("unexpected EOF"),
+            Ok(n) => assert!(n <= 4),
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+            Err(e) => panic!("unexpected error: {e:?}"),
+        }
+    }
+    assert_eq!(buf.initialized(), b"abcdefghi");
+    assert!(buf.advance_calls >= calls_before + 2);
 }

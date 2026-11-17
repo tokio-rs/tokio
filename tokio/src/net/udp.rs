@@ -1,11 +1,11 @@
 use crate::io::{Interest, PollEvented, ReadBuf, Ready};
-use crate::net::{to_socket_addrs, ToSocketAddrs};
+use crate::net::{recv, to_socket_addrs, ToSocketAddrs};
 use crate::util::check_socket_for_blocking;
 
 use std::fmt;
 use std::io;
 use std::net::{self, Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll};
 
 cfg_io_util! {
     use bytes::BufMut;
@@ -818,22 +818,15 @@ impl UdpSocket {
     ///
     /// [`connect`]: method@Self::connect
     pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
-        #[allow(clippy::blocks_in_conditions)]
-        let n = ready!(self.io.registration().poll_read_io(cx, || {
-            // Safety: will not read the maybe uninitialized bytes.
-            let b = unsafe {
-                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
-            };
-
-            self.io.recv(b)
-        }))?;
-
-        // Safety: We trust `recv` to have filled up `n` bytes in the buffer.
+        // Safety: `socket2::Socket::recv` only writes initialized bytes and
+        // returns the count written into `dst`.
         unsafe {
-            buf.assume_init(n);
+            recv::poll_read_uninit(&self.io, cx, buf, |dst| {
+                self.io
+                    .try_io(|| self.as_socket().recv(dst))
+                    .map(|n| (n, ()))
+            })
         }
-        buf.advance(n);
-        Poll::Ready(Ok(()))
     }
 
     /// Tries to receive a single datagram message on the socket from the remote
@@ -943,21 +936,13 @@ impl UdpSocket {
         /// }
         /// ```
         pub fn try_recv_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
-            self.io.registration().try_io(Interest::READABLE, || {
-                let dst = buf.chunk_mut();
-                let dst =
-                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
-
-                let n = (*self.io).recv(dst)?;
-
-                // Safety: We trust `UdpSocket::recv` to have filled up `n` bytes in the
-                // buffer.
-                unsafe {
-                    buf.advance_mut(n);
-                }
-
-                Ok(n)
-            })
+            // Safety: `socket2::Socket::recv` only writes initialized bytes and
+            // returns the count written into `dst`.
+            unsafe {
+                recv::try_read_buf_uninit(&self.io, buf, |dst| {
+                    self.io.try_io(|| self.as_socket().recv(dst)).map(|n| (n, n))
+                })
+            }
         }
 
         /// Receives a single datagram message on the socket from the remote address
@@ -991,23 +976,16 @@ impl UdpSocket {
         /// }
         /// ```
         pub async fn recv_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
-            self.io
-                .registration()
-                .async_io(Interest::READABLE | Interest::ERROR, || {
-                let dst = buf.chunk_mut();
-                let dst =
-                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
-
-                let n = (*self.io).recv(dst)?;
-
-                // Safety: We trust `UdpSocket::recv` to have filled up `n` bytes in the
-                // buffer.
-                unsafe {
-                    buf.advance_mut(n);
-                }
-
-                Ok(n)
-            })
+            // Safety: `socket2::Socket::recv` only writes initialized bytes and
+            // returns the count written into `dst`.
+            unsafe {
+                recv::async_read_buf_uninit(
+                    &self.io,
+                    Interest::READABLE | Interest::ERROR,
+                    buf,
+                    |dst| self.io.try_io(|| self.as_socket().recv(dst)).map(|n| (n, n)),
+                )
+            }
             .await
         }
 
@@ -1069,21 +1047,14 @@ impl UdpSocket {
         /// }
         /// ```
         pub fn try_recv_buf_from<B: BufMut>(&self, buf: &mut B) -> io::Result<(usize, SocketAddr)> {
-            self.io.registration().try_io(Interest::READABLE, || {
-                let dst = buf.chunk_mut();
-                let dst =
-                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
-
-                let (n, addr) = (*self.io).recv_from(dst)?;
-
-                // Safety: We trust `UdpSocket::recv_from` to have filled up `n` bytes in the
-                // buffer.
-                unsafe {
-                    buf.advance_mut(n);
-                }
-
-                Ok((n, addr))
-            })
+            // Safety: `socket2::Socket::recv_from` only writes initialized bytes and
+            // returns the count written into `dst`.
+            unsafe {
+                recv::try_read_buf_uninit(&self.io, buf, |dst| {
+                    let (n, addr) = self.io.try_io(|| self.as_socket().recv_from(dst))?;
+                    Ok((n, (n, recv::sock_addr_to_std(addr)?)))
+                })
+            }
         }
 
         /// Receives a single datagram message on the socket, advancing the
@@ -1125,23 +1096,19 @@ impl UdpSocket {
         /// }
         /// ```
         pub async fn recv_buf_from<B: BufMut>(&self, buf: &mut B) -> io::Result<(usize, SocketAddr)> {
-            self.io
-                .registration()
-                .async_io(Interest::READABLE | Interest::ERROR, || {
-                let dst = buf.chunk_mut();
-                let dst =
-                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
-
-                let (n, addr) = (*self.io).recv_from(dst)?;
-
-                // Safety: We trust `UdpSocket::recv_from` to have filled up `n` bytes in the
-                // buffer.
-                unsafe {
-                    buf.advance_mut(n);
-                }
-
-                Ok((n, addr))
-            })
+            // Safety: `socket2::Socket::recv_from` only writes initialized bytes and
+            // returns the count written into `dst`.
+            unsafe {
+                recv::async_read_buf_uninit(
+                    &self.io,
+                    Interest::READABLE | Interest::ERROR,
+                    buf,
+                    |dst| {
+                        let (n, addr) = self.io.try_io(|| self.as_socket().recv_from(dst))?;
+                        Ok((n, (n, recv::sock_addr_to_std(addr)?)))
+                    },
+                )
+            }
             .await
         }
     }
@@ -1363,22 +1330,14 @@ impl UdpSocket {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<SocketAddr>> {
-        #[allow(clippy::blocks_in_conditions)]
-        let (n, addr) = ready!(self.io.registration().poll_read_io(cx, || {
-            // Safety: will not read the maybe uninitialized bytes.
-            let b = unsafe {
-                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
-            };
-
-            self.io.recv_from(b)
-        }))?;
-
-        // Safety: We trust `recv` to have filled up `n` bytes in the buffer.
+        // Safety: `socket2::Socket::recv_from` only writes initialized bytes and
+        // returns the count written into `dst`.
         unsafe {
-            buf.assume_init(n);
+            recv::poll_read_uninit(&self.io, cx, buf, |dst| {
+                let (n, addr) = self.io.try_io(|| self.as_socket().recv_from(dst))?;
+                Ok((n, recv::sock_addr_to_std(addr)?))
+            })
         }
-        buf.advance(n);
-        Poll::Ready(Ok(addr))
     }
 
     /// Tries to receive a single datagram message on the socket. On success,
@@ -1613,22 +1572,15 @@ impl UdpSocket {
     /// [`poll_peek_sender`]: method@Self::poll_peek_sender
     /// [packet injection attack]: https://en.wikipedia.org/wiki/Packet_injection
     pub fn poll_peek(&self, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
-        #[allow(clippy::blocks_in_conditions)]
-        let n = ready!(self.io.registration().poll_read_io(cx, || {
-            // Safety: will not read the maybe uninitialized bytes.
-            let b = unsafe {
-                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
-            };
-
-            self.io.peek(b)
-        }))?;
-
-        // Safety: We trust `peek` to have filled up `n` bytes in the buffer.
+        // Safety: `socket2::Socket::peek` only writes initialized bytes and
+        // returns the count written into `dst`.
         unsafe {
-            buf.assume_init(n);
+            recv::poll_read_uninit(&self.io, cx, buf, |dst| {
+                self.io
+                    .try_io(|| self.as_socket().peek(dst))
+                    .map(|n| (n, ()))
+            })
         }
-        buf.advance(n);
-        Poll::Ready(Ok(()))
     }
 
     /// Tries to receive data on the connected address without removing it from the input queue.
@@ -1762,22 +1714,14 @@ impl UdpSocket {
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<SocketAddr>> {
-        #[allow(clippy::blocks_in_conditions)]
-        let (n, addr) = ready!(self.io.registration().poll_read_io(cx, || {
-            // Safety: will not read the maybe uninitialized bytes.
-            let b = unsafe {
-                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
-            };
-
-            self.io.peek_from(b)
-        }))?;
-
-        // Safety: We trust `recv` to have filled up `n` bytes in the buffer.
+        // Safety: `socket2::Socket::peek_from` only writes initialized bytes and
+        // returns the count written into `dst`.
         unsafe {
-            buf.assume_init(n);
+            recv::poll_read_uninit(&self.io, cx, buf, |dst| {
+                let (n, addr) = self.io.try_io(|| self.as_socket().peek_from(dst))?;
+                Ok((n, recv::sock_addr_to_std(addr)?))
+            })
         }
-        buf.advance(n);
-        Poll::Ready(Ok(addr))
     }
 
     /// Tries to receive data on the socket without removing it from the input queue.

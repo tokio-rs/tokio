@@ -3,7 +3,7 @@ cfg_not_wasi! {
 }
 
 cfg_not_wasip1! {
-    use crate::net::{to_socket_addrs, ToSocketAddrs};
+    use crate::net::{recv, to_socket_addrs, ToSocketAddrs};
     use std::future::poll_fn;
 }
 
@@ -16,7 +16,9 @@ use std::fmt;
 use std::io;
 use std::net::{Shutdown, SocketAddr};
 use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+#[cfg(all(target_os = "wasi", target_env = "p1"))]
+use std::task::ready;
+use std::task::{Context, Poll};
 
 cfg_io_util! {
     use bytes::BufMut;
@@ -166,6 +168,12 @@ impl TcpStream {
     pub(crate) fn new(connected: mio::net::TcpStream) -> io::Result<TcpStream> {
         let io = PollEvented::new(connected)?;
         Ok(TcpStream { io })
+    }
+
+    cfg_not_wasip1! {
+        fn as_socket(&self) -> socket2::SockRef<'_> {
+            socket2::SockRef::from(self)
+        }
     }
 
     /// A stream returned by `accept`: assumed readable and writable, so that
@@ -381,6 +389,31 @@ impl TcpStream {
     /// }
     /// ```
     pub fn poll_peek(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<usize>> {
+        self.poll_peek_inner(cx, buf)
+    }
+
+    cfg_not_wasip1! {
+        fn poll_peek_inner(
+            &self,
+            cx: &mut Context<'_>,
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<usize>> {
+            // Safety: `socket2::Socket::peek` only writes initialized bytes and
+            // returns the count written into `dst`.
+            unsafe {
+                recv::poll_read_uninit(&self.io, cx, buf, |dst| {
+                    self.io.try_io(|| self.as_socket().peek(dst)).map(|n| (n, n))
+                })
+            }
+        }
+    }
+
+    #[cfg(all(target_os = "wasi", target_env = "p1"))]
+    fn poll_peek_inner(
         &self,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
@@ -780,6 +813,23 @@ impl TcpStream {
         /// }
         /// ```
         pub fn try_read_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
+            self.try_read_buf_inner(buf)
+        }
+
+        cfg_not_wasip1! {
+            fn try_read_buf_inner<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
+                // Safety: `socket2::Socket::recv` only writes initialized bytes and
+                // returns the count written into `dst`.
+                unsafe {
+                    recv::try_read_buf_uninit(&self.io, buf, |dst| {
+                        self.io.try_io(|| self.as_socket().recv(dst)).map(|n| (n, n))
+                    })
+                }
+            }
+        }
+
+        #[cfg(all(target_os = "wasi", target_env = "p1"))]
+        fn try_read_buf_inner<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
             self.io.registration().try_io(Interest::READABLE, || {
                 use std::io::Read;
 

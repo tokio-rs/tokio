@@ -1,4 +1,5 @@
 use crate::io::{Interest, PollEvented, ReadBuf, Ready};
+use crate::net::recv;
 use crate::net::unix::SocketAddr;
 use crate::util::check_socket_for_blocking;
 
@@ -997,21 +998,13 @@ impl UnixDatagram {
         /// }
         /// ```
         pub fn try_recv_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
-            self.io.registration().try_io(Interest::READABLE, || {
-                let dst = buf.chunk_mut();
-                let dst =
-                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
-
-                // Safety: We trust `UnixDatagram::recv` to have filled up `n` bytes in the
-                // buffer.
-                let n = (*self.io).recv(dst)?;
-
-                unsafe {
-                    buf.advance_mut(n);
-                }
-
-                Ok(n)
-            })
+            // Safety: `socket2::Socket::recv` only writes initialized bytes and
+            // returns the count written into `dst`.
+            unsafe {
+                recv::try_read_buf_uninit(&self.io, buf, |dst| {
+                    self.io.try_io(|| self.as_socket().recv(dst)).map(|n| (n, n))
+                })
+            }
         }
 
         /// Receives data from the socket from the address to which it is connected,
@@ -1045,20 +1038,14 @@ impl UnixDatagram {
         /// # }
         /// ```
         pub async fn recv_buf<B: BufMut>(&self, buf: &mut B) -> io::Result<usize> {
-            self.io.registration().async_io(Interest::READABLE, || {
-                let dst = buf.chunk_mut();
-                let dst =
-                    unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
-
-                // Safety: We trust `UnixDatagram::recv_from` to have filled up `n` bytes in the
-                // buffer.
-                let n = (*self.io).recv(dst)?;
-
-                unsafe {
-                    buf.advance_mut(n);
-                }
-                Ok(n)
-            }).await
+            // Safety: `socket2::Socket::recv` only writes initialized bytes and
+            // returns the count written into `dst`.
+            unsafe {
+                recv::async_read_buf_uninit(&self.io, Interest::READABLE, buf, |dst| {
+                    self.io.try_io(|| self.as_socket().recv(dst)).map(|n| (n, n))
+                })
+            }
+            .await
         }
     }
 
@@ -1287,22 +1274,19 @@ impl UnixDatagram {
     ///
     /// [`connect`]: method@Self::connect
     pub fn poll_recv(&self, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
-        #[allow(clippy::blocks_in_conditions)]
-        let n = ready!(self.io.registration().poll_read_io(cx, || {
-            // Safety: will not read the maybe uninitialized bytes.
-            let b = unsafe {
-                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
-            };
-
-            self.io.recv(b)
-        }))?;
-
-        // Safety: We trust `recv` to have filled up `n` bytes in the buffer.
+        // Safety: `socket2::Socket::recv` only writes initialized bytes and
+        // returns the count written into `dst`.
         unsafe {
-            buf.assume_init(n);
+            recv::poll_read_uninit(&self.io, cx, buf, |dst| {
+                self.io
+                    .try_io(|| self.as_socket().recv(dst))
+                    .map(|n| (n, ()))
+            })
         }
-        buf.advance(n);
-        Poll::Ready(Ok(()))
+    }
+
+    fn as_socket(&self) -> socket2::SockRef<'_> {
+        socket2::SockRef::from(self)
     }
 
     /// Tries to receive data from the socket without waiting.

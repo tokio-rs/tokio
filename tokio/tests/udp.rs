@@ -17,6 +17,11 @@ use std::time::Duration;
 use tokio::{io::ReadBuf, net::UdpSocket, time};
 use tokio_test::assert_ok;
 
+mod support {
+    pub(crate) mod uninit_buf;
+}
+use support::uninit_buf::UninitBuf;
+
 const MSG: &[u8] = b"hello";
 const MSG_LEN: usize = MSG.len();
 
@@ -772,3 +777,123 @@ test!(IPv4 ttl, set_ttl(40));
     target_os = "wasi"
 )))]
 test!(IPv4 tos_v4, set_tos_v4(96));
+
+#[tokio::test]
+async fn recv_and_peek_uninit_partial_and_wouldblock() -> io::Result<()> {
+    use std::mem::MaybeUninit;
+    use tokio_test::{assert_pending, assert_ready_ok, task};
+
+    // Connected path: poll_peek, poll_recv, try_recv_buf, recv_buf.
+    {
+        let sender = UdpSocket::bind("127.0.0.1:0").await?;
+        let receiver = UdpSocket::bind("127.0.0.1:0").await?;
+        sender.connect(receiver.local_addr()?).await?;
+        receiver.connect(sender.local_addr()?).await?;
+
+        let mut raw = [MaybeUninit::<u8>::uninit(); 16];
+        let mut peek_read = ReadBuf::uninit(&mut raw);
+        let mut fut = task::spawn(poll_fn(|cx| receiver.poll_peek(cx, &mut peek_read)));
+        assert_pending!(fut.poll());
+
+        sender.send(b"peek").await?;
+        while !fut.is_woken() {
+            tokio::task::yield_now().await;
+        }
+        assert_ready_ok!(fut.poll());
+        assert_eq!(peek_read.filled(), b"peek");
+
+        let mut raw = [MaybeUninit::<u8>::uninit(); 16];
+        let mut read = ReadBuf::uninit(&mut raw);
+        poll_fn(|cx| receiver.poll_recv(cx, &mut read)).await?;
+        assert_eq!(read.filled(), b"peek");
+
+        let mut raw = [MaybeUninit::<u8>::uninit(); 16];
+        let mut read = ReadBuf::uninit(&mut raw);
+        let mut fut = task::spawn(poll_fn(|cx| receiver.poll_recv(cx, &mut read)));
+        assert_pending!(fut.poll());
+        sender.send(b"ab").await?;
+        while !fut.is_woken() {
+            tokio::task::yield_now().await;
+        }
+        assert_ready_ok!(fut.poll());
+        assert_eq!(read.filled(), b"ab");
+
+        let mut custom = UninitBuf::<16>::new(16);
+        assert_eq!(
+            receiver.try_recv_buf(&mut custom).unwrap_err().kind(),
+            io::ErrorKind::WouldBlock
+        );
+        assert_eq!(custom.advance_calls, 0);
+
+        sender.send(b"cde").await?;
+        loop {
+            receiver.readable().await?;
+            match receiver.try_recv_buf(&mut custom) {
+                Ok(n) => {
+                    assert_eq!(n, 3);
+                    break;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => return Err(e),
+            }
+        }
+        assert_eq!(custom.initialized(), b"cde");
+
+        sender.send(b"fg").await?;
+        assert_eq!(receiver.recv_buf(&mut custom).await?, 2);
+        assert_eq!(custom.initialized(), b"cdefg");
+    }
+
+    // Unconnected path: poll_peek_from, poll_recv_from, try_recv_buf_from, recv_buf_from.
+    {
+        let sender = UdpSocket::bind("127.0.0.1:0").await?;
+        let receiver = UdpSocket::bind("127.0.0.1:0").await?;
+        let sender_addr = sender.local_addr()?;
+        let receiver_addr = receiver.local_addr()?;
+
+        let mut custom = UninitBuf::<16>::new(16);
+        assert_eq!(
+            receiver.try_recv_buf_from(&mut custom).unwrap_err().kind(),
+            io::ErrorKind::WouldBlock
+        );
+
+        sender.send_to(b"xy", receiver_addr).await?;
+        let mut raw_peek = [MaybeUninit::<u8>::uninit(); 16];
+        let mut peek_read = ReadBuf::uninit(&mut raw_peek);
+        assert_eq!(
+            poll_fn(|cx| receiver.poll_peek_from(cx, &mut peek_read)).await?,
+            sender_addr
+        );
+        assert_eq!(peek_read.filled(), b"xy");
+
+        let mut raw_recv = [MaybeUninit::<u8>::uninit(); 16];
+        let mut recv_read = ReadBuf::uninit(&mut raw_recv);
+        assert_eq!(
+            poll_fn(|cx| receiver.poll_recv_from(cx, &mut recv_read)).await?,
+            sender_addr
+        );
+        assert_eq!(recv_read.filled(), b"xy");
+
+        sender.send_to(b"123", receiver_addr).await?;
+        let n = loop {
+            receiver.readable().await?;
+            match receiver.try_recv_buf_from(&mut custom) {
+                Ok((n, addr)) => {
+                    assert_eq!(addr, sender_addr);
+                    break n;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(e) => return Err(e),
+            }
+        };
+        assert_eq!(n, 3);
+        assert_eq!(custom.initialized(), b"123");
+
+        sender.send_to(b"45", receiver_addr).await?;
+        let (n, addr) = receiver.recv_buf_from(&mut custom).await?;
+        assert_eq!((n, addr), (2, sender_addr));
+        assert_eq!(custom.initialized(), b"12345");
+    }
+
+    Ok(())
+}

@@ -11,6 +11,11 @@ use std::io;
 use std::sync::Arc;
 use std::task::Poll;
 
+mod support {
+    pub(crate) mod uninit_buf;
+}
+use support::uninit_buf::UninitBuf;
+
 async fn echo_server(socket: UnixDatagram) -> io::Result<()> {
     let mut recv_buf = vec![0u8; 1024];
     loop {
@@ -453,5 +458,52 @@ async fn pair_starts_writable() -> io::Result<()> {
     let mut buf = [0u8; 8];
     assert_eq!(a.try_recv(&mut buf)?, 2);
     assert_eq!(&buf[..2], b"yo");
+    Ok(())
+}
+
+#[tokio::test]
+#[cfg_attr(miri, ignore)] // No SOCK_DGRAM for `socketpair` in miri.
+async fn recv_uninit_partial_and_wouldblock() -> io::Result<()> {
+    use std::mem::MaybeUninit;
+    use tokio_test::{assert_pending, assert_ready_ok, task};
+
+    let (tx, rx) = UnixDatagram::pair()?;
+
+    let mut raw = [MaybeUninit::<u8>::uninit(); 16];
+    let mut read = ReadBuf::uninit(&mut raw);
+    let mut fut = task::spawn(poll_fn(|cx| rx.poll_recv(cx, &mut read)));
+    assert_pending!(fut.poll());
+
+    tx.send(b"abc").await?;
+    while !fut.is_woken() {
+        tokio::task::yield_now().await;
+    }
+    assert_ready_ok!(fut.poll());
+    assert_eq!(read.filled(), b"abc");
+
+    let mut custom = UninitBuf::<16>::new(16);
+    assert_eq!(
+        rx.try_recv_buf(&mut custom).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+    assert_eq!(custom.advance_calls, 0);
+
+    tx.send(b"defg").await?;
+    loop {
+        rx.readable().await?;
+        match rx.try_recv_buf(&mut custom) {
+            Ok(n) => {
+                assert_eq!(n, 4);
+                break;
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    assert_eq!(custom.initialized(), b"defg");
+
+    tx.send(b"hi").await?;
+    assert_eq!(rx.recv_buf(&mut custom).await?, 2);
+    assert_eq!(custom.initialized(), b"defghi");
     Ok(())
 }
