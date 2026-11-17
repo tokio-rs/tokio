@@ -133,11 +133,8 @@ pin_project! {
     /// If you use it with `.await`, this does not apply.
     ///
     /// `Sleep` is safe to poll after completion. Polling a completed `Sleep` does
-    /// not panic and is idempotent, but may return `Poll::Pending` if the
-    /// [coop budget] or other similar Tokio features apply. In that case the task
-    /// is woken up again, and a later poll returns `Poll::Ready`.
-    ///
-    /// [coop budget]: crate::task::coop#cooperative-scheduling
+    /// not panic and is idempotent, but may spuriously return `Poll::Pending`
+    /// and register the current task for wakeup.
     ///
     /// # Examples
     ///

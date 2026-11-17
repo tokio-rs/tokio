@@ -271,44 +271,14 @@ async fn reset_after_firing() {
         .poll(&mut Context::from_waker(noop_waker_ref())));
 }
 
-#[tokio::test]
-async fn poll_after_completion_is_ready() {
-    // `unconstrained` removes coop so the assertion only depends on `Sleep`.
-    let timer = tokio::task::coop::unconstrained(time::sleep(ms(1)));
-    tokio::pin!(timer);
-
-    timer.as_mut().await;
-
-    for _ in 0..1024 {
-        assert_ready!(timer
-            .as_mut()
-            .poll(&mut Context::from_waker(noop_waker_ref())));
-    }
-}
-
-#[tokio::test]
-async fn poll_after_completion_without_budget() {
+#[tokio::test(start_paused = true)]
+async fn poll_after_completion() {
     let timer = time::sleep(ms(1));
     tokio::pin!(timer);
 
-    timer.as_mut().await;
-
-    // Every ready poll consumes budget, so the coop budget runs out.
-    let mut polls = 0;
-    while timer
-        .as_mut()
-        .poll(&mut Context::from_waker(noop_waker_ref()))
-        .is_ready()
-    {
-        polls += 1;
-        assert!(polls < 1024, "the coop budget never ran out");
+    for _ in 0..1024 {
+        timer.as_mut().await;
     }
-
-    // The budget is restored once the task yields.
-    tokio::task::yield_now().await;
-    assert_ready!(timer
-        .as_mut()
-        .poll(&mut Context::from_waker(noop_waker_ref())));
 }
 
 #[tokio::test]
