@@ -374,8 +374,13 @@ const NUM_WAITER_SHARDS: usize = 8;
 
 #[inline]
 fn waiter_shard(ptr: *const Waiter) -> usize {
+    #[cfg(target_pointer_width = "64")]
+    const GOLDEN_RATIO: usize = 0x9e37_79b9_7f4a_7c15;
+    #[cfg(not(target_pointer_width = "64"))]
+    const GOLDEN_RATIO: usize = 0x9e37_79b9;
+
     let addr = ptr as usize;
-    let hash = addr.wrapping_mul(0x9e37_79b9_7f4a_7c15_usize.wrapping_add(1));
+    let hash = addr.wrapping_mul(GOLDEN_RATIO);
     hash >> (usize::BITS - NUM_WAITER_SHARDS.ilog2())
 }
 
