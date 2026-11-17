@@ -779,33 +779,16 @@ test!(IPv4 ttl, set_ttl(40));
 test!(IPv4 tos_v4, set_tos_v4(96));
 
 #[tokio::test]
-async fn recv_and_peek_uninit_partial_and_wouldblock() -> io::Result<()> {
+async fn recv_uninit_partial_and_wouldblock() -> io::Result<()> {
     use std::mem::MaybeUninit;
     use tokio_test::{assert_pending, assert_ready_ok, task};
 
-    // Connected path: poll_peek, poll_recv, try_recv_buf, recv_buf.
+    // Connected path: poll_recv, try_recv_buf, recv_buf.
     {
         let sender = UdpSocket::bind("127.0.0.1:0").await?;
         let receiver = UdpSocket::bind("127.0.0.1:0").await?;
         sender.connect(receiver.local_addr()?).await?;
         receiver.connect(sender.local_addr()?).await?;
-
-        let mut raw = [MaybeUninit::<u8>::uninit(); 16];
-        let mut peek_read = ReadBuf::uninit(&mut raw);
-        let mut fut = task::spawn(poll_fn(|cx| receiver.poll_peek(cx, &mut peek_read)));
-        assert_pending!(fut.poll());
-
-        sender.send(b"peek").await?;
-        while !fut.is_woken() {
-            tokio::task::yield_now().await;
-        }
-        assert_ready_ok!(fut.poll());
-        assert_eq!(peek_read.filled(), b"peek");
-
-        let mut raw = [MaybeUninit::<u8>::uninit(); 16];
-        let mut read = ReadBuf::uninit(&mut raw);
-        poll_fn(|cx| receiver.poll_recv(cx, &mut read)).await?;
-        assert_eq!(read.filled(), b"peek");
 
         let mut raw = [MaybeUninit::<u8>::uninit(); 16];
         let mut read = ReadBuf::uninit(&mut raw);
@@ -844,7 +827,7 @@ async fn recv_and_peek_uninit_partial_and_wouldblock() -> io::Result<()> {
         assert_eq!(custom.initialized(), b"cdefg");
     }
 
-    // Unconnected path: poll_peek_from, poll_recv_from, try_recv_buf_from, recv_buf_from.
+    // Unconnected path: poll_recv_from, try_recv_buf_from, recv_buf_from.
     {
         let sender = UdpSocket::bind("127.0.0.1:0").await?;
         let receiver = UdpSocket::bind("127.0.0.1:0").await?;
@@ -858,14 +841,6 @@ async fn recv_and_peek_uninit_partial_and_wouldblock() -> io::Result<()> {
         );
 
         sender.send_to(b"xy", receiver_addr).await?;
-        let mut raw_peek = [MaybeUninit::<u8>::uninit(); 16];
-        let mut peek_read = ReadBuf::uninit(&mut raw_peek);
-        assert_eq!(
-            poll_fn(|cx| receiver.poll_peek_from(cx, &mut peek_read)).await?,
-            sender_addr
-        );
-        assert_eq!(peek_read.filled(), b"xy");
-
         let mut raw_recv = [MaybeUninit::<u8>::uninit(); 16];
         let mut recv_read = ReadBuf::uninit(&mut raw_recv);
         assert_eq!(
@@ -893,6 +868,65 @@ async fn recv_and_peek_uninit_partial_and_wouldblock() -> io::Result<()> {
         let (n, addr) = receiver.recv_buf_from(&mut custom).await?;
         assert_eq!((n, addr), (2, sender_addr));
         assert_eq!(custom.initialized(), b"12345");
+    }
+
+    Ok(())
+}
+
+#[cfg_attr(target_os = "wasi", ignore = "WASI does not yet support peeking")]
+#[tokio::test]
+async fn peek_uninit_partial_and_wouldblock() -> io::Result<()> {
+    use std::mem::MaybeUninit;
+    use tokio_test::{assert_pending, assert_ready_ok, task};
+
+    // Connected path: poll_peek + draining poll_recv.
+    {
+        let sender = UdpSocket::bind("127.0.0.1:0").await?;
+        let receiver = UdpSocket::bind("127.0.0.1:0").await?;
+        sender.connect(receiver.local_addr()?).await?;
+        receiver.connect(sender.local_addr()?).await?;
+
+        let mut raw = [MaybeUninit::<u8>::uninit(); 16];
+        let mut peek_read = ReadBuf::uninit(&mut raw);
+        let mut fut = task::spawn(poll_fn(|cx| receiver.poll_peek(cx, &mut peek_read)));
+        assert_pending!(fut.poll());
+
+        sender.send(b"peek").await?;
+        while !fut.is_woken() {
+            tokio::task::yield_now().await;
+        }
+        assert_ready_ok!(fut.poll());
+        assert_eq!(peek_read.filled(), b"peek");
+
+        let mut raw = [MaybeUninit::<u8>::uninit(); 16];
+        let mut read = ReadBuf::uninit(&mut raw);
+        poll_fn(|cx| receiver.poll_recv(cx, &mut read)).await?;
+        assert_eq!(read.filled(), b"peek");
+    }
+
+    // Unconnected path: poll_peek_from + draining poll_recv_from.
+    {
+        let sender = UdpSocket::bind("127.0.0.1:0").await?;
+        let receiver = UdpSocket::bind("127.0.0.1:0").await?;
+        let sender_addr = sender.local_addr()?;
+        let receiver_addr = receiver.local_addr()?;
+
+        sender.send_to(b"xy", receiver_addr).await?;
+        let mut raw_peek = [MaybeUninit::<u8>::uninit(); 16];
+        let mut peek_read = ReadBuf::uninit(&mut raw_peek);
+        assert_eq!(
+            poll_fn(|cx| receiver.poll_peek_from(cx, &mut peek_read)).await?,
+            sender_addr
+        );
+        assert_eq!(peek_read.filled(), b"xy");
+
+        let mut raw_recv = [MaybeUninit::<u8>::uninit(); 16];
+        let mut recv_read = ReadBuf::uninit(&mut raw_recv);
+        assert_eq!(
+            poll_fn(|cx| receiver.poll_recv_from(cx, &mut recv_read)).await?,
+            sender_addr
+        );
+        assert_eq!(recv_read.filled(), b"xy");
     }
 
     Ok(())
