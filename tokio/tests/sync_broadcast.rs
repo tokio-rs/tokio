@@ -999,3 +999,53 @@ fn receiver_len_after_lag_error_advances_cursor() {
     assert_eq!(assert_recv!(rx), 4);
     assert_eq!(rx.len(), 0);
 }
+#[test]
+fn high_contention_sharded_waiters_and_cancellation() {
+    const NUM_RECEIVERS: usize = 64;
+    const NUM_MESSAGES: usize = 200;
+
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .enable_time()
+        .build()
+        .unwrap();
+
+    rt.block_on(async {
+        let (tx, _rx) = broadcast::channel::<usize>(NUM_MESSAGES);
+        let mut handles = Vec::with_capacity(NUM_RECEIVERS);
+
+        for i in 0..NUM_RECEIVERS {
+            let mut rx = tx.subscribe();
+            handles.push(tokio::spawn(async move {
+                let mut received = 0;
+                while received < NUM_MESSAGES {
+                    if i % 2 == 0 && received % 5 == 0 {
+                        // Exercise `Recv::drop` unlinking from sharded waiter lists.
+                        if let Ok(Ok(val)) =
+                            tokio::time::timeout(std::time::Duration::from_nanos(1), rx.recv())
+                                .await
+                        {
+                            assert_eq!(val, received);
+                            received += 1;
+                            continue;
+                        }
+                    }
+                    if let Ok(val) = rx.recv().await {
+                        assert_eq!(val, received);
+                        received += 1;
+                    }
+                }
+            }));
+        }
+
+        tokio::task::yield_now().await;
+
+        for msg in 0..NUM_MESSAGES {
+            tx.send(msg).unwrap();
+        }
+
+        for handle in handles {
+            handle.await.unwrap();
+        }
+    });
+}
