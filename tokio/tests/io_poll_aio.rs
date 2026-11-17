@@ -18,7 +18,7 @@ mod aio {
     use super::*;
 
     #[derive(Debug)]
-    struct TokioSource<'fd>(mio_aio::Source<nix::sys::aio::AioFsync<'fd>>);
+    struct TokioSource<'fd>(mio_aio::Fsync<'fd>);
 
     impl<'fd> AioSource for TokioSource<'fd> {
         fn register(&mut self, kq: RawFd, token: usize) {
