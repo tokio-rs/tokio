@@ -371,13 +371,8 @@ impl Sleep {
         }
     }
 
-    /// Resets the `Sleep` instance to a new deadline.
-    ///
-    /// Unlike [`reset`][Self::reset], this __removes__ the internal timer.
-    pub(super) fn reset_without_timer(self: Pin<&mut Self>, deadline: Instant) {
-        let mut this = self.project();
-        *this.deadline = deadline;
-        this.timer.set(None);
+    pub(super) fn set_deadline(self: Pin<&mut Self>, deadline: Instant) {
+        *self.project().deadline = deadline;
     }
 
     fn poll_elapsed(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Result<(), Error>> {
