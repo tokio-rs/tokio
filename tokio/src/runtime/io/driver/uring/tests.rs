@@ -138,7 +138,7 @@ fn register_op_keeps_entry_on_submit_failure() {
 
     let entry = opcode::Nop::new().build();
     // SAFETY: the no-op entry does not reference any buffer.
-    let res = unsafe { handle.register_op(entry, futures::task::noop_waker()) };
+    let res = unsafe { handle.register_op(entry, futures::task::noop_waker(), |_| {}) };
 
     // The entry was pushed before the submit failed, so the slot is kept and its
     // index handed back for the caller to cancel.
@@ -151,4 +151,73 @@ fn register_op_keeps_entry_on_submit_failure() {
     ));
 
     drop(broken);
+}
+
+// If a completion waker panics after the new SQE is pushed, the caller must
+// already have been told the slab index so `Op::drop` can cancel the op
+// instead of freeing its buffer while the kernel still holds it.
+#[cfg(panic = "unwind")]
+#[test]
+#[cfg_attr(miri, ignore)]
+fn register_op_records_index_before_completion_waker_panic() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use std::task::{Wake, Waker};
+
+    struct PanicWaker;
+
+    impl Wake for PanicWaker {
+        fn wake(self: Arc<Self>) {
+            panic!("completion waker panic");
+        }
+
+        fn wake_by_ref(self: &Arc<Self>) {
+            panic!("completion waker panic");
+        }
+    }
+
+    let Some((_driver, handle)) = ready_handle() else {
+        return;
+    };
+
+    let panic_waker = Waker::from(Arc::new(PanicWaker));
+    for i in 0..512 {
+        let w = if i == 0 {
+            panic_waker.clone()
+        } else {
+            futures::task::noop_waker()
+        };
+        // SAFETY: NOP entries do not reference a buffer.
+        unsafe { handle.register_op(opcode::Nop::new().build(), w, |_| {}) };
+    }
+
+    let recorded = Arc::new(AtomicUsize::new(usize::MAX));
+    let recorded_cb = recorded.clone();
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
+        handle.register_op(
+            opcode::Nop::new().build(),
+            futures::task::noop_waker(),
+            |idx| {
+                recorded_cb.store(idx, Ordering::SeqCst);
+            },
+        )
+    }));
+
+    assert!(
+        res.is_err(),
+        "expected the completion waker to panic during registration"
+    );
+    let idx = recorded.load(Ordering::SeqCst);
+    assert_ne!(
+        idx,
+        usize::MAX,
+        "slab index must be recorded before a completion waker panics"
+    );
+    assert!(
+        matches!(
+            handle.get_uring().lock().ops.get(idx),
+            Some(Lifecycle::Waiting(_))
+        ),
+        "in-flight slot was dropped after the waker panic"
+    );
 }
