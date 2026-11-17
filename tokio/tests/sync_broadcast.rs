@@ -999,7 +999,9 @@ fn receiver_len_after_lag_error_advances_cursor() {
     assert_eq!(assert_recv!(rx), 4);
     assert_eq!(rx.len(), 0);
 }
+
 #[test]
+#[cfg(all(feature = "rt-multi-thread", not(target_os = "wasi")))]
 fn high_contention_sharded_waiters_and_cancellation() {
     const NUM_RECEIVERS: usize = 64;
     const NUM_MESSAGES: usize = 200;
