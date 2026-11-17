@@ -200,23 +200,37 @@ impl<T> Timeout<T> {
         self.value
     }
 
-    /// Returns the instant at which the future will time out, if the
-    /// deadline could be represented as an [`Instant`].
+    /// Returns the instant at which the future will time out.
     ///
     /// This mirrors [`Sleep::deadline`], since `Timeout` is backed by a
     /// `Sleep` internally. This is useful for introspecting the remaining
     /// time on a timeout, e.g. for logging or metrics.
     ///
-    /// Returns `None` only in the case where [`timeout`] was used
-    /// to construct this `Timeout` and `Instant::now() + duration` overflowed
-    /// the range that [`Instant`] can represent. [`timeout_at`]
-    /// always produces a `Some` deadline, since it is given the `Instant`
-    /// directly.
+    /// If this `Timeout` was constructed via [`timeout`] and
+    /// `Instant::now() + duration` overflowed the range that [`Instant`] can
+    /// represent, there is no `Sleep` driving this `Timeout` and it never
+    /// naturally elapses on its own. In that case this returns a deadline far
+    /// enough in the future to be effectively unreachable, rather than
+    /// requiring every caller to handle a missing deadline. [`timeout_at`]
+    /// never hits this case, since it is given the `Instant` directly.
     ///
     /// [`Sleep::deadline`]: crate::time::Sleep::deadline
-    pub fn deadline(&self) -> Option<Instant> {
-        self.delay.as_ref().map(Sleep::deadline)
+    pub fn deadline(&self) -> Instant {
+        match self.delay {
+            Some(ref delay) => delay.deadline(),
+            None => far_future(),
+        }
     }
+}
+
+/// Returns a deadline far enough in the future that, for all practical
+/// purposes, it will never be reached. Used as the deadline for a `Timeout`
+/// whose duration overflowed `Instant`'s representable range when it was
+/// constructed, so it has no underlying `Sleep` to report a real one from.
+fn far_future() -> Instant {
+    // 30 years is far longer than any realistic timeout duration, and well
+    // short of overflowing `Instant` when added to the current time.
+    Instant::now() + Duration::from_secs(86400 * 365 * 30)
 }
 
 impl<T> Future for Timeout<T>
