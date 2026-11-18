@@ -406,7 +406,7 @@ impl Context {
     /// Blocks the current thread until an event is received by the driver,
     /// including I/O events, timer events, ...
     fn park(&self, mut core: Box<Core>, handle: &Handle) -> Box<Core> {
-        let mut driver = core.driver.take().expect("driver missing");
+        let mut guard = DriverGuard::new(&self.core, core.driver.take().expect("driver missing"));
 
         if let Some(f) = &handle.shared.config.before_park {
             let (c, ()) = self.enter(core, || f());
@@ -418,7 +418,7 @@ impl Context {
             core.metrics.about_to_park();
             core.submit_metrics(handle);
 
-            core = self.park_internal(core, handle, &mut driver, None);
+            core = self.park_internal(core, handle, guard.driver(), None);
 
             core.metrics.unparked();
             core.submit_metrics(handle);
@@ -430,7 +430,7 @@ impl Context {
             // <https://github.com/tokio-rs/tokio/issues/8212>.
             core.submit_metrics(handle);
 
-            core = self.park_internal(core, handle, &mut driver, Some(Duration::from_millis(0)));
+            core = self.park_internal(core, handle, guard.driver(), Some(Duration::from_millis(0)));
         }
 
         if let Some(f) = &handle.shared.config.after_unpark {
@@ -438,19 +438,19 @@ impl Context {
             core = c;
         }
 
-        core.driver = Some(driver);
+        guard.restore(&mut core);
         core
     }
 
     /// Checks the driver for new events without blocking the thread.
     fn park_yield(&self, mut core: Box<Core>, handle: &Handle) -> Box<Core> {
-        let mut driver = core.driver.take().expect("driver missing");
+        let mut guard = DriverGuard::new(&self.core, core.driver.take().expect("driver missing"));
 
         core.submit_metrics(handle);
 
-        core = self.park_internal(core, handle, &mut driver, Some(Duration::from_millis(0)));
+        core = self.park_internal(core, handle, guard.driver(), Some(Duration::from_millis(0)));
 
-        core.driver = Some(driver);
+        guard.restore(&mut core);
         core
     }
 
@@ -805,6 +805,58 @@ impl Wake for Handle {
                     arc_self.driver.unpark();
                 }
             });
+        }
+    }
+}
+
+// ===== DriverGuard =====
+
+/// Puts the driver back into the core if parking unwinds.
+///
+/// `park` and `park_yield` move the driver out of the core so it can run while
+/// the core itself is stored in the scheduler context. The driver is only put
+/// back on the normal return path, so a panicking waker (for example a timer
+/// waking a foreign waker) dropped it during unwinding. `CoreGuard` still
+/// returns the core to `CurrentThread`, but with `driver: None`, and every
+/// later `block_on` then panics with "driver missing".
+///
+/// This guard holds the driver while the core is parked and hands it back to
+/// the core on unwind, so the runtime stays usable.
+struct DriverGuard<'a> {
+    core: &'a RefCell<Option<Box<Core>>>,
+    driver: Option<Driver>,
+}
+
+impl<'a> DriverGuard<'a> {
+    fn new(core: &'a RefCell<Option<Box<Core>>>, driver: Driver) -> Self {
+        Self {
+            core,
+            driver: Some(driver),
+        }
+    }
+
+    fn driver(&mut self) -> &mut Driver {
+        self.driver.as_mut().expect("driver missing")
+    }
+
+    /// Moves the driver back into the core on the normal return path.
+    fn restore(mut self, core: &mut Core) {
+        core.driver = self.driver.take();
+    }
+}
+
+impl Drop for DriverGuard<'_> {
+    fn drop(&mut self) {
+        let Some(driver) = self.driver.take() else {
+            return;
+        };
+
+        // While the driver runs, the core is in the scheduler context. `try_borrow_mut`
+        // keeps this from double-panicking if the core is borrowed elsewhere.
+        if let Ok(mut slot) = self.core.try_borrow_mut() {
+            if let Some(core) = slot.as_mut() {
+                core.driver = Some(driver);
+            }
         }
     }
 }
