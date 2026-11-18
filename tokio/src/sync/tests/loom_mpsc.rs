@@ -7,6 +7,102 @@ use std::future::poll_fn;
 use tokio_test::assert_ok;
 
 #[test]
+fn drop_rx_during_permit_send() {
+    drop_rx_during_permit_send_at(0);
+}
+
+#[test]
+fn drop_rx_during_permit_send_at_block_boundary() {
+    drop_rx_during_permit_send_at(BLOCK_CAP);
+}
+
+fn drop_rx_during_permit_send_at(start: usize) {
+    loom::model(move || {
+        let (tx, mut rx) = mpsc::channel(BLOCK_CAP + 2);
+        // Exercise both an empty block and growth after a consumed block.
+        for _ in 0..start {
+            let (reply, _) = crate::sync::oneshot::channel::<()>();
+            tx.try_send(reply).unwrap();
+            drop(rx.try_recv().unwrap());
+        }
+        let weak = tx.downgrade();
+        let permit1 = tx.clone().try_reserve_owned().unwrap();
+        let permit2 = tx.clone().try_reserve_owned().unwrap();
+        let (reply1, mut response1) = crate::sync::oneshot::channel::<()>();
+        let (reply2, mut response2) = crate::sync::oneshot::channel::<()>();
+
+        let send1 = thread::spawn(move || permit1.send(reply1));
+        let send2 = thread::spawn(move || permit2.send(reply2));
+        drop(rx);
+        let tx1 = send1.join().unwrap();
+        let tx2 = send2.join().unwrap();
+
+        assert_eq!(
+            response1.try_recv(),
+            Err(crate::sync::oneshot::error::TryRecvError::Closed)
+        );
+        assert_eq!(
+            response2.try_recv(),
+            Err(crate::sync::oneshot::error::TryRecvError::Closed)
+        );
+        assert_eq!(tx.capacity(), BLOCK_CAP + 2);
+        drop((tx1, tx2, tx, weak));
+    });
+}
+
+#[test]
+fn drop_rx_with_ready_prefix() {
+    loom::model(|| {
+        let (tx, rx) = mpsc::channel(BLOCK_CAP + 2);
+        let value = Arc::new(());
+        for _ in 0..BLOCK_CAP + 1 {
+            tx.try_send(value.clone()).unwrap();
+        }
+
+        let permit = tx.clone().try_reserve_owned().unwrap();
+        let sent = value.clone();
+        let send = thread::spawn(move || permit.send(sent));
+        drop(rx);
+        let _sender = send.join().unwrap();
+
+        assert_eq!(Arc::strong_count(&value), 1);
+        assert_eq!(tx.capacity(), BLOCK_CAP + 2);
+    });
+}
+
+#[test]
+fn drop_rx_during_bounded_send() {
+    loom::model(|| {
+        let (tx, rx) = mpsc::channel(1);
+        let sender = tx.clone();
+        let (reply, mut response) = crate::sync::oneshot::channel::<()>();
+        let send = thread::spawn(move || drop(block_on(sender.send(reply))));
+        drop(rx);
+        send.join().unwrap();
+        assert_eq!(
+            response.try_recv(),
+            Err(crate::sync::oneshot::error::TryRecvError::Closed)
+        );
+        assert_eq!(tx.capacity(), 1);
+        drop(tx);
+    });
+}
+
+#[test]
+fn close_rx_during_permit_send() {
+    loom::model(|| {
+        let (tx, mut rx) = mpsc::channel(1);
+        let permit = tx.try_reserve_owned().unwrap();
+        let send = thread::spawn(move || permit.send(123));
+        rx.close();
+        let tx = send.join().unwrap();
+        assert_eq!(rx.try_recv(), Ok(123));
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Disconnected));
+        drop(tx);
+    });
+}
+
+#[test]
 fn closing_tx() {
     loom::model(|| {
         let (tx, mut rx) = mpsc::channel(16);
