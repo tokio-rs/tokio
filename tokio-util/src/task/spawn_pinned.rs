@@ -122,6 +122,7 @@ impl LocalPoolHandle {
     /// }
     /// # }
     /// ```
+    #[track_caller]
     pub fn spawn_pinned<F, Fut>(&self, create_task: F) -> JoinHandle<Fut::Output>
     where
         F: FnOnce() -> Fut,

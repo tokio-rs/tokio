@@ -9,10 +9,21 @@ use crate::{io::Interest, loom::sync::Mutex};
 
 use super::{Handle, TOKEN_WAKEUP};
 
-use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::{io, mem, task::Waker};
 
 const DEFAULT_RING_SIZE: u32 = 256;
+
+fn register_probe(uring: &IoUring, probe: &mut Probe) -> io::Result<()> {
+    match uring.submitter().register_probe(probe) {
+        Ok(_) => Ok(()),
+        Err(e) if e.raw_os_error() == Some(libc::EINVAL) => {
+            // The kernel does not support IORING_REGISTER_PROBE.
+            Err(io::Error::from_raw_os_error(libc::ENOSYS))
+        }
+        Err(e) => Err(e),
+    }
+}
 
 /// Outcome of registering an op with the io_uring.
 pub(crate) enum RegisterResult {
@@ -46,33 +57,6 @@ impl UringContext {
 
     pub(crate) fn ring_mut(&mut self) -> &mut io_uring::IoUring {
         self.uring.as_mut().expect("io_uring not initialized")
-    }
-
-    /// Perform `io_uring_setup` system call, and Returns true if this
-    /// actually initialized the io_uring.
-    ///
-    /// If the machine doesn't support io_uring, then this will return an
-    /// `ENOSYS` error.
-    pub(crate) fn try_init(&mut self, probe: &mut Probe) -> io::Result<bool> {
-        if self.uring.is_some() {
-            // Already initialized.
-            return Ok(false);
-        }
-
-        let uring = IoUring::new(DEFAULT_RING_SIZE)?;
-
-        match uring.submitter().register_probe(probe) {
-            Ok(_) => {}
-            Err(e) if e.raw_os_error() == Some(libc::EINVAL) => {
-                // The kernel does not support IORING_REGISTER_PROBE.
-                return Err(io::Error::from_raw_os_error(libc::ENOSYS));
-            }
-            Err(e) => return Err(e),
-        }
-
-        self.uring.replace(uring);
-
-        Ok(true)
     }
 
     pub(crate) fn dispatch_completions(&mut self) {
@@ -207,12 +191,6 @@ impl Drop for UringContext {
 }
 
 impl Handle {
-    fn add_uring_source(&self, uringfd: RawFd) -> io::Result<()> {
-        let mut source = SourceFd(&uringfd);
-        self.registry
-            .register(&mut source, TOKEN_WAKEUP, Interest::READABLE.to_mio())
-    }
-
     pub(crate) fn get_uring(&self) -> &Mutex<UringContext> {
         &self.uring_context
     }
@@ -274,12 +252,25 @@ impl Handle {
     }
 
     /// Initialize the io_uring context if it hasn't been initialized yet.
+    ///
+    /// The ring is stored only after the reactor accepts its fd. A failure
+    /// there drops the ring, so the following attempt can create another one.
+    /// An existing ring stays stored, and this call fills `probe` from it.
     fn try_init(&self, probe: &mut Probe) -> io::Result<()> {
         let mut guard = self.get_uring().lock();
-        if guard.try_init(probe)? {
-            self.add_uring_source(guard.ring().as_raw_fd())?;
+        if let Some(uring) = guard.uring.as_ref() {
+            // The stored ring is already registered. Fill this probe from it.
+            return register_probe(uring, probe);
         }
 
+        let uring = IoUring::new(DEFAULT_RING_SIZE)?;
+        register_probe(&uring, probe)?;
+
+        let fd = uring.as_raw_fd();
+        let mut source = SourceFd(&fd);
+        self.registry
+            .register(&mut source, TOKEN_WAKEUP, Interest::READABLE.to_mio())?;
+        guard.uring = Some(uring);
         Ok(())
     }
 

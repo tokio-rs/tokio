@@ -1,10 +1,6 @@
 cfg_rt! {
     mod rt;
     pub(crate) use rt::RngSeedGenerator;
-
-    cfg_unstable! {
-        mod rt_unstable;
-    }
 }
 
 /// A seed for random number generation.

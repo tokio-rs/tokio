@@ -1,4 +1,4 @@
-333
+334
 &
 +
 0o777
@@ -65,6 +65,7 @@ JSPI
 Kotlin's
 LLVM
 Lauck
+MSRV
 MacOS
 Marsaglia's
 Mio

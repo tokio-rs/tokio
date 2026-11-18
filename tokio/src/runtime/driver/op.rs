@@ -222,8 +222,12 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
                 match mem::replace(lifecycle, Lifecycle::Submitted) {
                     // Only replace the stored waker if it wouldn't wake the new one
                     Lifecycle::Waiting(prev) if !prev.will_wake(cx.waker()) => {
-                        let waker = cx.waker().clone();
-                        *lifecycle = Lifecycle::Waiting(waker);
+                        *lifecycle = Lifecycle::Waiting(cx.waker().clone());
+                        // Drop the replaced waker after the lock is released,
+                        // as its destructor may cancel another op, which
+                        // locks the driver again.
+                        drop(ctx);
+                        drop(prev);
                         Poll::Pending
                     }
 

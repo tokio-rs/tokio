@@ -248,6 +248,10 @@ impl<T, U> Framed<T, U> {
     }
 
     /// Returns a mutable reference to the read buffer.
+    ///
+    /// The decoder may behave incorrectly if the buffer is modified in any way
+    /// other than reserving more space or appending data to the end of the
+    /// buffer.
     pub fn read_buffer_mut(&mut self) -> &mut BytesMut {
         &mut self.inner.state.read.buffer
     }

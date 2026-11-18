@@ -299,10 +299,12 @@ where
 
     fn initialize(
         _: sealed::Internal,
-        lower: usize,
+        _lower: usize,
         upper: Option<usize>,
     ) -> Result<U::InternalCollection, E> {
-        Ok(U::initialize(sealed::Internal, lower, upper))
+        // Collecting stops at the first error, so the lower bound of the
+        // stream says nothing about how many items will be collected.
+        Ok(U::initialize(sealed::Internal, 0, upper))
     }
 
     fn extend(

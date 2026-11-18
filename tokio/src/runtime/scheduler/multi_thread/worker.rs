@@ -71,8 +71,10 @@ use crate::task::coop;
 use crate::util::atomic_cell::AtomicCell;
 use crate::util::cacheline::CachePadded;
 use crate::util::rand::{FastRand, RngSeedGenerator};
+use crate::util::trace::SpawnMeta;
 
 use std::cell::RefCell;
+use std::io;
 use std::ops::ControlFlow;
 use std::task::Waker;
 use std::thread;
@@ -510,10 +512,32 @@ fn maybe_move_runtime() -> Result<(bool, bool), &'static str> {
 }
 
 impl Launch {
-    pub(crate) fn launch(mut self) {
-        for worker in self.0.drain(..) {
-            runtime::spawn_blocking(move || run(worker));
+    pub(crate) fn launch(self) -> io::Result<()> {
+        let rt = runtime::Handle::current();
+
+        for worker in &self.0 {
+            let worker_to_run = worker.clone();
+            let fn_size = std::mem::size_of_val(&worker_to_run);
+            let (_, result) = rt.inner.blocking_spawner().spawn_blocking_inner(
+                move || run(worker_to_run),
+                blocking::Mandatory::NonMandatory,
+                SpawnMeta::new_unnamed(fn_size),
+                &rt,
+            );
+
+            if let Err(error) = result {
+                for worker in self.0 {
+                    if let Some(mut core) = worker.core.take() {
+                        core.pre_shutdown(&worker);
+                        worker.handle.shutdown_core(core);
+                    }
+                }
+
+                return Err(io::Error::from(error));
+            }
         }
+
+        Ok(())
     }
 }
 
@@ -873,19 +897,15 @@ impl Context {
         *self.core.borrow_mut() = Some(core);
 
         #[cfg(feature = "time")]
-        let (duration, auto_advance_duration) = match self.worker.handle.timer_flavor {
-            TimerFlavor::Traditional => (duration, None::<Duration>),
+        let duration = match self.worker.handle.timer_flavor {
+            TimerFlavor::Traditional => duration,
             #[cfg(tokio_unstable)]
             TimerFlavor::Alternative => {
                 // Must happens after taking out the parker, as the `Handle::schedule_local`
                 // will delay the notify if the parker taken out.
                 //
                 // See comments in `Handle::schedule_local` for more details.
-                let MaintainLocalTimer {
-                    park_duration: duration,
-                    auto_advance_duration,
-                } = self.maintain_local_timers_before_parking(duration);
-                (duration, auto_advance_duration)
+                self.maintain_local_timers_before_parking(duration)
             }
         };
 
@@ -900,17 +920,14 @@ impl Context {
 
         #[cfg(feature = "time")]
         match self.worker.handle.timer_flavor {
-            TimerFlavor::Traditional => {
-                // suppress unused variable warning
-                let _ = auto_advance_duration;
-            }
+            TimerFlavor::Traditional => {}
             #[cfg(tokio_unstable)]
             TimerFlavor::Alternative => {
                 // Must happens before placing back the parker, as the `Handle::schedule_local`
                 // will delay the notify if the parker is still in `core`.
                 //
                 // See comments in `Handle::schedule_local` for more details.
-                self.maintain_local_timers_after_parking(auto_advance_duration);
+                self.maintain_local_timers_after_parking();
             }
         }
 
@@ -942,17 +959,11 @@ impl Context {
     ///
     /// * Remove cancelled timers from the local timer wheel.
     /// * Register remote timers to the local timer wheel.
-    /// * Adjust the park duration based on
-    ///   * the next timer expiration time.
-    ///   * whether auto-advancing is required (feature = "test-util").
-    ///
-    /// # Returns
-    ///
-    /// `(Box<Core>, park_duration, auto_advance_duration)`
+    /// * Adjust the park duration based on the next timer expiration time.
     fn maintain_local_timers_before_parking(
         &self,
         park_duration: Option<Duration>,
-    ) -> MaintainLocalTimer {
+    ) -> Option<Duration> {
         let handle = &self.worker.handle;
         let mut wake_queue = time_alt::WakeQueue::new();
 
@@ -991,33 +1002,17 @@ impl Context {
         wake_queue.wake_all();
 
         if should_yield {
-            MaintainLocalTimer {
-                park_duration: Some(Duration::from_millis(0)),
-                auto_advance_duration: None,
-            }
+            Some(Duration::from_millis(0))
         } else {
-            // get the minimum duration
-            let dur = util::time_alt::min_duration(park_duration, next_timer);
-            if util::time_alt::pre_auto_advance(&handle.driver, dur) {
-                MaintainLocalTimer {
-                    park_duration: Some(Duration::ZERO),
-                    auto_advance_duration: dur,
-                }
-            } else {
-                MaintainLocalTimer {
-                    park_duration: dur,
-                    auto_advance_duration: None,
-                }
-            }
+            util::time_alt::min_duration(park_duration, next_timer)
         }
     }
 
     #[cfg(all(tokio_unstable, feature = "time"))]
     /// Maintain local timers after unparking the resource driver.
     ///
-    /// * Auto-advance time, if required (feature = "test-util").
     /// * Process expired timers.
-    fn maintain_local_timers_after_parking(&self, auto_advance_duration: Option<Duration>) {
+    fn maintain_local_timers_after_parking(&self) {
         let handle = &self.worker.handle;
         let mut wake_queue = time_alt::WakeQueue::new();
 
@@ -1033,7 +1028,6 @@ impl Context {
             let core = maybe_core.as_mut().expect("core missing");
             let time_cx = &mut core.time_context;
 
-            util::time_alt::post_auto_advance(&handle.driver, auto_advance_duration);
             util::time_alt::process_expired_timers(
                 &mut time_cx.wheel,
                 &handle.driver,
@@ -1540,13 +1534,6 @@ impl Overflow<Arc<Handle>> for Handle {
     {
         self.shared.inject.push_batch(iter);
     }
-}
-
-#[cfg(all(tokio_unstable, feature = "time"))]
-/// Returned by [`Context::maintain_local_timers_before_parking`].
-struct MaintainLocalTimer {
-    park_duration: Option<Duration>,
-    auto_advance_duration: Option<Duration>,
 }
 
 #[track_caller]

@@ -3,6 +3,11 @@
 [graph]
 all-features = true
 
+[advisories]
+ignore = [
+    "RUSTSEC-2026-0441",
+]
+
 [licenses]
 allow = [
     "MIT",

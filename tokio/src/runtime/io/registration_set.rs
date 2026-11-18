@@ -150,6 +150,7 @@ unsafe impl linked_list::Link for Arc<ScheduledIo> {
 #[cfg(all(test, loom))]
 mod loom_tests {
     use super::*;
+    use crate::io::interest::Interest;
     use crate::io::ready::Ready;
     use crate::loom::sync::Mutex;
     use crate::loom::thread;
@@ -219,6 +220,42 @@ mod loom_tests {
             handle.release();
 
             assert!(!handle.set.needs_release());
+        });
+    }
+
+    #[test]
+    fn allocation_racing_shutdown_is_included_or_rejected() {
+        loom::model(|| {
+            let handle = Arc::new(Registrations::new());
+            let shutdown_handle = handle.clone();
+            let shutdown = thread::spawn(move || {
+                let ios = shutdown_handle
+                    .set
+                    .shutdown(&mut shutdown_handle.synced.lock());
+                for io in &ios {
+                    io.shutdown();
+                }
+                ios
+            });
+
+            let allocation = handle.set.allocate(&mut handle.synced.lock());
+            let ios = shutdown.join().unwrap();
+            match allocation {
+                Ok(io) => {
+                    assert_eq!(ios.len(), 1);
+                    assert!(Arc::ptr_eq(&ios[0], &io));
+                    assert!(io.ready_event(Interest::READABLE).is_shutdown);
+                }
+                Err(err) => {
+                    assert_eq!(err.kind(), io::ErrorKind::Other);
+                    assert_eq!(
+                        err.to_string(),
+                        crate::util::error::RUNTIME_SHUTTING_DOWN_ERROR
+                    );
+                    assert!(ios.is_empty());
+                }
+            }
+            assert!(handle.set.is_shutdown(&handle.synced.lock()));
         });
     }
 }

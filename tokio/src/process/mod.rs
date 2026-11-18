@@ -1478,6 +1478,10 @@ impl Child {
 ///
 /// This type implements the `AsyncWrite` trait to pass data to the stdin
 /// handle of a child process asynchronously.
+///
+/// Shutting down this stream closes its pipe after pending writes finish. Further
+/// writes and conversions to [`Stdio`] or an owned file descriptor or handle
+/// return an error. Accessing the file descriptor or handle after shutdown panics.
 #[derive(Debug)]
 pub struct ChildStdin {
     inner: imp::ChildStdin,
@@ -1640,12 +1644,14 @@ mod sys {
             }
 
             impl AsRawFd for $type {
+                #[track_caller]
                 fn as_raw_fd(&self) -> RawFd {
                     self.inner.as_raw_fd()
                 }
             }
 
             impl AsFd for $type {
+                #[track_caller]
                 fn as_fd(&self) -> BorrowedFd<'_> {
                     unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
                 }
@@ -1675,12 +1681,14 @@ mod windows {
             }
 
             impl AsRawHandle for $type {
+                #[track_caller]
                 fn as_raw_handle(&self) -> RawHandle {
                     self.inner.as_raw_handle()
                 }
             }
 
             impl AsHandle for $type {
+                #[track_caller]
                 fn as_handle(&self) -> BorrowedHandle<'_> {
                     unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
                 }

@@ -44,10 +44,14 @@ cfg_io_util! {
 /// let (tx, mut rx) = pipe::pipe()?;
 /// let mut buffer = String::new();
 ///
-/// let status = Command::new("echo")
-///     .arg("Hello, world!")
-///     .stdout(tx.into_blocking_fd()?)
-///     .status();
+/// let mut cmd = Command::new("echo");
+/// cmd.arg("Hello, world!")
+///     .stdout(tx.into_blocking_fd()?);
+/// let status = cmd.status();
+///
+/// // Drop `cmd` so it closes its copy of `tx`, allowing `rx` to reach EOF.
+/// drop(cmd);
+///
 /// rx.read_to_string(&mut buffer).await?;
 ///
 /// assert!(status.await?.success());
@@ -1463,7 +1467,7 @@ impl AsyncRead for Receiver {
     ) -> Poll<io::Result<()>> {
         // Safety: `mio_pipe::Receiver` uses a `std::fs::File` underneath,
         // which correctly handles reads into uninitialized memory.
-        unsafe { self.io.poll_read(cx, buf) }
+        unsafe { self.io.poll_read_pipe(cx, buf) }
     }
 }
 

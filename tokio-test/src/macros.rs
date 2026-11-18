@@ -165,15 +165,15 @@ macro_rules! assert_pending {
 /// ```
 #[macro_export]
 macro_rules! assert_ready_eq {
-    ($e:expr, $expect:expr) => {
+    ($e:expr, $expect:expr) => {{
         let val = $crate::assert_ready!($e);
         assert_eq!(val, $expect)
-    };
+    }};
 
-    ($e:expr, $expect:expr, $($msg:tt)+) => {
+    ($e:expr, $expect:expr, $($msg:tt)+) => {{
         let val = $crate::assert_ready!($e, $($msg)*);
         assert_eq!(val, $expect, $($msg)*)
-    };
+    }};
 }
 
 /// Asserts that the expression evaluates to `Ok` and returns the value.
