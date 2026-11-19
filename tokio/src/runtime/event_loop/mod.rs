@@ -24,6 +24,7 @@ use crate::runtime::local_runtime::LocalRuntime;
 use crate::runtime::scheduler::current_thread::CurrentThread;
 use crate::runtime::{context, EnterGuard, Handle, Runtime};
 use crate::task::JoinHandle;
+use crate::util::rand::RngSeed;
 use crate::util::trace::SpawnMeta;
 
 use std::future::Future;
@@ -182,6 +183,8 @@ struct Core<R> {
     /// Whether the last tick or park left tasks in the local queue. The
     /// local queue only changes while the loop is ticked or parked.
     local_ready: bool,
+    /// The random number generator's state between turns.
+    rng_seed: RngSeed,
 }
 
 /// `Runtime` or `LocalRuntime`, built `current_thread`.
@@ -210,10 +213,13 @@ impl Scheduler for LocalRuntime {
 
 impl<R: Scheduler> Core<R> {
     fn new(runtime: R) -> Core<R> {
-        runtime.handle().inner.as_current_thread().set_host_idle();
+        let handle = &runtime.handle().inner;
+        handle.as_current_thread().set_host_idle();
+        let rng_seed = handle.seed_generator().next_seed();
         Core {
             runtime,
             local_ready: false,
+            rng_seed,
         }
     }
 
@@ -222,23 +228,27 @@ impl<R: Scheduler> Core<R> {
     }
 
     fn tick(&mut self, max_tasks: usize) -> usize {
-        let handle = self.runtime.handle();
-        let (ran, local_ready) = context::enter_runtime(&handle.inner, false, |_| {
-            self.runtime
-                .current_thread()
-                .tick(handle.inner.as_current_thread(), max_tasks)
-        });
+        let runtime = &self.runtime;
+        let handle = runtime.handle();
+        let (ran, local_ready) =
+            context::enter_runtime_with_seed(&handle.inner, false, &mut self.rng_seed, |_| {
+                runtime
+                    .current_thread()
+                    .tick(handle.inner.as_current_thread(), max_tasks)
+            });
         self.local_ready = local_ready;
         ran
     }
 
     fn park(&mut self, timeout: Option<Duration>) {
-        let handle = self.runtime.handle();
-        self.local_ready = context::enter_runtime(&handle.inner, false, |_| {
-            self.runtime
-                .current_thread()
-                .park(handle.inner.as_current_thread(), timeout)
-        });
+        let runtime = &self.runtime;
+        let handle = runtime.handle();
+        self.local_ready =
+            context::enter_runtime_with_seed(&handle.inner, false, &mut self.rng_seed, |_| {
+                runtime
+                    .current_thread()
+                    .park(handle.inner.as_current_thread(), timeout)
+            });
     }
 
     fn next_sleep(&self) -> Option<Duration> {

@@ -15,6 +15,8 @@ cfg_rt! {
 
     mod runtime;
     pub(crate) use runtime::{EnterRuntime, enter_runtime};
+    #[cfg(tokio_unstable)]
+    pub(crate) use runtime::enter_runtime_with_seed;
 
     mod scoped;
     use scoped::Scoped;
