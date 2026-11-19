@@ -46,7 +46,7 @@ pub struct BytesCodec(());
 
 impl BytesCodec {
     /// Creates a new `BytesCodec` for shipping around raw bytes.
-    pub fn new() -> BytesCodec {
+    pub const fn new() -> BytesCodec {
         BytesCodec(())
     }
 }
