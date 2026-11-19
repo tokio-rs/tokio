@@ -25,24 +25,6 @@ fn register_probe(uring: &IoUring, probe: &mut Probe) -> io::Result<()> {
     }
 }
 
-/// Creates the ring, probes the opcodes supported by the kernel, and registers
-/// the ring's file descriptor so completions wake the driver.
-///
-/// On error, the ring is dropped, so nothing is left half set up.
-fn try_setup(registry: &mio::Registry) -> io::Result<(IoUring, Probe)> {
-    let uring = IoUring::new(DEFAULT_RING_SIZE)?;
-    let mut probe = Probe::new();
-    register_probe(&uring, &mut probe)?;
-
-    let fd = uring.as_raw_fd();
-    registry.register(
-        &mut SourceFd(&fd),
-        TOKEN_WAKEUP,
-        Interest::READABLE.to_mio(),
-    )?;
-    Ok((uring, probe))
-}
-
 /// Outcome of registering an op with the io_uring.
 pub(crate) enum RegisterResult {
     /// In-flight at this slab index.
@@ -69,23 +51,38 @@ impl UringContext {
         }
     }
 
-    /// Sets up io_uring for an IO driver, returning the context and
-    /// the opcodes supported by the kernel.
+    /// Sets up io_uring for an IO driver, returning the context and the
+    /// opcodes supported by the kernel.
     ///
-    /// If io_uring can't be set up for any reason,
-    /// this returns an empty context and no probe, and file
-    /// system operations fall back to the blocking thread pool.
-    pub(crate) fn setup(registry: &mio::Registry) -> (Self, Option<Probe>) {
-        match try_setup(registry) {
-            Ok((uring, probe)) => (
-                Self {
-                    uring: Some(uring),
-                    ops: Slab::new(),
-                },
-                Some(probe),
-            ),
-            Err(_) => (Self::new(), None),
-        }
+    /// Any setup error is returned.
+    pub(crate) fn setup(registry: &mio::Registry) -> io::Result<(Self, Probe)> {
+        let mut context = Self::new();
+        let mut probe = Probe::new();
+        context.try_init(registry, &mut probe)?;
+
+        // `try_init` succeeded: the ring is stored in `context` and registered
+        // with mio, and `probe` is filled.
+        Ok((context, probe))
+    }
+
+    /// Creates the ring, fills `probe` with the opcodes supported by the
+    /// kernel, and registers the ring's file descriptor with mio so
+    /// completions wake the driver.
+    ///
+    /// The ring is stored only after the registration succeeds, so a failure
+    /// drops the ring and leaves nothing half set up.
+    fn try_init(&mut self, registry: &mio::Registry, probe: &mut Probe) -> io::Result<()> {
+        let uring = IoUring::new(DEFAULT_RING_SIZE)?;
+        register_probe(&uring, probe)?;
+
+        let fd = uring.as_raw_fd();
+        registry.register(
+            &mut SourceFd(&fd),
+            TOKEN_WAKEUP,
+            Interest::READABLE.to_mio(),
+        )?;
+        self.uring = Some(uring);
+        Ok(())
     }
 
     pub(crate) fn ring(&self) -> &io_uring::IoUring {

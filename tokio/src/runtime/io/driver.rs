@@ -341,22 +341,22 @@ impl Handle {
     /// opcodes supported by the kernel.
     ///
     /// Called once, right after the driver is created, when the runtime is
-    /// built with `enable_io_uring`. If io_uring can't be set up for
-    /// any reason, it stays disabled, and file system operations fall back to
-    /// the blocking thread pool.
-    pub(crate) fn setup_uring(&mut self) {
+    /// built with `enable_io_uring`. Any setup error is returned, and nothing
+    /// is stored. Without io_uring compiled in, this does nothing.
+    pub(crate) fn setup_uring(&mut self) -> io::Result<()> {
         #[cfg(all(
             tokio_unstable,
             feature = "io-uring",
             feature = "rt",
             feature = "fs",
-            target_os = "linux",
+            target_os = "linux"
         ))]
         {
-            let (context, probe) = UringContext::setup(&self.registry);
+            let (context, probe) = UringContext::setup(&self.registry)?;
             self.uring_context = Mutex::new(context);
-            self.uring_probe = probe;
+            self.uring_probe = Some(probe);
         }
+        Ok(())
     }
 
     fn release_pending_registrations(&self) {

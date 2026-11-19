@@ -1968,9 +1968,9 @@ cfg_io_uring! {
         ///
         /// This also enables the I/O driver.
         ///
-        /// io_uring is set up when the runtime is built. If it can't be set
-        /// up for any reason the runtime is still built, and file system
-        /// operations fall back to the blocking thread pool.
+        /// io_uring is set up when the runtime is built. If it can't be set up
+        /// for any reason error is returned
+        ///
         ///
         /// # Example
         ///

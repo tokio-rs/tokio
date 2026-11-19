@@ -3,21 +3,20 @@ use super::{RegisterResult, UringContext};
 use crate::runtime::driver::op::Lifecycle;
 use crate::runtime::Builder;
 
-use io_uring::opcode;
+use io_uring::{opcode, Probe};
 use std::os::fd::AsRawFd;
 
 // Builds a driver whose io_uring context is stored and registered, or returns
-// `None` when io_uring is unavailable on the host.
+// `None` when io_uring can't be set up on the host.
 fn ready_handle() -> Option<(Driver, Handle)> {
     let (driver, mut handle) = Driver::new(1024, None).ok()?;
-    handle.setup_uring();
-    handle.uring_probe.is_some().then_some((driver, handle))
+    handle.setup_uring().ok()?;
+    Some((driver, handle))
 }
 
-// Returns `true` if `UringContext` can set up io_uring on this host and the
-// kernel supports the `Read` opcode.
-fn host_supports_uring_read() -> bool {
-    ready_handle().is_some_and(|(_driver, handle)| handle.is_uring_ready(opcode::Read::CODE))
+// Returns `true` if `UringContext` can set up io_uring on this host.
+fn host_supports_uring() -> bool {
+    ready_handle().is_some()
 }
 
 // Makes the next submission fail with a non-`EBUSY` error by pointing the ring's
@@ -51,7 +50,7 @@ impl Drop for BrokenRing {
 }
 
 // Points the reactor registration fd at `/dev/null` for the duration of a
-// `try_setup`, then puts the original epoll fd back.
+// `try_init`, then puts the original epoll fd back.
 struct BrokenRegistry {
     ep: i32,
     saved: i32,
@@ -80,34 +79,44 @@ impl Drop for BrokenRegistry {
     }
 }
 
-// A failed reactor registration must leave io_uring disabled: `setup` returns
-// a context without a ring and no probe, so nothing half set up is stored.
+// A failed reactor registration is returned as a setup error (build
+// fails), and no half set up ring or probe is stored.
 #[test]
 #[cfg_attr(miri, ignore)]
 fn register_failure_does_not_store_the_ring() {
     // Skip on hosts without io_uring: setup would fail before reaching the
-    // registration step. `setup_uring` doesn't report why setup failed, so
-    // this also skips on unexpected setup errors.
-    if ready_handle().is_none() {
+    // registration step.
+    if !host_supports_uring() {
         return;
     }
 
     let (_driver, mut handle) = Driver::new(1024, None).unwrap();
     let _broken = BrokenRegistry::new(&handle);
 
-    let Err(err) = super::try_setup(&handle.registry) else {
+    // `try_init` fails at the registration and doesn't store the ring.
+    let mut context = UringContext::new();
+    let Err(err) = context.try_init(&handle.registry, &mut Probe::new()) else {
         panic!("registration against /dev/null should fail");
     };
-    assert_ne!(err.raw_os_error(), Some(libc::ENOSYS));
+    // ENOSYS/EPERM would mean setup failed before the registration, so this
+    // wouldn't be testing a registration failure.
+    assert!(
+        !matches!(err.raw_os_error(), Some(libc::ENOSYS | libc::EPERM)),
+        "unexpected registration error: {err}"
+    );
+    assert!(
+        context.uring.is_none(),
+        "failed registration stored the ring"
+    );
 
-    // Mostly covered by the `setup_uring` check below, but checking `setup`
-    // directly shows whether a failure comes from `setup` itself or from how
-    // `setup_uring` stores its result.
-    let (ctx, probe) = UringContext::setup(&handle.registry);
-    assert!(ctx.uring.is_none(), "failed registration stored the ring");
-    assert!(probe.is_none(), "failed registration returned a probe");
+    assert!(
+        UringContext::setup(&handle.registry).is_err(),
+        "setup should return the registration error"
+    );
 
-    handle.setup_uring();
+    handle
+        .setup_uring()
+        .expect_err("setup_uring should return the registration error");
     assert!(
         handle.get_uring().lock().uring.is_none(),
         "setup_uring stored a ring after a failed registration"
@@ -181,31 +190,37 @@ fn runtime_with_enable_io_has_no_uring() {
     });
 }
 
-// A runtime built with `enable_io_uring` uses io_uring when the host
-// supports it, and falls back otherwise.
-#[test]
-#[cfg_attr(miri, ignore)]
-fn runtime_with_enable_io_uring_matches_host_support() {
-    let expected = host_supports_uring_read();
-    let rt = Builder::new_current_thread()
-        .enable_io_uring()
-        .build()
-        .unwrap();
+// Checks a runtime built with io_uring requested: it uses io_uring when the
+// host supports it, and fails to build otherwise.
+fn assert_runtime_requires_uring(builder: &mut Builder) {
+    let result = builder.build();
 
+    if !host_supports_uring() {
+        assert!(
+            result.is_err(),
+            "build() should fail when io_uring can't be set up"
+        );
+        return;
+    }
+
+    let rt = result.expect("build() failed although io_uring is available");
     rt.block_on(async {
-        assert_eq!(super::uring_supports(opcode::Read::CODE), expected);
+        assert!(super::uring_supports(opcode::Read::CODE));
     });
 }
 
-// `enable_all` includes `enable_io_uring` when io_uring is compiled in, so the
-// runtime uses io_uring when the host supports it.
+// A runtime built with `enable_io_uring` uses io_uring, or fails to build if
+// io_uring can't be set up.
 #[test]
 #[cfg_attr(miri, ignore)]
-fn runtime_with_enable_all_matches_host_support() {
-    let expected = host_supports_uring_read();
-    let rt = Builder::new_current_thread().enable_all().build().unwrap();
+fn runtime_with_enable_io_uring_requires_uring() {
+    assert_runtime_requires_uring(Builder::new_current_thread().enable_io_uring());
+}
 
-    rt.block_on(async {
-        assert_eq!(super::uring_supports(opcode::Read::CODE), expected);
-    });
+// `enable_all` includes `enable_io_uring` when io_uring is compiled in, so it
+// behaves the same.
+#[test]
+#[cfg_attr(miri, ignore)]
+fn runtime_with_enable_all_requires_uring() {
+    assert_runtime_requires_uring(Builder::new_current_thread().enable_all());
 }
