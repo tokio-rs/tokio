@@ -130,7 +130,7 @@ libc = { version = "0.2.168", optional = true }
 
 [target.'cfg(unix)'.dev-dependencies]
 libc = { version = "0.2.168" }
-nix = { version = "0.31.0", default-features = false, features = ["aio", "fs", "socket"] }
+nix = { version = "0.31.0", default-features = false, features = ["fs", "socket"] }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.61"
