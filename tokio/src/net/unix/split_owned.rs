@@ -8,6 +8,8 @@
 //! split has no associated overhead and enforces all invariants at the type
 //! level.
 
+#[cfg(feature = "io-util")]
+use crate::io::BufReader;
 use crate::io::{AsyncRead, AsyncWrite, Interest, ReadBuf, Ready};
 use crate::net::UnixStream;
 
@@ -97,6 +99,25 @@ impl fmt::Display for ReuniteError {
 }
 
 impl Error for ReuniteError {}
+
+/// Error indicating that two halves were not from the same socket, and thus could
+/// not be reunited.
+#[cfg(feature = "io-util")]
+#[derive(Debug)]
+pub struct BufReuniteError(pub BufReader<OwnedReadHalf>, pub OwnedWriteHalf);
+
+#[cfg(feature = "io-util")]
+impl fmt::Display for BufReuniteError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "tried to reunite halves that are not from the same socket"
+        )
+    }
+}
+
+#[cfg(feature = "io-util")]
+impl Error for BufReuniteError {}
 
 impl OwnedReadHalf {
     /// Attempts to put the two halves of a `UnixStream` back together and
