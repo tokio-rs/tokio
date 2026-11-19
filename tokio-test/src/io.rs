@@ -94,6 +94,12 @@ impl Builder {
     ///
     /// The next operation in the mock's script will be to expect a `read` call
     /// and return `error`.
+    ///
+    /// If another builder or mock still shares the error, the returned error
+    /// preserves its kind, display, source, and raw OS code. Shared custom errors
+    /// wrap an `Arc<io::Error>` containing the original error, so their payload
+    /// cannot be downcast directly to the original custom type. If the error is
+    /// no longer shared, it is returned unchanged, including its custom payload.
     pub fn read_error(&mut self, error: io::Error) -> &mut Self {
         let error = Some(error.into());
         self.actions.push_back(Action::ReadError(error));
@@ -113,6 +119,8 @@ impl Builder {
     ///
     /// The next operation in the mock's script will be to expect a `write`
     /// call that provides `error`.
+    ///
+    /// Shared errors are handled as described in [`read_error`](Self::read_error).
     pub fn write_error(&mut self, error: io::Error) -> &mut Self {
         let error = Some(error.into());
         self.actions.push_back(Action::WriteError(error));
@@ -191,6 +199,20 @@ impl Handle {
     }
 }
 
+fn take_error(error: &mut Option<Arc<io::Error>>) -> io::Error {
+    let error = error
+        .take()
+        .expect("Should have been removed from actions.");
+    match Arc::try_unwrap(error) {
+        Ok(error) => error,
+        Err(error) => match error.raw_os_error() {
+            Some(code) => io::Error::from_raw_os_error(code),
+            None if error.get_ref().is_none() => error.kind().into(),
+            None => io::Error::new(error.kind(), error),
+        },
+    }
+}
+
 impl Inner {
     fn new(actions: VecDeque<Action>, name: String) -> (Inner, Handle) {
         let (tx, rx) = mpsc::unbounded_channel();
@@ -229,12 +251,7 @@ impl Inner {
 
                 Ok(())
             }
-            Some(&mut Action::ReadError(ref mut err)) => {
-                // As the
-                let err = err.take().expect("Should have been removed from actions.");
-                let err = Arc::try_unwrap(err).expect("There are no other references.");
-                Err(err)
-            }
+            Some(&mut Action::ReadError(ref mut err)) => Err(take_error(err)),
             Some(_) => {
                 // Either waiting or expecting a write
                 Err(io::ErrorKind::WouldBlock.into())
@@ -255,9 +272,7 @@ impl Inner {
         }
 
         if let Some(&mut Action::WriteError(ref mut err)) = self.action() {
-            let err = err.take().expect("Should have been removed from actions.");
-            let err = Arc::try_unwrap(err).expect("There are no other references.");
-            return Err(err);
+            return Err(take_error(err));
         }
 
         for i in 0..self.actions.len() {
