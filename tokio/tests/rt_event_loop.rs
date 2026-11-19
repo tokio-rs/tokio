@@ -338,6 +338,45 @@ fn wake_from_another_thread_is_readable() {
 
 #[cfg(unix)]
 #[test]
+fn wake_on_the_host_thread_after_a_tick_is_reported_by_next_sleep() {
+    let mut el = event_loop();
+    let (tx, rx) = oneshot::channel::<u32>();
+    let jh = el.handle().spawn(async move { rx.await.unwrap() });
+    assert_eq!(el.tick(64), 1);
+    // The host's own work, before it next sleeps, completes the task's wait.
+    tx.send(7).unwrap();
+    assert!(
+        !el.readable_now(),
+        "the host is running, so it is not notified"
+    );
+    assert_eq!(el.next_sleep(), ZERO);
+    el.pump_fd(|| jh.is_finished());
+
+    // After `next_sleep` the host may be asleep, so the same wake notifies it.
+    let (tx, rx) = oneshot::channel::<u32>();
+    let jh = el.handle().spawn(async move { rx.await.unwrap() });
+    el.drain();
+    tx.send(8).unwrap();
+    assert!(el.readable_now());
+    el.pump_fd(|| jh.is_finished());
+}
+
+#[test]
+fn park_with_ready_work_returns_without_waiting() {
+    let mut el = local_event_loop();
+    let (tx, rx) = oneshot::channel::<u32>();
+    let jh = el.spawn_local(async move { rx.await.unwrap() });
+    el.drain();
+    tx.send(3).unwrap();
+    let start = Instant::now();
+    el.park(Some(Duration::from_secs(5)));
+    assert!(start.elapsed() < Duration::from_secs(1));
+    assert_eq!(el.tick(64), 1);
+    assert!(jh.is_finished());
+}
+
+#[cfg(unix)]
+#[test]
 fn cross_loop_wake() {
     let mut a = local_event_loop();
     let mut b = local_event_loop();

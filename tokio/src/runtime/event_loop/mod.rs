@@ -48,8 +48,9 @@ use std::time::Duration;
 /// }
 /// ```
 ///
-/// The builder's `event_interval` has no role: the host's `max_tasks` bounds
-/// each batch.
+/// The host's `max_tasks` bounds each batch. The builder's
+/// `event_interval` bounds how many tasks run between turns of the driver
+/// while tasks are ready, as on a native runtime.
 ///
 /// Tasks are submitted through the [`Handle`] from any thread, and run in
 /// batches from those ticks. [`Handle::block_on`] from another thread works
@@ -243,6 +244,7 @@ impl<R: Scheduler> Core<R> {
     fn next_sleep(&self) -> Option<Duration> {
         let handle = self.handle();
         let driver = handle.inner.driver();
+        handle.inner.as_current_thread().end_host_busy();
         if self.local_ready || handle.inner.as_current_thread().has_remote_work() {
             return Some(Duration::ZERO);
         }
@@ -300,6 +302,8 @@ macro_rules! event_loop_methods {
 
         /// Polls the I/O driver without blocking, then polls up to
         /// `max_tasks` ready tasks. Returns the number of tasks polled.
+        /// While tasks are ready, the driver is polled only once
+        /// `event_interval` tasks have run since it last was.
         /// `max_tasks == 0` drains the driver without running any tasks.
         ///
         /// Call this on a wakeup or when [`next_sleep`](Self::next_sleep) has
@@ -333,9 +337,10 @@ macro_rules! event_loop_methods {
         /// wakeup: a tick may register a nearer timer, and a nearer timer
         /// registered from another thread, or by a `Handle::block_on`
         /// elsewhere, wakes the host so that it does. A wakeup that arrives
-        /// while the loop is being ticked is reported here only, not by the
-        /// descriptor or [`on_work_available`], so the host must tick until
-        /// this is no longer `Some(ZERO)` before waiting.
+        /// while the loop is being ticked, or on the host's thread after a
+        /// tick, is reported here only, not by the descriptor or
+        /// [`on_work_available`], so the host must call this after its own
+        /// work and tick until it is no longer `Some(ZERO)` before waiting.
         ///
         /// [`on_work_available`]: crate::runtime::Builder::on_work_available
         pub fn next_sleep(&self) -> Option<Duration> {
@@ -370,7 +375,9 @@ macro_rules! event_loop_methods {
         ///
         /// Waits in the driver for `min(timeout, next_sleep())`, dispatching
         /// I/O readiness, signals and due timers to the tasks that wait on
-        /// them, but running none: the next [`tick`](Self::tick) does. A
+        /// them, but running none: the next [`tick`](Self::tick) does. With
+        /// tasks ready, it returns at once, polling the driver only once
+        /// `event_interval` tasks have run since it last did. A
         /// `timeout` of `None` waits indefinitely for a wakeup or a timer;
         /// with neither pending (no tasks, no I/O driver) only an `Unparker`
         /// can end it.

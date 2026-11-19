@@ -9,11 +9,23 @@
 //! is set before the host re-checks for work in `next_sleep`, and both sides
 //! swap, so either the wakeup observes `parked` or the host observes the
 //! work queued before it.
+//!
+//! The exception is a wakeup on the host's own thread between a turn and the
+//! host's next `next_sleep` or park, typically from the host's own work
+//! completing a task's I/O: the host cannot be asleep, and it must re-check
+//! for work before it sleeps, so the wakeup only queues, leaving `parked`
+//! for the first wakeup from elsewhere.
+//!
+//! While work is ready, a turn polls the driver only once `event_interval`
+//! tasks have run since it last did, as a native runtime does between
+//! batches, so a park that wakes for I/O and the tick that follows it turn
+//! the driver once.
 
 use super::{Context, Core, CoreGuard, CurrentThread, Handle};
 use crate::loom::sync::Arc;
+use crate::runtime::context;
 
-use std::sync::atomic::Ordering::{AcqRel, Acquire};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed};
 use std::thread;
 use std::time::Duration;
 
@@ -48,6 +60,19 @@ impl Handle {
     /// The host is idle: the next remote wakeup notifies it.
     pub(crate) fn set_host_idle(&self) {
         self.shared.parked.swap(true, AcqRel);
+    }
+
+    /// The host may sleep from here: a wakeup on any thread notifies it.
+    pub(crate) fn end_host_busy(&self) {
+        self.shared.host_busy_on.store(0, Relaxed);
+    }
+
+    /// Whether this is the host's thread between a turn and its next
+    /// `next_sleep` or park. Only that thread stores its own id, so a
+    /// relaxed load that matches it is current.
+    pub(crate) fn is_host_busy_here(&self) -> bool {
+        let busy = self.shared.host_busy_on.load(Relaxed);
+        busy != 0 && context::thread_id().is_ok_and(|id| id.as_u64() == busy)
     }
 
     /// Whether a remote wakeup has queued tasks, or an `Unparker` has woken
@@ -112,6 +137,7 @@ struct Turn<'a> {
 
 impl<'a> Turn<'a> {
     fn begin(handle: &'a Handle) -> Turn<'a> {
+        handle.end_host_busy();
         handle.shared.parked.swap(false, AcqRel);
         let unparked = handle.shared.woken.swap(false, AcqRel);
         Turn { handle, unparked }
@@ -121,6 +147,20 @@ impl<'a> Turn<'a> {
 impl Drop for Turn<'_> {
     fn drop(&mut self) {
         self.handle.set_host_idle();
+        if let Ok(id) = context::thread_id() {
+            self.handle.shared.host_busy_on.store(id.as_u64(), Relaxed);
+        }
+    }
+}
+
+impl Context {
+    /// Whether ready work lets this turn skip the driver: it was polled
+    /// fewer than `event_interval` tasks ago and has not been unparked
+    /// since, which would leave its descriptor readable.
+    fn driver_is_fresh(&self, core: &Core, turn: &Turn<'_>) -> bool {
+        (turn.unparked || self.has_pending_work(core))
+            && core.tick.wrapping_sub(core.driver_tick) < self.handle.shared.config.event_interval
+            && !self.handle.shared.driver_unparked.load(Acquire)
     }
 }
 
@@ -128,10 +168,14 @@ impl CoreGuard<'_> {
     fn tick(self, max_tasks: usize) -> (usize, bool) {
         let ret = self.enter(|core, context| {
             let handle = &context.handle;
-            let _turn = Turn::begin(handle);
+            let turn = Turn::begin(handle);
             // The driver's turn: I/O readiness and due timers, ahead of the
             // batch that consumes what they wake.
-            let core = context.park_yield(core, handle);
+            let core = if context.driver_is_fresh(&core, &turn) {
+                core
+            } else {
+                context.park_yield(core, handle)
+            };
             let (core, ran) = context.run_batch(core, max_tasks);
             let local = !core.tasks.is_empty();
             (core, ran.map(|ran| (ran, local)))
@@ -149,6 +193,10 @@ impl CoreGuard<'_> {
         self.enter(|core, context| {
             let handle = &context.handle;
             let turn = Turn::begin(handle);
+            if context.driver_is_fresh(&core, &turn) {
+                let local = !core.tasks.is_empty();
+                return (core, local);
+            }
             let timeout = if turn.unparked {
                 Some(Duration::ZERO)
             } else {
