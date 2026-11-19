@@ -156,6 +156,24 @@ fn read_partial_then_not_ready() {
 }
 
 #[test]
+fn read_interrupted_is_retried() {
+    let mut task = task::spawn(());
+    let mock = mock! {
+        Err(io::Error::new(io::ErrorKind::Interrupted, "")),
+        Ok(b"\x00\x00\x00\x01".to_vec()),
+        Ok(b"\x00\x00\x00\x02".to_vec()),
+        Ok(b"".to_vec()),
+    };
+    let mut framed = FramedRead::new(mock, U32Decoder);
+
+    task.enter(|cx, _| {
+        assert_read!(pin!(framed).poll_next(cx), 1);
+        assert_read!(pin!(framed).poll_next(cx), 2);
+        assert!(assert_ready!(pin!(framed).poll_next(cx)).is_none());
+    });
+}
+
+#[test]
 fn read_err() {
     let mut task = task::spawn(());
     let mock = mock! {
