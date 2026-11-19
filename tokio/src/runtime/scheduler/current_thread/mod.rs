@@ -19,9 +19,9 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::future::{poll_fn, Future};
 use std::pin::Pin;
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 #[cfg(tokio_unstable)]
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
 use std::thread::ThreadId;
