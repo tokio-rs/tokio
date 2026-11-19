@@ -41,6 +41,11 @@ pub(crate) struct CurrentThread {
     /// Notifier for waking up other threads to steal the
     /// driver.
     notify: Notify,
+
+    /// The thread last recorded in the worker metrics by a host event loop's
+    /// turn, or 0, so that a turn only records it when it changes.
+    #[cfg(tokio_unstable)]
+    host_thread: AtomicU64,
 }
 
 /// Handle to the current thread scheduler
@@ -226,6 +231,8 @@ impl CurrentThread {
         let scheduler = CurrentThread {
             core,
             notify: Notify::new(),
+            #[cfg(tokio_unstable)]
+            host_thread: AtomicU64::new(0),
         };
 
         (scheduler, handle)

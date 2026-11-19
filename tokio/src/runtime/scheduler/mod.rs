@@ -49,6 +49,21 @@ pub(super) enum Context {
 }
 
 impl Handle {
+    /// Whether both are handles to the same runtime.
+    #[cfg(feature = "rt")]
+    pub(crate) fn ptr_eq(&self, other: &Handle) -> bool {
+        match (self, other) {
+            #[cfg(feature = "rt")]
+            (Handle::CurrentThread(a), Handle::CurrentThread(b)) => Arc::ptr_eq(a, b),
+
+            #[cfg(feature = "rt-multi-thread")]
+            (Handle::MultiThread(a), Handle::MultiThread(b)) => Arc::ptr_eq(a, b),
+
+            #[allow(unreachable_patterns)]
+            _ => false,
+        }
+    }
+
     #[cfg_attr(not(feature = "full"), allow(dead_code))]
     pub(crate) fn driver(&self) -> &driver::Handle {
         match *self {

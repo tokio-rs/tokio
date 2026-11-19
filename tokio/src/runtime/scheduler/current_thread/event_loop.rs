@@ -48,10 +48,16 @@ impl CurrentThread {
     fn host_core(&self, handle: &Arc<Handle>) -> CoreGuard<'_> {
         // `enter_runtime` has rejected a nested tick already.
         let core = self.take_core(handle).expect("core checked out");
-        handle
-            .shared
-            .worker_metrics
-            .set_thread_id(thread::current().id());
+        // `thread::current()` and the metrics' lock cost more than a turn's
+        // other bookkeeping, and an event loop is rarely moved.
+        let id = context::thread_id().map_or(0, |id| id.as_u64());
+        if id == 0 || self.host_thread.load(Relaxed) != id {
+            self.host_thread.store(id, Relaxed);
+            handle
+                .shared
+                .worker_metrics
+                .set_thread_id(thread::current().id());
+        }
         core
     }
 }
