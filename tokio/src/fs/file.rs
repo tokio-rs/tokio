@@ -318,6 +318,22 @@ impl File {
         let mut inner = self.inner.lock().await;
         inner.complete_inflight().await;
 
+        #[cfg(all(
+            not(test),
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
+        {
+            use crate::runtime::driver::op::Op;
+
+            if let Some(res) = self.uring_sync(Op::sync_all).await {
+                return res;
+            }
+        }
+
         let std = self.std.clone();
         asyncify(move || std.sync_all()).await
     }
@@ -353,8 +369,62 @@ impl File {
         let mut inner = self.inner.lock().await;
         inner.complete_inflight().await;
 
+        #[cfg(all(
+            not(test),
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
+        {
+            use crate::runtime::driver::op::Op;
+
+            if let Some(res) = self.uring_sync(Op::sync_data).await {
+                return res;
+            }
+        }
+
         let std = self.std.clone();
         asyncify(move || std.sync_data()).await
+    }
+
+    /// Flushes the file to disk with io_uring, if the runtime supports it.
+    ///
+    /// Returns `None` if it doesn't, so the caller flushes the file on the
+    /// blocking pool instead.
+    #[cfg(all(
+        not(test),
+        tokio_unstable,
+        feature = "io-uring",
+        feature = "rt",
+        feature = "fs",
+        target_os = "linux",
+    ))]
+    async fn uring_sync(
+        &self,
+        op: fn(
+            crate::io::uring::utils::ArcFd,
+        ) -> crate::runtime::driver::op::Op<crate::io::uring::fsync::Fsync>,
+    ) -> Option<io::Result<()>> {
+        let handle = crate::runtime::Handle::try_current().ok()?;
+        let driver_handle = handle.inner.driver().io.as_ref()?;
+        match driver_handle
+            .check_and_init(io_uring::opcode::Fsync::CODE)
+            .await
+        {
+            Ok(true) => {}
+            Ok(false) => return None,
+            Err(e) => return Some(Err(e)),
+        }
+
+        loop {
+            match op(self.std.clone()).await {
+                // Retry like `std::fs::File::sync_all`, which retries on `EINTR`.
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                res => return Some(res),
+            }
+        }
     }
 
     /// Truncates or extends the underlying file, updating the size of this file to become size.
