@@ -176,8 +176,9 @@ impl CoreGuard<'_> {
             let handle = &context.handle;
             let turn = Turn::begin(handle);
             // The driver's turn: I/O readiness and due timers, ahead of the
-            // batch that consumes what they wake.
-            let core = if context.driver_is_fresh(&core, &turn) {
+            // batch that consumes what they wake. A zero-task tick always
+            // drains it.
+            let core = if max_tasks > 0 && context.driver_is_fresh(&core, &turn) {
                 core
             } else {
                 context.park_yield(core, handle)

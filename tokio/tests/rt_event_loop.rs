@@ -362,6 +362,28 @@ fn wake_on_the_host_thread_after_a_tick_is_reported_by_next_sleep() {
 }
 
 #[test]
+fn tick_zero_turns_the_driver_with_ready_work() {
+    let mut el = event_loop();
+    el.handle().spawn(async {
+        loop {
+            tokio::task::yield_now().await;
+        }
+    });
+    el.tick(1);
+    let mut sleep = {
+        let _enter = el.enter();
+        tokio_test::task::spawn(tokio::time::sleep(Duration::from_millis(1)))
+    };
+    assert!(sleep.poll().is_pending());
+    std::thread::sleep(Duration::from_millis(10));
+    assert_eq!(el.tick(0), 0);
+    assert!(
+        sleep.is_woken(),
+        "the due timer fired without running tasks"
+    );
+}
+
+#[test]
 fn park_with_ready_work_returns_without_waiting() {
     let mut el = local_event_loop();
     let (tx, rx) = oneshot::channel::<u32>();
