@@ -380,3 +380,30 @@ async fn paused_time_spawn_unix_datagram_and_sleep() {
     h.await.unwrap();
     assert_eq!(time.elapsed(), Duration::from_millis(100));
 }
+
+#[cfg(not(any(target_os = "wasi", target_os = "emscripten")))]
+#[tokio::test(start_paused = true)]
+async fn advance_wakes_parked_driver() {
+    let start = Instant::now();
+    let duration = Duration::from_secs(60);
+    let (done_tx, done_rx) = std::sync::mpsc::channel();
+    let handle = tokio::runtime::Handle::current();
+
+    // The blocking task inhibits auto-advance, so the driver parks in
+    // real time. It stays alive until the timer fires, so its release
+    // cannot be what wakes the driver. Without the wake, the driver would
+    // sleep out the timeout in real time and the timer would still fire at
+    // the right virtual time, so the worker bounds the wait in real time.
+    let worker = tokio::task::spawn_blocking(move || {
+        std::thread::sleep(Duration::from_millis(20));
+        handle.block_on(time::advance(duration));
+        done_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("advance did not wake the parked driver");
+    });
+
+    time::sleep(duration).await;
+    assert_eq!(start.elapsed(), duration);
+    let _ = done_tx.send(());
+    worker.await.unwrap();
+}
