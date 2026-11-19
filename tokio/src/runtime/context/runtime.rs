@@ -63,7 +63,10 @@ where
         already_entered()
     };
     let ret = f(&mut guard.blocking);
-    if let Some(advanced) = CONTEXT.with(|c| c.rng.get()).map(|mut rng| rng.replace_seed(guard.old_seed.clone())) {
+    if let Some(advanced) = CONTEXT
+        .with(|c| c.rng.get())
+        .map(|mut rng| rng.replace_seed(guard.old_seed.clone()))
+    {
         *seed = advanced;
     }
     ret
