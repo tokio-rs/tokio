@@ -53,7 +53,8 @@ impl<S: Stream> Stream for ChunksTimeout<S> {
                 Poll::Ready(Some(item)) => {
                     if me.items.is_empty() {
                         me.deadline.set(Some(sleep(*me.duration)));
-                        me.items.reserve_exact(*me.cap);
+                        // Limit the initial allocation for large chunks; grow on demand.
+                        let _ = me.items.try_reserve_exact(usize::min(1024, *me.cap));
                     }
                     me.items.push(item);
                     if me.items.len() >= *me.cap {
