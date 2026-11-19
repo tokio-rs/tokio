@@ -301,8 +301,7 @@ impl<T> Block<T> {
     /// Mark a slot as ready
     fn set_ready(&self, slot: usize) -> usize {
         let mask = 1 << slot;
-        // Each slot is published once, so this bit is zero and cannot carry.
-        self.header.ready_slots.fetch_add(mask, Release)
+        self.header.ready_slots.fetch_or(mask, Release)
     }
 
     /// Returns `true` when all slots have their `ready` bits set.

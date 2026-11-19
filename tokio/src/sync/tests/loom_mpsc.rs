@@ -89,6 +89,48 @@ fn drop_rx_during_bounded_send() {
 }
 
 #[test]
+fn drop_rx_during_unbounded_send() {
+    drop_rx_during_unbounded_send_at(0);
+}
+
+#[test]
+fn drop_rx_during_unbounded_send_at_block_boundary() {
+    drop_rx_during_unbounded_send_at(BLOCK_CAP);
+}
+
+fn drop_rx_during_unbounded_send_at(start: usize) {
+    loom::model(move || {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        for _ in 0..start {
+            let (reply, _) = crate::sync::oneshot::channel::<()>();
+            tx.send(reply).unwrap();
+            drop(rx.try_recv().unwrap());
+        }
+        let sender1 = tx.clone();
+        let sender2 = tx.clone();
+        let (reply1, mut response1) = crate::sync::oneshot::channel::<()>();
+        let (reply2, mut response2) = crate::sync::oneshot::channel::<()>();
+
+        // Drop SendError too: either the send fails or the channel drops the value.
+        let send1 = thread::spawn(move || drop(sender1.send(reply1)));
+        let send2 = thread::spawn(move || drop(sender2.send(reply2)));
+        drop(rx);
+        send1.join().unwrap();
+        send2.join().unwrap();
+
+        assert_eq!(
+            response1.try_recv(),
+            Err(crate::sync::oneshot::error::TryRecvError::Closed)
+        );
+        assert_eq!(
+            response2.try_recv(),
+            Err(crate::sync::oneshot::error::TryRecvError::Closed)
+        );
+        drop(tx);
+    });
+}
+
+#[test]
 fn close_rx_during_permit_send() {
     loom::model(|| {
         let (tx, mut rx) = mpsc::channel(1);
