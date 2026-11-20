@@ -260,6 +260,33 @@ pub(crate) fn unpark(slot: &Slot) {
     }
 }
 
+#[cfg(all(tokio_unstable, feature = "rt"))]
+std::thread_local! {
+    static HOST_TURN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Runs `f` as an event loop's turn. The host calls it from its own loop,
+/// which already has the turn and has no promising activation to suspend, so
+/// a zero-duration park within it returns at once rather than yielding.
+#[cfg(all(tokio_unstable, feature = "rt"))]
+pub(crate) fn host_turn<R>(f: impl FnOnce() -> R) -> R {
+    struct Reset(bool);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            HOST_TURN.with(|t| t.set(self.0));
+        }
+    }
+    let _reset = Reset(HOST_TURN.with(|t| t.replace(true)));
+    f()
+}
+
+pub(crate) fn in_host_turn() -> bool {
+    #[cfg(all(tokio_unstable, feature = "rt"))]
+    return HOST_TURN.with(std::cell::Cell::get);
+    #[cfg(not(all(tokio_unstable, feature = "rt")))]
+    return false;
+}
+
 /// Suspend the owning activation for `dur` on a host timer, with nothing to
 /// unpark it: a park on a slot no parker owns.
 #[cfg(all(feature = "rt", feature = "net"))]
@@ -274,7 +301,8 @@ pub(crate) fn sleep(dur: Duration) {
 /// the deadline, but a zero-timeout `epoll_wait` is a synchronous probe, and
 /// the host loop is the only producer of readiness, so the scheduler's
 /// maintenance park would never let Node deliver socket events. Yield a
-/// host turn first, as the zero-duration `ParkThread` park does.
+/// host turn first, as the zero-duration `ParkThread` park does, except
+/// within an event loop's [`host_turn`].
 ///
 /// The real wait is a suspension like [`park`]'s, and clears the scheduler
 /// context for the same reason: a host activation entering tokio meanwhile
@@ -292,7 +320,9 @@ pub(crate) fn io_wait<R>(
 ) -> R {
     if jspi_enabled() {
         if max_wait == Some(Duration::ZERO) {
-            sleep(Duration::ZERO);
+            if !in_host_turn() {
+                sleep(Duration::ZERO);
+            }
             return wait(max_wait);
         }
         let _scheduler = crate::runtime::context::clear_scheduler();

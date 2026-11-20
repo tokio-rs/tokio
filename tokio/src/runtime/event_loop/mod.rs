@@ -32,6 +32,16 @@ use std::future::Future;
 use std::os::fd::BorrowedFd;
 use std::time::Duration;
 
+// Under JSPI a zero-duration park yields to the host by suspending, but a
+// tick runs from the host's own loop, with nothing to suspend.
+#[cfg(all(target_os = "emscripten", not(target_feature = "atomics")))]
+use crate::runtime::jspi::host_turn;
+
+#[cfg(not(all(target_os = "emscripten", not(target_feature = "atomics"))))]
+fn host_turn<R>(f: impl FnOnce() -> R) -> R {
+    f()
+}
+
 /// A runtime driven by a host event loop instead of by parking a thread.
 ///
 /// Built with [`Builder::build_event_loop`] from a `current_thread` builder.
@@ -230,12 +240,13 @@ impl<R: Scheduler> Core<R> {
     fn tick(&mut self, max_tasks: usize) -> usize {
         let runtime = &self.runtime;
         let handle = runtime.handle();
-        let (ran, local_ready) =
+        let (ran, local_ready) = host_turn(|| {
             context::enter_runtime_with_seed(&handle.inner, false, &mut self.rng_seed, |_| {
                 runtime
                     .current_thread()
                     .tick(handle.inner.as_current_thread(), max_tasks)
-            });
+            })
+        });
         self.local_ready = local_ready;
         ran
     }
