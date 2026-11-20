@@ -111,7 +111,7 @@ fn rt_multi_spawn_many_remote_busy2(c: &mut Criterion) {
     let flag = Arc::new(AtomicBool::new(true));
 
     // Spawn some tasks to keep the runtimes busy
-    for _ in 0..(NUM_WORKERS) {
+    for _ in 0..NUM_WORKERS {
         let flag = flag.clone();
         fn iter(flag: Arc<AtomicBool>) {
             tokio::spawn(async {
