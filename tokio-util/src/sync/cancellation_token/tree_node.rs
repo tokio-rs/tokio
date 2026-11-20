@@ -38,6 +38,7 @@
 //! Specifically, through invariant #2, we know that we always have to lock a parent
 //! before its child.
 //!
+use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::{Arc, Mutex, MutexGuard};
 
 /// A node of the cancellation tree structure
@@ -46,7 +47,9 @@ use crate::loom::sync::{Arc, Mutex, MutexGuard};
 pub(crate) struct TreeNode {
     inner: Mutex<Inner>,
     waker: tokio::sync::Notify,
+    is_cancelled: AtomicBool,
 }
+
 impl TreeNode {
     pub(crate) fn new() -> Self {
         Self {
@@ -58,9 +61,9 @@ impl TreeNode {
                 num_handles: 1,
             }),
             waker: tokio::sync::Notify::new(),
+            is_cancelled: AtomicBool::new(false),
         }
     }
-
     pub(crate) fn notified(&self) -> tokio::sync::futures::Notified<'_> {
         self.waker.notified()
     }
@@ -80,7 +83,7 @@ struct Inner {
 
 /// Returns whether or not the node is cancelled
 pub(crate) fn is_cancelled(node: &Arc<TreeNode>) -> bool {
-    node.inner.lock().unwrap().is_cancelled
+    node.is_cancelled.load(Ordering::Acquire)
 }
 
 /// Creates a child node
@@ -100,6 +103,7 @@ pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
                 num_handles: 1,
             }),
             waker: tokio::sync::Notify::new(),
+            is_cancelled: AtomicBool::new(true),
         });
     }
 
@@ -112,6 +116,7 @@ pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
             num_handles: 1,
         }),
         waker: tokio::sync::Notify::new(),
+        is_cancelled: AtomicBool::new(false),
     });
 
     locked_parent.children.push(child.clone());
@@ -344,6 +349,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
 
         // Cancel the child
         locked_child.is_cancelled = true;
+        child.is_cancelled.store(true, Ordering::Release);
         locked_child.children = Vec::new();
         drop(locked_child);
 
@@ -360,6 +366,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
 
     // Cancel the node itself.
     locked_node.is_cancelled = true;
+    node.is_cancelled.store(true, Ordering::Release);
     let to_notify = std::mem::take(&mut locked_node.children);
     drop(locked_node);
 

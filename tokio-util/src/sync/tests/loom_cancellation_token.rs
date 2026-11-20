@@ -183,3 +183,28 @@ fn cancel_parent_and_child() {
         assert_ok!(th3.join());
     });
 }
+
+#[test]
+fn is_cancelled_release_acquire() {
+    loom::model(|| {
+        let data = loom::sync::Arc::new(loom::sync::atomic::AtomicUsize::new(0));
+        let parent = CancellationToken::new();
+        let child = parent.child_token();
+
+        let data_clone = data.clone();
+        let parent_clone = parent.clone();
+        let t1 = loom::thread::spawn(move || {
+            data_clone.store(42, loom::sync::atomic::Ordering::Relaxed);
+            parent_clone.cancel();
+        });
+
+        if child.is_cancelled() {
+            assert_eq!(data.load(loom::sync::atomic::Ordering::Relaxed), 42);
+        }
+
+        t1.join().unwrap();
+        assert!(parent.is_cancelled());
+        assert!(child.is_cancelled());
+        assert_eq!(data.load(loom::sync::atomic::Ordering::Relaxed), 42);
+    });
+}
