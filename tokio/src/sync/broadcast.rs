@@ -399,7 +399,7 @@ struct Shared<T> {
     /// Lazily-allocated cache-padded sharded waiter lists for high receiver counts.
     shards: AtomicPtr<WaiterShards>,
 
-    /// Bitmask of waiter buckets (`bit 0` = inline `waiters`, `bits 1..=8` = `shards[0..8]`)
+    /// Bit mask of waiter buckets (`bit 0` = inline `waiters`, `bits 1..=8` = `shards[0..8]`)
     /// that currently contain at least one parked waiter.
     active_shards: AtomicU16,
 
@@ -1446,15 +1446,11 @@ impl<T> Receiver<T> {
                                 }
 
                                 if !(*ptr).queued.load(Relaxed) {
-                                    if !(*ptr).queued.load(Relaxed) {
-                                        if waiters.is_empty() {
-                                            self.shared
-                                                .active_shards
-                                                .fetch_or(1u16 << bucket, Release);
-                                        }
-                                        (*ptr).queued.store(true, Relaxed);
-                                        waiters.push_front(NonNull::new_unchecked(&mut *ptr));
+                                    if waiters.is_empty() {
+                                        self.shared.active_shards.fetch_or(1u16 << bucket, Release);
                                     }
+                                    (*ptr).queued.store(true, Relaxed);
+                                    waiters.push_front(NonNull::new_unchecked(&mut *ptr));
                                 }
                             });
                         }
