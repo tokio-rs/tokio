@@ -199,6 +199,53 @@ async fn replace() {
 }
 
 #[test]
+fn extend_without_key_bounds() {
+    struct Key(u8);
+
+    fn extend<K, V>(map: &mut StreamMap<K, V>, entries: impl IntoIterator<Item = (K, V)>) {
+        map.extend(entries);
+    }
+
+    let mut map = StreamMap::new();
+    extend(&mut map, [(Key(1), stream::iter([1]))]);
+    StreamMap::extend(&mut map, [(Key(2), stream::iter([2]))]);
+    Extend::extend(&mut map, [(Key(3), stream::iter([3]))]);
+
+    let mut keys: Vec<_> = map.keys().map(|key| key.0).collect();
+    keys.sort_unstable();
+    assert_eq!(keys, [1, 2, 3]);
+}
+
+#[tokio::test]
+async fn extend_keeps_existing_streams() {
+    let mut map = StreamMap::new();
+    map.insert("foo", stream::iter([1]));
+    map.insert("bar", stream::iter([2]));
+
+    map.extend([("foo", stream::iter([3]))]);
+
+    assert_eq!(map.len(), 3);
+    let mut values: Vec<_> = map.collect().await;
+    values.sort_unstable();
+    assert_eq!(values, [("bar", 2), ("foo", 1), ("foo", 3)]);
+}
+
+#[tokio::test]
+async fn extend_keeps_duplicate_keys() {
+    let mut map = StreamMap::new();
+    map.extend([
+        ("foo", stream::iter([1])),
+        ("bar", stream::iter([2])),
+        ("foo", stream::iter([3])),
+    ]);
+
+    assert_eq!(map.len(), 3);
+    let mut values: Vec<_> = map.collect().await;
+    values.sort_unstable();
+    assert_eq!(values, [("bar", 2), ("foo", 1), ("foo", 3)]);
+}
+
+#[test]
 fn size_hint_with_upper() {
     let mut map = StreamMap::new();
 
