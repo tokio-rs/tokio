@@ -487,7 +487,7 @@ impl Spawner {
                 if let Some(shutdown_tx) = shutdown_tx {
                     let id = thread_mgmt_state.worker_thread_index;
 
-                    match self.spawn_thread(shutdown_tx, rt, id) {
+                    match self.spawn_thread_retrying(shutdown_tx, rt, id) {
                         Ok(handle) => {
                             self.inner.metrics.inc_num_threads();
                             thread_mgmt_state.worker_thread_index += 1;
@@ -511,6 +511,42 @@ impl Spawner {
 
                 Ok(())
             })
+    }
+
+    /// [`Spawner::spawn_thread`], retried while the OS is briefly out of
+    /// threads (`EAGAIN`) and the pool has no blocking thread at all.
+    ///
+    /// With a thread in the pool, a failed start is fine: a busy thread picks
+    /// the task up later. With none, `spawn_blocking` panics ("OS can't spawn
+    /// worker thread"), and under memory or process-count pressure that takes
+    /// the whole process down for a condition that passes in moments. So wait
+    /// with a growing pause, about 2 s in all, before giving up.
+    ///
+    /// The caller holds the pool's thread-management lock, so other
+    /// spawners and shutdown wait while this sleeps. With no blocking thread
+    /// in the pool, no blocking worker needs the lock.
+    fn spawn_thread_retrying(
+        &self,
+        shutdown_tx: shutdown::Sender,
+        rt: &Handle,
+        id: usize,
+    ) -> io::Result<thread::JoinHandle<()>> {
+        let mut pause = Duration::from_millis(1);
+        loop {
+            match self.spawn_thread(shutdown_tx.clone(), rt, id) {
+                Err(ref e)
+                    if is_temporary_os_thread_error(e)
+                        && self.num_blocking_threads() == 0
+                        && pause <= Duration::from_millis(1024) =>
+                {
+                    // Not `thread::sleep`: that is loom's under `cfg(loom)`,
+                    // where a thread start never fails anyway.
+                    std::thread::sleep(pause);
+                    pause *= 2;
+                }
+                outcome => return outcome,
+            }
+        }
     }
 
     fn spawn_thread(
