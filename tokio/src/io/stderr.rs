@@ -16,6 +16,10 @@ cfg_io_std! {
     /// to occur as a single write, so multiple threads writing data with
     /// [`write_all`] may result in interleaved output.
     ///
+    /// Writes run on a blocking thread. Dropping a write future or this handle
+    /// does not cancel that write; it may keep running on the blocking pool, and
+    /// runtime shutdown waits for started blocking work.
+    ///
     /// Created by the [`stderr`] function.
     ///
     /// [`stderr`]: stderr()
@@ -49,6 +53,9 @@ cfg_io_std! {
     /// you should be aware that writes using [`write_all`] are not guaranteed
     /// to occur as a single write, so multiple threads writing data with
     /// [`write_all`] may result in interleaved output.
+    ///
+    /// Each write uses a blocking thread. Dropping the write future or this
+    /// handle does not cancel that write.
     ///
     /// Note that unlike [`std::io::stderr`], each call to this `stderr()`
     /// produces a new writer, so for example, this program does **not** flush stderr:

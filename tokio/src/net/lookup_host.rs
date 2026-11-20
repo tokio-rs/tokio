@@ -12,6 +12,13 @@ cfg_net! {
     /// This API is not intended to cover all DNS use cases. Anything beyond the
     /// basic use case should be done with a specialized library.
     ///
+    /// # Cancellation
+    ///
+    /// Resolving a host name runs on the blocking thread pool. Dropping the
+    /// returned future stops waiting for the result, but the underlying lookup
+    /// continues until it finishes. That unfinished work can delay runtime
+    /// shutdown.
+    ///
     /// # Examples
     ///
     /// To resolve a DNS entry:
