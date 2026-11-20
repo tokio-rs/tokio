@@ -397,3 +397,80 @@ async fn test_named_pipe_access() -> io::Result<()> {
     }
     Ok(())
 }
+
+#[tokio::test]
+async fn test_named_pipe_try_write_vectored() -> io::Result<()> {
+    const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-try-write-vectored";
+
+    let server = ServerOptions::new()
+        .first_pipe_instance(true)
+        .create(PIPE_NAME)?;
+    let client = ClientOptions::new().open(PIPE_NAME)?;
+    server.connect().await?;
+
+    let first = b"hello ";
+    let second = b"world";
+    let bufs = [io::IoSlice::new(first), io::IoSlice::new(second)];
+
+    client.writable().await?;
+    let written = client.try_write_vectored(&bufs)?;
+    assert_eq!(
+        written,
+        first.len() + second.len(),
+        "try_write_vectored must fill every buffer, not just the first"
+    );
+
+    let mut buf = [0u8; 11];
+    let mut read = 0;
+    while read < written {
+        server.readable().await?;
+        match server.try_read(&mut buf[read..]) {
+            Ok(0) => break,
+            Ok(n) => read += n,
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+            Err(e) => return Err(e),
+        }
+    }
+    assert_eq!(&buf[..read], b"hello world");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_named_pipe_try_read_vectored() -> io::Result<()> {
+    const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-try-read-vectored";
+
+    let server = ServerOptions::new()
+        .first_pipe_instance(true)
+        .create(PIPE_NAME)?;
+    let client = ClientOptions::new().open(PIPE_NAME)?;
+    server.connect().await?;
+
+    client.writable().await?;
+    client.try_write(b"0123456789")?;
+
+    let mut head = [0u8; 4];
+    let mut tail = [0u8; 6];
+    let mut bufs = [
+        io::IoSliceMut::new(&mut head),
+        io::IoSliceMut::new(&mut tail),
+    ];
+
+    let read = loop {
+        server.readable().await?;
+        match server.try_read_vectored(&mut bufs) {
+            Ok(n) => break n,
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+            Err(e) => return Err(e),
+        }
+    };
+
+    assert_eq!(
+        read, 10,
+        "try_read_vectored must fill every buffer, not just the first"
+    );
+    assert_eq!(&head, b"0123");
+    assert_eq!(&tail, b"456789");
+
+    Ok(())
+}
