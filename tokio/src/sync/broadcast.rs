@@ -131,7 +131,7 @@
 //! ```
 
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::atomic::{AtomicBool, AtomicUsize};
+use crate::loom::sync::atomic::{AtomicBool, AtomicPtr, AtomicU8, AtomicUsize};
 use crate::loom::sync::{Arc, Mutex, MutexGuard, RwLock};
 use crate::task::coop::cooperative;
 use crate::util::cacheline::CachePadded;
@@ -143,7 +143,6 @@ use std::future::Future;
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
-use std::sync::atomic::AtomicU8;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::task::{ready, Context, Poll, Waker};
 
@@ -372,32 +371,61 @@ const NUM_WAITER_SHARDS: usize = 2;
 #[cfg(not(loom))]
 const NUM_WAITER_SHARDS: usize = 8;
 
-#[inline]
-fn waiter_shard(ptr: *const Waiter) -> usize {
-    #[cfg(target_pointer_width = "64")]
-    const GOLDEN_RATIO: usize = 0x9e37_79b9_7f4a_7c15;
-    #[cfg(not(target_pointer_width = "64"))]
-    const GOLDEN_RATIO: usize = 0x9e37_79b9;
+/// Subscriber count threshold at which waiter lists transition from a single
+/// inline mutex to lazily-allocated cache-padded shards.
+#[cfg(loom)]
+const SHARDING_THRESHOLD: usize = 2;
+#[cfg(not(loom))]
+const SHARDING_THRESHOLD: usize = 32;
 
-    let addr = ptr as usize;
-    let hash = addr.wrapping_mul(GOLDEN_RATIO);
-    hash >> (usize::BITS - NUM_WAITER_SHARDS.ilog2())
-}
+type WaiterShards = [CachePadded<Mutex<LinkedList<Waiter>>>; NUM_WAITER_SHARDS];
 
 use super::Notify;
 
 /// Data shared between senders and receivers.
 struct Shared<T> {
+    /// slots in the channel.
     buffer: Box<[Mutex<Slot<T>>]>,
+
+    /// Mask a position -> index.
     mask: usize,
+
+    /// Tail of the queue.
     tail: RwLock<Tail>,
-    waiters: [CachePadded<Mutex<LinkedList<Waiter>>>; NUM_WAITER_SHARDS],
+
+    /// Default inline list of waiting receivers (used below `SHARDING_THRESHOLD`).
+    waiters: Mutex<LinkedList<Waiter>>,
+
+    /// Lazily-allocated cache-padded sharded waiter lists for high receiver counts.
+    shards: AtomicPtr<WaiterShards>,
+
+    /// Bitmask of sharded buckets that currently contain at least one waiter.
     active_shards: AtomicU8,
+
     #[cfg(loom)]
     next_shard: AtomicUsize,
+
+    /// Number of outstanding Sender handles.
     num_tx: AtomicUsize,
+
+    /// Number of outstanding weak Sender handles.
     num_weak_tx: AtomicUsize,
+
+    /// Notify when the last subscribed [`Receiver`] drops.
     notify_last_rx_drop: Notify,
+}
+
+impl<T> Drop for Shared<T> {
+    fn drop(&mut self) {
+        let ptr = self.shards.load(Acquire);
+        if !ptr.is_null() {
+            // Safety: `ptr` was allocated via `Box::into_raw(Box::new(...))`
+            // in `ensure_shards` and `Shared` is now being dropped exclusively.
+            unsafe {
+                drop(Box::from_raw(ptr));
+            }
+        }
+    }
 }
 
 /// Next position to write a value.
@@ -431,18 +459,20 @@ struct Slot<T> {
 }
 
 /// An entry in the wait queue.
+#[derive(Debug)]
 struct Waiter {
-    /// True if queued.
+    /// True if queued in a waiters list.
     queued: AtomicBool,
 
-    /// Shard index in `Shared::waiters`.
-    shard: usize,
-
-    /// Task waiting on the broadcast channel.
+    /// Task context to wake when a value is sent.
     waker: Option<Waker>,
 
     /// Intrusive linked-list pointers.
     pointers: linked_list::Pointers<Waiter>,
+
+    /// Target waiter bucket: `u8::MAX` if unassigned, `0` for inline `shared.waiters`,
+    /// or `1..=NUM_WAITER_SHARDS` for `shards[shard - 1]`.
+    shard: u8,
 
     /// Should not be `Unpin`.
     _p: PhantomPinned,
@@ -452,9 +482,9 @@ impl Waiter {
     fn new() -> Self {
         Self {
             queued: AtomicBool::new(false),
-            shard: usize::MAX,
             waker: None,
             pointers: linked_list::Pointers::new(),
+            shard: u8::MAX,
             _p: PhantomPinned,
         }
     }
@@ -603,8 +633,6 @@ impl<T> Sender<T> {
         });
 
         let shared = Arc::new(Shared {
-            #[cfg(loom)]
-            next_shard: AtomicUsize::new(0),
             buffer: buffer.collect(),
             mask: capacity - 1,
             tail: RwLock::new(Tail {
@@ -612,12 +640,19 @@ impl<T> Sender<T> {
                 rx_cnt: receiver_count,
                 closed: receiver_count == 0,
             }),
-            waiters: std::array::from_fn(|_| CachePadded::new(Mutex::new(LinkedList::new()))),
+            waiters: Mutex::new(LinkedList::new()),
+            shards: AtomicPtr::new(std::ptr::null_mut()),
             active_shards: AtomicU8::new(0),
+            #[cfg(loom)]
+            next_shard: AtomicUsize::new(0),
             num_tx: AtomicUsize::new(1),
             num_weak_tx: AtomicUsize::new(0),
             notify_last_rx_drop: Notify::new(),
         });
+
+        if receiver_count >= SHARDING_THRESHOLD {
+            shared.maybe_enable_shards(receiver_count);
+        }
 
         Sender { shared }
     }
@@ -981,9 +1016,11 @@ fn new_receiver<T>(shared: Arc<Shared<T>>) -> Receiver<T> {
     }
 
     tail.rx_cnt = tail.rx_cnt.checked_add(1).expect("overflow");
+    let rx_cnt = tail.rx_cnt;
     let next = tail.pos;
 
     drop(tail);
+    shared.maybe_enable_shards(rx_cnt);
 
     Receiver { shared, next }
 }
@@ -1038,71 +1075,142 @@ impl<'a> WaitersList<'a> {
 }
 
 impl<T> Shared<T> {
-    fn notify_rx(&self) {
-        if self.active_shards.load(Acquire) == 0 {
+    /// Lazily allocates the sharded waiter array once `rx_cnt >= SHARDING_THRESHOLD`.
+    fn maybe_enable_shards(&self, rx_cnt: usize) {
+        if rx_cnt < SHARDING_THRESHOLD || !self.shards.load(Acquire).is_null() {
             return;
         }
 
-        let mut wakers = WakeList::new();
-        for (shard_idx, shard) in self.waiters.iter().enumerate() {
-            let bit = 1u8 << shard_idx;
-            if self.active_shards.load(Acquire) & bit == 0 {
-                continue;
+        let boxed: Box<WaiterShards> = Box::new(std::array::from_fn(|_| {
+            CachePadded::new(Mutex::new(LinkedList::new()))
+        }));
+        let raw = Box::into_raw(boxed);
+
+        if self
+            .shards
+            .compare_exchange(std::ptr::null_mut(), raw, AcqRel, Acquire)
+            .is_err()
+        {
+            // Another thread initialized `shards` first; free our duplicate allocation.
+            unsafe {
+                drop(Box::from_raw(raw));
             }
-
-            let mut shard_guard = shard.lock();
-            if shard_guard.is_empty() {
-                self.active_shards.fetch_and(!bit, AcqRel);
-                continue;
-            }
-
-            let guard = Waiter::new();
-            pin!(guard);
-
-            let mut list =
-                WaitersList::new(std::mem::take(&mut *shard_guard), guard.as_ref(), shard);
-
-            'shard_loop: loop {
-                while wakers.can_push() {
-                    match list.pop_back_locked(&mut shard_guard) {
-                        Some(waiter) => unsafe {
-                            if let Some(waker) = (*waiter.as_ptr()).waker.take() {
-                                wakers.push(waker);
-                            }
-
-                            let queued = &(*waiter.as_ptr()).queued;
-                            assert!(queued.load(Relaxed));
-                            queued.store(false, Release);
-                        },
-                        None => {
-                            if shard_guard.is_empty() {
-                                self.active_shards.fetch_and(!bit, AcqRel);
-                            }
-                            break 'shard_loop;
-                        }
-                    }
-                }
-
-                drop(shard_guard);
-                wakers.wake_all();
-                shard_guard = shard.lock();
-            }
-
-            drop(shard_guard);
-            wakers.wake_all();
         }
     }
-    #[inline]
-    fn assign_shard(&self, ptr: *const Waiter) -> usize {
+
+    /// Assigns a bucket index (`0` = inline, `1..=NUM_WAITER_SHARDS` = shard index + 1).
+    fn assign_waiter_bucket(&self, _ptr: *const Waiter) -> u8 {
+        if self.shards.load(Acquire).is_null() {
+            return 0;
+        }
+
         #[cfg(loom)]
-        {
-            let _ = ptr;
-            self.next_shard.fetch_add(1, Relaxed) % NUM_WAITER_SHARDS
-        }
+        let shard_idx = self.next_shard.fetch_add(1, Relaxed) % NUM_WAITER_SHARDS;
+
         #[cfg(not(loom))]
-        {
-            waiter_shard(ptr)
+        let shard_idx = {
+            #[cfg(target_pointer_width = "64")]
+            const GOLDEN_RATIO: usize = 0x9e37_79b9_7f4a_7c15;
+            #[cfg(not(target_pointer_width = "64"))]
+            const GOLDEN_RATIO: usize = 0x9e37_79b9;
+
+            let hash = (_ptr as usize).wrapping_mul(GOLDEN_RATIO);
+            hash >> (usize::BITS - NUM_WAITER_SHARDS.ilog2())
+        };
+
+        (shard_idx as u8) + 1
+    }
+
+    /// Returns a reference to the mutex guarding `bucket` (`0` = inline, `1..=N` = shard).
+    ///
+    /// # Safety
+    /// If `bucket > 0`, `self.shards` must already be non-null (which is guaranteed once
+    /// `assign_waiter_bucket` returned `bucket > 0`, because `shards` is never reset to null
+    /// before `Shared` drops).
+    unsafe fn waiter_mutex(&self, bucket: u8) -> &Mutex<LinkedList<Waiter>> {
+        if bucket == 0 {
+            &self.waiters
+        } else {
+            // Safety: caller guarantees `bucket > 0` was returned by `assign_waiter_bucket`,
+            // which only happens after `self.shards` is initialized and remains valid until `Drop`.
+            let shards = unsafe { &*self.shards.load(Acquire) };
+            &shards[(bucket - 1) as usize]
         }
+    }
+
+    fn notify_rx(&self) {
+        let mut wakers = WakeList::new();
+
+        // 1. Drain the inline waiter list (fast path when `< SHARDING_THRESHOLD`).
+        self.drain_waiter_list(&self.waiters, None, &mut wakers);
+
+        // 2. Drain any active sharded waiter lists (used once `>= SHARDING_THRESHOLD`).
+        if self.active_shards.load(Acquire) != 0 {
+            let shards_ptr = self.shards.load(Acquire);
+            if !shards_ptr.is_null() {
+                // Safety: `shards_ptr` remains valid until `Shared` drops.
+                let shards = unsafe { &*shards_ptr };
+                for (shard_idx, shard) in shards.iter().enumerate() {
+                    let bit = 1u8 << shard_idx;
+                    if self.active_shards.load(Acquire) & bit == 0 {
+                        continue;
+                    }
+                    self.drain_waiter_list(shard, Some(bit), &mut wakers);
+                }
+            }
+        }
+    }
+
+    fn drain_waiter_list(
+        &self,
+        list_mutex: &Mutex<LinkedList<Waiter>>,
+        shard_bit: Option<u8>,
+        wakers: &mut WakeList,
+    ) {
+        let mut guard_lock = list_mutex.lock();
+        if guard_lock.is_empty() {
+            if let Some(bit) = shard_bit {
+                self.active_shards.fetch_and(!bit, AcqRel);
+            }
+            return;
+        }
+
+        let guard = Waiter::new();
+        pin!(guard);
+
+        let mut list =
+            WaitersList::new(std::mem::take(&mut *guard_lock), guard.as_ref(), list_mutex);
+
+        'drain_loop: loop {
+            while wakers.can_push() {
+                match list.pop_back_locked(&mut guard_lock) {
+                    Some(waiter) => unsafe {
+                        if let Some(waker) = (*waiter.as_ptr()).waker.take() {
+                            wakers.push(waker);
+                        }
+
+                        let queued = &(*waiter.as_ptr()).queued;
+                        assert!(queued.load(Relaxed));
+                        queued.store(false, Release);
+                    },
+                    None => {
+                        if let Some(bit) = shard_bit {
+                            if guard_lock.is_empty() {
+                                self.active_shards.fetch_and(!bit, AcqRel);
+                            }
+                        }
+                        break 'drain_loop;
+                    }
+                }
+            }
+
+            drop(guard_lock);
+            wakers.wake_all();
+            guard_lock = list_mutex.lock();
+        }
+
+        drop(guard_lock);
+        wakers.wake_all();
     }
 }
 
@@ -1319,18 +1427,13 @@ impl<T> Receiver<T> {
                     if let Some((waiter, waker)) = waiter {
                         // Safety: called while locked.
                         unsafe {
-                            // Only queue if not already queued
                             waiter.with_mut(|ptr| {
-                                if (*ptr).shard == usize::MAX {
-                                    (*ptr).shard = self.shared.assign_shard(ptr);
+                                if (*ptr).shard == u8::MAX {
+                                    (*ptr).shard = self.shared.assign_waiter_bucket(ptr);
                                 }
-                                let shard = (*ptr).shard;
-                                let mut waiters = self.shared.waiters[shard].lock();
+                                let bucket = (*ptr).shard;
+                                let mut waiters = self.shared.waiter_mutex(bucket).lock();
 
-                                // If there is no waker **or** if the currently
-                                // stored waker references a **different** task,
-                                // track the tasks' waker to be notified on
-                                // receipt of a new value.
                                 match (*ptr).waker {
                                     Some(ref w) if w.will_wake(waker) => {}
                                     _ => {
@@ -1338,10 +1441,11 @@ impl<T> Receiver<T> {
                                     }
                                 }
 
-                                // If the waiter is not already queued, enqueue it.
                                 if !(*ptr).queued.load(Relaxed) {
-                                    if waiters.is_empty() {
-                                        self.shared.active_shards.fetch_or(1 << shard, Release);
+                                    if bucket > 0 && waiters.is_empty() {
+                                        self.shared
+                                            .active_shards
+                                            .fetch_or(1 << (bucket - 1), Release);
                                     }
                                     (*ptr).queued.store(true, Relaxed);
                                     waiters.push_front(NonNull::new_unchecked(&mut *ptr));
@@ -1661,7 +1765,7 @@ impl<'a, T> Recv<'a, T> {
             receiver,
             waiter: WaiterCell(UnsafeCell::new(Waiter {
                 queued: AtomicBool::new(false),
-                shard: usize::MAX,
+                shard: u8::MAX,
                 waker: None,
                 pointers: linked_list::Pointers::new(),
                 _p: PhantomPinned,
@@ -1718,8 +1822,8 @@ impl<'a, T> Drop for Recv<'a, T> {
         // If not, no further synchronization is required, since the waiter
         // is not in the list and, as such, is not shared with any other threads.
         if queued {
-            let shard = self.waiter.0.with(|ptr| unsafe { (*ptr).shard });
-            let mut waiters = self.receiver.shared.waiters[shard].lock();
+            let bucket = self.waiter.0.with(|ptr| unsafe { (*ptr).shard });
+            let mut waiters = unsafe { self.receiver.shared.waiter_mutex(bucket).lock() };
 
             let queued = self
                 .waiter
