@@ -231,7 +231,7 @@ impl ShardedImpl {
             };
             for task in tasks {
                 metrics.dec_queue_depth();
-                task.shutdown_or_run_if_mandatory();
+                task.shutdown_or_run_if_mandatory(metrics);
             }
         }
     }
@@ -306,7 +306,7 @@ impl ShardedImpl {
             // other workers are not blocked on this worker.
             while let Some(task) = self.pop(&mut cursor) {
                 metrics.dec_queue_depth();
-                task.run();
+                task.run(metrics);
             }
 
             coord = self.coord.lock();
@@ -322,7 +322,7 @@ impl ShardedImpl {
             if let Some(task) = self.pop(&mut cursor) {
                 metrics.dec_queue_depth();
                 drop(coord);
-                task.run();
+                task.run(metrics);
                 continue 'main;
             }
 
@@ -412,7 +412,7 @@ impl ShardedImpl {
 #[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
-    use crate::runtime::blocking::pool::Mandatory;
+    use crate::runtime::blocking::pool::BlockingTaskKind;
     use crate::runtime::blocking::schedule::BlockingSchedule;
     use crate::runtime::blocking::task::BlockingTask;
     #[cfg(not(target_family = "wasm"))]
@@ -440,7 +440,7 @@ mod tests {
             id,
             task::SpawnLocation::capture(),
         );
-        Task::new(task, Mandatory::NonMandatory)
+        Task::new(task, BlockingTaskKind::Regular, &SpawnerMetrics::default())
     }
 
     // Bypass only random shard selection, leaving worker execution and its
@@ -552,8 +552,9 @@ mod tests {
         drop(tx);
 
         let mut cursor = PopCursor::new_for_test();
+        let metrics = SpawnerMetrics::default();
         while let Some(task) = queue.pop(&mut cursor) {
-            task.run();
+            task.run(&metrics);
         }
         rx.try_iter().collect()
     }

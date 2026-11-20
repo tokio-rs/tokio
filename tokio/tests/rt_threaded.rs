@@ -36,6 +36,36 @@ fn single_thread() {
 #[test]
 #[cfg(not(target_family = "wasm"))]
 #[cfg_attr(miri, ignore)]
+fn block_in_place_hands_off_core_with_another_runtime_entered() {
+    let a = runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .build()
+        .unwrap();
+    let b = runtime::Builder::new_current_thread().build().unwrap();
+    let a_handle = a.handle().clone();
+    let b_handle = b.handle().clone();
+    let result = a.block_on(async move {
+        tokio::spawn(async move {
+            let _guard = b_handle.enter();
+            tokio::task::block_in_place(|| {
+                let (tx, rx) = mpsc::channel();
+                a_handle.spawn(async move {
+                    let _ = tx.send(());
+                });
+                rx.recv_timeout(std::time::Duration::from_secs(5))
+            })
+        })
+        .await
+        .unwrap()
+    });
+    a.shutdown_background();
+    b.shutdown_background();
+    assert!(result.is_ok(), "replacement worker did not run: {result:?}");
+}
+
+#[test]
+#[cfg(not(target_family = "wasm"))]
+#[cfg_attr(miri, ignore)]
 fn build_returns_error_if_worker_thread_cannot_be_spawned() {
     let spawn_result = std::thread::Builder::new()
         .stack_size(usize::MAX)
