@@ -146,13 +146,8 @@ static GLOBALS: OnceLock<Globals> = OnceLock::new();
 
 /// Returns the process-wide signal registry, initializing it on first use.
 ///
-/// Initialization is fallible because the signal self-pipe cannot always be
-/// created. A failed initialization is deliberately not cached: the reported
-/// failures are transient (the same machine fails sometimes and works fine
-/// minutes later), so caching a failed result would leave signals, and any
-/// `enable_all()` runtime, dead for the rest of the process after one bad
-/// moment. Retrying lets a later call succeed once the underlying condition
-/// (such as file descriptor exhaustion) clears.
+/// A failed initialization is not cached so that a subsequent call can succeed
+/// if the underlying error (such as file descriptor exhaustion) is transient.
 pub(crate) fn globals() -> io::Result<&'static Globals>
 where
     OsExtraData: 'static + Send + Sync,
