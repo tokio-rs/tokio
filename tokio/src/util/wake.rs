@@ -41,6 +41,9 @@ pub(crate) fn waker_ref<W: Wake>(wake: &Arc<W>) -> WakerRef<'_> {
     }
 }
 
+// Keep the vtable at one address per Wake type so will_wake identifies a
+// borrowed Waker and its clone as waking the same task.
+#[inline(never)]
 fn waker_vtable<W: Wake>() -> &'static RawWakerVTable {
     &RawWakerVTable::new(
         clone_arc_raw::<W>,
