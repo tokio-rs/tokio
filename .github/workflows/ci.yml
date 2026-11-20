@@ -1242,6 +1242,20 @@ jobs:
           CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
           RUSTFLAGS: "-Dwarnings -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576"
 
+      - name: Test the tokio event loop for emscripten (JSPI)
+        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros,net" --test rt_emscripten_event_loop
+        working-directory: tokio
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
+          RUSTFLAGS: "-Dwarnings --cfg tokio_unstable -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sJSPI -Clink-args=-sSTACK_SIZE=1048576 -Clink-args=-sMODULARIZE=instance -Clink-args=-sAUTO_INIT -Clink-args=-Wno-experimental -Clink-args=-sNODERAWSOCKETS -Clink-args=-sNODERAWFS"
+
+      - name: Test the tokio event loop for emscripten (non-JSPI)
+        run: cargo test -p tokio --target wasm32-unknown-emscripten --features "rt,time,sync,macros" --test rt_emscripten_event_loop
+        working-directory: tokio
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER: node
+          RUSTFLAGS: "-Dwarnings --cfg tokio_unstable -Clink-args=-sALLOW_MEMORY_GROWTH=1 -Clink-args=-sEXIT_RUNTIME=1 -Clink-args=-sSTACK_SIZE=1048576"
+
       - name: Install Rust ${{ env.rust_emscripten_nightly }}
         uses: dtolnay/rust-toolchain@nightly
         with:
