@@ -105,6 +105,17 @@ fn tick_from_host_callback_with_io_driver() {
     run_hosted(Builder::new_current_thread().enable_all());
 }
 
+// The reactor is an epoll set, whose descriptor the host listens on.
+#[cfg(feature = "net")]
+#[test]
+fn io_driver_exposes_event_fd() {
+    let el = Builder::new_current_thread()
+        .enable_all()
+        .build_local_event_loop(Default::default())
+        .unwrap();
+    assert!(el.event_fd().is_some());
+}
+
 #[test]
 fn timers_fire_when_driven_by_next_sleep() {
     let mut el = Builder::new_current_thread()
