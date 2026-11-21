@@ -126,6 +126,10 @@ impl<S: Stream> Stream for SinkWriter<S> {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.project().inner.poll_next(cx)
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
 }
 
 impl<S: AsyncRead> AsyncRead for SinkWriter<S> {

@@ -79,3 +79,14 @@ async fn test_direct_sink_writer() -> Result<(), Error> {
 
     Ok(())
 }
+
+#[test]
+fn test_stream_size_hint_is_forwarded() {
+    use futures_core::Stream;
+
+    let copy_to_bytes = CopyToBytes::new(tokio_stream::iter(vec![1u8, 2, 3]));
+    assert_eq!(copy_to_bytes.size_hint(), (3, Some(3)));
+
+    let sink_writer = SinkWriter::new(tokio_stream::iter(vec![1u8, 2, 3]));
+    assert_eq!(sink_writer.size_hint(), (3, Some(3)));
+}
