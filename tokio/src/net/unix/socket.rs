@@ -98,16 +98,17 @@ cfg_net_unix! {
 }
 
 impl UnixSocket {
-    // emscripten's node backend has no `getsockopt(SO_TYPE)`, and datagram
-    // sockets are unavailable there, so every `UnixSocket` is a stream.
-    #[cfg(target_os = "emscripten")]
     fn ty(&self) -> socket2::Type {
-        socket2::Type::STREAM
-    }
-
-    #[cfg(not(target_os = "emscripten"))]
-    fn ty(&self) -> socket2::Type {
-        self.inner.r#type().unwrap()
+        // emscripten's node backend has no `getsockopt(SO_TYPE)`, and datagram
+        // sockets are unavailable there, so every `UnixSocket` is a stream.
+        #[cfg(target_os = "emscripten")]
+        {
+            socket2::Type::STREAM
+        }
+        #[cfg(not(target_os = "emscripten"))]
+        {
+            self.inner.r#type().unwrap()
+        }
     }
 
     /// Creates a new Unix datagram socket.

@@ -20,15 +20,14 @@ use std::io;
 use std::pin::pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, Wake, Waker};
-// `SO_LINGER` (the only `Duration` consumer) is unsupported on WASI/emscripten.
-#[cfg(not(any(target_os = "wasi", target_os = "emscripten")))]
-use std::time::Duration;
 
 #[tokio::test]
 #[cfg(not(any(target_os = "wasi", target_os = "emscripten")))] // WASI/emscripten do not support `SO_LINGER`
 #[cfg_attr(miri, ignore = "Miri doesn't support `SO_LINGER`")]
 #[expect(deprecated)] // set_linger is deprecated
 async fn set_linger() {
+    use std::time::Duration;
+
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
 
     let stream = TcpStream::connect(listener.local_addr().unwrap())
