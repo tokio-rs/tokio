@@ -5,6 +5,7 @@ use crate::runtime::driver::op::Lifecycle;
 use io_uring::{opcode, Probe};
 use std::io;
 use std::os::fd::AsRawFd;
+use std::task::Waker;
 
 // Builds a driver whose io_uring context is stored and registered, or returns
 // `None` when io_uring is unavailable on the host.
@@ -149,6 +150,101 @@ fn register_op_keeps_entry_on_submit_failure() {
         handle.get_uring().lock().ops.get(index),
         Some(Lifecycle::Waiting(_))
     ));
+
+    drop(broken);
+}
+
+fn nops(count: usize) -> impl ExactSizeIterator<Item = io_uring::squeue::Entry> {
+    (0..count).map(|_| opcode::Nop::new().build())
+}
+
+// A link only reaches the next entry in the submission queue, so a chain that
+// doesn't fit in the queue is refused before anything is pushed.
+#[test]
+#[cfg_attr(miri, ignore)]
+fn register_ops_refuses_chain_larger_than_queue() {
+    let Some((_driver, handle)) = ready_handle() else {
+        return;
+    };
+
+    let capacity = handle.get_uring().lock().ring_mut().submission().capacity();
+    let mut index = Vec::new();
+    // SAFETY: no-op entries do not reference any buffer.
+    let res =
+        unsafe { handle.register_ops(nops(capacity + 1), true, Waker::noop(), |i| index.push(i)) };
+
+    let err = res.expect_err("a chain larger than the queue is refused");
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+    assert!(index.is_empty());
+    assert!(handle.get_uring().lock().ops.is_empty());
+}
+
+// A batch is pushed as far as there is room, so it can be larger than the queue.
+#[test]
+#[cfg_attr(miri, ignore)]
+fn register_ops_splits_batch_larger_than_queue() {
+    let Some((_driver, handle)) = ready_handle() else {
+        return;
+    };
+
+    let capacity = handle.get_uring().lock().ring_mut().submission().capacity();
+    let count = capacity + capacity / 2;
+    let mut index = Vec::new();
+    // SAFETY: no-op entries do not reference any buffer.
+    let res = unsafe { handle.register_ops(nops(count), false, Waker::noop(), |i| index.push(i)) };
+
+    res.expect("a batch larger than the queue is submitted");
+    assert_eq!(index.len(), count);
+    let ctx = handle.get_uring().lock();
+    assert!(index.iter().all(|&i| ctx.ops.contains(i)));
+}
+
+// When the submit fails after the entries were pushed, every pushed entry is
+// reported, so the caller keeps their memory alive until they complete.
+#[test]
+#[cfg_attr(miri, ignore)]
+fn register_ops_reports_pushed_entries_on_submit_failure() {
+    let Some((_driver, handle)) = ready_handle() else {
+        return;
+    };
+
+    let broken = BrokenRing::new(&handle);
+
+    let mut index = Vec::new();
+    // SAFETY: no-op entries do not reference any buffer.
+    let res = unsafe { handle.register_ops(nops(3), true, Waker::noop(), |i| index.push(i)) };
+
+    res.expect_err("the submit fails after the push");
+    assert_eq!(index.len(), 3);
+    let ctx = handle.get_uring().lock();
+    for i in index {
+        assert!(matches!(ctx.ops.get(i), Some(Lifecycle::Waiting(_))));
+    }
+    drop(ctx);
+
+    drop(broken);
+}
+
+// A batch larger than the queue fills it, and then the flush fails. Only the
+// entries that were pushed are reported and keep a slot.
+#[test]
+#[cfg_attr(miri, ignore)]
+fn register_ops_reports_only_pushed_entries_when_flush_fails() {
+    let Some((_driver, handle)) = ready_handle() else {
+        return;
+    };
+
+    let capacity = handle.get_uring().lock().ring_mut().submission().capacity();
+    let broken = BrokenRing::new(&handle);
+
+    let mut index = Vec::new();
+    // SAFETY: no-op entries do not reference any buffer.
+    let res =
+        unsafe { handle.register_ops(nops(capacity + 1), false, Waker::noop(), |i| index.push(i)) };
+
+    res.expect_err("the flush fails");
+    assert_eq!(index.len(), capacity);
+    assert_eq!(handle.get_uring().lock().ops.len(), capacity);
 
     drop(broken);
 }
