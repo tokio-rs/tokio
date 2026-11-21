@@ -38,8 +38,6 @@
 //! Specifically, through invariant #2, we know that we always have to lock a parent
 //! before its child.
 //!
-use std::sync::atomic::fence;
-
 use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::{Arc, Mutex, MutexGuard};
 
@@ -49,6 +47,7 @@ use crate::loom::sync::{Arc, Mutex, MutexGuard};
 pub(crate) struct TreeNode {
     inner: Mutex<Inner>,
     waker: tokio::sync::Notify,
+    /// Mirrors `Inner::is_cancelled` for lock-free reads. Only mutated while holding `inner`.
     is_cancelled: AtomicBool,
 }
 
@@ -66,6 +65,7 @@ impl TreeNode {
             is_cancelled: AtomicBool::new(false),
         }
     }
+
     pub(crate) fn notified(&self) -> tokio::sync::futures::Notified<'_> {
         self.waker.notified()
     }
@@ -371,10 +371,6 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
     node.is_cancelled.store(true, Ordering::Release);
     let to_notify = std::mem::take(&mut locked_node.children);
     drop(locked_node);
-
-    // Ensure the `is_cancelled` stores above are visible to any task that
-    // registers a waker on `Notify` and then re-checks `is_cancelled()`.
-    fence(Ordering::SeqCst);
 
     for child in to_notify {
         child.waker.notify_waiters();

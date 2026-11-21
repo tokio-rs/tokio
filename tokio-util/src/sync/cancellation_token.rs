@@ -9,7 +9,6 @@ use crate::util::MaybeDangling;
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
-use std::sync::atomic::{fence, Ordering};
 
 use guard::DropGuard;
 use guard_ref::DropGuardRef;
@@ -348,21 +347,16 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        let mut this = self.project();
-        loop {
-            if this.future.as_mut().poll(cx).is_pending() {
-                // Pair with the `SeqCst` fence in `tree_node::cancel` before
-                // `notify_waiters()` so we cannot miss a wakeup if `cancel()` ran
-                // between the initial `is_cancelled()` check and `Notified::poll()`.
-                fence(Ordering::SeqCst);
-                if this.cancellation_token.is_cancelled() {
-                    return Poll::Ready(());
-                }
-                return Poll::Pending;
-            }
-
-            this.future.set(this.cancellation_token.inner.notified());
+        let this = self.project();
+        if this.cancellation_token.is_cancelled() {
+            return Poll::Ready(());
         }
+
+        // No wakeups can be lost here because there is always a call to
+        // `is_cancelled` between the creation of the future and the call to
+        // `poll`, and the code that sets the cancelled flag does so before
+        // waking the `Notified`.
+        this.future.poll(cx)
     }
 }
 
@@ -407,31 +401,17 @@ impl Future for WaitForCancellationFutureOwned {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        let mut this = self.project();
+        let this = self.project();
 
-        loop {
-            if this.cancellation_token.is_cancelled() {
-                return Poll::Ready(());
-            }
-
-            if this.future.as_mut().poll(cx).is_pending() {
-                // Pair with the `SeqCst` fence in `tree_node::cancel` before
-                // `notify_waiters()` so we cannot miss a wakeup if `cancel()` ran
-                // between the initial `is_cancelled()` check and `Notified::poll()`.
-                fence(Ordering::SeqCst);
-                if this.cancellation_token.is_cancelled() {
-                    return Poll::Ready(());
-                }
-                return Poll::Pending;
-            }
-
-            // # Safety
-            //
-            // cancellation_token is dropped after future due to the field ordering.
-            this.future.set(MaybeDangling::new(unsafe {
-                Self::new_future(this.cancellation_token)
-            }));
+        if this.cancellation_token.is_cancelled() {
+            return Poll::Ready(());
         }
+
+        // No wakeups can be lost here because there is always a call to
+        // `is_cancelled` between the creation of the future and the call to
+        // `poll`, and the code that sets the cancelled flag does so before
+        // waking the `Notified`.
+        this.future.poll(cx)
     }
 }
 
