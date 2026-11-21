@@ -38,6 +38,9 @@
 //! Specifically, through invariant #2, we know that we always have to lock a parent
 //! before its child.
 //!
+use std::sync::atomic::fence;
+
+use crate::loom::sync::atomic::{AtomicBool, Ordering};
 use crate::loom::sync::{Arc, Mutex, MutexGuard};
 
 /// A node of the cancellation tree structure
@@ -46,7 +49,9 @@ use crate::loom::sync::{Arc, Mutex, MutexGuard};
 pub(crate) struct TreeNode {
     inner: Mutex<Inner>,
     waker: tokio::sync::Notify,
+    is_cancelled: AtomicBool,
 }
+
 impl TreeNode {
     pub(crate) fn new() -> Self {
         Self {
@@ -58,9 +63,9 @@ impl TreeNode {
                 num_handles: 1,
             }),
             waker: tokio::sync::Notify::new(),
+            is_cancelled: AtomicBool::new(false),
         }
     }
-
     pub(crate) fn notified(&self) -> tokio::sync::futures::Notified<'_> {
         self.waker.notified()
     }
@@ -80,7 +85,21 @@ struct Inner {
 
 /// Returns whether or not the node is cancelled
 pub(crate) fn is_cancelled(node: &Arc<TreeNode>) -> bool {
-    node.inner.lock().unwrap().is_cancelled
+    #[cfg(all(test, loom))]
+    {
+        // `tokio::sync::Notify` is compiled with `std::sync` when `tokio-util`
+        // runs under `loom`, so Loom cannot observe the happens-before edge
+        // between `Notify::notify_waiters` and `Notified::poll`. Acquiring
+        // `node.inner` under `loom` models that synchronization without
+        // affecting production builds.
+        let _guard = node.inner.lock().unwrap();
+        node.is_cancelled.load(Ordering::Acquire)
+    }
+
+    #[cfg(not(all(test, loom)))]
+    {
+        node.is_cancelled.load(Ordering::Acquire)
+    }
 }
 
 /// Creates a child node
@@ -100,6 +119,7 @@ pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
                 num_handles: 1,
             }),
             waker: tokio::sync::Notify::new(),
+            is_cancelled: AtomicBool::new(true),
         });
     }
 
@@ -112,6 +132,7 @@ pub(crate) fn child_node(parent: &Arc<TreeNode>) -> Arc<TreeNode> {
             num_handles: 1,
         }),
         waker: tokio::sync::Notify::new(),
+        is_cancelled: AtomicBool::new(false),
     });
 
     locked_parent.children.push(child.clone());
@@ -344,6 +365,7 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
 
         // Cancel the child
         locked_child.is_cancelled = true;
+        child.is_cancelled.store(true, Ordering::Release);
         locked_child.children = Vec::new();
         drop(locked_child);
 
@@ -360,8 +382,13 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
 
     // Cancel the node itself.
     locked_node.is_cancelled = true;
+    node.is_cancelled.store(true, Ordering::Release);
     let to_notify = std::mem::take(&mut locked_node.children);
     drop(locked_node);
+
+    // Ensure the `is_cancelled` stores above are visible to any task that
+    // registers a waker on `Notify` and then re-checks `is_cancelled()`.
+    fence(Ordering::SeqCst);
 
     for child in to_notify {
         child.waker.notify_waiters();
