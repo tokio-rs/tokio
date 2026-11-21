@@ -88,11 +88,20 @@ impl PollSemaphore {
                 fut_box
             }
             None => {
-                // avoid allocations completely if we can grab a permit immediately
-                match Arc::clone(&self.semaphore).try_acquire_many_owned(permits) {
-                    Ok(permit) => return Poll::Ready(Some(permit)),
-                    Err(TryAcquireError::Closed) => return Poll::Ready(None),
-                    Err(TryAcquireError::NoPermits) => {}
+                {
+                    let coop = ready!(crate::util::poll_proceed(cx));
+                    // avoid allocations completely if we can grab a permit immediately
+                    match Arc::clone(&self.semaphore).try_acquire_many_owned(permits) {
+                        Ok(permit) => {
+                            coop.made_progress();
+                            return Poll::Ready(Some(permit));
+                        }
+                        Err(TryAcquireError::Closed) => {
+                            coop.made_progress();
+                            return Poll::Ready(None);
+                        }
+                        Err(TryAcquireError::NoPermits) => {}
+                    }
                 }
 
                 let next_fut = Arc::clone(&self.semaphore).acquire_many_owned(permits);

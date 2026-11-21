@@ -129,6 +129,7 @@ impl AsyncRead for Receiver {
         let to_read = buf.remaining().min(inner.buf.remaining());
         if to_read == 0 {
             if inner.is_closed() || buf.remaining() == 0 {
+                coop.made_progress();
                 return Poll::Ready(Ok(()));
             }
 
@@ -203,6 +204,7 @@ impl AsyncWrite for Sender {
         let mut inner = self.inner.lock().unwrap();
 
         if inner.is_closed() {
+            coop.made_progress();
             return Poll::Ready(Err(IoError::new(IoErrorKind::BrokenPipe, CLOSED_ERROR_MSG)));
         }
 
@@ -213,6 +215,7 @@ impl AsyncWrite for Sender {
         let to_write = buf.len().min(free);
         if to_write == 0 {
             if buf.is_empty() {
+                coop.made_progress();
                 return Poll::Ready(Ok(0));
             }
 
@@ -288,10 +291,12 @@ impl AsyncWrite for Sender {
 
         let mut inner = self.inner.lock().unwrap();
         if inner.is_closed() {
+            coop.made_progress();
             return Poll::Ready(Err(IoError::new(IoErrorKind::BrokenPipe, CLOSED_ERROR_MSG)));
         }
 
         if bufs.iter().all(|buf| buf.is_empty()) {
+            coop.made_progress();
             return Poll::Ready(Ok(0));
         }
 
