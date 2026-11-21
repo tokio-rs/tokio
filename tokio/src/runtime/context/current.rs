@@ -9,8 +9,9 @@ use std::marker::PhantomData;
 #[derive(Debug)]
 #[must_use]
 pub(crate) struct SetCurrentGuard {
-    // The previous handle
-    prev: Option<scheduler::Handle>,
+    // The previous handle, unless it is the handle this guard set, in which
+    // case the current handle is left as it is.
+    prev: Option<Option<scheduler::Handle>>,
 
     // The depth for this guard
     depth: usize,
@@ -47,7 +48,15 @@ where
 
 impl Context {
     pub(super) fn set_current(&self, handle: &scheduler::Handle) -> SetCurrentGuard {
-        let old_handle = self.current.handle.borrow_mut().replace(handle.clone());
+        // Re-entering the current runtime, as a host event loop does on every
+        // turn, keeps its handle rather than cloning and restoring it.
+        let mut current = self.current.handle.borrow_mut();
+        let old_handle = if current.as_ref().is_some_and(|h| h.ptr_eq(handle)) {
+            None
+        } else {
+            Some(current.replace(handle.clone()))
+        };
+        drop(current);
         let depth = self.current.depth.get();
 
         assert!(depth != usize::MAX, "reached max `enter` depth");
@@ -90,7 +99,9 @@ impl Drop for SetCurrentGuard {
                 }
             }
 
-            *ctx.current.handle.borrow_mut() = self.prev.take();
+            if let Some(prev) = self.prev.take() {
+                *ctx.current.handle.borrow_mut() = prev;
+            }
             ctx.current.depth.set(depth - 1);
         });
     }

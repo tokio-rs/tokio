@@ -1,4 +1,6 @@
 use crate::loom::sync::atomic::AtomicBool;
+#[cfg(tokio_unstable)]
+use crate::loom::sync::atomic::AtomicU64;
 use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
@@ -17,6 +19,8 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::future::{poll_fn, Future};
 use std::pin::Pin;
+#[cfg(tokio_unstable)]
+use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::Waker;
@@ -24,6 +28,10 @@ use std::thread::ThreadId;
 use std::time::Duration;
 use std::time::Instant;
 use std::{fmt, thread};
+
+cfg_event_loop! {
+    mod event_loop;
+}
 
 /// Executes tasks on the current thread
 pub(crate) struct CurrentThread {
@@ -33,6 +41,11 @@ pub(crate) struct CurrentThread {
     /// Notifier for waking up other threads to steal the
     /// driver.
     notify: Notify,
+
+    /// The thread last recorded in the worker metrics by a host event loop's
+    /// turn, or 0, so that a turn only records it when it changes.
+    #[cfg(tokio_unstable)]
+    host_thread: AtomicU64,
 }
 
 /// Handle to the current thread scheduler
@@ -68,6 +81,10 @@ struct Core {
     /// Current tick
     tick: u32,
 
+    /// `tick` at the last driver turn.
+    #[cfg(tokio_unstable)]
+    driver_tick: u32,
+
     /// Runtime driver
     ///
     /// The driver is removed before starting to park the thread
@@ -98,6 +115,17 @@ struct Shared {
     /// Indicates whether the thread is currently parked in the driver so
     /// remote wakeups are coalesced.
     parked: AtomicBool,
+
+    /// The thread of a host event loop between a turn and its next
+    /// `next_sleep` or park, or 0. A wakeup on that thread does not unpark:
+    /// the host is running, and re-checks for work before it sleeps.
+    #[cfg(tokio_unstable)]
+    host_busy_on: AtomicU64,
+
+    /// Whether the driver was unparked since its last turn, so that its
+    /// descriptor is readable until the next turn consumes the wakeup.
+    #[cfg(tokio_unstable)]
+    driver_unparked: AtomicBool,
 
     /// Scheduler configuration options
     config: Config,
@@ -174,6 +202,10 @@ impl CurrentThread {
                 owned: OwnedTasks::new(1),
                 woken: AtomicBool::new(false),
                 parked: AtomicBool::new(false),
+                #[cfg(tokio_unstable)]
+                host_busy_on: AtomicU64::new(0),
+                #[cfg(tokio_unstable)]
+                driver_unparked: AtomicBool::new(false),
                 config,
                 scheduler_metrics: SchedulerMetrics::new(),
                 worker_metrics,
@@ -188,6 +220,8 @@ impl CurrentThread {
         let core = AtomicCell::new(Some(Box::new(Core {
             tasks: VecDeque::with_capacity(INITIAL_CAPACITY),
             tick: 0,
+            #[cfg(tokio_unstable)]
+            driver_tick: 0,
             driver: Some(driver),
             metrics: MetricsBatch::new(&handle.shared.worker_metrics),
             global_queue_interval,
@@ -197,6 +231,8 @@ impl CurrentThread {
         let scheduler = CurrentThread {
             core,
             notify: Notify::new(),
+            #[cfg(tokio_unstable)]
+            host_thread: AtomicU64::new(0),
         };
 
         (scheduler, handle)
@@ -495,6 +531,13 @@ impl Context {
         driver: &mut Driver,
         duration: Option<Duration>,
     ) -> Box<Core> {
+        #[cfg(tokio_unstable)]
+        let core = {
+            let mut core = core;
+            core.driver_tick = core.tick;
+            handle.shared.driver_unparked.store(false, Relaxed);
+            core
+        };
         let (core, ()) = self.enter(core, || {
             match duration {
                 Some(dur) => driver.park_timeout(&handle.driver, dur),
@@ -687,8 +730,19 @@ impl Handle {
     }
 
     pub(crate) fn unpark(&self) {
+        #[cfg(tokio_unstable)]
+        if self.is_host_busy_here() {
+            return;
+        }
         if self.shared.parked.swap(false, AcqRel) {
+            #[cfg(tokio_unstable)]
+            self.shared.driver_unparked.store(true, Release);
             self.driver.unpark();
+
+            #[cfg(tokio_unstable)]
+            if let Some(f) = &self.shared.config.on_work_available {
+                f();
+            }
         }
     }
 }

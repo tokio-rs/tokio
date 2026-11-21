@@ -3,6 +3,7 @@
 // unintentionally defined as a public module. Hide it from the documentation
 // instead of changing it to a private module to avoid breakage.
 #[doc(hidden)]
+#[cfg(not(target_os = "emscripten"))]
 pub mod datagram;
 
 pub(crate) mod listener;
