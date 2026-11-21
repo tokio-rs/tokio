@@ -74,16 +74,10 @@ pub async fn read(path: impl AsRef<Path>) -> io::Result<Vec<u8>> {
     ))]
     {
         use crate::fs::read_uring;
+        use crate::runtime::io::uring_supports;
 
-        if let Ok(handle) = crate::runtime::Handle::try_current() {
-            if let Some(driver_handle) = handle.inner.driver().io.as_ref() {
-                if driver_handle
-                    .check_and_init(io_uring::opcode::Read::CODE)
-                    .await?
-                {
-                    return read_uring(path).await;
-                }
-            }
+        if uring_supports(io_uring::opcode::Read::CODE) {
+            return read_uring(path).await;
         }
     }
 
