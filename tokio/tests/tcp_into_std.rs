@@ -6,6 +6,7 @@
     feature = "rt",
     feature = "io-util",
     not(all(target_os = "wasi", target_env = "p1")),
+    not(target_os = "emscripten"), // No blocking socket reads on emscripten.
 ))]
 
 use std::io::Read;

@@ -5,9 +5,9 @@
 //! timer at the deadline or by [`unpark`] from a later activation (a host
 //! callback entering tokio). Both the runtime driver and the thread parker
 //! behind `blocking_recv` and friends park through here, so neither needs the
-//! `rt` feature. The runtime stays entered while parked, so a `block_on` from
-//! another activation on the thread during the park panics as a nested
-//! runtime.
+//! `rt` feature; with `net`, Emscripten's `epoll_wait` suspends as well. The
+//! runtime stays entered while parked, so a `block_on` from another
+//! activation on the thread during the park panics as a nested runtime.
 
 use std::ffi::c_void;
 use std::ptr;
@@ -257,5 +257,55 @@ pub(crate) fn unpark(slot: &Slot) {
         // already-settled promise is a no-op, so a race with the timer is
         // harmless. Does not suspend.
         unsafe { emscripten_promise_resolve(promise, EM_PROMISE_FULFILL, ptr::null_mut()) }
+    }
+}
+
+/// Suspend the owning activation for `dur` on a host timer, with nothing to
+/// unpark it: a park on a slot no parker owns.
+#[cfg(all(feature = "rt", feature = "net"))]
+pub(crate) fn sleep(dur: Duration) {
+    park(&Slot::new(), Some(dur));
+}
+
+/// The I/O driver's `epoll_wait` of `max_wait` (`None` = no deadline) as a
+/// park. `wait` runs the `epoll_wait` with the timeout it is given.
+///
+/// Under JSPI a non-zero wait suspends on the host loop until readiness or
+/// the deadline, but a zero-timeout `epoll_wait` is a synchronous probe, and
+/// the host loop is the only producer of readiness, so the scheduler's
+/// maintenance park would never let Node deliver socket events. Yield a
+/// host turn first, as the zero-duration `ParkThread` park does.
+///
+/// The real wait is a suspension like [`park`]'s, and clears the scheduler
+/// context for the same reason: a host activation entering tokio meanwhile
+/// must wake the driver through the reactor, not the on-runtime shortcut.
+/// The zero-timeout probe never suspends, and the host turn before it goes
+/// through [`park`].
+///
+/// Without JSPI `epoll_wait` cannot block and returns at once, so a timed
+/// wait spins to its deadline before probing and a wait with no deadline
+/// panics, as `ParkThread` does.
+#[cfg(all(feature = "rt", feature = "net"))]
+pub(crate) fn io_wait<R>(
+    max_wait: Option<Duration>,
+    wait: impl FnOnce(Option<Duration>) -> R,
+) -> R {
+    if jspi_enabled() {
+        if max_wait == Some(Duration::ZERO) {
+            sleep(Duration::ZERO);
+            return wait(max_wait);
+        }
+        let _scheduler = crate::runtime::context::clear_scheduler();
+        return wait(max_wait);
+    }
+    match max_wait {
+        Some(dur) => {
+            std::thread::sleep(dur);
+            wait(Some(Duration::ZERO))
+        }
+        None => panic!(
+            "cannot block on wasm32-unknown-emscripten: waiting for I/O \
+             readiness needs the build to link `-sJSPI`"
+        ),
     }
 }
