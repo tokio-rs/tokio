@@ -462,15 +462,16 @@
 //!
 //! ### `WASI` support
 //!
-//! The `wasm32-wasip1` and `wasm32-wasip2` targets support the above features.
-//! Timers work correctly as blocking the thread is supported.
+//! The `wasm32-wasip1`, `wasm32-wasip2`, and `wasm32-wasip3` targets support
+//! the above features.  Timers work correctly as blocking the thread is
+//! supported.
 //!
-//! Under the `tokio_unstable` flag, these targets support the use
-//! of `tokio::net`. On `wasm32-wasip1`, not all methods are available on the
-//! networking types as this target does not support the creation of new
-//! sockets from within `WASM`. Because of this, sockets must currently be
-//! created via the `FromRawFd` trait on `wasm32-wasip1`. The `wasm32-wasip2`
-//! target does not have this limitation.
+//! Under the `tokio_unstable` flag, these targets support the use of
+//! `tokio::net`. On `wasm32-wasip1`, not all methods are available on the
+//! networking types as this target does not support the creation of new sockets
+//! from within `WASM`. Because of this, sockets must currently be created via
+//! the `FromRawFd` trait on `wasm32-wasip1`. The `wasm32-wasip2` and
+//! `wasm32-wasip3` targets do not have this limitation.
 //!
 //! ### Emscripten support
 //!
