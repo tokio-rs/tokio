@@ -249,6 +249,75 @@ pub struct WeakSender<T> {
 /// # }
 /// ```
 ///
+/// Batching receives with lag handling
+///
+/// Batching is possible with [`recv`][Receiver::recv] and
+/// [`try_recv`][Receiver::try_recv], but a drain loop like
+/// `while let Ok(value) = rx.try_recv()` silently stops on the first error.
+/// That discards [`Lagged`][crate::sync::broadcast::error::TryRecvError::Lagged],
+/// whose count cannot be recovered later, and it conflates `Empty` (try again
+/// later) with `Closed` (no senders left).
+///
+/// Match each error variant explicitly: add `Lagged(n)` to a running total and
+/// keep the values collected so far. Stop draining on `Empty`, but continue
+/// awaiting new messages. Only `Closed` means the channel is finished.
+///
+/// ```
+/// use tokio::sync::broadcast;
+/// use tokio::sync::broadcast::error::{RecvError, TryRecvError};
+///
+/// async fn recv_batch(
+///     rx: &mut broadcast::Receiver<i32>,
+///     max: usize,
+/// ) -> (Vec<i32>, u64) {
+///     let mut values = Vec::with_capacity(max);
+///     let mut lagged = 0u64;
+///
+///     // Await the first message so lag reported by `recv` is not lost.
+///     while values.len() < max {
+///         match rx.recv().await {
+///             Ok(value) => values.push(value),
+///             Err(RecvError::Lagged(n)) => {
+///                 lagged += n;
+///                 continue;
+///             }
+///             Err(RecvError::Closed) => return (values, lagged),
+///         }
+///         break;
+///     }
+///
+///     // Drain what is already buffered, but never past `max`.
+///     while values.len() < max {
+///         match rx.try_recv() {
+///             Ok(value) => values.push(value),
+///             Err(TryRecvError::Lagged(n)) => lagged += n,
+///             Err(TryRecvError::Empty) => break,
+///             Err(TryRecvError::Closed) => break,
+///         }
+///     }
+///
+///     (values, lagged)
+/// }
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// // Capacity 2 → ring buffer of length 2, so the third send overwrites `1`.
+/// let (tx, mut rx) = broadcast::channel(2);
+///
+/// tx.send(1).unwrap();
+/// tx.send(2).unwrap();
+/// tx.send(3).unwrap();
+/// drop(tx);
+///
+/// let (batch, lagged) = recv_batch(&mut rx, 8).await;
+///
+/// // `1` was overwritten, but the retained values are still delivered and
+/// // draining stops only after the channel is closed.
+/// assert_eq!(lagged, 1);
+/// assert_eq!(batch, vec![2, 3]);
+/// # }
+/// ```
+///
 /// [`broadcast`]: crate::sync::broadcast
 pub struct Receiver<T> {
     /// State shared with all receivers and senders.
