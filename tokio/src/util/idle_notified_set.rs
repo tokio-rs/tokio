@@ -9,12 +9,11 @@
 use std::marker::PhantomPinned;
 use std::mem::ManuallyDrop;
 use std::ptr::NonNull;
-use std::task::{Context, Waker};
+use std::task::{Context, RawWaker, RawWakerVTable, Waker};
 
 use crate::loom::cell::UnsafeCell;
-use crate::loom::sync::{Arc, Mutex};
+use crate::loom::sync::{Arc, Mutex, MutexGuard};
 use crate::util::linked_list::{self, Link, LinkedList};
-use crate::util::{waker_ref, Wake};
 
 /// This is the main handle to the collection.
 pub(crate) struct IdleNotifiedSet<T> {
@@ -37,7 +36,17 @@ pub(crate) struct EntryInOneOfTheLists<'a, T> {
     set: &'a mut IdleNotifiedSet<T>,
 }
 
-type Lists<T> = Mutex<ListsInner<T>>;
+struct Lists<T> {
+    inner: Mutex<ListsInner<T>>,
+    /// The vtable used by all wakers for entries in these lists.
+    vtable: &'static RawWakerVTable,
+}
+
+impl<T> Lists<T> {
+    fn lock(&self) -> MutexGuard<'_, ListsInner<T>> {
+        self.inner.lock()
+    }
+}
 
 /// The linked lists hold strong references to the `ListEntry` items, and the
 /// `ListEntry` items also hold a strong reference back to the Lists object, but
@@ -123,11 +132,14 @@ unsafe impl<T> Sync for ListEntry<T> {}
 impl<T> IdleNotifiedSet<T> {
     /// Create a new `IdleNotifiedSet`.
     pub(crate) fn new() -> Self {
-        let lists = Mutex::new(ListsInner {
-            notified: LinkedList::new(),
-            idle: LinkedList::new(),
-            waker: None,
-        });
+        let lists = Lists {
+            inner: Mutex::new(ListsInner {
+                notified: LinkedList::new(),
+                idle: LinkedList::new(),
+                waker: None,
+            }),
+            vtable: ListEntry::<T>::waker_vtable(),
+        };
 
         IdleNotifiedSet {
             lists: Arc::new(lists),
@@ -409,9 +421,14 @@ impl<'a, T> EntryInOneOfTheLists<'a, T> {
     pub(crate) fn with_value_and_context<F, U>(&mut self, func: F) -> U
     where
         F: FnOnce(&mut T, &mut Context<'_>) -> U,
-        T: 'static,
     {
-        let waker = waker_ref(&self.entry);
+        let ptr = Arc::as_ptr(&self.entry).cast::<()>();
+        // Safety: The vtable functions expect a pointer from `Arc::as_ptr`.
+        // The waker is wrapped in `ManuallyDrop` as it does not own a
+        // refcount, and it does not outlive `self.entry`.
+        let waker = ManuallyDrop::new(unsafe {
+            Waker::from_raw(RawWaker::new(ptr, self.entry.parent.vtable))
+        });
 
         let mut context = Context::from_waker(&waker);
 
@@ -437,7 +454,7 @@ impl<T> Drop for IdleNotifiedSet<T> {
     }
 }
 
-impl<T: 'static> Wake for ListEntry<T> {
+impl<T> ListEntry<T> {
     fn wake_by_ref(me: &Arc<Self>) {
         let mut lock = me.parent.lock();
 
@@ -466,9 +483,45 @@ impl<T: 'static> Wake for ListEntry<T> {
         }
     }
 
-    fn wake(me: Arc<Self>) {
-        Self::wake_by_ref(&me);
+    /// Creates the vtable for wakers of a `ListEntry<T>`.
+    ///
+    /// A `static` cannot be generic over `T`, and each call may return a
+    /// vtable at a different address. So this is called once per set, and all
+    /// wakers for its entries use the stored vtable, as `Waker::will_wake`
+    /// relies on.
+    fn waker_vtable() -> &'static RawWakerVTable {
+        &RawWakerVTable::new(
+            clone_entry_waker::<T>,
+            wake_entry_by_val::<T>,
+            wake_entry_by_ref::<T>,
+            drop_entry_waker::<T>,
+        )
     }
+}
+
+unsafe fn clone_entry_waker<T>(ptr: *const ()) -> RawWaker {
+    let entry = ptr as *const ListEntry<T>;
+    // Safety: `ptr` was created from `Arc::as_ptr` in `with_value_and_context`.
+    let vtable = unsafe { &*entry }.parent.vtable;
+    unsafe { Arc::increment_strong_count(entry) };
+    RawWaker::new(ptr, vtable)
+}
+
+unsafe fn wake_entry_by_val<T>(ptr: *const ()) {
+    // Safety: `ptr` was created from `Arc::as_ptr` in `with_value_and_context`.
+    let entry = unsafe { Arc::from_raw(ptr as *const ListEntry<T>) };
+    ListEntry::wake_by_ref(&entry);
+}
+
+unsafe fn wake_entry_by_ref<T>(ptr: *const ()) {
+    // Safety: `ptr` was created from `Arc::as_ptr` in `with_value_and_context`.
+    let entry = ManuallyDrop::new(unsafe { Arc::from_raw(ptr as *const ListEntry<T>) });
+    ListEntry::wake_by_ref(&entry);
+}
+
+unsafe fn drop_entry_waker<T>(ptr: *const ()) {
+    // Safety: `ptr` was created from `Arc::as_ptr` in `with_value_and_context`.
+    drop(unsafe { Arc::from_raw(ptr as *const ListEntry<T>) });
 }
 
 /// # Safety
@@ -511,5 +564,18 @@ mod tests {
         set.spawn_on(futures::future::ready(()), rt.handle());
 
         rt.block_on(set.join_next()).unwrap().unwrap();
+    }
+
+    #[test]
+    fn entry_waker_matches_its_clone() {
+        let mut set = super::IdleNotifiedSet::new();
+        let mut entry = set.insert_idle(());
+        entry.with_value_and_context(|_, cx| {
+            let waker = cx.waker();
+            let clone = waker.clone();
+            assert!(waker.will_wake(&clone));
+            clone.wake();
+        });
+        drop(set.pop_notified(futures::task::noop_waker_ref()).unwrap());
     }
 }

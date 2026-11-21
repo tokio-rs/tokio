@@ -9,7 +9,7 @@ use tokio::sync::oneshot;
 use tokio::time::{timeout, Duration};
 use tokio_test::{assert_err, assert_ok};
 
-use std::future::Future;
+use std::future::{poll_fn, Future};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::{Context, Poll};
@@ -45,6 +45,15 @@ fn spawned_task_does_not_progress_without_block_on() {
     let out = rt.block_on(async { assert_ok!(rx.await) });
 
     assert_eq!(out, "hello");
+}
+
+#[test]
+fn block_on_waker_matches_its_clone() {
+    rt().block_on(poll_fn(|cx| {
+        let waker = cx.waker();
+        assert!(waker.will_wake(&waker.clone()));
+        Poll::Ready(())
+    }));
 }
 
 #[test]
