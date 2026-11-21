@@ -143,3 +143,54 @@ async fn tokio_to_futures_vectored_write_scalar_fallback() {
     ];
     assert_eq!(writer.write_vectored(&bufs).await.unwrap(), 3);
 }
+
+struct FuturesVectoredWriter {
+    bufs: Vec<Vec<u8>>,
+    called: bool,
+}
+
+impl futures_io::AsyncWrite for FuturesVectoredWriter {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        _buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        panic!("vectored writes should not call poll_write");
+    }
+
+    fn poll_write_vectored(
+        mut self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        bufs: &[IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        assert!(bufs
+            .iter()
+            .map(|buf| &buf[..])
+            .eq(self.bufs.iter().map(|buf| &buf[..])));
+        self.called = true;
+        Poll::Ready(Ok(bufs.iter().map(|buf| buf.len()).sum()))
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+}
+
+#[tokio::test]
+async fn futures_to_tokio_vectored_write() {
+    use tokio::io::AsyncWriteExt as _;
+    use tokio_util::compat::FuturesAsyncWriteCompatExt;
+
+    let inner = FuturesVectoredWriter {
+        bufs: vec![b"abc".to_vec(), b"def".to_vec()],
+        called: false,
+    };
+    let mut writer = inner.compat_write();
+    let bufs = [IoSlice::new(b"abc"), IoSlice::new(b"def")];
+    assert_eq!(writer.write_vectored(&bufs).await.unwrap(), 6);
+    assert!(writer.get_ref().called);
+}
