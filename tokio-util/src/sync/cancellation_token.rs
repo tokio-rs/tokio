@@ -9,7 +9,6 @@ use crate::util::MaybeDangling;
 use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
-use std::sync::atomic::{fence, Ordering};
 
 use guard::DropGuard;
 use guard_ref::DropGuardRef;
@@ -350,11 +349,14 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         let mut this = self.project();
         loop {
+            if this.cancellation_token.is_cancelled() {
+                return Poll::Ready(());
+            }
+
             if this.future.as_mut().poll(cx).is_pending() {
-                // Pair with the `SeqCst` fence in `tree_node::cancel` before
-                // `notify_waiters()` so we cannot miss a wakeup if `cancel()` ran
-                // between the initial `is_cancelled()` check and `Notified::poll()`.
-                fence(Ordering::SeqCst);
+                // Re-check `is_cancelled` after registering the `Notified` waker
+                // to prevent a lost wakeup if `cancel()` raced between the initial
+                // `is_cancelled()` check and `Notified::poll()`.
                 if this.cancellation_token.is_cancelled() {
                     return Poll::Ready(());
                 }
@@ -415,10 +417,9 @@ impl Future for WaitForCancellationFutureOwned {
             }
 
             if this.future.as_mut().poll(cx).is_pending() {
-                // Pair with the `SeqCst` fence in `tree_node::cancel` before
-                // `notify_waiters()` so we cannot miss a wakeup if `cancel()` ran
-                // between the initial `is_cancelled()` check and `Notified::poll()`.
-                fence(Ordering::SeqCst);
+                // Re-check `is_cancelled` after registering the `Notified` waker
+                // to prevent a lost wakeup if `cancel()` raced between the initial
+                // `is_cancelled()` check and `Notified::poll()`.
                 if this.cancellation_token.is_cancelled() {
                     return Poll::Ready(());
                 }

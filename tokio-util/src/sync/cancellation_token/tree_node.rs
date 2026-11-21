@@ -85,7 +85,21 @@ struct Inner {
 
 /// Returns whether or not the node is cancelled
 pub(crate) fn is_cancelled(node: &Arc<TreeNode>) -> bool {
-    node.is_cancelled.load(Ordering::Acquire)
+    #[cfg(all(test, loom))]
+    {
+        // `tokio::sync::Notify` is compiled with `std::sync` when `tokio-util`
+        // runs under `loom`, so Loom cannot observe the happens-before edge
+        // between `Notify::notify_waiters` and `Notified::poll`. Acquiring
+        // `node.inner` under `loom` models that synchronization without
+        // affecting production builds.
+        let _guard = node.inner.lock().unwrap();
+        node.is_cancelled.load(Ordering::Acquire)
+    }
+
+    #[cfg(not(all(test, loom)))]
+    {
+        node.is_cancelled.load(Ordering::Acquire)
+    }
 }
 
 /// Creates a child node
