@@ -11,7 +11,7 @@
 #![cfg(not(miri))] // Too slow on miri.
 
 use rand::SeedableRng;
-use rand::{rngs::StdRng, Rng};
+use rand::{rngs::StdRng, RngExt};
 use tokio::time::{self, Duration, Instant, Sleep};
 use tokio_test::{assert_elapsed, assert_pending, assert_ready, assert_ready_eq, task};
 
