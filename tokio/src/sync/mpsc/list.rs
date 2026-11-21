@@ -76,18 +76,21 @@ pub(crate) fn channel_from_index<T>(start_index: usize) -> (Tx<T>, Rx<T>) {
 }
 
 impl<T> Tx<T> {
-    /// Pushes a value into the list.
-    pub(crate) fn push(&self, value: T) {
+    /// Pushes a value into the list, returning it if the receiver abandoned it.
+    pub(crate) fn push(&self, value: T) -> Option<T> {
         // First, claim a slot for the value. `Acquire` is used here to
         // synchronize with the `fetch_add` in `reclaim_blocks`.
         let slot_index = self.tail_position.fetch_add(1, Acquire);
 
         // Load the current block and write the value
-        let block = self.find_block(slot_index);
+        let block = match self.find_block(slot_index) {
+            Some(block) => block,
+            None => return Some(value),
+        };
 
         unsafe {
             // Write the value to the block
-            block.as_ref().write(slot_index, value);
+            block.as_ref().write(slot_index, value)
         }
     }
 
@@ -100,12 +103,12 @@ impl<T> Tx<T> {
         // claimed.
         let slot_index = self.tail_position.fetch_add(1, Acquire);
 
-        let block = self.find_block(slot_index);
-
-        unsafe { block.as_ref().tx_close() }
+        if let Some(block) = self.find_block(slot_index) {
+            unsafe { block.as_ref().tx_close() }
+        }
     }
 
-    fn find_block(&self, slot_index: usize) -> NonNull<Block<T>> {
+    fn find_block(&self, slot_index: usize) -> Option<NonNull<Block<T>>> {
         // The start index of the block that contains `index`.
         let start_index = block::start_index(slot_index);
 
@@ -137,13 +140,13 @@ impl<T> Tx<T> {
             let block = unsafe { &(*block_ptr) };
 
             if block.is_at_index(start_index) {
-                return unsafe { NonNull::new_unchecked(block_ptr) };
+                return Some(unsafe { NonNull::new_unchecked(block_ptr) });
             }
 
             let next_block = block
                 .load_next(Acquire)
                 // There is no allocated next block, grow the linked list.
-                .unwrap_or_else(|| block.grow());
+                .or_else(|| block.grow())?;
 
             // If the block is **not** final, then the tail pointer cannot be
             // advanced any more.
@@ -230,9 +233,10 @@ impl<T> Tx<T> {
                     reused = true;
                     break;
                 }
-                Err(next) => {
+                Err(Some(next)) => {
                     curr = next;
                 }
+                Err(None) => break,
             }
         }
 
@@ -429,6 +433,80 @@ impl<T> Rx<T> {
         }
     }
 
+    /// Drains the ready prefix with normal block reclamation, then abandons
+    /// the remaining blocks without waiting for in-flight writers.
+    pub(super) fn drain(&mut self, tx: &Tx<T>, on_drop: impl FnMut(T)) {
+        struct Guard<'a, T, F: FnMut(T)> {
+            rx: &'a mut Rx<T>,
+            on_drop: F,
+        }
+
+        impl<T, F: FnMut(T)> Drop for Guard<'_, T, F> {
+            fn drop(&mut self) {
+                self.rx.abandon(&mut self.on_drop);
+            }
+        }
+
+        let mut guard = Guard { rx: self, on_drop };
+        while let Some(block::Read::Value(value)) = guard.rx.pop(tx) {
+            (guard.on_drop)(value);
+        }
+    }
+
+    /// Abandons the receive half without reclaiming blocks. Later writers take
+    /// back their values. Blocks remain allocated until the channel is dropped.
+    pub(super) fn abandon(&mut self, on_drop: impl FnMut(T)) {
+        struct Guard<T, F: FnMut(T)> {
+            block: Option<NonNull<Block<T>>>,
+            ready: usize,
+            on_drop: F,
+        }
+
+        impl<T, F: FnMut(T)> Guard<T, F> {
+            fn drain(&mut self) {
+                while let Some(block) = self.block {
+                    // SAFETY: draining never reclaims blocks, and the channel
+                    // keeps them alive for the duration of this call.
+                    let block = unsafe { block.as_ref() };
+                    while self.ready != 0 {
+                        let offset = self.ready.trailing_zeros() as usize;
+                        self.ready &= !(1 << offset);
+                        // SAFETY: rx_close atomically transferred ownership of
+                        // these initialized slots to us. Each is taken once.
+                        let value = unsafe { block.take_value(offset) };
+                        (self.on_drop)(value);
+                    }
+                    self.block = block.rx_close_next();
+                    if let Some(next) = self.block {
+                        self.ready = unsafe { next.as_ref() }.rx_close();
+                    }
+                }
+            }
+        }
+
+        impl<T, F: FnMut(T)> Drop for Guard<T, F> {
+            fn drop(&mut self) {
+                self.drain();
+            }
+        }
+
+        let head = unsafe { self.head.as_ref() };
+        let ready = head.rx_close();
+        // `head` can still point to the previous block after its last value
+        // was consumed. Otherwise, skip the consumed prefix of this block.
+        let ready = if head.is_at_index(block::start_index(self.index)) {
+            ready & (usize::MAX << block::offset(self.index))
+        } else {
+            0
+        };
+        let mut guard = Guard {
+            block: Some(self.head),
+            ready,
+            on_drop,
+        };
+        guard.drain();
+    }
+
     /// Effectively `Drop` all the blocks. Should only be called once, when
     /// the list is dropping.
     pub(super) unsafe fn free_blocks(&mut self) {
@@ -478,7 +556,7 @@ mod tests {
         let head = rx.free_head;
 
         for i in 0..BLOCK_CAP {
-            tx.push(i);
+            assert!(tx.push(i).is_none());
             assert!(matches!(rx.pop(&tx), Some(block::Read::Value(v)) if v == i));
         }
 
@@ -490,10 +568,10 @@ mod tests {
         // Fill the rest of the second block (wrapping `tail_position` to 0),
         // then push one item into the third block to retire the first block.
         for i in 1..BLOCK_CAP {
-            tx.push(i);
+            assert!(tx.push(i).is_none());
         }
         assert_eq!(rx.len(&tx), BLOCK_CAP);
-        tx.push(BLOCK_CAP);
+        assert!(tx.push(BLOCK_CAP).is_none());
 
         // Advancing `rx` to the second block must not reclaim the first block yet,
         // because `rx.index` has not reached the wrapped `required_index` (1).
@@ -512,13 +590,68 @@ mod tests {
         unsafe {
             let slow_tail = &*slow_tail.load(Relaxed);
             let slow_block = slow_tail.load_next(Acquire).unwrap();
-            slow_block.as_ref().write(slow_slot, 0);
+            assert!(slow_block.as_ref().write(slow_slot, 0).is_none());
         }
 
         for i in 0..=BLOCK_CAP {
             assert!(matches!(rx.pop(&tx), Some(block::Read::Value(v)) if v == i));
         }
         unsafe { rx.free_blocks() };
+    }
+
+    #[test]
+    fn drain_with_unpublished_slots() {
+        use super::*;
+        use crate::sync::oneshot;
+
+        // Cover a partially consumed block, a full block, and index wraparound.
+        for start in [0, 0usize.wrapping_sub(2 * BLOCK_CAP)] {
+            for consumed in [0, 1, BLOCK_CAP] {
+                let (tx, mut rx) = channel_from_index(start);
+                for _ in 0..consumed {
+                    let (reply, _) = oneshot::channel::<()>();
+                    assert!(tx.push(reply).is_none());
+                    drop(rx.pop(&tx));
+                }
+
+                // Stop one writer after it claims a slot. Ready messages behind
+                // this hole, including in later blocks, must still be drained.
+                let slot = tx.tail_position.fetch_add(1, Acquire);
+                let block = tx.find_block(slot).unwrap();
+                let mut responses = Vec::new();
+                for _ in 0..3 * BLOCK_CAP {
+                    let (reply, response) = oneshot::channel::<()>();
+                    assert!(tx.push(reply).is_none());
+                    responses.push(response);
+                }
+                rx.drain(&tx, drop);
+                for response in &mut responses {
+                    assert_eq!(
+                        response.try_recv(),
+                        Err(oneshot::error::TryRecvError::Closed)
+                    );
+                }
+
+                let (reply, mut response) = oneshot::channel::<()>();
+                drop(unsafe { block.as_ref().write(slot, reply) }.unwrap());
+                assert_eq!(
+                    response.try_recv(),
+                    Err(oneshot::error::TryRecvError::Closed)
+                );
+
+                // Sending beyond the sealed tail also returns ownership.
+                for _ in 0..2 * BLOCK_CAP {
+                    let (reply, mut response) = oneshot::channel::<()>();
+                    drop(tx.push(reply).unwrap());
+                    assert_eq!(
+                        response.try_recv(),
+                        Err(oneshot::error::TryRecvError::Closed)
+                    );
+                }
+                rx.abandon(|_| panic!("value drained twice"));
+                unsafe { rx.free_blocks() };
+            }
+        }
     }
 
     #[test]
