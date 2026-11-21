@@ -218,14 +218,18 @@ where
             // Make sure we've got room for at least one byte to read to ensure
             // that we don't get a spurious 0 that looks like EOF.
             state.buffer.reserve(1);
+            let read = loop {
+                match poll_read_buf(pinned.inner.as_mut(), cx, &mut state.buffer) {
+                    Poll::Ready(Err(err)) if err.kind() == io::ErrorKind::Interrupted => continue,
+                    read => break read,
+                }
+            };
             #[allow(clippy::blocks_in_conditions)]
-            let bytect = match poll_read_buf(pinned.inner.as_mut(), cx, &mut state.buffer).map_err(
-                |err| {
-                    trace!("Got an error, going to errored state");
-                    state.has_errored = true;
-                    err
-                },
-            )? {
+            let bytect = match read.map_err(|err| {
+                trace!("Got an error, going to errored state");
+                state.has_errored = true;
+                err
+            })? {
                 Poll::Ready(ct) => ct,
                 // implicit reading -> reading or implicit paused -> paused
                 Poll::Pending => return Poll::Pending,
@@ -285,7 +289,12 @@ where
             let WriteFrame { buffer, .. } = pinned.state.borrow_mut();
             trace!(remaining = buffer.len(), "writing;");
 
-            let n = ready!(poll_write_buf(pinned.inner.as_mut(), cx, buffer))?;
+            let n = loop {
+                match ready!(poll_write_buf(pinned.inner.as_mut(), cx, buffer)) {
+                    Err(err) if err.kind() == io::ErrorKind::Interrupted => continue,
+                    res => break res?,
+                }
+            };
 
             if n == 0 {
                 return Poll::Ready(Err(io::Error::new(
