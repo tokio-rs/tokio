@@ -38,7 +38,7 @@
 //! Specifically, through invariant #2, we know that we always have to lock a parent
 //! before its child.
 //!
-use crate::loom::sync::atomic::{AtomicBool, Ordering};
+use crate::loom::sync::atomic::{fence, AtomicBool, Ordering};
 use crate::loom::sync::{Arc, Mutex, MutexGuard};
 
 /// A node of the cancellation tree structure
@@ -371,6 +371,10 @@ pub(crate) fn cancel(node: &Arc<TreeNode>) {
     node.is_cancelled.store(true, Ordering::Release);
     let to_notify = std::mem::take(&mut locked_node.children);
     drop(locked_node);
+
+    // Ensure the `is_cancelled` stores above are visible to any task that
+    // registers a waker on `Notify` and then re-checks `is_cancelled()`.
+    fence(Ordering::SeqCst);
 
     for child in to_notify {
         child.waker.notify_waiters();
