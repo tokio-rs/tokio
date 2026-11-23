@@ -919,6 +919,10 @@ impl AsyncWrite for NamedPipeServer {
         self.io.poll_write_vectored(cx, bufs)
     }
 
+    fn is_write_vectored(&self) -> bool {
+        true
+    }
+
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
     }
@@ -1708,6 +1712,10 @@ impl AsyncWrite for NamedPipeClient {
         bufs: &[io::IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
         self.io.poll_write_vectored(cx, bufs)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        true
     }
 
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
