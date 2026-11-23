@@ -250,13 +250,19 @@ macro_rules! assert_err {
     }};
 }
 
-/// Asserts that an exact duration has elapsed since the start instant ±1ms.
+/// Asserts that at least `dur`, and at most `dur` + 1ms, has elapsed since the
+/// start instant.
+///
+/// This is intended for use with a paused clock, for example with
+/// `#[tokio::test(start_paused = true)]`. With a real clock, a sleep can
+/// overshoot by more than 1ms and the assertion will fail.
 ///
 /// ```rust
 /// use tokio::time::{self, Instant};
 /// use std::time::Duration;
 /// use tokio_test::assert_elapsed;
-/// # async fn test_time_passed() {
+/// # #[tokio::main(flavor = "current_thread", start_paused = true)]
+/// # async fn main() {
 ///
 /// let start = Instant::now();
 /// let dur = Duration::from_millis(50);
