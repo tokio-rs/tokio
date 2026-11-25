@@ -249,6 +249,69 @@ pub struct WeakSender<T> {
 /// # }
 /// ```
 ///
+/// Receiving in batches
+///
+/// Use [`recv`](Receiver::recv) to wait for the first message in a batch, then
+/// use [`try_recv`](Receiver::try_recv) to collect more without waiting. Count
+/// skipped messages on both paths. During the drain, a lag error uses one
+/// attempt and leaves the collected messages in the batch.
+///
+/// When the channel is empty, process the batch and wait for more messages.
+/// When the channel is closed and drained, process any remaining batch before
+/// stopping.
+///
+/// ```
+/// use tokio::sync::broadcast;
+/// use tokio::sync::broadcast::error::{RecvError, TryRecvError};
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() {
+/// const MAX_BATCH_SIZE: usize = 3;
+/// let (tx, mut rx) = broadcast::channel(2);
+/// tx.send(1).unwrap();
+/// tx.send(2).unwrap();
+/// tx.send(3).unwrap(); // Overwrites 1.
+/// drop(tx);
+///
+/// let mut skipped = 0;
+/// let mut batch = Vec::with_capacity(MAX_BATCH_SIZE);
+/// let mut batches = 0;
+/// loop {
+///     match rx.recv().await {
+///         Ok(value) => batch.push(value),
+///         Err(RecvError::Lagged(n)) => {
+///             skipped += n;
+///             continue;
+///         }
+///         Err(RecvError::Closed) => break,
+///     }
+///
+///     let mut closed = false;
+///     for _ in 1..MAX_BATCH_SIZE {
+///         match rx.try_recv() {
+///             Ok(value) => batch.push(value),
+///             Err(TryRecvError::Lagged(n)) => skipped += n,
+///             Err(TryRecvError::Empty) => break,
+///             Err(TryRecvError::Closed) => {
+///                 closed = true;
+///                 break;
+///             }
+///         }
+///     }
+///
+///     // Process the batch here, even if the channel has closed.
+///     assert_eq!(batch, [2, 3]);
+///     batches += 1;
+///     batch.clear();
+///     if closed {
+///         break;
+///     }
+/// }
+/// assert_eq!(batches, 1);
+/// assert_eq!(skipped, 1);
+/// # }
+/// ```
+///
 /// [`broadcast`]: crate::sync::broadcast
 pub struct Receiver<T> {
     /// State shared with all receivers and senders.
