@@ -58,7 +58,10 @@ pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Re
     target_os = "linux"
 ))]
 async fn write_uring(path: &Path, mut buf: OwnedBuf) -> io::Result<()> {
-    use crate::{fs::OpenOptions, runtime::driver::op::Op};
+    use crate::{
+        fs::OpenOptions,
+        runtime::driver::op::{Completion, Op},
+    };
     use std::os::fd::OwnedFd;
 
     let file = OpenOptions::new()
@@ -77,23 +80,25 @@ async fn write_uring(path: &Path, mut buf: OwnedBuf) -> io::Result<()> {
     let mut buf_offset: usize = 0;
     let mut file_offset: u64 = 0;
     while buf_offset < total {
-        let (res, r_buf, r_fd) = Op::write_at(fd, buf, buf_offset, file_offset)?.await;
+        let completion = Op::write_at(fd, buf, buf_offset, file_offset)?.await;
 
-        // A cancelled op returns no resources to continue with, so its error is
-        // terminal; otherwise an interrupted write retries from where it stopped.
-        let (Some(r_buf), Some(r_fd)) = (r_buf, r_fd) else {
-            return Err(res.expect_err("a cancelled op completes with an error"));
+        // A cancelled op keeps its resources in the driver, so its error is
+        // terminal. Otherwise an interrupted write retries from where it stopped.
+        let (n, resources) = match completion {
+            Completion::Cancelled(error) => return Err(error),
+            Completion::Done { result, resources } => {
+                let n = match result {
+                    Ok(0) => return Err(io::ErrorKind::WriteZero.into()),
+                    Ok(n) => n,
+                    Err(e) if e.kind() == io::ErrorKind::Interrupted => 0,
+                    Err(e) => return Err(e),
+                };
+                (n, resources)
+            }
         };
 
-        let n = match res {
-            Ok(0) => return Err(io::ErrorKind::WriteZero.into()),
-            Ok(n) => n,
-            Err(e) if e.kind() == io::ErrorKind::Interrupted => 0,
-            Err(e) => return Err(e),
-        };
-
-        buf = r_buf;
-        fd = r_fd;
+        buf = resources.buf;
+        fd = resources.fd;
         buf_offset += n as usize;
         file_offset += n as u64;
     }

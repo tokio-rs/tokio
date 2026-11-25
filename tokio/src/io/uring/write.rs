@@ -1,4 +1,4 @@
-use crate::runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op};
+use crate::runtime::driver::op::{CancelData, Cancellable, Completable, Completion, CqeResult, Op};
 use crate::util::as_ref::OwnedBuf;
 
 use io_uring::{opcode, types};
@@ -11,20 +11,37 @@ pub(crate) struct Write {
     fd: OwnedFd,
 }
 
+/// Buffer and file descriptor borrowed by a write.
+pub(crate) struct WriteResources {
+    pub(crate) buf: OwnedBuf,
+    pub(crate) fd: OwnedFd,
+}
+
 impl Completable for Write {
-    // The buffer and fd are `None` only when the op was cancelled and they were
-    // kept in the driver; otherwise they are returned to the caller.
-    type Output = (io::Result<u32>, Option<OwnedBuf>, Option<OwnedFd>);
+    type Output = Completion<u32, WriteResources>;
+
     fn complete(self, cqe: CqeResult) -> Self::Output {
-        (cqe.result, Some(self.buf), Some(self.fd))
+        Completion::Done {
+            result: cqe.result,
+            resources: WriteResources {
+                buf: self.buf,
+                fd: self.fd,
+            },
+        }
     }
 
     fn complete_with_error(self, err: Error) -> Self::Output {
-        (Err(err), Some(self.buf), Some(self.fd))
+        Completion::Done {
+            result: Err(err),
+            resources: WriteResources {
+                buf: self.buf,
+                fd: self.fd,
+            },
+        }
     }
 
     fn complete_after_cancel(err: Error) -> Self::Output {
-        (Err(err), None, None)
+        Completion::Cancelled(err)
     }
 }
 

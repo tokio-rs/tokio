@@ -1115,27 +1115,33 @@ impl Inner {
         mut buf: Buf,
         max_buf_size: usize,
     ) -> (Operation, Buf) {
-        use crate::runtime::driver::op::Op;
+        use crate::runtime::driver::op::{Completion, Op};
 
         loop {
-            let (res, r_fd, r_buf) =
-                // u64::MAX to use and advance the file position
-                Op::read_at(fd, buf, max_buf_size, u64::MAX).await;
-            match (res, r_fd, r_buf) {
-                // Retry an interrupted read with the resources the op handed back.
-                (Err(e), Some(r_fd), Some(r_buf)) if e.kind() == io::ErrorKind::Interrupted => {
-                    buf = r_buf;
-                    fd = r_fd;
+            // u64::MAX to use and advance the file position
+            match Op::read_at(fd, buf, max_buf_size, u64::MAX).await {
+                // The kernel is done with the resources. Retry from where it stopped.
+                Completion::Done {
+                    result: Err(e),
+                    resources,
+                } if e.kind() == io::ErrorKind::Interrupted => {
+                    buf = resources.buf;
+                    fd = resources.fd;
                     continue;
                 }
+                Completion::Done {
+                    result: Err(e),
+                    resources,
+                } => break (Operation::Read(Err(e)), resources.buf),
                 // A cancelled op keeps its buffer in the driver, so the idle slot
                 // gets a fresh empty `Buf` instead.
-                (Err(e), _, r_buf) => {
-                    let buf = r_buf.unwrap_or_else(|| Buf::with_capacity(0));
-                    break (Operation::Read(Err(e)), buf);
+                Completion::Cancelled(e) => {
+                    break (Operation::Read(Err(e)), Buf::with_capacity(0));
                 }
-                (Ok(n), _, Some(r_buf)) => break (Operation::Read(Ok(n as usize)), r_buf),
-                (Ok(_), ..) => unreachable!("a successful read returns its buffer"),
+                Completion::Done {
+                    result: Ok(n),
+                    resources,
+                } => break (Operation::Read(Ok(n as usize)), resources.buf),
             }
         }
     }

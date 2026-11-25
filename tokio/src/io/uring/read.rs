@@ -1,10 +1,10 @@
 use crate::io::blocking::Buf;
 use crate::io::uring::utils::{ArcFd, UringFd};
-use crate::runtime::driver::op::{CancelData, Cancellable, Completable, CqeResult, Op};
+use crate::runtime::driver::op::{CancelData, Cancellable, Completable, Completion, CqeResult, Op};
 
 use io_uring::{opcode, types};
 use std::fmt;
-use std::io::{self, Error};
+use std::io::Error;
 use std::os::fd::OwnedFd;
 
 /// Trait for buffers that can be used with io-uring read operations.
@@ -53,6 +53,12 @@ pub(crate) struct Read<B, F = ArcFd> {
     buf: B,
 }
 
+/// File descriptor and buffer borrowed by a read.
+pub(crate) struct ReadResources<B, F = ArcFd> {
+    pub(crate) fd: F,
+    pub(crate) buf: B,
+}
+
 impl<B: fmt::Debug, F> fmt::Debug for Read<B, F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Read")
@@ -62,9 +68,7 @@ impl<B: fmt::Debug, F> fmt::Debug for Read<B, F> {
 }
 
 impl<B: ReadBuffer, F: UringFd> Completable for Read<B, F> {
-    // The fd and buffer are `None` only when the op was cancelled and they were
-    // kept in the driver; otherwise they are returned to the caller.
-    type Output = (io::Result<u32>, Option<F>, Option<B>);
+    type Output = Completion<u32, ReadResources<B, F>>;
 
     fn complete(self, cqe: CqeResult) -> Self::Output {
         let mut buf = self.buf;
@@ -72,15 +76,24 @@ impl<B: ReadBuffer, F: UringFd> Completable for Read<B, F> {
             // SAFETY: kernel wrote exactly `len` bytes into the prepared buffer.
             unsafe { buf.uring_read_complete(len) };
         }
-        (cqe.result, Some(self.fd), Some(buf))
+        Completion::Done {
+            result: cqe.result,
+            resources: ReadResources { fd: self.fd, buf },
+        }
     }
 
     fn complete_with_error(self, err: Error) -> Self::Output {
-        (Err(err), Some(self.fd), Some(self.buf))
+        Completion::Done {
+            result: Err(err),
+            resources: ReadResources {
+                fd: self.fd,
+                buf: self.buf,
+            },
+        }
     }
 
     fn complete_after_cancel(err: Error) -> Self::Output {
-        (Err(err), None, None)
+        Completion::Cancelled(err)
     }
 }
 
