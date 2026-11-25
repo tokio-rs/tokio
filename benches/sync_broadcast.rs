@@ -111,6 +111,59 @@ fn bench_try_recv(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(contention, bench_contention, bench_try_recv);
+fn parked_wake_impl<const N_TASKS: usize>(g: &mut BenchmarkGroup<WallTime>) {
+    let rt = rt();
+
+    let (tx, _rx) = broadcast::channel::<usize>(1000);
+    let wg = Arc::new((AtomicUsize::new(0), Notify::new()));
+
+    for _ in 0..N_TASKS {
+        let wg = wg.clone();
+        let mut rx = tx.subscribe();
+        rt.spawn(async move {
+            while let Ok(v) = rx.recv().await {
+                black_box(v);
+                if wg.0.fetch_sub(1, Ordering::Relaxed) == 1 {
+                    wg.1.notify_one();
+                }
+            }
+        });
+    }
+
+    const N_ITERS: usize = 100;
+
+    g.bench_function(N_TASKS.to_string(), |b| {
+        b.iter(|| {
+            rt.block_on({
+                let wg = wg.clone();
+                let tx = tx.clone();
+                async move {
+                    for i in 0..N_ITERS {
+                        assert_eq!(wg.0.fetch_add(N_TASKS, Ordering::Relaxed), 0);
+                        tx.send(i).unwrap();
+                        while wg.0.load(Ordering::Relaxed) > 0 {
+                            wg.1.notified().await;
+                        }
+                    }
+                }
+            })
+        })
+    });
+}
+
+fn bench_parked_wake(c: &mut Criterion) {
+    let mut group = c.benchmark_group("parked_wake");
+    parked_wake_impl::<32>(&mut group);
+    parked_wake_impl::<64>(&mut group);
+    parked_wake_impl::<128>(&mut group);
+    group.finish();
+}
+
+criterion_group!(
+    contention,
+    bench_contention,
+    bench_try_recv,
+    bench_parked_wake
+);
 
 criterion_main!(contention);
