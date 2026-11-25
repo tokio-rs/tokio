@@ -67,6 +67,9 @@ cfg_rt! {
 
     pub(crate) use self::rand::RngSeedGenerator;
 
+    mod wake;
+    pub(crate) use wake::WakerRef;
+
     mod sync_wrapper;
     pub(crate) use sync_wrapper::SyncWrapper;
 

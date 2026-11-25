@@ -14,6 +14,7 @@ use std::task::{Context, RawWaker, RawWakerVTable, Waker};
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::{Arc, Mutex, MutexGuard};
 use crate::util::linked_list::{self, Link, LinkedList};
+use crate::util::WakerRef;
 
 /// This is the main handle to the collection.
 pub(crate) struct IdleNotifiedSet<T> {
@@ -423,12 +424,9 @@ impl<'a, T> EntryInOneOfTheLists<'a, T> {
         F: FnOnce(&mut T, &mut Context<'_>) -> U,
     {
         let ptr = Arc::as_ptr(&self.entry).cast::<()>();
-        // Safety: The vtable functions expect a pointer from `Arc::as_ptr`.
-        // The waker is wrapped in `ManuallyDrop` as it does not own a
-        // refcount, and it does not outlive `self.entry`.
-        let waker = ManuallyDrop::new(unsafe {
-            Waker::from_raw(RawWaker::new(ptr, self.entry.parent.vtable))
-        });
+        // Safety: The vtable functions expect a pointer from `Arc::as_ptr`,
+        // and the returned `WakerRef` does not outlive `self.entry`.
+        let waker = unsafe { WakerRef::from_raw(RawWaker::new(ptr, self.entry.parent.vtable)) };
 
         let mut context = Context::from_waker(&waker);
 

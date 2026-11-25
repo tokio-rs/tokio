@@ -11,7 +11,7 @@ use crate::runtime::{
 };
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
-use crate::util::RngSeedGenerator;
+use crate::util::{RngSeedGenerator, WakerRef};
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -663,16 +663,14 @@ impl Handle {
     }
 
     /// Returns a waker for the handle, without increasing its refcount.
-    ///
-    /// The waker must not outlive `me`.
-    fn waker_ref(me: &Arc<Self>) -> ManuallyDrop<Waker> {
+    fn waker_ref(me: &Arc<Self>) -> WakerRef<'_> {
         // Set woken to true when enter block_on, ensure outer future
         // be polled for the first time when enter loop
         me.shared.woken.store(true, Release);
         let ptr = Arc::as_ptr(me).cast::<()>();
-        // Safety: The vtable functions expect a pointer from `Arc::as_ptr`.
-        // The waker is wrapped in `ManuallyDrop` as it does not own a refcount.
-        ManuallyDrop::new(unsafe { Waker::from_raw(RawWaker::new(ptr, &WAKER_VTABLE)) })
+        // Safety: The vtable functions expect a pointer from `Arc::as_ptr`,
+        // and the returned `WakerRef` cannot outlive `me`.
+        unsafe { WakerRef::from_raw(RawWaker::new(ptr, &WAKER_VTABLE)) }
     }
 
     // reset woken to false and return original value
