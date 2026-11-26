@@ -83,3 +83,60 @@ fn test_zero_sized() {
     assert_eq!(b.get_pin().now_or_never(), Some(5));
     assert_eq!(b.get_pin().now_or_never(), Some(5));
 }
+
+#[test]
+fn test_try_set_err_preserves_existing_future() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    struct TrackedFuture {
+        value: u32,
+        drops: Arc<AtomicUsize>,
+        _padding: [u8; 32],
+    }
+
+    impl Future for TrackedFuture {
+        type Output = u32;
+
+        fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<u32> {
+            Poll::Ready(self.value)
+        }
+    }
+
+    impl Drop for TrackedFuture {
+        fn drop(&mut self) {
+            self.drops.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    let drops = Arc::new(AtomicUsize::new(0));
+    let fut1 = TrackedFuture {
+        value: 42,
+        drops: Arc::clone(&drops),
+        _padding: [0; 32],
+    };
+    assert_ne!(Layout::for_value(&fut1), Layout::new::<ZeroSizedFuture>());
+
+    let mut b = ReusableBoxFuture::new(fut1);
+
+    // Attempting to replace with a different layout must fail without dropping
+    // or replacing the existing future.
+    assert!(b.try_set(ZeroSizedFuture {}).is_err());
+    assert_eq!(drops.load(Ordering::SeqCst), 0);
+    assert_eq!(b.get_pin().now_or_never(), Some(42));
+
+    // The original allocation's layout must still be intact, allowing reuse
+    // with another future of the same layout.
+    let fut2 = TrackedFuture {
+        value: 99,
+        drops: Arc::clone(&drops),
+        _padding: [1; 32],
+    };
+    b.try_set(fut2)
+        .unwrap_or_else(|_| panic!("original layout should still be reusable"));
+    assert_eq!(drops.load(Ordering::SeqCst), 1);
+    assert_eq!(b.get_pin().now_or_never(), Some(99));
+
+    drop(b);
+    assert_eq!(drops.load(Ordering::SeqCst), 2);
+}

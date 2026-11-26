@@ -61,7 +61,12 @@ impl<'a, T> ReusableBoxFuture<'a, T> {
         {
             // future::Pending<T> is a ZST so this never allocates.
             let boxed = mem::replace(&mut this.boxed, Box::pin(future::pending()));
-            reuse_pin_box(boxed, future, |boxed| this.boxed = Pin::from(boxed))
+            reuse_pin_box(boxed, future, |boxed| this.boxed = Pin::from(boxed)).map_err(
+                |(boxed, future)| {
+                    this.boxed = boxed;
+                    future
+                },
+            )
         }
 
         real_try_set(self, future)
@@ -98,13 +103,17 @@ impl<T> fmt::Debug for ReusableBoxFuture<'_, T> {
     }
 }
 
-fn reuse_pin_box<T: ?Sized, U, O, F>(boxed: Pin<Box<T>>, new_value: U, callback: F) -> Result<O, U>
+fn reuse_pin_box<T: ?Sized, U, O, F>(
+    boxed: Pin<Box<T>>,
+    new_value: U,
+    callback: F,
+) -> Result<O, (Pin<Box<T>>, U)>
 where
     F: FnOnce(Box<U>) -> O,
 {
     let layout = Layout::for_value::<T>(&*boxed);
     if layout != Layout::new::<U>() {
-        return Err(new_value);
+        return Err((boxed, new_value));
     }
 
     // SAFETY: We don't ever construct a non-pinned reference to the old `T` from now on, and we
