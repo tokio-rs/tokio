@@ -4,6 +4,7 @@ use crate::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use pin_project_lite::pin_project;
 use std::fmt;
 use std::io::{self, IoSlice, SeekFrom, Write};
+use std::mem;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
@@ -234,7 +235,8 @@ impl<W: AsyncWrite + AsyncSeek> AsyncSeek for BufWriter<W> {
     }
 
     fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
-        let pos = match self.seek_state {
+        let state = mem::replace(self.as_mut().project().seek_state, SeekState::Init);
+        let pos = match state {
             SeekState::Init => {
                 return self.project().inner.poll_complete(cx);
             }
@@ -243,27 +245,26 @@ impl<W: AsyncWrite + AsyncSeek> AsyncSeek for BufWriter<W> {
         };
 
         // Flush the internal buffer before seeking.
-        ready!(self.as_mut().flush_buf(cx))?;
+        if self.as_mut().flush_buf(cx)?.is_pending() {
+            *self.project().seek_state = state;
+            return Poll::Pending;
+        }
 
         let mut me = self.project();
         if let Some(pos) = pos {
             // Ensure previous seeks have finished before starting a new one
-            ready!(me.inner.as_mut().poll_complete(cx))?;
-            if let Err(e) = me.inner.as_mut().start_seek(pos) {
-                *me.seek_state = SeekState::Init;
-                return Poll::Ready(Err(e));
+            if me.inner.as_mut().poll_complete(cx)?.is_pending() {
+                *me.seek_state = state;
+                return Poll::Pending;
             }
+            me.inner.as_mut().start_seek(pos)?;
         }
-        match me.inner.poll_complete(cx) {
-            Poll::Ready(res) => {
-                *me.seek_state = SeekState::Init;
-                Poll::Ready(res)
-            }
-            Poll::Pending => {
-                *me.seek_state = SeekState::Pending;
-                Poll::Pending
-            }
+
+        let res = me.inner.poll_complete(cx);
+        if res.is_pending() {
+            *me.seek_state = SeekState::Pending;
         }
+        res
     }
 }
 
