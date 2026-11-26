@@ -1,12 +1,13 @@
-use futures_util::future::{AbortHandle, Abortable};
-use std::fmt;
-use std::fmt::{Debug, Formatter};
+use pin_project_lite::pin_project;
+use std::cell::Cell;
+use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use tokio::sync::oneshot;
-use tokio::task::{spawn_local, JoinHandle};
+use std::task::{Context, Poll};
+use tokio::sync::Notify;
+use tokio::task::JoinHandle;
 
 /// A cloneable handle to a local pool, used for spawning `!Send` tasks.
 ///
@@ -86,7 +87,7 @@ impl LocalPoolHandle {
         self.pool
             .workers
             .iter()
-            .map(|worker| worker.task_count.load(Ordering::SeqCst))
+            .map(|worker| worker.shared.task_count.load(Ordering::SeqCst))
             .collect::<Vec<_>>()
     }
 
@@ -220,89 +221,14 @@ impl LocalPool {
         Fut: Future + 'static,
         Fut::Output: Send + 'static,
     {
-        let (sender, receiver) = oneshot::channel();
         let (worker, job_guard) = match worker_choice {
             WorkerChoice::LeastBurdened => self.find_and_incr_least_burdened_worker(),
             WorkerChoice::ByIdx(idx) => self.find_worker_by_idx(idx),
         };
-        let worker_spawner = worker.spawner.clone();
 
-        // Spawn a future onto the worker's runtime so we can immediately return
-        // a join handle.
-        worker.runtime_handle.spawn(async move {
-            // Move the job guard into the task
-            let _job_guard = job_guard;
-
-            // Propagate aborts via Abortable/AbortHandle
-            let (abort_handle, abort_registration) = AbortHandle::new_pair();
-            let _abort_guard = AbortGuard(abort_handle);
-
-            // Inside the future we can't run spawn_local yet because we're not
-            // in the context of a LocalRuntime. We need to send create_task to the
-            // LocalRuntime task for spawning.
-            let spawn_task = Box::new(move || {
-                // Once we're in the LocalRuntime context we can call spawn_local
-                let join_handle =
-                    spawn_local(
-                        async move { Abortable::new(create_task(), abort_registration).await },
-                    );
-
-                // Send the join handle back to the spawner. If sending fails,
-                // we assume the parent task was canceled, so cancel this task
-                // as well.
-                if let Err(join_handle) = sender.send(join_handle) {
-                    join_handle.abort()
-                }
-            });
-
-            // Send the callback to the LocalRuntime task
-            if let Err(e) = worker_spawner.send(spawn_task) {
-                // Propagate the error as a panic in the join handle.
-                panic!("Failed to send job to worker: {e}");
-            }
-
-            // Wait for the task's join handle
-            let join_handle = match receiver.await {
-                Ok(handle) => handle,
-                Err(e) => {
-                    // We sent the task successfully, but failed to get its
-                    // join handle... We assume something happened to the worker
-                    // and the task was not spawned. Propagate the error as a
-                    // panic in the join handle.
-                    panic!("Worker failed to send join handle: {e}");
-                }
-            };
-
-            // Wait for the task to complete
-            let join_result = join_handle.await;
-
-            match join_result {
-                Ok(Ok(output)) => output,
-                Ok(Err(_)) => {
-                    // Pinned task was aborted. But that only happens if this
-                    // task is aborted. So this is an impossible branch.
-                    unreachable!(
-                        "Reaching this branch means this task was previously \
-                         aborted but it continued running anyways"
-                    )
-                }
-                Err(e) => {
-                    if e.is_panic() {
-                        std::panic::resume_unwind(e.into_panic());
-                    } else if e.is_cancelled() {
-                        // No one else should have the join handle, so this is
-                        // unexpected. Forward this error as a panic in the join
-                        // handle.
-                        panic!("spawn_pinned task was canceled: {e}");
-                    } else {
-                        // Something unknown happened (not a panic or
-                        // cancellation). Forward this error as a panic in the
-                        // join handle.
-                        panic!("spawn_pinned task failed: {e}");
-                    }
-                }
-            }
-        })
+        worker
+            .runtime_handle
+            .spawn(PinnedFuture::new(create_task, job_guard))
     }
 
     /// Find the worker with the least number of tasks, increment its task
@@ -312,27 +238,34 @@ impl LocalPool {
     /// A job count guard is also returned to ensure the task count gets
     /// decremented when the job is done.
     fn find_and_incr_least_burdened_worker(&self) -> (&LocalWorkerHandle, JobCountGuard) {
+        if self.workers.len() == 1 {
+            let worker = &self.workers[0];
+            worker.shared.task_count.fetch_add(1, Ordering::SeqCst);
+            return (worker, JobCountGuard(Arc::clone(&worker.shared)));
+        }
+
         loop {
-            let (worker, task_count) = self
+            let (worker, mut task_count) = self
                 .workers
                 .iter()
-                .map(|worker| (worker, worker.task_count.load(Ordering::SeqCst)))
+                .map(|worker| (worker, worker.shared.task_count.load(Ordering::Relaxed)))
                 .min_by_key(|&(_, count)| count)
                 .expect("There must be more than one worker");
 
-            // Make sure the task count hasn't changed since when we choose this
-            // worker. Otherwise, restart the search.
-            if worker
-                .task_count
-                .compare_exchange(
+            // Make sure the task count hasn't increased since when we chose
+            // this worker. If it decreased (or on a spurious failure), retry
+            // on the same worker without rescanning all workers.
+            loop {
+                match worker.shared.task_count.compare_exchange_weak(
                     task_count,
                     task_count + 1,
                     Ordering::SeqCst,
                     Ordering::Relaxed,
-                )
-                .is_ok()
-            {
-                return (worker, JobCountGuard(Arc::clone(&worker.task_count)));
+                ) {
+                    Ok(_) => return (worker, JobCountGuard(Arc::clone(&worker.shared))),
+                    Err(actual) if actual <= task_count => task_count = actual,
+                    Err(_) => break,
+                }
             }
         }
     }
@@ -340,51 +273,197 @@ impl LocalPool {
     #[track_caller]
     fn find_worker_by_idx(&self, idx: usize) -> (&LocalWorkerHandle, JobCountGuard) {
         let worker = &self.workers[idx];
-        worker.task_count.fetch_add(1, Ordering::SeqCst);
+        worker.shared.task_count.fetch_add(1, Ordering::SeqCst);
 
-        (worker, JobCountGuard(Arc::clone(&worker.task_count)))
+        (worker, JobCountGuard(Arc::clone(&worker.shared)))
+    }
+}
+
+thread_local! {
+    // Points to the `WorkerShared` of the worker currently running on this
+    // thread, or null if this thread is not executing a local pool worker.
+    static CURRENT_WORKER: Cell<*const ()> = const { Cell::new(std::ptr::null()) };
+}
+
+struct CurrentWorkerGuard;
+
+impl CurrentWorkerGuard {
+    fn enter(worker: &Arc<WorkerShared>) -> Self {
+        let ptr = Arc::as_ptr(worker).cast::<()>();
+        CURRENT_WORKER.with(|cell| {
+            debug_assert!(cell.get().is_null());
+            cell.set(ptr);
+        });
+        Self
+    }
+}
+
+impl Drop for CurrentWorkerGuard {
+    fn drop(&mut self) {
+        let _ = CURRENT_WORKER.try_with(|cell| cell.set(std::ptr::null()));
+    }
+}
+
+#[repr(align(128))]
+struct WorkerShared {
+    task_count: AtomicUsize,
+    closed: AtomicBool,
+    shutdown_notify: Notify,
+}
+
+impl WorkerShared {
+    fn is_current_worker(self: &Arc<Self>) -> bool {
+        let expected = Arc::as_ptr(self).cast::<()>();
+        CURRENT_WORKER
+            .try_with(|cell| std::ptr::eq(cell.get(), expected))
+            .unwrap_or(false)
     }
 }
 
 /// Automatically decrements a worker's job count when a job finishes (when
-/// this gets dropped).
-struct JobCountGuard(Arc<AtomicUsize>);
+/// this gets dropped), and signals worker shutdown if the pool has been
+/// dropped and no tasks remain.
+struct JobCountGuard(Arc<WorkerShared>);
 
 impl Drop for JobCountGuard {
     fn drop(&mut self) {
         // Decrement the job count
-        let previous_value = self.0.fetch_sub(1, Ordering::SeqCst);
+        let previous_value = self.0.task_count.fetch_sub(1, Ordering::SeqCst);
         debug_assert!(previous_value >= 1);
+        if previous_value == 1 && self.0.closed.load(Ordering::SeqCst) {
+            self.0.shutdown_notify.notify_one();
+        }
     }
 }
 
-/// Calls abort on the handle when dropped.
-struct AbortGuard(AbortHandle);
-
-impl Drop for AbortGuard {
-    fn drop(&mut self) {
-        self.0.abort();
+pin_project! {
+    struct PinnedFuture<F, Fut> {
+        #[pin]
+        state: PinnedFutureState<F, Fut>,
+        job_guard: JobCountGuard,
+    }
+    impl<F, Fut> PinnedDrop for PinnedFuture<F, Fut> {
+        fn drop(this: Pin<&mut Self>) {
+            let this = this.project();
+            // If `state` currently holds the `!Send` future, verify that we
+            // are on the worker thread that created it before its destructor
+            // runs.
+            if matches!(
+                this.state.as_ref().project_ref(),
+                PinnedFutureStateProjRef::Running { .. }
+            ) && !this.job_guard.0.is_current_worker()
+            {
+                std::process::abort();
+            }
+        }
     }
 }
 
-type PinnedFutureSpawner = Box<dyn FnOnce() + Send + 'static>;
+pin_project! {
+    #[project = PinnedFutureStateProj]
+    #[project_ref = PinnedFutureStateProjRef]
+    #[project_replace = PinnedFutureStateProjReplace]
+    enum PinnedFutureState<F, Fut> {
+        Init { create_task: F },
+        Running { #[pin] fut: Fut },
+        Done,
+    }
+}
+
+// SAFETY: `PinnedFuture` starts in `Init`, which contains only `F: Send` and
+// `JobCountGuard: Send`. The `!Send` future `Fut` is only created and polled
+// inside `Future::poll` after asserting `job_guard.0.is_current_worker()`.
+// Because `job_guard` owns an `Arc<WorkerShared>`, the worker's identity
+// pointer stays uniquely allocated for the lifetime of `PinnedFuture` and is
+// only installed in `CURRENT_WORKER` on that worker's dedicated thread while
+// driving or dropping its `LocalRuntime`. `PinnedDrop` checks the same thread
+// identity before `Running { fut }` can be dropped and aborts on a mismatch,
+// ensuring `Fut` is never created, accessed, polled, or dropped on any other
+// thread.
+unsafe impl<F: Send, Fut> Send for PinnedFuture<F, Fut> {}
+
+impl<F, Fut> PinnedFuture<F, Fut> {
+    fn new(create_task: F, job_guard: JobCountGuard) -> Self {
+        Self {
+            state: PinnedFutureState::Init { create_task },
+            job_guard,
+        }
+    }
+}
+
+impl<F, Fut> Future for PinnedFuture<F, Fut>
+where
+    F: FnOnce() -> Fut,
+    Fut: Future,
+{
+    type Output = Fut::Output;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        assert!(
+            this.job_guard.0.is_current_worker(),
+            "pinned task polled on wrong thread"
+        );
+
+        let mut state = this.state;
+
+        if matches!(
+            state.as_ref().project_ref(),
+            PinnedFutureStateProjRef::Init { .. }
+        ) {
+            // Transition to `Done` before calling `create_task` so a panic in
+            // the callback leaves no future behind.
+            let create_task = match state.as_mut().project_replace(PinnedFutureState::Done) {
+                PinnedFutureStateProjReplace::Init { create_task } => create_task,
+                _ => unreachable!(),
+            };
+            let fut = create_task();
+            state.set(PinnedFutureState::Running { fut });
+        }
+
+        match state.as_mut().project() {
+            PinnedFutureStateProj::Running { fut } => match fut.poll(cx) {
+                Poll::Ready(output) => {
+                    // Drop the `!Send` future immediately on the worker thread.
+                    state.set(PinnedFutureState::Done);
+                    Poll::Ready(output)
+                }
+                Poll::Pending => Poll::Pending,
+            },
+            PinnedFutureStateProj::Init { .. } => unreachable!(),
+            PinnedFutureStateProj::Done => {
+                panic!("pinned future polled after completion")
+            }
+        }
+    }
+}
 
 struct LocalWorkerHandle {
     runtime_handle: tokio::runtime::Handle,
-    spawner: UnboundedSender<PinnedFutureSpawner>,
-    task_count: Arc<AtomicUsize>,
+    shared: Arc<WorkerShared>,
+}
+
+impl Drop for LocalWorkerHandle {
+    fn drop(&mut self) {
+        self.shared.closed.store(true, Ordering::SeqCst);
+        if self.shared.task_count.load(Ordering::SeqCst) == 0 {
+            self.shared.shutdown_notify.notify_one();
+        }
+    }
 }
 
 impl LocalWorkerHandle {
     /// Create a new worker for executing pinned tasks
     fn new_worker() -> LocalWorkerHandle {
-        let (sender, receiver) = unbounded_channel();
         let (handle_sender, handle_receiver) = std::sync::mpsc::channel();
+        let shared = Arc::new(WorkerShared {
+            task_count: AtomicUsize::new(0),
+            closed: AtomicBool::new(false),
+            shutdown_notify: Notify::new(),
+        });
+        let shared_clone = Arc::clone(&shared);
 
-        let task_count = Arc::new(AtomicUsize::new(0));
-        let task_count_clone = Arc::clone(&task_count);
-
-        std::thread::spawn(|| Self::run(handle_sender, receiver, task_count_clone));
+        std::thread::spawn(|| Self::run(handle_sender, shared_clone));
 
         let runtime_handle = handle_receiver
             .recv()
@@ -393,16 +472,18 @@ impl LocalWorkerHandle {
 
         LocalWorkerHandle {
             runtime_handle,
-            spawner: sender,
-            task_count,
+            shared,
         }
     }
 
     fn run(
         handle_sender: std::sync::mpsc::Sender<std::io::Result<tokio::runtime::Handle>>,
-        mut task_receiver: UnboundedReceiver<PinnedFutureSpawner>,
-        task_count: Arc<AtomicUsize>,
+        shared: Arc<WorkerShared>,
     ) {
+        // Declared before `runtime` so `CURRENT_WORKER` remains set while
+        // `runtime` drops any remaining tasks during shutdown or unwinding.
+        let _worker_guard = CurrentWorkerGuard::enter(&shared);
+
         let runtime = match tokio::runtime::LocalRuntime::new() {
             Ok(runtime) => runtime,
             Err(err) => {
@@ -419,34 +500,27 @@ impl LocalWorkerHandle {
         drop(handle_sender);
 
         runtime.block_on(async {
-            while let Some(spawn_task) = task_receiver.recv().await {
-                // Calls spawn_local(future)
-                (spawn_task)();
+            loop {
+                let notified = shared.shutdown_notify.notified();
+                tokio::pin!(notified);
+                // Register before checking the shutdown condition so a
+                // notification sent after the check cannot be missed.
+                notified.as_mut().enable();
+
+                if shared.closed.load(Ordering::SeqCst)
+                    && shared.task_count.load(Ordering::SeqCst) == 0
+                {
+                    break;
+                }
+
+                notified.await;
             }
         });
 
-        // If there are any tasks on the runtime that has already completed,
-        // but whose output has not yet been reported, let that task complete.
-        //
-        // Since the task_count is decremented when the runtime task exits,
-        // reading that counter lets us know if any such tasks completed during
-        // the call to `block_on`.
-        let mut previous_task_count = task_count.load(Ordering::SeqCst);
-        loop {
-            // This call will also run tasks spawned on the runtime.
-            runtime.block_on(tokio::task::yield_now());
-            let new_task_count = task_count.load(Ordering::SeqCst);
-            if new_task_count == previous_task_count {
-                break;
-            } else {
-                previous_task_count = new_task_count;
-            }
-        }
-
-        // It's now no longer possible for a task on the local runtime
-        // associated with task that has completed. Drop both
-        // local runtime to let tasks on the runtime be cancelled if and
-        // only if they are still on the runtime.
+        // All `spawn_pinned` tasks have already completed and dropped their
+        // `JobCountGuard` before `block_on` exited. Drop the local runtime on
+        // this worker thread so any detached `spawn_local` tasks are cancelled
+        // cleanly.
         drop(runtime);
     }
 }
