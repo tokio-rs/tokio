@@ -194,7 +194,7 @@ cfg_test_util! {
             Ok(())
         });
 
-        crate::runtime::Handle::current().inner.driver().unpark();
+        crate::runtime::Handle::current().inner.unpark_timer();
     }
 
     /// Advances time.
@@ -279,7 +279,7 @@ cfg_test_util! {
             clock.advance(duration)
         });
 
-        crate::runtime::Handle::current().inner.driver().unpark();
+        crate::runtime::Handle::current().inner.unpark_timer();
 
         crate::task::yield_now().await;
     }
