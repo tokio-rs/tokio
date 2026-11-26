@@ -234,10 +234,48 @@ async fn abort_send_after_successful_reserve() {
 #[tokio::test]
 async fn closed_when_receiver_drops() {
     let (send, _) = channel::<i32>(1);
+    let weak = send.downgrade();
     let mut send = PollSender::new(send);
 
     let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
     assert_ready_err!(reserve.poll());
+    drop(reserve);
+
+    assert!(send.is_closed());
+    assert!(send.get_ref().is_none());
+    assert!(weak.upgrade().is_none());
+
+    let cloned = send.clone();
+    assert!(cloned.is_closed());
+    assert!(cloned.get_ref().is_none());
+}
+
+#[tokio::test]
+async fn closed_when_receiver_drops_during_pending_reserve() {
+    let (send, recv) = channel::<i32>(1);
+    let weak = send.downgrade();
+    let mut send = PollSender::new(send);
+
+    let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+    assert_ready_ok!(reserve.poll());
+    send.send_item(1).unwrap();
+
+    let mut reserve = spawn(poll_fn(|cx| send.poll_reserve(cx)));
+    assert_pending!(reserve.poll());
+
+    drop(recv);
+
+    assert!(reserve.is_woken());
+    assert_ready_err!(reserve.poll());
+    drop(reserve);
+
+    assert!(send.is_closed());
+    assert!(send.get_ref().is_none());
+    assert!(weak.upgrade().is_none());
+
+    let cloned = send.clone();
+    assert!(cloned.is_closed());
+    assert!(cloned.get_ref().is_none());
 }
 
 #[should_panic]

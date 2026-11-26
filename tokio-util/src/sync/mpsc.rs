@@ -149,7 +149,10 @@ impl<T: Send> PollSender<T> {
                         (Some(Poll::Ready(Ok(()))), State::ReadyToSend(permit))
                     }
                     // Channel is closed.
-                    Poll::Ready(Err(e)) => (Some(Poll::Ready(Err(e))), State::Closed),
+                    Poll::Ready(Err(e)) => {
+                        self.sender = None;
+                        (Some(Poll::Ready(Err(e))), State::Closed)
+                    }
                     // Channel doesn't have capacity yet, so we need to wait.
                     Poll::Pending => (Some(Poll::Pending), State::Acquiring),
                 },
