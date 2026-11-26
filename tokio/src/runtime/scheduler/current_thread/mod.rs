@@ -11,15 +11,16 @@ use crate::runtime::{
 };
 use crate::sync::notify::Notify;
 use crate::util::atomic_cell::AtomicCell;
-use crate::util::{waker_ref, RngSeedGenerator, Wake, WakerRef};
+use crate::util::{RngSeedGenerator, WakerRef};
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::future::{poll_fn, Future};
+use std::mem::ManuallyDrop;
 use std::pin::Pin;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::Poll::{Pending, Ready};
-use std::task::Waker;
+use std::task::{RawWaker, RawWakerVTable, Waker};
 use std::thread::ThreadId;
 use std::time::Duration;
 use std::time::Instant;
@@ -661,11 +662,15 @@ impl Handle {
         self.shared.inject.pop()
     }
 
+    /// Returns a waker for the handle, without increasing its refcount.
     fn waker_ref(me: &Arc<Self>) -> WakerRef<'_> {
         // Set woken to true when enter block_on, ensure outer future
         // be polled for the first time when enter loop
         me.shared.woken.store(true, Release);
-        waker_ref(me)
+        let ptr = Arc::as_ptr(me).cast::<()>();
+        // Safety: The vtable functions expect a pointer from `Arc::as_ptr`,
+        // and the returned `WakerRef` cannot outlive `me`.
+        unsafe { WakerRef::from_raw(RawWaker::new(ptr, &WAKER_VTABLE)) }
     }
 
     // reset woken to false and return original value
@@ -819,12 +824,7 @@ impl Schedule for Arc<Handle> {
     }
 }
 
-impl Wake for Handle {
-    fn wake(arc_self: Arc<Self>) {
-        Wake::wake_by_ref(&arc_self);
-    }
-
-    /// Wake by reference
+impl Handle {
     fn wake_by_ref(arc_self: &Arc<Self>) {
         let already_woken = arc_self.shared.woken.swap(true, Release);
 
@@ -843,6 +843,34 @@ impl Wake for Handle {
             });
         }
     }
+}
+
+// A `static` gives every waker for the handle the same vtable address, which
+// `Waker::will_wake` relies on.
+static WAKER_VTABLE: RawWakerVTable =
+    RawWakerVTable::new(clone_waker, wake_by_val, wake_by_ref, drop_waker);
+
+unsafe fn clone_waker(ptr: *const ()) -> RawWaker {
+    // Safety: `ptr` was created from `Arc::as_ptr` in `Handle::waker_ref`.
+    unsafe { Arc::increment_strong_count(ptr as *const Handle) };
+    RawWaker::new(ptr, &WAKER_VTABLE)
+}
+
+unsafe fn wake_by_val(ptr: *const ()) {
+    // Safety: `ptr` was created from `Arc::as_ptr` in `Handle::waker_ref`.
+    let handle = unsafe { Arc::from_raw(ptr as *const Handle) };
+    Handle::wake_by_ref(&handle);
+}
+
+unsafe fn wake_by_ref(ptr: *const ()) {
+    // Safety: `ptr` was created from `Arc::as_ptr` in `Handle::waker_ref`.
+    let handle = ManuallyDrop::new(unsafe { Arc::from_raw(ptr as *const Handle) });
+    Handle::wake_by_ref(&handle);
+}
+
+unsafe fn drop_waker(ptr: *const ()) {
+    // Safety: `ptr` was created from `Arc::as_ptr` in `Handle::waker_ref`.
+    drop(unsafe { Arc::from_raw(ptr as *const Handle) });
 }
 
 // ===== CoreGuard =====
