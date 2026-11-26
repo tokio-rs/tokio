@@ -2,7 +2,7 @@
 #![cfg(not(target_os = "wasi"))] // Wasi doesn't support threads
 
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::Barrier;
 use tokio_util::task;
@@ -421,6 +421,8 @@ async fn pool_drop_from_inside_pinned_task() {
 #[tokio::test]
 #[cfg(panic = "unwind")]
 async fn panic_in_callback_poll_and_drop_keeps_load_consistent() {
+    use std::sync::atomic::AtomicUsize;
+
     struct PanicOnDrop {
         drops: Arc<AtomicUsize>,
         _not_send: Rc<()>,
