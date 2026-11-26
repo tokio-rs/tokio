@@ -1,9 +1,10 @@
 #![cfg(feature = "full")]
 #![cfg(windows)]
 
-use std::io;
+use bytes::Buf;
+use std::io::{self, IoSlice, IoSliceMut};
 use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::windows::named_pipe::{ClientOptions, PipeMode, ServerOptions};
 use tokio::time;
 use windows_sys::Win32::Foundation::{ERROR_NO_DATA, ERROR_PIPE_BUSY};
@@ -395,5 +396,88 @@ async fn test_named_pipe_access() -> io::Result<()> {
 
         server.await??;
     }
+    Ok(())
+}
+
+// This tests that `try_write_vectored` and `try_read_vectored` use every
+// buffer, in both directions.
+//
+// Regression test for: https://github.com/tokio-rs/tokio/issues/6970
+#[tokio::test]
+async fn test_named_pipe_try_io_vectored() -> io::Result<()> {
+    const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-try-io-vectored";
+
+    let server = ServerOptions::new().create(PIPE_NAME)?;
+    let client = ClientOptions::new().open(PIPE_NAME)?;
+    server.connect().await?;
+
+    let bufs = [IoSlice::new(b"hello "), IoSlice::new(b"world")];
+
+    // client to server
+    client.writable().await?;
+    assert_eq!(client.try_write_vectored(&bufs)?, 11);
+
+    let mut head = [0u8; 4];
+    let mut tail = [0u8; 16];
+    let n = loop {
+        server.readable().await?;
+        let mut bufs = [IoSliceMut::new(&mut head), IoSliceMut::new(&mut tail)];
+        match server.try_read_vectored(&mut bufs) {
+            Ok(n) => break n,
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+            Err(e) => return Err(e),
+        }
+    };
+    assert_eq!(n, 11);
+    assert_eq!(&head, b"hell");
+    assert_eq!(&tail[..7], b"o world");
+
+    // server to client
+    server.writable().await?;
+    assert_eq!(server.try_write_vectored(&bufs)?, 11);
+
+    let mut head = [0u8; 4];
+    let mut tail = [0u8; 16];
+    let n = loop {
+        client.readable().await?;
+        let mut bufs = [IoSliceMut::new(&mut head), IoSliceMut::new(&mut tail)];
+        match client.try_read_vectored(&mut bufs) {
+            Ok(n) => break n,
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+            Err(e) => return Err(e),
+        }
+    };
+    assert_eq!(n, 11);
+    assert_eq!(&head, b"hell");
+    assert_eq!(&tail[..7], b"o world");
+
+    Ok(())
+}
+
+// This tests that the `AsyncWrite` impls report vectored writes as supported,
+// so that `write_buf` passes every chunk of a `Buf` to the pipe in one write.
+#[tokio::test]
+async fn test_named_pipe_write_buf_vectored() -> io::Result<()> {
+    const PIPE_NAME: &str = r"\\.\pipe\test-named-pipe-write-buf-vectored";
+
+    let mut server = ServerOptions::new().create(PIPE_NAME)?;
+    let mut client = ClientOptions::new().open(PIPE_NAME)?;
+    server.connect().await?;
+
+    assert!(server.is_write_vectored());
+    assert!(client.is_write_vectored());
+
+    let mut buf = [0u8; 11];
+
+    let mut chunks = Buf::chain(&b"hello "[..], &b"world"[..]);
+    assert_eq!(client.write_buf(&mut chunks).await?, 11);
+    server.read_exact(&mut buf).await?;
+    assert_eq!(&buf, b"hello world");
+
+    let mut chunks = Buf::chain(&b"hello "[..], &b"world"[..]);
+    assert_eq!(server.write_buf(&mut chunks).await?, 11);
+    client.read_exact(&mut buf).await?;
+    assert_eq!(&buf, b"hello world");
+
     Ok(())
 }

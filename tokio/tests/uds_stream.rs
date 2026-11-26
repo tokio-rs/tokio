@@ -1,4 +1,9 @@
-#![cfg(feature = "full")]
+#![cfg(all(
+    feature = "net",
+    feature = "macros",
+    feature = "rt",
+    feature = "io-util"
+))]
 #![warn(rust_2018_idioms)]
 #![cfg(unix)]
 #![cfg(not(miri))] // No Unix domain sockets on miri.
@@ -433,7 +438,9 @@ async fn try_read_buf() -> std::io::Result<()> {
 
 // https://github.com/tokio-rs/tokio/issues/3879
 #[tokio::test]
-#[cfg(not(target_os = "macos"))]
+// emscripten's node-backed AF_UNIX inherits BSD accept-queue semantics (a
+// queued connection survives the listener close), same as macOS.
+#[cfg(not(any(target_os = "macos", target_os = "emscripten")))]
 async fn epollhup() -> io::Result<()> {
     let dir = tempfile::Builder::new()
         .prefix("tokio-uds-tests")
@@ -493,6 +500,7 @@ async fn abstract_socket_name() {
 
 // Both ends of a fresh pair are writable without a driver event, but not
 // readable until the peer writes.
+#[cfg(not(target_os = "emscripten"))] // No `socketpair(2)` on emscripten's node backend.
 #[tokio::test(flavor = "current_thread")]
 async fn pair_starts_writable() -> io::Result<()> {
     let (a, mut b) = UnixStream::pair()?;

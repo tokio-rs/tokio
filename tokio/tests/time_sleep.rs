@@ -271,6 +271,16 @@ async fn reset_after_firing() {
         .poll(&mut Context::from_waker(noop_waker_ref())));
 }
 
+#[tokio::test(start_paused = true)]
+async fn poll_after_completion() {
+    let timer = time::sleep(ms(1));
+    tokio::pin!(timer);
+
+    for _ in 0..1024 {
+        timer.as_mut().await;
+    }
+}
+
 #[tokio::test]
 async fn exactly_max() {
     time::pause();

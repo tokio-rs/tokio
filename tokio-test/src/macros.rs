@@ -61,14 +61,12 @@ macro_rules! assert_ready {
 #[macro_export]
 macro_rules! assert_ready_ok {
     ($e:expr) => {{
-        use tokio_test::{assert_ready, assert_ok};
-        let val = assert_ready!($e);
-        assert_ok!(val)
+        let val = $crate::assert_ready!($e);
+        $crate::assert_ok!(val)
     }};
     ($e:expr, $($msg:tt)+) => {{
-        use tokio_test::{assert_ready, assert_ok};
-        let val = assert_ready!($e, $($msg)*);
-        assert_ok!(val, $($msg)*)
+        let val = $crate::assert_ready!($e, $($msg)*);
+        $crate::assert_ok!(val, $($msg)*)
     }};
 }
 
@@ -94,14 +92,12 @@ macro_rules! assert_ready_ok {
 #[macro_export]
 macro_rules! assert_ready_err {
     ($e:expr) => {{
-        use tokio_test::{assert_ready, assert_err};
-        let val = assert_ready!($e);
-        assert_err!(val)
+        let val = $crate::assert_ready!($e);
+        $crate::assert_err!(val)
     }};
     ($e:expr, $($msg:tt)+) => {{
-        use tokio_test::{assert_ready, assert_err};
-        let val = assert_ready!($e, $($msg)*);
-        assert_err!(val, $($msg)*)
+        let val = $crate::assert_ready!($e, $($msg)*);
+        $crate::assert_err!(val, $($msg)*)
     }};
 }
 
@@ -254,13 +250,19 @@ macro_rules! assert_err {
     }};
 }
 
-/// Asserts that an exact duration has elapsed since the start instant ±1ms.
+/// Asserts that at least `dur`, and at most `dur` + 1ms, has elapsed since the
+/// start instant.
+///
+/// This is intended for use with a paused clock, for example with
+/// `#[tokio::test(start_paused = true)]`. With a real clock, a sleep can
+/// overshoot by more than 1ms and the assertion will fail.
 ///
 /// ```rust
 /// use tokio::time::{self, Instant};
 /// use std::time::Duration;
 /// use tokio_test::assert_elapsed;
-/// # async fn test_time_passed() {
+/// # #[tokio::main(flavor = "current_thread", start_paused = true)]
+/// # async fn main() {
 ///
 /// let start = Instant::now();
 /// let dur = Duration::from_millis(50);
@@ -286,4 +288,26 @@ macro_rules! assert_elapsed {
             lower
         );
     }};
+}
+
+#[cfg(test)]
+mod tests {
+    use std::task::Poll;
+
+    // The crate cannot name itself as `tokio_test`, so these only compile when
+    // the macros reach their helpers through `$crate`. That is the same setup a
+    // user gets after renaming the dependency in Cargo.toml.
+    #[test]
+    fn assert_ready_ok_without_tokio_test_in_scope() {
+        let poll: Poll<Result<u32, ()>> = Poll::Ready(Ok(1));
+        assert_eq!(assert_ready_ok!(poll), 1);
+        assert_eq!(assert_ready_ok!(poll, "value = {}", 1), 1);
+    }
+
+    #[test]
+    fn assert_ready_err_without_tokio_test_in_scope() {
+        let poll: Poll<Result<(), u32>> = Poll::Ready(Err(2));
+        assert_eq!(assert_ready_err!(poll), 2);
+        assert_eq!(assert_ready_err!(poll, "value = {}", 2), 2);
+    }
 }

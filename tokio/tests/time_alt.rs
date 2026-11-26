@@ -124,6 +124,24 @@ fn cancelled_timer_waker_drop_can_register_timer() {
 }
 
 #[test]
+fn poll_after_completion() {
+    for rt in rt_combinations() {
+        rt.block_on(async {
+            tokio::spawn(async {
+                let timer = tokio::time::sleep(Duration::from_millis(1));
+                tokio::pin!(timer);
+
+                for _ in 0..1024 {
+                    timer.as_mut().await;
+                }
+            })
+            .await
+            .unwrap();
+        });
+    }
+}
+
+#[test]
 fn timeout() {
     const N: u32 = 512;
 
