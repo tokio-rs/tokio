@@ -13,11 +13,11 @@ use std::task::{ready, Context, Poll};
 ///
 /// ```
 /// use bytes::{Bytes, BytesMut};
-/// use tokio_stream as stream;
-/// use tokio::io::Result;
-/// use tokio_util::io::{StreamReader, poll_read_buf};
 /// use std::future::poll_fn;
 /// use std::pin::Pin;
+/// use tokio::io::Result;
+/// use tokio_stream as stream;
+/// use tokio_util::io::{poll_read_buf, StreamReader};
 /// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> std::io::Result<()> {
 ///
@@ -89,9 +89,9 @@ pub fn poll_read_buf<T: AsyncRead + ?Sized, B: BufMut>(
 /// [`Buf`]:
 ///
 /// ```no_run
-/// use tokio_util::io::poll_write_buf;
-/// use tokio::io;
 /// use tokio::fs::File;
+/// use tokio::io;
+/// use tokio_util::io::poll_write_buf;
 ///
 /// use bytes::Buf;
 /// use std::future::poll_fn;
