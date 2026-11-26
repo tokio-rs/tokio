@@ -13,7 +13,7 @@ const MAX_PRECISION: u32 = 10;
 
 /// Log Histogram
 ///
-/// This implements an [H2 Histogram](https://iop.systems/blog/h2-histogram/), a histogram similar
+/// This implements an [H2 Histogram](https://h2histogram.org/), a histogram similar
 /// to HdrHistogram, but with better performance. It guarantees an error bound of `2^-p`.
 ///
 /// Unlike a traditional H2 histogram this has two small changes:
@@ -282,7 +282,7 @@ impl Error for InvalidHistogramConfiguration {}
 ///
 /// This function does NOT enforce that the value is within the number of expected buckets.
 fn bucket_index(value: u64, p: u32) -> u64 {
-    // Algorithm described here: https://iop.systems/blog/h2-histogram/
+    // Algorithm described here: https://h2histogram.org/
     // find the highest non-zero digit
     if value == 0 {
         return 0;

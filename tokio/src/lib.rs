@@ -21,7 +21,10 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(docsrs, allow(unused_attributes))]
 #![cfg_attr(loom, allow(dead_code, unreachable_pub))]
-#![cfg_attr(windows, allow(rustdoc::broken_intra_doc_links))]
+#![cfg_attr(
+    any(windows, target_family = "wasm"),
+    allow(rustdoc::broken_intra_doc_links)
+)]
 
 //! A runtime for writing reliable network applications without compromising speed.
 //!
@@ -459,23 +462,24 @@
 //!
 //! ### `WASI` support
 //!
-//! The `wasm32-wasip1` and `wasm32-wasip2` targets support the above features.
-//! Timers work correctly as blocking the thread is supported.
+//! The `wasm32-wasip1`, `wasm32-wasip2`, and `wasm32-wasip3` targets support
+//! the above features.  Timers work correctly as blocking the thread is
+//! supported.
 //!
-//! Under the `tokio_unstable` flag, these targets support the use
-//! of `tokio::net`. On `wasm32-wasip1`, not all methods are available on the
-//! networking types as this target does not support the creation of new
-//! sockets from within `WASM`. Because of this, sockets must currently be
-//! created via the `FromRawFd` trait on `wasm32-wasip1`. The `wasm32-wasip2`
-//! target does not have this limitation.
+//! Under the `tokio_unstable` flag, these targets support the use of
+//! `tokio::net`. On `wasm32-wasip1`, not all methods are available on the
+//! networking types as this target does not support the creation of new sockets
+//! from within `WASM`. Because of this, sockets must currently be created via
+//! the `FromRawFd` trait on `wasm32-wasip1`. The `wasm32-wasip2` and
+//! `wasm32-wasip3` targets do not have this limitation.
 //!
 //! ### Emscripten support
 //!
 //! The `wasm32-unknown-emscripten` target supports the single-threaded runtime
-//! with the `rt`, `time`, `sync`, `macros`, `fs`, `io-util`, `io-std`, and
-//! `test-util` features. The `rt-multi-thread` feature is additionally
-//! supported when building with Emscripten pthreads (`-pthread`). The `net`,
-//! `process`, and `signal` features are not supported.
+//! with the `rt`, `time`, `sync`, `macros`, `fs`, `io-util`, `io-std`,
+//! `test-util`, and `net` features. The `rt-multi-thread` feature is
+//! additionally supported when building with Emscripten pthreads (`-pthread`).
+//! The `process` and `signal` features are not supported.
 //!
 //! Emscripten's filesystem is synchronous, so `tokio::fs` and `io-std` run
 //! their operations inline on the calling thread rather than on the blocking
@@ -490,6 +494,19 @@
 //! `WebAssembly.promising`. A wait from any other activation throws
 //! `WebAssembly.SuspendError`. That is a foreign exception rather than a Rust
 //! panic, so it can't be caught by `catch_unwind`.
+//!
+//! `net` uses the standard `mio` epoll reactor over Emscripten's sockets. The
+//! I/O driver's wait is a blocking `epoll_wait`, which needs either JSPI
+//! (suspending on the host event loop) or pthreads with `-sPROXY_TO_PTHREAD`
+//! (blocking on a worker). Built with `-sNODERAWSOCKETS` (real Node sockets),
+//! [`TcpStream`](crate::net::TcpStream),
+//! [`TcpListener`](crate::net::TcpListener), [`UdpSocket`](crate::net::UdpSocket),
+//! stream `AF_UNIX` sockets ([`UnixStream`](crate::net::UnixStream),
+//! [`UnixListener`](crate::net::UnixListener), [`UnixSocket`](crate::net::UnixSocket)),
+//! [`lookup_host`](crate::net::lookup_host), and
+//! [`AsyncFd`](crate::io::unix::AsyncFd) behave as on native. Node has no
+//! `socketpair(2)` (so `UnixStream::pair`), no datagram `AF_UNIX` (so
+//! `UnixDatagram`), and no `SO_PEERCRED` (so `peer_cred`).
 
 // Test that pointer width is compatible. This asserts that e.g. usize is at
 // least 32 bits, which a lot of components in Tokio currently assumes.
@@ -515,11 +532,8 @@ compile_error! {
 ))]
 compile_error!("Only features sync,macros,io-util,rt,time are supported on wasm.");
 
-#[cfg(all(
-    target_os = "emscripten",
-    any(feature = "net", feature = "process", feature = "signal")
-))]
-compile_error!("Features net,process,signal are not supported on wasm32-unknown-emscripten.");
+#[cfg(all(target_os = "emscripten", any(feature = "process", feature = "signal")))]
+compile_error!("Features process,signal are not supported on wasm32-unknown-emscripten.");
 
 #[cfg(all(
     target_os = "emscripten",
