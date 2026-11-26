@@ -862,6 +862,75 @@ fn max_allowed_length_field() {
     assert_eq!(codec.max_frame_length(), usize::MAX);
 }
 
+// Repro for tokio-rs/tokio#8780: LengthDelimitedCodec with num_skip(0)
+// and a zero-length frame returns empty frames forever without
+// consuming any input bytes (remote CPU exhaustion via Framed).
+// The decoder must reject the frame with InvalidData instead.
+#[test]
+fn decode_num_skip_zero_zero_length_frame_is_rejected() {
+    let mut codec = LengthDelimitedCodec::builder()
+        .length_field_offset(0)
+        .length_field_type::<u32>()
+        .length_adjustment(0)
+        .num_skip(0)
+        .new_codec();
+
+    let mut buf = BytesMut::from(&b"\x00\x00\x00\x00"[..]);
+
+    let err = codec.decode(&mut buf).unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+}
+
+// A zero-length payload is a legitimate empty frame under the default
+// config: the 4-byte head is consumed and one empty frame is yielded.
+// Guards against over-broad fixes for tokio-rs/tokio#8780.
+#[test]
+fn decode_zero_length_frame_default_config_still_works() {
+    let mut codec = LengthDelimitedCodec::new();
+    let mut buf = BytesMut::from(&b"\x00\x00\x00\x00"[..]);
+
+    let frame = codec.decode(&mut buf).unwrap();
+    assert_eq!(frame.unwrap().len(), 0);
+    assert!(buf.is_empty());
+    assert!(codec.decode(&mut buf).unwrap().is_none());
+}
+
+// The same rejection applies to any frame shorter than its own length
+// field, not just a zero-length one: with num_skip(0) a 2-byte frame in
+// a 4-byte head would leave head bytes behind for the next decode.
+#[test]
+fn decode_frame_shorter_than_length_field_is_rejected() {
+    let mut codec = LengthDelimitedCodec::builder()
+        .length_field_offset(0)
+        .length_field_type::<u32>()
+        .length_adjustment(0)
+        .num_skip(0)
+        .new_codec();
+
+    let mut buf = BytesMut::from(&b"\x00\x00\x00\x02"[..]);
+
+    let err = codec.decode(&mut buf).unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+}
+
+// Boundary: a frame exactly as long as its own length field consumes
+// the whole head and still decodes.
+#[test]
+fn decode_frame_equal_to_length_field_still_works() {
+    let mut codec = LengthDelimitedCodec::builder()
+        .length_field_offset(0)
+        .length_field_type::<u32>()
+        .length_adjustment(0)
+        .num_skip(0)
+        .new_codec();
+
+    let mut buf = BytesMut::from(&b"\x00\x00\x00\x04"[..]);
+
+    let frame = codec.decode(&mut buf).unwrap();
+    assert_eq!(frame.unwrap().len(), 4);
+    assert!(buf.is_empty());
+}
+
 // ===== Test utils =====
 
 struct Mock {

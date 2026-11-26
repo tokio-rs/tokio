@@ -53,6 +53,9 @@ cfg_net! {
 
 cfg_net_unix! {
     pub mod unix;
+    // Node has no datagram `AF_UNIX` sockets.
+    #[cfg(not(target_os = "emscripten"))]
+    #[cfg_attr(docsrs, doc(cfg(not(target_os = "emscripten"))))]
     pub use unix::datagram::socket::UnixDatagram;
     pub use unix::listener::UnixListener;
     pub use unix::stream::UnixStream;

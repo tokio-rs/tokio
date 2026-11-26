@@ -508,6 +508,8 @@ impl<T> DelayQueue<T> {
     /// # Panics
     ///
     /// This function panics if `when` is too far in the future.
+    /// It also panics if called from outside the context of a Tokio
+    /// runtime or if timers are disabled.
     ///
     /// # Examples
     ///
@@ -623,6 +625,8 @@ impl<T> DelayQueue<T> {
     ///
     /// This function panics if `timeout` is greater than the maximum
     /// duration supported by the timer in the current `Runtime`.
+    /// It also panics if called from outside the context of a Tokio
+    /// runtime or if timers are disabled.
     ///
     /// # Examples
     ///
