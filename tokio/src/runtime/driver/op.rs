@@ -143,6 +143,12 @@ impl From<cqueue::Entry> for CqeResult {
     }
 }
 
+/// Result of an io-uring operation that borrowed a caller's resources.
+pub(crate) enum Completion<T, R> {
+    Done { result: io::Result<T>, resources: R },
+    Cancelled(io::Error),
+}
+
 /// A trait that converts a CQE result into a usable value for each operation.
 pub(crate) trait Completable {
     type Output;

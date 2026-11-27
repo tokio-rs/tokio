@@ -1,5 +1,5 @@
 use crate::fs::OpenOptions;
-use crate::runtime::driver::op::Op;
+use crate::runtime::driver::op::{Completion, Op};
 
 use std::io;
 use std::io::ErrorKind;
@@ -133,22 +133,25 @@ async fn op_read(
     read_len: u32,
 ) -> io::Result<(OwnedFd, Vec<u8>, bool)> {
     loop {
-        let (res, r_fd, r_buf) = Op::read_at(fd, buf, read_len as usize, *offset).await;
-
-        match (res, r_fd, r_buf) {
-            // Retry an interrupted read with the buffer the op handed back. A
-            // cancelled op returns no buffer, so it falls through as terminal.
-            (Err(e), Some(r_fd), Some(r_buf)) if e.kind() == ErrorKind::Interrupted => {
-                buf = r_buf;
-                fd = r_fd;
+        match Op::read_at(fd, buf, read_len as usize, *offset).await {
+            // The kernel is done with the resources. Retry from where it stopped.
+            Completion::Done {
+                result: Err(e),
+                resources,
+            } if e.kind() == ErrorKind::Interrupted => {
+                buf = resources.buf;
+                fd = resources.fd;
             }
-            (Err(e), ..) => return Err(e),
-            (Ok(size_read), Some(r_fd), Some(r_buf)) => {
+            // Cancelled keeps the fd and buffer in the driver, so the error is terminal.
+            Completion::Done { result: Err(e), .. } | Completion::Cancelled(e) => return Err(e),
+            Completion::Done {
+                result: Ok(size_read),
+                resources,
+            } => {
                 *offset += size_read as u64;
 
-                return Ok((r_fd, r_buf, size_read == 0));
+                return Ok((resources.fd, resources.buf, size_read == 0));
             }
-            (Ok(_), ..) => unreachable!("a successful read returns its fd and buffer"),
         }
     }
 }
