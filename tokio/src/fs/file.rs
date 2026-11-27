@@ -566,6 +566,8 @@ impl File {
     /// # }
     /// ```
     pub async fn set_permissions(&self, perm: Permissions) -> io::Result<()> {
+        self.inner.lock().await.complete_inflight().await;
+
         let std = self.std.clone();
         asyncify(move || std.set_permissions(perm)).await
     }
