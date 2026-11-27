@@ -2,8 +2,8 @@
 
 mod cancellation_token;
 pub use cancellation_token::{
-    guard::DropGuard, guard_ref::DropGuardRef, CancellationToken, WaitForCancellationFuture,
-    WaitForCancellationFutureOwned,
+    guard::DropGuard, guard_ref::DropGuardRef, panic_guard::PanicGuard, CancellationToken,
+    WaitForCancellationFuture, WaitForCancellationFutureOwned,
 };
 pub(crate) use cancellation_token::{RunUntilCancelledFuture, RunUntilCancelledFutureOwned};
 
