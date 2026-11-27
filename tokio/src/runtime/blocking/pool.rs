@@ -8,6 +8,8 @@ use crate::runtime::blocking::{shutdown, BlockingTask};
 use crate::runtime::builder::ThreadNameFn;
 use crate::runtime::task::{self, JoinHandle};
 use crate::runtime::{AutoBox, Builder, Callback, Handle};
+#[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+use crate::util::metric_atomics::MetricAtomicU64;
 use crate::util::metric_atomics::MetricAtomicUsize;
 use crate::util::trace::{blocking_task, SpawnMeta};
 
@@ -16,6 +18,8 @@ use std::fmt;
 use std::io;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
+#[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+use std::time::Instant;
 
 pub(crate) struct BlockingPool {
     spawner: Spawner,
@@ -32,6 +36,12 @@ pub(crate) struct SpawnerMetrics {
     num_threads: MetricAtomicUsize,
     num_idle_threads: MetricAtomicUsize,
     queue_depth: MetricAtomicUsize,
+    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+    track_queue_latency: bool,
+    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+    queue_latency_ns: MetricAtomicU64,
+    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+    queue_latency_observations: MetricAtomicU64,
 }
 
 impl SpawnerMetrics {
@@ -180,14 +190,18 @@ impl ThreadManagementState {
 
 pub(crate) struct Task {
     task: task::UnownedTask<BlockingSchedule>,
-    mandatory: Mandatory,
+    kind: BlockingTaskKind,
+    #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+    submitted_at: Option<Instant>,
 }
 
-#[derive(PartialEq, Eq)]
-pub(crate) enum Mandatory {
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum BlockingTaskKind {
     #[cfg_attr(any(not(feature = "fs"), target_os = "emscripten"), allow(dead_code))]
     Mandatory,
-    NonMandatory,
+    Regular,
+    #[cfg_attr(not(feature = "rt-multi-thread"), allow(dead_code))]
+    SchedulerWorker,
 }
 
 pub(crate) enum SpawnError {
@@ -207,23 +221,353 @@ impl From<SpawnError> for io::Error {
     }
 }
 
+#[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+#[inline]
+fn now() -> Option<Instant> {
+    if cfg!(all(
+        target_arch = "wasm32",
+        target_os = "unknown",
+        target_vendor = "unknown"
+    )) {
+        None
+    } else {
+        Some(Instant::now())
+    }
+}
+
+#[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+#[inline]
+fn duration_as_u64(dur: Duration) -> u64 {
+    u64::try_from(dur.as_nanos()).unwrap_or(u64::MAX)
+}
+
 impl Task {
-    pub(crate) fn new(task: task::UnownedTask<BlockingSchedule>, mandatory: Mandatory) -> Task {
-        Task { task, mandatory }
+    pub(crate) fn new(
+        task: task::UnownedTask<BlockingSchedule>,
+        kind: BlockingTaskKind,
+        _metrics: &SpawnerMetrics,
+    ) -> Task {
+        Task {
+            task,
+            kind,
+            #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+            submitted_at: if kind != BlockingTaskKind::SchedulerWorker
+                && _metrics.track_queue_latency
+            {
+                now()
+            } else {
+                None
+            },
+        }
     }
 
     pub(super) fn shutdown(self) {
         self.task.shutdown();
     }
 
-    pub(super) fn run(self) {
+    pub(super) fn run(self, _metrics: &SpawnerMetrics) {
+        #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+        if let Some(submitted_at) = self.submitted_at {
+            // These counters do not synchronize task data. They wrap on overflow,
+            // and separate reads do not form an atomic snapshot.
+            _metrics
+                .queue_latency_ns
+                .add(duration_as_u64(submitted_at.elapsed()), Ordering::Relaxed);
+            _metrics
+                .queue_latency_observations
+                .add(1, Ordering::Relaxed);
+        }
         self.task.run();
     }
 
-    pub(super) fn shutdown_or_run_if_mandatory(self) {
-        match self.mandatory {
-            Mandatory::NonMandatory => self.task.shutdown(),
-            Mandatory::Mandatory => self.task.run(),
+    pub(super) fn shutdown_or_run_if_mandatory(self, metrics: &SpawnerMetrics) {
+        match self.kind {
+            BlockingTaskKind::Mandatory => self.run(metrics),
+            BlockingTaskKind::Regular | BlockingTaskKind::SchedulerWorker => self.task.shutdown(),
+        }
+    }
+}
+
+#[cfg(all(
+    test,
+    not(loom),
+    not(target_family = "wasm"),
+    tokio_unstable,
+    target_has_atomic = "64"
+))]
+mod latency_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::mpsc;
+    use std::sync::Arc;
+
+    fn tracked_runtime(sharded: bool) -> crate::runtime::Runtime {
+        let mut builder = Builder::new_current_thread();
+        builder.sharded_blocking_queue = sharded;
+        builder.track_blocking_queue_latency = true;
+        builder.max_blocking_threads(1).build().unwrap()
+    }
+
+    fn exercise(sharded: bool, enabled: bool, multi_thread: bool) {
+        #[cfg(feature = "rt-multi-thread")]
+        let mut builder = if multi_thread {
+            Builder::new_multi_thread()
+        } else {
+            Builder::new_current_thread()
+        };
+        #[cfg(not(feature = "rt-multi-thread"))]
+        let mut builder = {
+            assert!(!multi_thread);
+            Builder::new_current_thread()
+        };
+        builder.sharded_blocking_queue = sharded;
+        builder.track_blocking_queue_latency = enabled;
+        builder.max_blocking_threads(1);
+        let rt = builder.build().unwrap();
+        let spawner = rt.handle().inner.blocking_spawner().clone();
+        let metrics = &spawner.inner.metrics;
+
+        let first = rt.spawn_blocking(|| {});
+        rt.block_on(first).unwrap();
+        assert_eq!(
+            metrics.queue_latency_observations.load(Ordering::Relaxed),
+            u64::from(enabled)
+        );
+
+        let (started_tx, started_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let blocker = rt.spawn_blocking(move || {
+            started_tx.send(()).unwrap();
+            release_rx.recv().unwrap();
+        });
+        started_rx.recv().unwrap();
+
+        let cancelled = rt.spawn_blocking(|| panic!("cancelled task ran"));
+        cancelled.abort();
+        let mut submitters = Vec::new();
+        for _ in 0..4 {
+            let handle = rt.handle().clone();
+            submitters.push(std::thread::spawn(move || handle.spawn_blocking(|| {})));
+        }
+        let tasks: Vec<_> = submitters.into_iter().map(|t| t.join().unwrap()).collect();
+        release_tx.send(()).unwrap();
+        rt.block_on(async {
+            blocker.await.unwrap();
+            assert!(cancelled.await.unwrap_err().is_cancelled());
+            for task in tasks {
+                task.await.unwrap();
+            }
+            let error = crate::task::spawn_blocking(|| panic!("blocking task panic"))
+                .await
+                .unwrap_err();
+            assert!(error.is_panic());
+        });
+        assert_eq!(
+            metrics.queue_latency_observations.load(Ordering::Relaxed),
+            if enabled { 8 } else { 0 }
+        );
+        if enabled {
+            assert!(metrics.queue_latency_ns.load(Ordering::Relaxed) > 0);
+        } else {
+            assert_eq!(metrics.queue_latency_ns.load(Ordering::Relaxed), 0);
+        }
+    }
+
+    #[test]
+    fn normal_dequeues_are_recorded_once() {
+        for sharded in [false, true] {
+            for enabled in [false, true] {
+                exercise(sharded, enabled, false);
+                #[cfg(feature = "rt-multi-thread")]
+                exercise(sharded, enabled, true);
+            }
+        }
+    }
+
+    #[cfg(feature = "rt-multi-thread")]
+    #[test]
+    fn scheduler_workers_are_not_observed() {
+        for sharded in [false, true] {
+            let mut builder = Builder::new_multi_thread();
+            builder.worker_threads(1);
+            builder.sharded_blocking_queue = sharded;
+            builder.track_blocking_queue_latency = true;
+            let rt = builder.build().unwrap();
+            let spawner = rt.handle().inner.blocking_spawner().clone();
+            let metrics = &spawner.inner.metrics;
+
+            rt.block_on(async {
+                crate::spawn(async {
+                    crate::task::block_in_place(|| {
+                        let (tx, rx) = mpsc::channel();
+                        crate::spawn(async move { tx.send(()).unwrap() });
+                        rx.recv().unwrap();
+                    });
+                })
+                .await
+                .unwrap();
+                assert_eq!(
+                    metrics.queue_latency_observations.load(Ordering::Relaxed),
+                    0
+                );
+                crate::task::spawn_blocking(|| {}).await.unwrap();
+            });
+            assert_eq!(
+                metrics.queue_latency_observations.load(Ordering::Relaxed),
+                1
+            );
+        }
+    }
+
+    #[cfg(all(feature = "rt-multi-thread", target_os = "linux", not(miri)))]
+    #[test]
+    fn scheduler_start_failure_returns_error_for_each_queue() {
+        for sharded in [false, true] {
+            let tracker = Arc::new(());
+            let mut builder = Builder::new_multi_thread();
+            builder.sharded_blocking_queue = sharded;
+            builder
+                .worker_threads(1)
+                .thread_stack_size(usize::MAX)
+                .on_thread_start({
+                    let tracker = tracker.clone();
+                    move || {
+                        let _ = &tracker;
+                    }
+                });
+            assert!(builder.build().is_err());
+            drop(builder);
+            assert_eq!(Arc::strong_count(&tracker), 1);
+        }
+    }
+
+    #[test]
+    fn queue_latency_accumulates_delay() {
+        for sharded in [false, true] {
+            let rt = tracked_runtime(sharded);
+            let spawner = rt.handle().inner.blocking_spawner().clone();
+            let metrics = &spawner.inner.metrics;
+
+            let (started_tx, started_rx) = mpsc::channel();
+            let (release_tx, release_rx) = mpsc::channel();
+            let blocker = rt.spawn_blocking(move || {
+                started_tx.send(()).unwrap();
+                release_rx.recv().unwrap();
+            });
+            started_rx.recv().unwrap();
+
+            let delayed_task = rt.spawn_blocking(|| {});
+            std::thread::sleep(Duration::from_millis(5));
+            release_tx.send(()).unwrap();
+
+            rt.block_on(async {
+                blocker.await.unwrap();
+                delayed_task.await.unwrap();
+            });
+
+            assert_eq!(
+                metrics.queue_latency_observations.load(Ordering::Relaxed),
+                2
+            );
+            assert!(
+                metrics.queue_latency_ns.load(Ordering::Relaxed) >= 5_000_000,
+                "expected at least 5ms, got {}ns",
+                metrics.queue_latency_ns.load(Ordering::Relaxed)
+            );
+        }
+    }
+
+    #[test]
+    fn shutdown_records_only_tasks_that_run() {
+        for sharded in [false, true] {
+            let rt = tracked_runtime(sharded);
+            let spawner = rt.handle().inner.blocking_spawner().clone();
+            let (started_tx, started_rx) = mpsc::channel();
+            let (release_tx, release_rx) = mpsc::channel();
+            let blocker = rt.spawn_blocking(move || {
+                started_tx.send(()).unwrap();
+                release_rx.recv().unwrap();
+            });
+            started_rx.recv().unwrap();
+            let tasks: Vec<_> = (0..4).map(|_| rt.spawn_blocking(|| ())).collect();
+            rt.shutdown_background();
+            release_tx.send(()).unwrap();
+
+            let waiter = Builder::new_current_thread().build().unwrap();
+            let completed = waiter.block_on(async {
+                blocker.await.unwrap();
+                let mut completed = 0;
+                for task in tasks {
+                    match task.await {
+                        Ok(()) => completed += 1,
+                        Err(error) => assert!(error.is_cancelled()),
+                    }
+                }
+                completed
+            });
+            assert_eq!(
+                spawner
+                    .inner
+                    .metrics
+                    .queue_latency_observations
+                    .load(Ordering::Relaxed),
+                1 + completed
+            );
+        }
+    }
+
+    #[test]
+    fn shutdown_only_runs_and_observes_mandatory_tasks() {
+        for (kind, should_run) in [
+            (BlockingTaskKind::Regular, false),
+            (BlockingTaskKind::Mandatory, true),
+        ] {
+            let metrics = SpawnerMetrics {
+                track_queue_latency: true,
+                ..SpawnerMetrics::default()
+            };
+            let rt = Builder::new_current_thread().build().unwrap();
+            let id = task::Id::next();
+            let ran = Arc::new(AtomicBool::new(false));
+            let ran_clone = ran.clone();
+            let f: Box<dyn FnOnce() + Send> = Box::new(move || {
+                ran_clone.store(true, Ordering::SeqCst);
+            });
+            let fut = blocking_task::<Box<dyn FnOnce() + Send>, _>(
+                BlockingTask::new(f),
+                SpawnMeta::new_unnamed(0),
+                id.as_u64(),
+            );
+            let (unowned, handle) = task::unowned(
+                fut,
+                BlockingSchedule::new(rt.handle()),
+                id,
+                task::SpawnLocation::capture(),
+            );
+            let task = Task::new(unowned, kind, &metrics);
+            assert_eq!(
+                metrics.queue_latency_observations.load(Ordering::Relaxed),
+                0
+            );
+
+            task.shutdown_or_run_if_mandatory(&metrics);
+
+            assert_eq!(ran.load(Ordering::SeqCst), should_run);
+            assert_eq!(
+                metrics.queue_latency_observations.load(Ordering::Relaxed),
+                u64::from(should_run)
+            );
+            if !should_run {
+                assert_eq!(metrics.queue_latency_ns.load(Ordering::Relaxed), 0);
+            }
+
+            rt.block_on(async {
+                if should_run {
+                    handle.await.unwrap();
+                } else {
+                    assert!(handle.await.unwrap_err().is_cancelled());
+                }
+            });
         }
     }
 }
@@ -300,7 +644,11 @@ impl BlockingPool {
                     thread_cap,
                     scheduler_threads,
                     keep_alive,
-                    metrics: SpawnerMetrics::default(),
+                    metrics: SpawnerMetrics {
+                        #[cfg(all(tokio_unstable, target_has_atomic = "64"))]
+                        track_queue_latency: builder.track_blocking_queue_latency,
+                        ..SpawnerMetrics::default()
+                    },
                 }),
             },
             shutdown_rx,
@@ -365,14 +713,14 @@ impl Spawner {
         let (join_handle, spawn_result) = if AutoBox::<F>::SHOULD_BOX {
             self.spawn_blocking_inner(
                 Box::new(func),
-                Mandatory::NonMandatory,
+                BlockingTaskKind::Regular,
                 SpawnMeta::new_unnamed(fn_size),
                 rt,
             )
         } else {
             self.spawn_blocking_inner(
                 func,
-                Mandatory::NonMandatory,
+                BlockingTaskKind::Regular,
                 SpawnMeta::new_unnamed(fn_size),
                 rt,
             )
@@ -385,6 +733,27 @@ impl Spawner {
             Err(SpawnError::NoThreads(e)) => {
                 panic!("OS can't spawn worker thread: {e}")
             }
+        }
+    }
+
+    #[cfg(feature = "rt-multi-thread")]
+    #[track_caller]
+    pub(crate) fn spawn_scheduler_worker<F>(&self, rt: &Handle, func: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        let fn_size = std::mem::size_of::<F>();
+        let (_, spawn_result) = self.spawn_blocking_inner(
+            func,
+            BlockingTaskKind::SchedulerWorker,
+            SpawnMeta::new_unnamed(fn_size),
+            rt,
+        );
+
+        match spawn_result {
+            Ok(()) => {}
+            Err(SpawnError::ShuttingDown) => {}
+            Err(SpawnError::NoThreads(e)) => panic!("OS can't spawn worker thread: {e}"),
         }
     }
 
@@ -404,14 +773,14 @@ impl Spawner {
             let (join_handle, spawn_result) = if AutoBox::<F>::SHOULD_BOX {
                 self.spawn_blocking_inner(
                     Box::new(func),
-                    Mandatory::Mandatory,
+                    BlockingTaskKind::Mandatory,
                     SpawnMeta::new_unnamed(fn_size),
                     rt,
                 )
             } else {
                 self.spawn_blocking_inner(
                     func,
-                    Mandatory::Mandatory,
+                    BlockingTaskKind::Mandatory,
                     SpawnMeta::new_unnamed(fn_size),
                     rt,
                 )
@@ -429,7 +798,7 @@ impl Spawner {
     pub(crate) fn spawn_blocking_inner<F, R>(
         &self,
         func: F,
-        is_mandatory: Mandatory,
+        kind: BlockingTaskKind,
         spawn_meta: SpawnMeta<'_>,
         rt: &Handle,
     ) -> (JoinHandle<R>, Result<(), SpawnError>)
@@ -448,7 +817,8 @@ impl Spawner {
             task::SpawnLocation::capture(),
         );
 
-        let spawned = self.spawn_task(Task::new(task, is_mandatory), rt);
+        let task = Task::new(task, kind, &self.inner.metrics);
+        let spawned = self.spawn_task(task, rt);
         (handle, spawned)
     }
 
@@ -669,7 +1039,7 @@ impl LockedImpl {
             while let Some(task) = locked.queue.pop_front() {
                 metrics.dec_queue_depth();
                 drop(locked);
-                task.run();
+                task.run(metrics);
 
                 locked = self.mutex.lock();
             }
@@ -715,7 +1085,7 @@ impl LockedImpl {
                     metrics.dec_queue_depth();
                     drop(locked);
 
-                    task.shutdown_or_run_if_mandatory();
+                    task.shutdown_or_run_if_mandatory(metrics);
 
                     locked = self.mutex.lock();
                 }

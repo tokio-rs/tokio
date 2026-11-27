@@ -211,19 +211,19 @@ impl<'a> Builder<'a> {
         Function: FnOnce() -> Output + Send + 'static,
         Output: Send + 'static,
     {
-        use crate::runtime::Mandatory;
+        use crate::runtime::BlockingTaskKind;
         let fn_size = mem::size_of::<Function>();
         let (join_handle, spawn_result) = if AutoBox::<Function>::SHOULD_BOX {
             handle.inner.blocking_spawner().spawn_blocking_inner(
                 Box::new(function),
-                Mandatory::NonMandatory,
+                BlockingTaskKind::Regular,
                 SpawnMeta::new(self.name, fn_size),
                 handle,
             )
         } else {
             handle.inner.blocking_spawner().spawn_blocking_inner(
                 function,
-                Mandatory::NonMandatory,
+                BlockingTaskKind::Regular,
                 SpawnMeta::new(self.name, fn_size),
                 handle,
             )
