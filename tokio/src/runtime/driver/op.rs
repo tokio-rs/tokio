@@ -1,4 +1,5 @@
 use crate::io::blocking::Buf;
+use crate::io::uring::fsync::Fsync;
 use crate::io::uring::open::Open;
 use crate::io::uring::read::Read;
 use crate::io::uring::rename::Rename;
@@ -38,6 +39,7 @@ pub(crate) enum CancelData {
     Open(Open),
     Write(Write),
     Rename(Rename),
+    Fsync(Fsync),
     ReadVec(Read<Vec<u8>, OwnedFd>),
     ReadBuf(Read<Buf, ArcFd>),
     #[cfg(

@@ -31,6 +31,7 @@ use crate::blocking::{spawn_blocking, spawn_mandatory_blocking};
 use std::fs::File as StdFile;
 
 cfg_io_uring! {
+    use crate::runtime::driver::op::Op;
     #[cfg(not(test))]
     use crate::spawn;
 }
@@ -318,6 +319,17 @@ impl File {
         let mut inner = self.inner.lock().await;
         inner.complete_inflight().await;
 
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
+        if self.uring_sync_all().await? {
+            return Ok(());
+        }
+
         let std = self.std.clone();
         asyncify(move || std.sync_all()).await
     }
@@ -352,6 +364,17 @@ impl File {
     pub async fn sync_data(&self) -> io::Result<()> {
         let mut inner = self.inner.lock().await;
         inner.complete_inflight().await;
+
+        #[cfg(all(
+            tokio_unstable,
+            feature = "io-uring",
+            feature = "rt",
+            feature = "fs",
+            target_os = "linux",
+        ))]
+        if self.uring_sync_data().await? {
+            return Ok(());
+        }
 
         let std = self.std.clone();
         asyncify(move || std.sync_data()).await
@@ -646,6 +669,53 @@ impl File {
     /// Get the maximum buffer size for the underlying [`AsyncRead`] / [`AsyncWrite`] operation.
     pub fn max_buf_size(&self) -> usize {
         self.max_buf_size
+    }
+}
+
+cfg_io_uring! {
+    impl File {
+        /// Flushes the data and metadata of the file to disk with io_uring.
+        ///
+        /// Returns `false`, without flushing, if the runtime can't use io_uring
+        /// for it.
+        async fn uring_sync_all(&self) -> io::Result<bool> {
+            if !uring_fsync_supported().await? {
+                return Ok(false);
+            }
+
+            // The op owns a handle to the file, as the driver keeps it until
+            // the kernel is done with the descriptor, even if this future is
+            // dropped first.
+            Op::sync_all(self.std.clone()).await?;
+            Ok(true)
+        }
+
+        /// Flushes the data of the file to disk with io_uring, and only the
+        /// metadata needed to read it back.
+        ///
+        /// Returns `false`, without flushing, if the runtime can't use io_uring
+        /// for it.
+        async fn uring_sync_data(&self) -> io::Result<bool> {
+            if !uring_fsync_supported().await? {
+                return Ok(false);
+            }
+
+            Op::sync_data(self.std.clone()).await?;
+            Ok(true)
+        }
+    }
+
+    /// Returns `true` if the current runtime can flush files with io_uring.
+    async fn uring_fsync_supported() -> io::Result<bool> {
+        let Ok(handle) = crate::runtime::Handle::try_current() else {
+            return Ok(false);
+        };
+        let Some(driver_handle) = handle.inner.driver().io.as_ref() else {
+            return Ok(false);
+        };
+        driver_handle
+            .check_and_init(io_uring::opcode::Fsync::CODE)
+            .await
     }
 }
 
