@@ -40,6 +40,10 @@ impl<T, S: Semaphore + fmt::Debug> fmt::Debug for Rx<T, S> {
 pub(crate) trait Semaphore {
     fn is_idle(&self) -> bool;
 
+    /// Returns the number of accepted messages, including sends in progress,
+    /// if the semaphore tracks messages separately from reserved capacity.
+    fn message_count(&self) -> Option<usize>;
+
     fn add_permit(&self);
 
     fn add_permits(&self, n: usize);
@@ -288,6 +292,10 @@ impl<T, S: Semaphore> Rx<T, S> {
     }
 
     pub(crate) fn is_empty(&self) -> bool {
+        if let Some(count) = self.inner.semaphore.message_count() {
+            return count == 0;
+        }
+
         self.inner.rx_fields.with(|rx_fields_ptr| {
             let rx_fields = unsafe { &*rx_fields_ptr };
             rx_fields.list.is_empty(&self.inner.tx)
@@ -295,6 +303,10 @@ impl<T, S: Semaphore> Rx<T, S> {
     }
 
     pub(crate) fn len(&self) -> usize {
+        if let Some(count) = self.inner.semaphore.message_count() {
+            return count;
+        }
+
         self.inner.rx_fields.with(|rx_fields_ptr| {
             let rx_fields = unsafe { &*rx_fields_ptr };
             rx_fields.list.len(&self.inner.tx)
@@ -451,6 +463,10 @@ impl<T, S: Semaphore> Rx<T, S> {
                             return Ok(value);
                         }
                         TryPopResult::Closed => return Err(TryRecvError::Disconnected),
+                        // An unbounded send may have been accepted before it
+                        // claimed a slot in the queue. Wait for it like Busy.
+                        TryPopResult::Empty
+                            if self.inner.semaphore.message_count().is_some_and(|n| n > 0) => {}
                         // If close() was called, an empty queue should report Disconnected.
                         TryPopResult::Empty
                             if rx_fields.rx_closed && self.inner.semaphore.is_idle() =>
@@ -469,9 +485,8 @@ impl<T, S: Semaphore> Rx<T, S> {
             // This allows us to put our own CachedParkThread waker in the
             // AtomicWaker slot instead.
             //
-            // This is not a spurious wakeup to `poll_recv` since we just got a
-            // Busy from `try_pop`, which only happens if there are messages in
-            // the queue.
+            // This is not a spurious wakeup to `poll_recv` since a send is in
+            // progress, either in the queue or tracked by the semaphore.
             self.inner.rx_waker.wake();
 
             // Park the thread until the problematic send has completed.
@@ -591,6 +606,10 @@ impl<T, S> Drop for Chan<T, S> {
 // ===== impl Semaphore for (::Semaphore, capacity) =====
 
 impl Semaphore for bounded::Semaphore {
+    fn message_count(&self) -> Option<usize> {
+        None
+    }
+
     fn add_permit(&self) {
         self.semaphore.release(1);
     }
@@ -615,6 +634,10 @@ impl Semaphore for bounded::Semaphore {
 // ===== impl Semaphore for AtomicUsize =====
 
 impl Semaphore for unbounded::Semaphore {
+    fn message_count(&self) -> Option<usize> {
+        Some(self.0.load(Acquire) >> 1)
+    }
+
     fn add_permit(&self) {
         let prev = self.0.fetch_sub(2, Release);
 
