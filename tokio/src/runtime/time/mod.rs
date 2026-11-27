@@ -26,7 +26,7 @@ use crate::loom::sync::Mutex;
 use crate::runtime::driver::{self, IoStack};
 use crate::runtime::scheduler;
 use crate::time::error::Error;
-use crate::time::{Clock, Duration};
+use crate::time::{Clock, Duration, Instant};
 use crate::util::WakeList;
 
 use std::fmt;
@@ -214,27 +214,27 @@ impl Driver {
 
         match next_wake {
             Some(when) => {
-                let now = handle.time_source.now(rt_handle.clock());
+                let now = rt_handle.clock().now();
                 // Note that we effectively round up to 1ms here - this avoids
                 // very short-duration microsecond-resolution sleeps that the OS
                 // might treat as zero-length.
                 let mut duration = handle
                     .time_source
-                    .tick_to_duration(when.saturating_sub(now));
+                    .tick_to_duration(when.saturating_sub(handle.time_source.instant_to_tick(now)));
 
                 if duration > Duration::from_millis(0) {
                     if let Some(limit) = limit {
                         duration = std::cmp::min(limit, duration);
                     }
 
-                    self.park_thread_timeout(rt_handle, duration);
+                    self.park_thread_timeout(rt_handle, Some(now), duration);
                 } else {
                     self.park.park_timeout(rt_handle, Duration::from_secs(0));
                 }
             }
             None => {
                 if let Some(duration) = limit {
-                    self.park_thread_timeout(rt_handle, duration);
+                    self.park_thread_timeout(rt_handle, None, duration);
                 } else {
                     self.park.park(rt_handle);
                 }
@@ -246,9 +246,16 @@ impl Driver {
     }
 
     cfg_test_util! {
-        fn park_thread_timeout(&mut self, rt_handle: &driver::Handle, duration: Duration) {
+        /// `now` is the clock reading `duration` was computed from, if any.
+        fn park_thread_timeout(
+            &mut self,
+            rt_handle: &driver::Handle,
+            now: Option<Instant>,
+            duration: Duration,
+        ) {
             let handle = rt_handle.time();
             let clock = rt_handle.clock();
+            let now = now.unwrap_or_else(|| clock.now());
 
             if clock.can_auto_advance() {
                 self.park.park_timeout(rt_handle, Duration::from_secs(0));
@@ -259,9 +266,7 @@ impl Driver {
                 // advance the clock.
                 if !handle.did_wake() {
                     // Simulate advancing time
-                    if let Err(msg) = clock.advance(duration) {
-                        panic!("{}", msg);
-                    }
+                    clock.try_auto_advance(now, duration);
                 }
             } else {
                 self.park.park_timeout(rt_handle, duration);
@@ -270,7 +275,12 @@ impl Driver {
     }
 
     cfg_not_test_util! {
-        fn park_thread_timeout(&mut self, rt_handle: &driver::Handle, duration: Duration) {
+        fn park_thread_timeout(
+            &mut self,
+            rt_handle: &driver::Handle,
+            _now: Option<Instant>,
+            duration: Duration,
+        ) {
             self.park.park_timeout(rt_handle, duration);
         }
     }
