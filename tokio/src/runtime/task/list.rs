@@ -202,9 +202,9 @@ impl<S: 'static> OwnedTasks<S> {
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
         // If the task's owner ID is `None` then it is not part of any list and
         // doesn't need removing.
-        let task_id = task.header().get_owner_id()?;
+        let owner_id = task.header().get_owner_id()?;
 
-        assert_eq!(task_id, self.id);
+        assert_eq!(owner_id, self.id);
 
         // safety: We just checked that the provided task is not in some other
         // linked list.
@@ -304,9 +304,9 @@ impl<S: 'static> LocalOwnedTasks<S> {
     pub(crate) fn remove(&self, task: &Task<S>) -> Option<Task<S>> {
         // If the task's owner ID is `None` then it is not part of any list and
         // doesn't need removing.
-        let task_id = task.header().get_owner_id()?;
+        let owner_id = task.header().get_owner_id()?;
 
-        assert_eq!(task_id, self.id);
+        assert_eq!(owner_id, self.id);
 
         self.with_inner(|inner|
             // safety: We just checked that the provided task is not in some
