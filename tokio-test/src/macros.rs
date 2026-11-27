@@ -223,9 +223,8 @@ macro_rules! assert_ok {
 /// # Examples
 ///
 /// ```
-/// use tokio_test::assert_err;
 /// use std::str::FromStr;
-///
+/// use tokio_test::assert_err;
 ///
 /// let err = assert_err!(u32::from_str("fail"));
 ///
@@ -258,8 +257,8 @@ macro_rules! assert_err {
 /// overshoot by more than 1ms and the assertion will fail.
 ///
 /// ```rust
-/// use tokio::time::{self, Instant};
 /// use std::time::Duration;
+/// use tokio::time::{self, Instant};
 /// use tokio_test::assert_elapsed;
 /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
 /// # async fn main() {

@@ -277,8 +277,8 @@
 //! ```no_run
 //! # #[cfg(not(target_family = "wasm"))]
 //! # {
-//! use tokio::net::TcpListener;
 //! use tokio::io::{AsyncReadExt, AsyncWriteExt};
+//! use tokio::net::TcpListener;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {

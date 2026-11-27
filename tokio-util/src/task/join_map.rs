@@ -188,8 +188,8 @@ impl<K, V, S> JoinMap<K, V, S> {
     /// ```
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
-    /// use tokio_util::task::JoinMap;
     /// use std::collections::hash_map::RandomState;
+    /// use tokio_util::task::JoinMap;
     ///
     /// let s = RandomState::new();
     /// let mut map = JoinMap::with_capacity_and_hasher(10, s);
