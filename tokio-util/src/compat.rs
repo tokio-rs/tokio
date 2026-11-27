@@ -190,7 +190,7 @@ impl<T: tokio::io::AsyncWrite> TokioAsyncWriteCompatExt for T {}
 // === impl Compat ===
 
 impl<T> Compat<T> {
-    fn new(inner: T) -> Self {
+    const fn new(inner: T) -> Self {
         Self {
             inner,
             seek_pos: None,
@@ -199,7 +199,7 @@ impl<T> Compat<T> {
 
     /// Get a reference to the `Future`, `Stream`, `AsyncRead`, or `AsyncWrite` object
     /// contained within.
-    pub fn get_ref(&self) -> &T {
+    pub const fn get_ref(&self) -> &T {
         &self.inner
     }
 
