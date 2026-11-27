@@ -2,10 +2,11 @@ use crate::io::blocking::Buf;
 use crate::io::uring::open::Open;
 use crate::io::uring::read::Read;
 use crate::io::uring::rename::Rename;
+use crate::io::uring::ring::RingOp;
 use crate::io::uring::utils::ArcFd;
 use crate::io::uring::write::Write;
 
-use crate::runtime::io::RegisterResult;
+use crate::runtime::io::{PollOp, RegisterResult};
 use crate::runtime::Handle;
 
 #[cfg(
@@ -25,7 +26,6 @@ use io_uring::cqueue;
 use io_uring::squeue::Entry;
 use std::future::Future;
 use std::io;
-use std::mem;
 use std::os::fd::OwnedFd;
 use std::pin::Pin;
 use std::task::{Context, Poll, Waker};
@@ -53,6 +53,8 @@ pub(crate) enum CancelData {
         any(target_env = "gnu", target_os = "android")
     )]
     Statx(Statx),
+    /// An op submitted through `tokio::io::uring::Ring`.
+    Ring(RingOp),
 }
 
 #[derive(Debug)]
@@ -217,29 +219,18 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
             State::Polled(idx) => {
                 let driver = this.handle.inner.driver().io();
                 let mut ctx = driver.get_uring().lock();
-                let lifecycle = ctx.ops.get_mut(*idx).expect("Lifecycle must be present");
 
-                match mem::replace(lifecycle, Lifecycle::Submitted) {
-                    // Only replace the stored waker if it wouldn't wake the new one
-                    Lifecycle::Waiting(prev) if !prev.will_wake(cx.waker()) => {
-                        *lifecycle = Lifecycle::Waiting(cx.waker().clone());
+                match ctx.poll_op(*idx, cx.waker()) {
+                    PollOp::Pending(replaced) => {
                         // Drop the replaced waker after the lock is released,
                         // as its destructor may cancel another op, which
                         // locks the driver again.
                         drop(ctx);
-                        drop(prev);
+                        drop(replaced);
                         Poll::Pending
                     }
 
-                    Lifecycle::Waiting(prev) => {
-                        *lifecycle = Lifecycle::Waiting(prev);
-                        Poll::Pending
-                    }
-
-                    Lifecycle::Completed(cqe) => {
-                        // Clean up and complete the future
-                        ctx.remove_op(*idx);
-
+                    PollOp::Ready(cqe) => {
                         this.state = State::Complete;
 
                         drop(ctx);
@@ -248,14 +239,6 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
                             .take_data()
                             .expect("Data must be present on completion");
                         Poll::Ready(data.complete(cqe.into()))
-                    }
-
-                    Lifecycle::Submitted => {
-                        unreachable!("Submitted lifecycle should never be seen here");
-                    }
-
-                    Lifecycle::Cancelled(_) => {
-                        unreachable!("Cancelled lifecycle should never be seen here");
                     }
                 }
             }
