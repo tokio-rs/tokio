@@ -999,3 +999,64 @@ fn receiver_len_after_lag_error_advances_cursor() {
     assert_eq!(assert_recv!(rx), 4);
     assert_eq!(rx.len(), 0);
 }
+
+#[test]
+fn sharded_waiters_parked_and_woken() {
+    const NUM_RECEIVERS: usize = 64;
+    const NUM_MESSAGES: usize = 32;
+
+    let (tx, _rx) = broadcast::channel::<usize>(NUM_MESSAGES);
+    let mut receivers: Vec<_> = (0..NUM_RECEIVERS).map(|_| tx.subscribe()).collect();
+
+    for msg in 0..NUM_MESSAGES {
+        // Poll every receiver once so all 64 waiters are guaranteed to be parked
+        // across the sharded waiter buckets before sending.
+        let mut futures: Vec<_> = receivers
+            .iter_mut()
+            .map(|rx| tokio_test::task::spawn(rx.recv()))
+            .collect();
+
+        for fut in &mut futures {
+            assert_pending!(fut.poll());
+        }
+
+        assert_eq!(tx.send(msg).unwrap(), NUM_RECEIVERS + 1);
+
+        for fut in &mut futures {
+            assert_eq!(assert_ready_ok!(fut.poll()), msg);
+        }
+    }
+}
+
+#[test]
+fn sharded_waiters_drop_unlinks_cleanly() {
+    const NUM_RECEIVERS: usize = 64;
+
+    let (tx, _rx) = broadcast::channel::<usize>(16);
+    let mut receivers: Vec<_> = (0..NUM_RECEIVERS).map(|_| tx.subscribe()).collect();
+
+    // Park all 64 receivers across the shard buckets, then drop the even ones
+    // while they are still queued in their buckets.
+    let mut futures: Vec<_> = receivers
+        .iter_mut()
+        .map(|rx| Some(tokio_test::task::spawn(rx.recv())))
+        .collect();
+
+    for fut in futures.iter_mut().flatten() {
+        assert_pending!(fut.poll());
+    }
+
+    for (i, fut) in futures.iter_mut().enumerate() {
+        if i % 2 == 0 {
+            drop(fut.take());
+        }
+    }
+
+    assert_eq!(tx.send(42).unwrap(), NUM_RECEIVERS + 1);
+
+    for (i, fut) in futures.iter_mut().enumerate() {
+        if i % 2 != 0 {
+            assert_eq!(assert_ready_ok!(fut.as_mut().unwrap().poll()), 42);
+        }
+    }
+}
