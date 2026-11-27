@@ -220,6 +220,10 @@ impl Task {
         self.task.run();
     }
 
+    pub(super) fn id(&self) -> task::Id {
+        self.task.id()
+    }
+
     pub(super) fn shutdown_or_run_if_mandatory(self) {
         match self.mandatory {
             Mandatory::NonMandatory => self.task.shutdown(),
