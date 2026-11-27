@@ -67,8 +67,6 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let pin = self.get_mut();
 
-        pin.rd.reserve(INITIAL_RD_CAPACITY);
-
         loop {
             // Are there still bytes left in the read buffer to decode?
             if pin.is_readable {
@@ -87,6 +85,8 @@ where
 
             // We're out of data. Try and fetch more data to decode
             let addr = {
+                // Decoding the previous datagram may have shrunk the buffer.
+                pin.rd.reserve(INITIAL_RD_CAPACITY);
                 // Safety: `chunk_mut()` returns a `&mut UninitSlice`, and `UninitSlice` is a
                 // transparent wrapper around `[MaybeUninit<u8>]`.
                 let buf = unsafe { pin.rd.chunk_mut().as_uninit_slice_mut() };
