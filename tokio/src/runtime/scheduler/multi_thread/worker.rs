@@ -825,7 +825,10 @@ impl Context {
     }
 
     fn maintenance(&self, mut core: Box<Core>) -> Box<Core> {
-        if core.tick % self.worker.handle.shared.config.event_interval == 0 {
+        if core
+            .tick
+            .is_multiple_of(self.worker.handle.shared.config.event_interval)
+        {
             super::counters::inc_num_maintenance();
 
             core.stats.end_processing_scheduled_tasks();
@@ -1076,7 +1079,7 @@ impl Core {
 
     /// Return the next notified task available to this worker.
     fn next_task(&mut self, worker: &Worker) -> Option<Notified> {
-        if self.tick % self.global_queue_interval == 0 {
+        if self.tick.is_multiple_of(self.global_queue_interval) {
             // Update the global queue interval, if needed
             self.tune_global_queue_interval(worker);
 

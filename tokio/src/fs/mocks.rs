@@ -7,7 +7,7 @@ use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::{
     cell::RefCell,
     collections::VecDeque,
-    fs::{FileTimes, Metadata, Permissions},
+    fs::{FileTimes, Metadata, Permissions, TryLockError},
     future::Future,
     io::{self, Read, Seek, SeekFrom, Write},
     path::PathBuf,
@@ -28,6 +28,8 @@ mock! {
         pub fn inner_read(&self, dst: &mut [u8]) -> io::Result<usize>;
         pub fn inner_seek(&self, pos: SeekFrom) -> io::Result<u64>;
         pub fn inner_write(&self, src: &[u8]) -> io::Result<usize>;
+        pub fn lock(&self) -> io::Result<()>;
+        pub fn lock_shared(&self) -> io::Result<()>;
         pub fn metadata(&self) -> io::Result<Metadata>;
         pub fn open(pb: PathBuf) -> io::Result<Self>;
         pub fn set_len(&self, size: u64) -> io::Result<()>;
@@ -37,6 +39,9 @@ mock! {
         pub fn sync_all(&self) -> io::Result<()>;
         pub fn sync_data(&self) -> io::Result<()>;
         pub fn try_clone(&self) -> io::Result<Self>;
+        pub fn try_lock(&self) -> Result<(), TryLockError>;
+        pub fn try_lock_shared(&self) -> Result<(), TryLockError>;
+        pub fn unlock(&self) -> io::Result<()>;
     }
     #[cfg(windows)]
     impl From<std::os::windows::io::OwnedHandle> for File {
