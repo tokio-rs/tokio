@@ -148,3 +148,36 @@ async fn framed_half() -> std::io::Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn framed_lines_codec_max_length_resets_per_datagram() -> std::io::Result<()> {
+    let rx = UdpSocket::bind("127.0.0.1:0").await?;
+    let a_soc = UdpSocket::bind("127.0.0.1:0").await?;
+    let b_soc = UdpSocket::bind("127.0.0.1:0").await?;
+
+    let rx_addr = rx.local_addr()?;
+    let b_addr = b_soc.local_addr()?;
+
+    let mut rx = UdpFramed::new(rx, LinesCodec::new_with_max_length(8));
+
+    // An over-long datagram from one peer...
+    a_soc.send_to(b"AAAAAAAAAAAA", rx_addr).await?;
+    assert!(matches!(
+        rx.next().await.unwrap(),
+        Err(tokio_util::codec::LinesCodecError::MaxLineLengthExceeded)
+    ));
+
+    // ...must not cause the first line of the next datagram, from another
+    // peer, to be discarded.
+    b_soc.send_to(b"login\nsecond", rx_addr).await?;
+    assert_eq!(
+        rx.next().await.unwrap().unwrap(),
+        ("login".to_string(), b_addr)
+    );
+    assert_eq!(
+        rx.next().await.unwrap().unwrap(),
+        ("second".to_string(), b_addr)
+    );
+
+    Ok(())
+}
