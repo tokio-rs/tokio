@@ -151,6 +151,7 @@ impl<T, D> FramedRead<T, D> {
     /// other than reserving more space or appending data to the end of the
     /// buffer.
     pub fn read_buffer_mut(&mut self) -> &mut BytesMut {
+        self.inner.state.is_readable = true;
         &mut self.inner.state.buffer
     }
 
@@ -163,6 +164,18 @@ impl<T, D> FramedRead<T, D> {
             read_buf: self.inner.state.buffer,
             write_buf: BytesMut::new(),
             _priv: (),
+        }
+    }
+
+    /// Creates the `FramedRead` from I/O stream, the buffer
+    /// with unprocessed data, and the codec.
+    pub fn from_parts(parts: FramedParts<T, D>) -> FramedRead<T, D> {
+        FramedRead {
+            inner: FramedImpl {
+                inner: parts.io,
+                codec: parts.codec,
+                state: parts.read_buf.into(),
+            },
         }
     }
 }
