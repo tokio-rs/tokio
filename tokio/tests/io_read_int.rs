@@ -25,8 +25,6 @@ macro_rules! number {
             }
             // The last injected error belongs to the next operation.
             let mut reader = b.build();
-            // Arc::try_unwrap requires sole ownership; see tokio-test/src/io.rs
-            drop(b);
             assert_eq!(reader.$read().await.unwrap(), $value);
             assert_eq!(
                 reader.read(&mut [0]).await.unwrap_err().kind(),

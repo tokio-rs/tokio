@@ -57,8 +57,6 @@ macro_rules! number {
             }
             // The last injected error belongs to the next operation.
             let mut writer = b.build();
-            // Arc::try_unwrap requires sole ownership; see tokio-test/src/io.rs:259.
-            drop(b);
             writer.$write($value).await.unwrap();
             assert_eq!(
                 writer.write(&[0]).await.unwrap_err().kind(),
