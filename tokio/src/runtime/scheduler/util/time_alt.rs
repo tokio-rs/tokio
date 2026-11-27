@@ -76,8 +76,8 @@ pub(crate) fn next_expiration_time(wheel: &Wheel, drv_hdl: &driver::Handle) -> O
         let time_source = time_hdl.time_source();
 
         wheel.next_expiration_time().map(|tick| {
-            let now = time_source.now(clock);
-            time_source.tick_to_duration(tick.saturating_sub(now))
+            let now = clock.now();
+            time_source.duration_until_tick(tick, now)
         })
     })
 }
