@@ -178,11 +178,17 @@ impl<T: Cancellable + Completable + Send> Future for Op<T> {
                 let waker = cx.waker().clone();
 
                 let driver = this.handle.inner.driver().io();
-                // SAFETY: entry is valid for the entire duration of the operation
-                let result = unsafe { driver.register_op(entry, waker) };
+                // SAFETY: entry is valid for the entire duration of the operation.
+                // Record the slab index as soon as the SQE is pushed so a
+                // panic in a completion waker still cancels the in-flight op.
+                let result = unsafe {
+                    driver.register_op(entry, waker, |idx| {
+                        this.state = State::Polled(idx);
+                    })
+                };
 
                 match result {
-                    RegisterResult::Submitted(idx) => this.state = State::Polled(idx),
+                    RegisterResult::Submitted => {}
 
                     // The kernel never saw the entry, so the resources go back to
                     // the caller with the error.
