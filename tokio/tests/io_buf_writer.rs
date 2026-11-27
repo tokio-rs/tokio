@@ -17,7 +17,8 @@ use std::pin::Pin;
 use tokio::io::{AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt, BufWriter, SeekFrom};
 
 use futures::future;
-use tokio_test::assert_ok;
+use tokio_test::task::spawn;
+use tokio_test::{assert_ok, assert_pending, assert_ready_ok};
 
 use std::cmp;
 use std::io::IoSlice;
@@ -557,4 +558,193 @@ async fn write_vectored_large_slice_on_vectored() {
     let bytes_written = h.write_all(IoBufs::new(&mut bufs)).await;
     assert_eq!(bytes_written, msg.len());
     assert_eq!(h.flush().await, msg);
+}
+
+enum MockAction {
+    Pending,
+    Error(io::ErrorKind),
+}
+
+struct MockSeekWriter {
+    inner: Cursor<Vec<u8>>,
+    next_write: Option<MockAction>,
+    on_write_arm_poll_complete: Option<MockAction>,
+    next_poll_complete: Option<MockAction>,
+    seek_calls: Vec<SeekFrom>,
+}
+
+impl MockSeekWriter {
+    fn new() -> Self {
+        Self {
+            inner: Cursor::new(Vec::new()),
+            next_write: None,
+            on_write_arm_poll_complete: None,
+            next_poll_complete: None,
+            seek_calls: Vec::new(),
+        }
+    }
+}
+
+impl AsyncWrite for MockSeekWriter {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        if let Some(action) = self.next_write.take() {
+            return match action {
+                MockAction::Pending => {
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                }
+                MockAction::Error(kind) => Poll::Ready(Err(io::Error::from(kind))),
+            };
+        }
+        let res = Pin::new(&mut self.inner).poll_write(cx, buf);
+        if let Poll::Ready(Ok(_)) = res {
+            if let Some(action) = self.on_write_arm_poll_complete.take() {
+                self.next_poll_complete = Some(action);
+            }
+        }
+        res
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_shutdown(cx)
+    }
+}
+
+impl AsyncSeek for MockSeekWriter {
+    fn start_seek(mut self: Pin<&mut Self>, pos: SeekFrom) -> io::Result<()> {
+        assert!(
+            self.next_poll_complete.is_none(),
+            "start_seek called while poll_complete action was still pending"
+        );
+        self.seek_calls.push(pos);
+        Pin::new(&mut self.inner).start_seek(pos)
+    }
+
+    fn poll_complete(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<u64>> {
+        if let Some(action) = self.next_poll_complete.take() {
+            return match action {
+                MockAction::Pending => {
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                }
+                MockAction::Error(kind) => Poll::Ready(Err(io::Error::from(kind))),
+            };
+        }
+        Pin::new(&mut self.inner).poll_complete(cx)
+    }
+}
+
+#[tokio::test]
+async fn buf_writer_seek_resets_state_on_flush_error() {
+    let mut w = BufWriter::with_capacity(8, MockSeekWriter::new());
+    w.write_all(b"abcd").await.unwrap();
+    w.flush().await.unwrap();
+    w.write_all(b"ef").await.unwrap();
+
+    // Fail flush_buf during seek.
+    w.get_mut().next_write = Some(MockAction::Error(io::ErrorKind::BrokenPipe));
+    let err = w.seek(SeekFrom::Start(1)).await.unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
+    assert!(w.get_ref().seek_calls.is_empty());
+    assert_eq!(w.buffer(), b"ef");
+
+    // Subsequent stream_position must not re-execute the failed seek to 1.
+    assert_eq!(w.stream_position().await.unwrap(), 6);
+    assert_eq!(w.get_ref().seek_calls, vec![SeekFrom::Current(0)]);
+    assert_eq!(w.get_ref().inner.get_ref(), b"abcdef");
+
+    // Also verify direct poll_complete after a flush error does not re-execute the failed seek.
+    w.write_all(b"g").await.unwrap();
+    w.get_mut().next_write = Some(MockAction::Error(io::ErrorKind::BrokenPipe));
+    let err = w.seek(SeekFrom::Start(0)).await.unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
+
+    let pos = future::poll_fn(|cx| Pin::new(&mut w).poll_complete(cx))
+        .await
+        .unwrap();
+    assert_eq!(pos, 6);
+    assert_eq!(w.get_ref().seek_calls, vec![SeekFrom::Current(0)]);
+    assert_eq!(w.buffer(), b"g");
+}
+
+#[tokio::test]
+async fn buf_writer_seek_resets_state_on_pre_seek_poll_complete_error() {
+    let mut w = BufWriter::with_capacity(8, MockSeekWriter::new());
+    w.write_all(b"abcd").await.unwrap();
+    w.flush().await.unwrap();
+    w.write_all(b"ef").await.unwrap();
+
+    // Let flush_buf succeed, then fail the pre-seek inner.poll_complete.
+    w.get_mut().on_write_arm_poll_complete = Some(MockAction::Error(io::ErrorKind::BrokenPipe));
+    let err = w.seek(SeekFrom::Start(1)).await.unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
+    assert!(w.get_ref().seek_calls.is_empty());
+    assert!(w.buffer().is_empty());
+
+    // Subsequent stream_position must not re-execute the failed seek to 1.
+    assert_eq!(w.stream_position().await.unwrap(), 6);
+    assert_eq!(w.get_ref().seek_calls, vec![SeekFrom::Current(0)]);
+    assert_eq!(w.get_ref().inner.get_ref(), b"abcdef");
+
+    // Also verify direct start_seek + poll_complete when pre-seek inner.poll_complete errors.
+    w.get_mut().next_poll_complete = Some(MockAction::Error(io::ErrorKind::BrokenPipe));
+    Pin::new(&mut w).start_seek(SeekFrom::Start(0)).unwrap();
+    let err = future::poll_fn(|cx| Pin::new(&mut w).poll_complete(cx))
+        .await
+        .unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
+
+    let pos = future::poll_fn(|cx| Pin::new(&mut w).poll_complete(cx))
+        .await
+        .unwrap();
+    assert_eq!(pos, 6);
+    assert_eq!(w.get_ref().seek_calls, vec![SeekFrom::Current(0)]);
+}
+
+#[tokio::test]
+async fn buf_writer_seek_preserves_state_on_flush_pending() {
+    let mut w = BufWriter::with_capacity(8, MockSeekWriter::new());
+    w.write_all(b"abcd").await.unwrap();
+    w.flush().await.unwrap();
+    w.write_all(b"ef").await.unwrap();
+
+    w.get_mut().next_write = Some(MockAction::Pending);
+    let mut seek = spawn(w.seek(SeekFrom::Start(2)));
+    assert_pending!(seek.poll());
+    assert!(seek.is_woken());
+    assert_eq!(assert_ready_ok!(seek.poll()), 2);
+    drop(seek);
+
+    assert!(w.buffer().is_empty());
+    assert_eq!(w.get_ref().inner.get_ref(), b"abcdef");
+    assert_eq!(w.get_ref().seek_calls, vec![SeekFrom::Start(2)]);
+    assert_eq!(w.stream_position().await.unwrap(), 2);
+}
+
+#[tokio::test]
+async fn buf_writer_seek_preserves_state_on_pre_seek_poll_complete_pending() {
+    let mut w = BufWriter::with_capacity(8, MockSeekWriter::new());
+    w.write_all(b"abcd").await.unwrap();
+    w.flush().await.unwrap();
+    w.write_all(b"ef").await.unwrap();
+
+    w.get_mut().on_write_arm_poll_complete = Some(MockAction::Pending);
+    let mut seek = spawn(w.seek(SeekFrom::Start(2)));
+    assert_pending!(seek.poll());
+    assert!(seek.is_woken());
+    assert_eq!(assert_ready_ok!(seek.poll()), 2);
+    drop(seek);
+
+    assert!(w.buffer().is_empty());
+    assert_eq!(w.get_ref().inner.get_ref(), b"abcdef");
+    assert_eq!(w.get_ref().seek_calls, vec![SeekFrom::Start(2)]);
+    assert_eq!(w.stream_position().await.unwrap(), 2);
 }
