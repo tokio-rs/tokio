@@ -7,11 +7,21 @@ use std::{io, path::Path};
 ///
 /// This is the async equivalent of [`std::fs::read_to_string`][std].
 ///
-/// This operation is implemented by running the equivalent blocking operation
-/// on a separate thread pool using [`spawn_blocking`].
+/// When io_uring is not used, this operation is implemented by running the
+/// equivalent blocking operation on a separate thread pool using [`spawn_blocking`].
 ///
 /// [`spawn_blocking`]: crate::task::spawn_blocking
 /// [std]: fn@std::fs::read_to_string
+///
+/// # io_uring support
+///
+/// On Linux, you can also use io_uring for executing system calls. To enable
+/// io_uring, you need to specify the `--cfg tokio_unstable` flag at compile time,
+/// enable the io-uring cargo feature, and set the `Builder::enable_io_uring`
+/// runtime option.
+///
+/// Support for io_uring is currently experimental, so its behavior may change
+/// or it may be removed in future versions.
 ///
 /// # Examples
 ///
@@ -25,6 +35,29 @@ use std::{io, path::Path};
 /// # }
 /// ```
 pub async fn read_to_string(path: impl AsRef<Path>) -> io::Result<String> {
-    let path = path.as_ref().to_owned();
+    let path = path.as_ref();
+
+    #[cfg(all(tokio_unstable, feature = "io-uring", feature = "rt", feature = "fs",))]
+    {
+        use crate::fs::read_uring;
+
+        let handle = crate::runtime::Handle::current();
+        let driver_handle = handle.inner.driver().io();
+        if driver_handle
+            .check_and_init(io_uring::opcode::Read::CODE)
+            .await?
+        {
+            return read_uring(path).await.and_then(|bytes| {
+                String::from_utf8(bytes)
+                    .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+            });
+        }
+    }
+
+    read_to_string_spawn_blocking(path).await
+}
+
+async fn read_to_string_spawn_blocking(path: &Path) -> io::Result<String> {
+    let path = path.to_owned();
     asyncify(move || std::fs::read_to_string(path)).await
 }
