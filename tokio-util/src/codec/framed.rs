@@ -82,7 +82,12 @@ impl<T, U> Framed<T, U> {
 
     /// Provides a [`Stream`] and [`Sink`] interface for reading and writing to this
     /// I/O object, using [`Decoder`] and [`Encoder`] to read and write the raw data,
-    /// with a specific read buffer initial capacity.
+    /// with a specific initial capacity for both the read and the write buffer.
+    ///
+    /// `capacity` is also used as the backpressure boundary: once the write
+    /// buffer holds at least `capacity` bytes, [`poll_ready`] flushes it before
+    /// another frame is accepted. The default boundary is 8 KiB.
+    /// Use [`set_backpressure_boundary`] to change it separately.
     ///
     /// Raw I/O objects work with byte sequences, but higher-level code usually
     /// wants to batch these into meaningful chunks, called "frames". This
@@ -104,6 +109,8 @@ impl<T, U> Framed<T, U> {
     /// [`Decode`]: crate::codec::Decoder
     /// [`Encoder`]: crate::codec::Encoder
     /// [`split`]: https://docs.rs/futures/0.3/futures/stream/trait.StreamExt.html#method.split
+    /// [`poll_ready`]: futures_sink::Sink::poll_ready
+    /// [`set_backpressure_boundary`]: Framed::set_backpressure_boundary
     pub fn with_capacity(inner: T, codec: U, capacity: usize) -> Framed<T, U> {
         Framed {
             inner: FramedImpl {

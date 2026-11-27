@@ -49,6 +49,14 @@ impl<T, E> FramedWrite<T, E> {
 
     /// Creates a new `FramedWrite` with the given `encoder` and a buffer of `capacity`
     /// initial size.
+    ///
+    /// `capacity` is also used as the backpressure boundary: once the buffer
+    /// holds at least `capacity` bytes, [`poll_ready`] flushes it before
+    /// another frame is accepted. The default boundary is 8 KiB.
+    /// Use [`set_backpressure_boundary`] to change it separately.
+    ///
+    /// [`poll_ready`]: futures_sink::Sink::poll_ready
+    /// [`set_backpressure_boundary`]: FramedWrite::set_backpressure_boundary
     pub fn with_capacity(inner: T, encoder: E, capacity: usize) -> FramedWrite<T, E> {
         FramedWrite {
             inner: FramedImpl {
