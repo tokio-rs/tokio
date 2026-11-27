@@ -27,7 +27,8 @@ struct BlockHeader<T> {
     /// Slots in this block have indices in `start_index .. start_index + BLOCK_CAP`.
     start_index: usize,
 
-    /// The next block in the linked list.
+    /// The next block in the linked list. `RX_CLOSED_NEXT` seals the end
+    /// of the list when the receiver is dropped and must never be dereferenced.
     next: AtomicPtr<Block<T>>,
 
     /// Bitfield tracking slots that are ready to have their values consumed.
@@ -63,6 +64,13 @@ const RELEASED: usize = 1 << BLOCK_CAP;
 ///
 /// When this flag is set, the send half of the channel has closed.
 const TX_CLOSED: usize = RELEASED << 1;
+
+/// The receiver has abandoned this block. Later writes retain ownership of
+/// their values, and blocks are no longer reclaimed until the channel is freed.
+const RX_CLOSED: usize = TX_CLOSED << 1;
+
+/// A misaligned address that cannot be a block pointer.
+const RX_CLOSED_NEXT: usize = 1;
 
 /// Mask covering all bits used to track slot readiness.
 const READY_MASK: usize = RELEASED - 1;
@@ -162,16 +170,14 @@ impl<T> Block<T> {
             return None;
         }
 
-        // Get the value
-        //
-        // Safety:
-        //
-        // 1. The caller guarantees that there is no concurrent access to the slot.
-        // 2. The `UnsafeCell` always give us a valid pointer to the value.
-        let value = self.values[offset].with(|ptr| unsafe { ptr::read(ptr) });
+        // Safety: the ready bit is set, and the caller owns this slot.
+        Some(Read::Value(unsafe { self.take_value(offset) }))
+    }
 
-        // Safety: the ready bit is set, so the value has been initialized.
-        Some(Read::Value(unsafe { value.assume_init() }))
+    /// Takes an initialized value. The caller must exclusively own the slot
+    /// and must not read or drop its contents again.
+    pub(super) unsafe fn take_value(&self, offset: usize) -> T {
+        self.values[offset].with(|ptr| unsafe { (*ptr).assume_init_read() })
     }
 
     /// Returns true if *this* block has a value in the given slot.
@@ -187,7 +193,8 @@ impl<T> Block<T> {
         is_ready(ready_bits, offset)
     }
 
-    /// Writes a value to the block at the given offset.
+    /// Writes a value to the block at the given offset, returning it if the
+    /// receiver has abandoned the block.
     ///
     /// # Safety
     ///
@@ -195,7 +202,7 @@ impl<T> Block<T> {
     ///
     /// * The slot is empty.
     /// * No concurrent access to the slot.
-    pub(crate) unsafe fn write(&self, slot_index: usize, value: T) {
+    pub(crate) unsafe fn write(&self, slot_index: usize, value: T) -> Option<T> {
         // Get the offset into the block
         let slot_offset = offset(slot_index);
 
@@ -206,10 +213,42 @@ impl<T> Block<T> {
             }
         });
 
-        // Release the value. After this point, the slot ref may no longer
-        // be used. It is possible for the receiver to free the memory at
-        // any point.
-        self.set_ready(slot_offset);
+        // Publish the value and check whether the receiver abandoned the block.
+        if self.set_ready(slot_offset) & RX_CLOSED != 0 {
+            Some(unsafe { self.take_value(slot_offset) })
+        } else {
+            // The receiver may now free the block. Do not access it again.
+            None
+        }
+    }
+
+    /// Abandons this block and returns the ready slots owned by the receiver.
+    /// Subsequent calls return zero, including slots written after abandonment.
+    pub(super) fn rx_close(&self) -> usize {
+        let prev = self.header.ready_slots.fetch_or(RX_CLOSED, AcqRel);
+        if prev & RX_CLOSED == 0 {
+            prev & READY_MASK
+        } else {
+            0
+        }
+    }
+
+    /// Prevents growth past this block, or returns its successor.
+    pub(super) fn rx_close_next(&self) -> Option<NonNull<Block<T>>> {
+        self.header
+            .next
+            .compare_exchange(
+                ptr::null_mut(),
+                ptr::without_provenance_mut(RX_CLOSED_NEXT),
+                AcqRel,
+                Acquire,
+            )
+            .err()
+            .and_then(Self::next_block)
+    }
+
+    fn next_block(ptr: *mut Block<T>) -> Option<NonNull<Block<T>>> {
+        NonNull::new(ptr).filter(|ptr| ptr.as_ptr().addr() != RX_CLOSED_NEXT)
     }
 
     /// Signal to the receiver that the sender half of the list is closed.
@@ -260,9 +299,9 @@ impl<T> Block<T> {
     }
 
     /// Mark a slot as ready
-    fn set_ready(&self, slot: usize) {
+    fn set_ready(&self, slot: usize) -> usize {
         let mask = 1 << slot;
-        self.header.ready_slots.fetch_or(mask, Release);
+        self.header.ready_slots.fetch_or(mask, Release)
     }
 
     /// Returns `true` when all slots have their `ready` bits set.
@@ -288,7 +327,7 @@ impl<T> Block<T> {
 
     /// Loads the next block
     pub(crate) fn load_next(&self, ordering: Ordering) -> Option<NonNull<Block<T>>> {
-        let ret = NonNull::new(self.header.next.load(ordering));
+        let ret = Self::next_block(self.header.next.load(ordering));
 
         debug_assert!(unsafe {
             ret.is_none_or(|block| {
@@ -302,7 +341,7 @@ impl<T> Block<T> {
     /// Pushes `block` as the next block in the link.
     ///
     /// Returns Ok if successful, otherwise, a pointer to the next block in
-    /// the list is returned.
+    /// the list is returned. `Err(None)` means the receiver sealed the list.
     ///
     /// This requires that the next pointer is null.
     ///
@@ -320,27 +359,23 @@ impl<T> Block<T> {
         block: &mut NonNull<Block<T>>,
         success: Ordering,
         failure: Ordering,
-    ) -> Result<(), NonNull<Block<T>>> {
+    ) -> Result<(), Option<NonNull<Block<T>>>> {
         // Safety: caller guarantees that `block` is valid.
         unsafe { block.as_mut() }.header.start_index =
             self.header.start_index.wrapping_add(BLOCK_CAP);
 
-        let next_ptr = self
-            .header
+        self.header
             .next
             .compare_exchange(ptr::null_mut(), block.as_ptr(), success, failure)
-            .unwrap_or_else(|x| x);
-
-        match NonNull::new(next_ptr) {
-            Some(next_ptr) => Err(next_ptr),
-            None => Ok(()),
-        }
+            .map(|_| ())
+            .map_err(Self::next_block)
     }
 
     /// Grows the `Block` linked list by allocating and appending a new block.
     ///
     /// The next block in the linked list is returned. This may or may not be
-    /// the one allocated by the function call.
+    /// the one allocated by the function call. Returns `None` if the receiver
+    /// sealed the list at this block.
     ///
     /// # Implementation
     ///
@@ -351,7 +386,7 @@ impl<T> Block<T> {
     /// linked list. If the compare-and-swap fails, the current thread acquires
     /// the next block in the linked list, allowing the current thread to access
     /// the slots.
-    pub(crate) fn grow(&self) -> NonNull<Block<T>> {
+    pub(crate) fn grow(&self) -> Option<NonNull<Block<T>>> {
         // Create the new block. It is assumed that the block will become the
         // next one after `&self`. If this turns out to not be the case,
         // `start_index` is updated accordingly.
@@ -359,32 +394,12 @@ impl<T> Block<T> {
 
         let mut new_block = unsafe { NonNull::new_unchecked(Box::into_raw(new_block)) };
 
-        // Attempt to store the block. The first compare-and-swap attempt is
-        // "unrolled" due to minor differences in logic
-        //
-        // `AcqRel` is used as the ordering **only** when attempting the
-        // compare-and-swap on self.next.
-        //
-        // If the compare-and-swap fails, then the actual value of the cell is
-        // returned from this function and accessed by the caller. Given this,
-        // the memory must be acquired.
-        //
-        // `Release` ensures that the newly allocated block is available to
-        // other threads acquiring the next pointer.
-        let next = NonNull::new(
-            self.header
-                .next
-                .compare_exchange(ptr::null_mut(), new_block.as_ptr(), AcqRel, Acquire)
-                .unwrap_or_else(|x| x),
-        );
-
-        let next = match next {
-            Some(next) => next,
-            None => {
-                // The compare-and-swap succeeded and the newly allocated block
-                // is successfully pushed.
-                return new_block;
-            }
+        // Release publishes the new block; Acquire makes an existing successor
+        // available to the caller if another sender linked it first.
+        // SAFETY: new_block is exclusively owned until try_push succeeds.
+        let next = match unsafe { self.try_push(&mut new_block, AcqRel, Acquire) } {
+            Ok(()) => return Some(new_block),
+            Err(next) => next,
         };
 
         // There already is a next block in the linked list. The newly allocated
@@ -398,18 +413,20 @@ impl<T> Block<T> {
         let mut curr = next;
 
         // TODO: Should this iteration be capped?
-        loop {
-            let actual = unsafe { curr.as_ref().try_push(&mut new_block, AcqRel, Acquire) };
-
-            curr = match actual {
-                Ok(()) => {
-                    return next;
-                }
-                Err(curr) => curr,
+        while let Some(block) = curr {
+            // SAFETY: new_block is still exclusively owned, and linked blocks
+            // remain allocated while this sender is finding its slot.
+            curr = match unsafe { block.as_ref().try_push(&mut new_block, AcqRel, Acquire) } {
+                Ok(()) => return next,
+                Err(next) => next,
             };
 
             crate::loom::thread::yield_now();
         }
+
+        // The receiver sealed the list before we could link our allocation.
+        drop(unsafe { Box::from_raw(new_block.as_ptr()) });
+        next
     }
 }
 

@@ -520,6 +520,102 @@ async fn recv_close_gets_none_reserved() {
 }
 
 #[test]
+fn permit_send_after_rx_drop_drops_value() {
+    let (tx, rx) = mpsc::channel(1);
+    let permit = tx.try_reserve().unwrap();
+    let (reply, mut response) = tokio::sync::oneshot::channel::<()>();
+
+    drop(rx);
+    permit.send(reply);
+
+    assert_eq!(
+        response.try_recv(),
+        Err(tokio::sync::oneshot::error::TryRecvError::Closed)
+    );
+    assert_eq!(tx.capacity(), 1);
+}
+
+#[test]
+fn owned_permit_send_after_rx_drop_drops_value() {
+    let (tx, rx) = mpsc::channel(1);
+    let permit = tx.try_reserve_owned().unwrap();
+    let (reply, mut response) = tokio::sync::oneshot::channel::<()>();
+
+    drop(rx);
+    let tx = permit.send(reply);
+
+    assert_eq!(
+        response.try_recv(),
+        Err(tokio::sync::oneshot::error::TryRecvError::Closed)
+    );
+    assert_eq!(tx.capacity(), 1);
+}
+
+#[test]
+#[cfg(not(panic = "abort"))]
+fn permit_send_after_rx_drop_panicking_value() {
+    struct PanicOnDrop;
+    impl Drop for PanicOnDrop {
+        fn drop(&mut self) {
+            panic!("value dropped");
+        }
+    }
+
+    let (tx, rx) = mpsc::channel(2);
+    let permit = tx.try_reserve().unwrap();
+    let owned = tx.clone().try_reserve_owned().unwrap();
+    drop(rx);
+
+    assert!(panic::catch_unwind(|| permit.send(PanicOnDrop)).is_err());
+    assert_eq!(tx.capacity(), 1);
+    assert!(panic::catch_unwind(|| owned.send(PanicOnDrop)).is_err());
+    assert_eq!(tx.capacity(), 2);
+}
+
+#[test]
+fn value_drop_can_send_another_permit() {
+    use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
+
+    struct Value {
+        next: Option<mpsc::OwnedPermit<Value>>,
+        drops: Arc<AtomicUsize>,
+    }
+
+    impl Drop for Value {
+        fn drop(&mut self) {
+            self.drops.fetch_add(1, Relaxed);
+            if let Some(permit) = self.next.take() {
+                permit.send(Value {
+                    next: None,
+                    drops: self.drops.clone(),
+                });
+            }
+        }
+    }
+
+    for send_after_drop in [false, true] {
+        let (tx, rx) = mpsc::channel(2);
+        let drops = Arc::new(AtomicUsize::new(0));
+        let permit = tx.clone().try_reserve_owned().unwrap();
+        let value = Value {
+            next: Some(tx.clone().try_reserve_owned().unwrap()),
+            drops: drops.clone(),
+        };
+
+        if send_after_drop {
+            drop(rx);
+            permit.send(value);
+        } else {
+            permit.send(value);
+            drop(rx);
+        }
+
+        assert_eq!(drops.load(Relaxed), 2);
+        assert_eq!(tx.capacity(), 2);
+    }
+}
+
+#[test]
 fn failed_reserve_many_wakes_closed_receiver() {
     let (tx, mut rx) = mpsc::channel::<()>(2);
 

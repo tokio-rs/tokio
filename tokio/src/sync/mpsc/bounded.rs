@@ -1692,6 +1692,7 @@ impl<T> Permit<'_, T> {
     /// to the receiver and the permit is consumed. The operation will succeed
     /// even if the receiver half has been closed. See [`Receiver::close`] for
     /// more details on performing a clean shutdown.
+    /// If the receiver has been dropped, the value is dropped.
     ///
     /// [`Receiver::close`]: Receiver::close
     ///
@@ -1816,6 +1817,7 @@ impl<T> OwnedPermit<T> {
     /// to the receiver and the permit is consumed. The operation will succeed
     /// even if the receiver half has been closed. See [`Receiver::close`] for
     /// more details on performing a clean shutdown.
+    /// If the receiver has been dropped, the value is dropped.
     ///
     /// Unlike [`Permit::send`], this method returns the [`Sender`] from which
     /// the `OwnedPermit` was reserved.

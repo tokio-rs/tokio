@@ -193,7 +193,10 @@ impl<T, S> Tx<T, S> {
     }
 
     /// Send a message and notify the receiver.
-    pub(crate) fn send(&self, value: T) {
+    pub(crate) fn send(&self, value: T)
+    where
+        S: Semaphore,
+    {
         self.inner.send(value);
     }
 
@@ -502,55 +505,48 @@ impl<T, S: Semaphore> Rx<T, S> {
 
 impl<T, S: Semaphore> Drop for Rx<T, S> {
     fn drop(&mut self) {
-        use super::block::Read::Value;
+        struct Guard<'a, T, S: Semaphore>(&'a mut Rx<T, S>);
 
-        self.close();
-
-        self.inner.rx_fields.with_mut(|rx_fields_ptr| {
-            let rx_fields = unsafe { &mut *rx_fields_ptr };
-            struct Guard<'a, T, S: Semaphore> {
-                list: &'a mut list::Rx<T>,
-                tx: &'a list::Tx<T>,
-                sem: &'a S,
+        impl<T, S: Semaphore> Drop for Guard<'_, T, S> {
+            fn drop(&mut self) {
+                self.0.inner.rx_fields.with_mut(|rx_fields_ptr| {
+                    // SAFETY: the receiver owns these fields, and close() has
+                    // released its access before this guard runs.
+                    let rx_fields = unsafe { &mut *rx_fields_ptr };
+                    rx_fields.list.drain(&self.0.inner.tx, |value| {
+                        self.0.inner.semaphore.add_permit();
+                        drop(value);
+                    });
+                });
             }
+        }
 
-            impl<'a, T, S: Semaphore> Guard<'a, T, S> {
-                fn drain(&mut self) {
-                    // call T's destructor.
-                    while let Some(Value(_)) = self.list.pop(self.tx) {
-                        self.sem.add_permit();
-                    }
-                }
-            }
+        // Closing can invoke user wakers, so install the drain guard first.
+        let guard = Guard(self);
+        // Detach now so close() panics cannot leave a waker holding the channel
+        // alive. Keep it in a local until the semaphore has been closed.
+        let rx_waker = guard.0.inner.rx_waker.take_waker();
+        guard.0.close();
 
-            impl<'a, T, S: Semaphore> Drop for Guard<'a, T, S> {
-                fn drop(&mut self) {
-                    self.drain();
-                }
-            }
-
-            let mut guard = Guard {
-                list: &mut rx_fields.list,
-                tx: &self.inner.tx,
-                sem: &self.inner.semaphore,
-            };
-
-            // When Rx is dropped, there is nothing for a task to poll anymore.
-            // This means we can drop our waker to potentially free up resources.
-            // Do so before draining the channel where panics may occur.
-            self.inner.rx_waker.take_waker();
-
-            guard.drain();
-        });
+        // Drop the receiver's waker before draining user values.
+        drop(rx_waker);
+        drop(guard);
     }
 }
 
 // ===== impl Chan =====
 
 impl<T, S> Chan<T, S> {
-    fn send(&self, value: T) {
+    fn send(&self, value: T)
+    where
+        S: Semaphore,
+    {
         // Push the value
-        self.tx.push(value);
+        if let Some(value) = self.tx.push(value) {
+            self.semaphore.add_permit();
+            drop(value);
+            return;
+        }
 
         // Notify the rx task
         self.rx_waker.wake();
@@ -575,14 +571,12 @@ impl<T, S> Chan<T, S> {
 
 impl<T, S> Drop for Chan<T, S> {
     fn drop(&mut self) {
-        use super::block::Read::Value;
-
         // Safety: the only owner of the rx fields is Chan, and being
         // inside its own Drop means we're the last ones to touch it.
         self.rx_fields.with_mut(|rx_fields_ptr| {
             let rx_fields = unsafe { &mut *rx_fields_ptr };
 
-            while let Some(Value(_)) = rx_fields.list.pop(&self.tx) {}
+            // Rx::drop drained the list, and later senders took back their values.
             unsafe { rx_fields.list.free_blocks() };
         });
     }

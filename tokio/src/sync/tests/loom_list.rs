@@ -19,7 +19,7 @@ fn smoke() {
 
             thread::spawn(move || {
                 for i in 0..NUM_MSG {
-                    tx.push((th, i));
+                    assert!(tx.push((th, i)).is_none());
                 }
             });
         }

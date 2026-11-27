@@ -35,8 +35,9 @@
 //!
 //! If the [`Receiver`] handle is dropped, then messages can no longer
 //! be read out of the channel. In this case, all further attempts to send will
-//! result in an error. Additionally, all unread messages will be drained from the
-//! channel and dropped.
+//! result in an error, except sends through previously reserved [`Permit`] or
+//! [`OwnedPermit`] values, which drop the sent value. Additionally, all unread
+//! messages will be drained from the channel and dropped.
 //!
 //! # Clean Shutdown
 //!
