@@ -12,6 +12,36 @@ use std::{
 };
 
 use io_uring::IoUring;
+use tokio::runtime::{Builder, Runtime};
+
+#[cfg(feature = "rt-multi-thread")]
+pub fn multi_rt(n: usize) -> Box<dyn Fn() -> Runtime> {
+    Box::new(move || {
+        Builder::new_multi_thread()
+            .worker_threads(n)
+            .enable_all()
+            .build()
+            .unwrap()
+    })
+}
+
+#[allow(dead_code)]
+pub fn current_rt() -> Box<dyn Fn() -> Runtime> {
+    Box::new(|| Builder::new_current_thread().enable_all().build().unwrap())
+}
+
+#[cfg(feature = "rt-multi-thread")]
+#[allow(dead_code)]
+pub fn rt_combinations() -> Vec<Box<dyn Fn() -> Runtime>> {
+    vec![
+        current_rt(),
+        multi_rt(1),
+        multi_rt(2),
+        multi_rt(8),
+        multi_rt(64),
+        multi_rt(256),
+    ]
+}
 
 // Currently, we are running some of the tests on Kernels where io_uring is not supported
 // to check if the fallback mechanism works, this comes with the limitation that we are not
