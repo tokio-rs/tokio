@@ -147,6 +147,12 @@ impl Inner {
             return;
         }
 
+        // Within an event loop's tick a zero-duration park is a probe: the
+        // host already has the turn, and there is no activation to suspend.
+        if dur == Some(Duration::ZERO) && crate::runtime::jspi::in_host_turn() {
+            return;
+        }
+
         // If JSPI is disabled, then we cannot park on JSPI, so instead use a
         // spin loop for a timed park, and a panic for any other suspension.
         // A zero-duration park returns immediately as on native.

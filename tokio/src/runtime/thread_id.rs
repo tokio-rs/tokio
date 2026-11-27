@@ -4,6 +4,11 @@ use std::num::NonZeroU64;
 pub(crate) struct ThreadId(NonZeroU64);
 
 impl ThreadId {
+    #[cfg(tokio_unstable)]
+    pub(crate) fn as_u64(&self) -> u64 {
+        self.0.get()
+    }
+
     pub(crate) fn next() -> Self {
         use crate::loom::sync::atomic::{AtomicU64, Ordering::Relaxed};
 

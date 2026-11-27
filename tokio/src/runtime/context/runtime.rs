@@ -36,7 +36,49 @@ pub(crate) fn enter_runtime<F, R>(handle: &scheduler::Handle, allow_block_in_pla
 where
     F: FnOnce(&mut BlockingRegionGuard) -> R,
 {
-    let maybe_guard = CONTEXT.with(|c| {
+    let rng_seed = || handle.seed_generator().next_seed();
+    match try_enter_runtime(handle, allow_block_in_place, rng_seed) {
+        Some(mut guard) => f(&mut guard.blocking),
+        None => already_entered(),
+    }
+}
+
+/// [`enter_runtime`] continuing the random number generator from `seed`, and
+/// leaving `seed` where the call's draws advanced it, rather than drawing a
+/// seed from the runtime's generator, which takes a lock. A host event loop
+/// enters the runtime for each of its turns, and its turns share one stream
+/// as the iterations of a `block_on` do.
+#[track_caller]
+#[cfg(all(feature = "rt", tokio_unstable))]
+pub(crate) fn enter_runtime_with_seed<F, R>(
+    handle: &scheduler::Handle,
+    allow_block_in_place: bool,
+    seed: &mut RngSeed,
+    f: F,
+) -> R
+where
+    F: FnOnce(&mut BlockingRegionGuard) -> R,
+{
+    let Some(mut guard) = try_enter_runtime(handle, allow_block_in_place, || seed.clone()) else {
+        already_entered()
+    };
+    let ret = f(&mut guard.blocking);
+    if let Some(advanced) = CONTEXT
+        .with(|c| c.rng.get())
+        .map(|mut rng| rng.replace_seed(guard.old_seed.clone()))
+    {
+        *seed = advanced;
+    }
+    ret
+}
+
+#[track_caller]
+fn try_enter_runtime(
+    handle: &scheduler::Handle,
+    allow_block_in_place: bool,
+    rng_seed: impl FnOnce() -> RngSeed,
+) -> Option<EnterRuntimeGuard> {
+    CONTEXT.with(|c| {
         if c.runtime.get().is_entered() {
             None
         } else {
@@ -45,8 +87,7 @@ where
                 allow_block_in_place,
             });
 
-            // Generate a new seed
-            let rng_seed = handle.seed_generator().next_seed();
+            let rng_seed = rng_seed();
 
             // Swap the RNG seed
             let mut rng = c.rng.get().unwrap_or_else(FastRand::new);
@@ -59,12 +100,12 @@ where
                 old_seed,
             })
         }
-    });
+    })
+}
 
-    if let Some(mut guard) = maybe_guard {
-        return f(&mut guard.blocking);
-    }
-
+#[cold]
+#[track_caller]
+fn already_entered() -> ! {
     panic!(
         "Cannot start a runtime from within a runtime. This happens \
             because a function (like `block_on`) attempted to block the \
