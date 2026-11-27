@@ -178,6 +178,13 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         delegate_call!(self.poll_next(cx))
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            Self::Left(l) => l.size_hint(),
+            Self::Right(r) => r.size_hint(),
+        }
+    }
 }
 
 impl<L, R> FusedStream for Either<L, R>
@@ -256,6 +263,15 @@ mod tests {
             assert!(either.is_terminated());
             assert_eq!(either.next().await, None);
         }
+    }
+
+    #[test]
+    fn either_forwards_size_hint() {
+        let left: Either<_, Once<u32>> = Either::Left(tokio_stream::iter(vec![1u32, 2, 3]));
+        assert_eq!(futures_core::Stream::size_hint(&left), (3, Some(3)));
+
+        let right: Either<Once<u32>, _> = Either::Right(tokio_stream::iter(vec![1u32, 2]));
+        assert_eq!(futures_core::Stream::size_hint(&right), (2, Some(2)));
     }
 
     #[tokio::test]
