@@ -116,6 +116,9 @@ use std::io;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
+/// The most bytes one `poll_read` on a [`Compat`] zeroes.
+const MAX_ZEROED_PER_READ: usize = 64 * 1024;
+
 pin_project! {
     /// A compatibility layer that allows conversion between the
     /// `tokio::io` and `futures-io` `AsyncRead` and `AsyncWrite` traits.
@@ -224,9 +227,14 @@ where
         cx: &mut Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
-        // We can't trust the inner type to not peak at the bytes,
-        // so we must defensively initialize the buffer.
-        let slice = buf.initialize_unfilled();
+        // We can't trust the inner type to not peek at the bytes, so we must
+        // initialize the slice. Bound it, since the caller may pass a large
+        // uninitialized buffer on every poll.
+        let already_initialized = buf.initialized().len() - buf.filled().len();
+        let len = buf
+            .remaining()
+            .min(already_initialized.max(MAX_ZEROED_PER_READ));
+        let slice = buf.initialize_unfilled_to(len);
         let n = ready!(futures_io::AsyncRead::poll_read(
             self.project().inner,
             cx,
