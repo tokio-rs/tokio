@@ -194,3 +194,74 @@ async fn futures_to_tokio_vectored_write() {
     assert_eq!(writer.write_vectored(&bufs).await.unwrap(), 6);
     assert!(writer.get_ref().called);
 }
+
+/// Records each read slice's length and fills it from `data`.
+struct SliceLenReader {
+    data: Vec<u8>,
+    slice_lens: Vec<usize>,
+}
+
+impl futures_io::AsyncRead for SliceLenReader {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<io::Result<usize>> {
+        self.slice_lens.push(buf.len());
+        let n = buf.len().min(self.data.len());
+        buf[..n].copy_from_slice(&self.data[..n]);
+        self.data.drain(..n);
+        Poll::Ready(Ok(n))
+    }
+}
+
+#[tokio::test]
+async fn futures_to_tokio_read_bounds_the_zeroed_slice() {
+    use tokio::io::AsyncReadExt as _;
+    use tokio_util::compat::FuturesAsyncReadCompatExt;
+
+    let inner = SliceLenReader {
+        data: vec![7; 16],
+        slice_lens: Vec::new(),
+    };
+    let mut reader = inner.compat();
+    let mut buf = bytes::BytesMut::with_capacity(8 * 1024 * 1024);
+    assert_eq!(reader.read_buf(&mut buf).await.unwrap(), 16);
+    assert_eq!(&buf[..], &[7; 16]);
+
+    let slice_lens = &reader.get_ref().slice_lens;
+    assert_eq!(slice_lens.len(), 1);
+    assert!(
+        slice_lens[0] <= 64 * 1024,
+        "zeroed {} bytes for a 16-byte read",
+        slice_lens[0]
+    );
+}
+
+#[tokio::test]
+async fn futures_to_tokio_read_passes_an_initialized_buffer_through() {
+    use tokio::io::AsyncReadExt as _;
+    use tokio_util::compat::FuturesAsyncReadCompatExt;
+
+    const LEN: usize = 1024 * 1024;
+    let inner = SliceLenReader {
+        data: vec![7; LEN],
+        slice_lens: Vec::new(),
+    };
+    let mut reader = inner.compat();
+    let mut buf = vec![0; LEN];
+    assert_eq!(reader.read(&mut buf).await.unwrap(), LEN);
+    assert_eq!(reader.get_ref().slice_lens, [LEN]);
+}
+
+#[tokio::test]
+async fn futures_to_tokio_read_to_end_reads_past_the_bound() {
+    use tokio::io::AsyncReadExt as _;
+    use tokio_util::compat::FuturesAsyncReadCompatExt;
+
+    let data: Vec<u8> = (0..300 * 1024).map(|i| i as u8).collect();
+    let mut reader = futures::io::Cursor::new(data.clone()).compat();
+    let mut out = Vec::new();
+    reader.read_to_end(&mut out).await.unwrap();
+    assert_eq!(out, data);
+}
