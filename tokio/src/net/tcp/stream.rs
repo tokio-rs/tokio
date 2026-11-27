@@ -92,8 +92,13 @@ impl TcpStream {
         /// To configure the socket before connecting, you can use the [`TcpSocket`]
         /// type.
         ///
+        /// This function does not enable [`TCP_NODELAY`] on the resulting stream.
+        /// The Nagle algorithm remains enabled by default, which is a common
+        /// pitfall when low latency is desired.
+        ///
         /// [`ToSocketAddrs`]: trait@crate::net::ToSocketAddrs
         /// [`TcpSocket`]: struct@crate::net::TcpSocket
+        /// [`TCP_NODELAY`]: TcpStream::set_nodelay
         ///
         /// # Examples
         ///
