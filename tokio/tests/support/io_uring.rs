@@ -34,16 +34,15 @@ pub fn io_uring_supported() -> bool {
     }
 }
 
-/// Whether tokio uses io_uring, rather than the `spawn_blocking` fallback, for
-/// the `fs` functions built on `opcode` (`Statx` for `try_exists`, `Read` for
-/// `read`). Mirrors the gate in `tokio/src/fs`: the target must have
-/// `libc::statx` (see the FIXME there about musl) and the kernel must support
-/// the opcode. Tests that assert on the io_uring path (e.g. that the first
-/// poll is `Pending`) return early when this is false, since the blocking
-/// fallback may already be done by the first poll.
+/// Whether Tokio uses io_uring for the given filesystem opcode.
+/// `Statx` requires libc support, while `Read` works on Linux musl too.
+/// Tests use this to skip io_uring-specific assertions when the
+/// operation falls back to `spawn_blocking`.
 #[allow(dead_code)]
 pub fn uring_fs_op_in_use(opcode: u8) -> bool {
-    if !cfg!(any(target_env = "gnu", target_os = "android")) {
+    if opcode == io_uring::opcode::Statx::CODE
+        && !cfg!(any(target_env = "gnu", target_os = "android"))
+    {
         return false;
     }
     uring_op_supported(opcode)
