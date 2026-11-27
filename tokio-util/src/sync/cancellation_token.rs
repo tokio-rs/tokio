@@ -226,6 +226,22 @@ impl CancellationToken {
         tree_node::is_cancelled(&self.inner)
     }
 
+    /// Variant of [`is_cancelled`] that establishes a full happens-before with
+    /// the corresponding `cancel()`.
+    ///
+    /// Used inside the `WaitForCancellationFuture::poll` check-then-register
+    /// pattern, where a load returning `false` must happen-before the
+    /// concurrent `cancel()` write that would otherwise wake us — without
+    /// that, the `Notified` waker registration could race with
+    /// `notify_waiters()` and the future could sleep forever. The
+    /// public [`is_cancelled`] uses a plain atomic load and is therefore not
+    /// suitable here.
+    ///
+    /// [`is_cancelled`]: Self::is_cancelled
+    fn is_cancelled_with_sync(&self) -> bool {
+        tree_node::is_cancelled_with_sync(&self.inner)
+    }
+
     /// Returns a [`Future`] that gets fulfilled when cancellation is requested.
     ///
     /// Equivalent to:
@@ -349,14 +365,17 @@ impl<'a> Future for WaitForCancellationFuture<'a> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         let mut this = self.project();
         loop {
-            if this.cancellation_token.is_cancelled() {
+            // Uses the syncing variant: see `is_cancelled_with_sync` for why
+            // the plain lock-free `is_cancelled` is not safe here.
+            if this.cancellation_token.is_cancelled_with_sync() {
                 return Poll::Ready(());
             }
 
             // No wakeups can be lost here because there is always a call to
-            // `is_cancelled` between the creation of the future and the call to
-            // `poll`, and the code that sets the cancelled flag does so before
-            // waking the `Notified`.
+            // `is_cancelled_with_sync` between the creation of the future and
+            // the call to `poll`, and the code that sets the cancelled flag
+            // does so before waking the `Notified`. The mutex taken inside
+            // `is_cancelled_with_sync` provides the needed happens-before.
             if this.future.as_mut().poll(cx).is_pending() {
                 return Poll::Pending;
             }
@@ -410,14 +429,17 @@ impl Future for WaitForCancellationFutureOwned {
         let mut this = self.project();
 
         loop {
-            if this.cancellation_token.is_cancelled() {
+            // Uses the syncing variant: see `is_cancelled_with_sync` for why
+            // the plain lock-free `is_cancelled` is not safe here.
+            if this.cancellation_token.is_cancelled_with_sync() {
                 return Poll::Ready(());
             }
 
             // No wakeups can be lost here because there is always a call to
-            // `is_cancelled` between the creation of the future and the call to
-            // `poll`, and the code that sets the cancelled flag does so before
-            // waking the `Notified`.
+            // `is_cancelled_with_sync` between the creation of the future and
+            // the call to `poll`, and the code that sets the cancelled flag
+            // does so before waking the `Notified`. The mutex taken inside
+            // `is_cancelled_with_sync` provides the needed happens-before.
             if this.future.as_mut().poll(cx).is_pending() {
                 return Poll::Pending;
             }
