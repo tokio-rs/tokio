@@ -117,7 +117,6 @@
 //!
 //!         // Flush the buffer before it goes out of scope.
 //!         writer.flush().await?;
-//!
 //!     } // Unless flushed or shut down, the contents of the buffer is discarded on drop.
 //!
 //!     Ok(())

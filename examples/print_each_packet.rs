@@ -50,7 +50,6 @@
 //!
 //! console.log("Listening on:", listenPort);
 //! ```
-//!
 
 #![warn(rust_2018_idioms)]
 
