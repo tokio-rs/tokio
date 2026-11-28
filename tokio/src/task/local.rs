@@ -2,9 +2,7 @@
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::{Arc, Mutex};
 use crate::runtime;
-use crate::runtime::task::{
-    self, JoinHandle, LocalOwnedTasks, SpawnLocation, Task, TaskHarnessScheduleHooks,
-};
+use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task, TaskHarnessScheduleHooks};
 use crate::runtime::{context, AutoBox, ThreadId};
 use crate::sync::AtomicWaker;
 use crate::util::trace::SpawnMeta;
@@ -1035,12 +1033,10 @@ impl Context {
         // Safety: called from the thread that owns the `LocalSet`
         let (handle, notified) = {
             self.shared.local_state.assert_called_from_owner_thread();
-            self.shared.local_state.owned.bind(
-                future,
-                self.shared.clone(),
-                id,
-                SpawnLocation::capture(),
-            )
+            self.shared
+                .local_state
+                .owned
+                .bind(future, self.shared.clone(), id, meta.spawned_at)
         };
 
         if let Some(notified) = notified {

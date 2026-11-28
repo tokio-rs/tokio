@@ -254,6 +254,7 @@ cfg_io_blocking! {
     /// operations. Tasks will be scheduled as mandatory, meaning they are
     /// guaranteed to run unless a shutdown is already taking place. In case a
     /// shutdown is already taking place, `None` will be returned.
+    #[track_caller]
     pub(crate) fn spawn_mandatory_blocking<F, R>(func: F) -> Option<JoinHandle<R>>
     where
         F: FnOnce() -> R + Send + 'static,
@@ -441,12 +442,8 @@ impl Spawner {
         let fut =
             blocking_task::<F, BlockingTask<F>>(BlockingTask::new(func), spawn_meta, id.as_u64());
 
-        let (task, handle) = task::unowned(
-            fut,
-            BlockingSchedule::new(rt),
-            id,
-            task::SpawnLocation::capture(),
-        );
+        let (task, handle) =
+            task::unowned(fut, BlockingSchedule::new(rt), id, spawn_meta.spawned_at);
 
         let spawned = self.spawn_task(Task::new(task, is_mandatory), rt);
         (handle, spawned)
