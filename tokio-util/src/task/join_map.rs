@@ -591,7 +591,7 @@ where
     /// let mut map = JoinMap::new();
     ///
     /// map.spawn("hello world", async move { /* ... */ });
-    /// map.spawn("goodbye world", async move { /* ... */});
+    /// map.spawn("goodbye world", async move { /* ... */ });
     ///
     /// // A task for the key "goodbye world" should exist in the map:
     /// assert!(map.abort("goodbye world"));

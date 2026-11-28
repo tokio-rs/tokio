@@ -20,7 +20,6 @@
 ///     pub struct AnotherStruct {};
 /// }
 /// ```
-///
 macro_rules! feature {
     (
         #![$meta:meta]

@@ -33,7 +33,6 @@ use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf, Result}
 ///     println!("Result is {}", result.await);
 /// }
 /// ```
-///
 // This is because although the output types for both futures is the same, the exact future
 // types are different, but the compiler must be able to choose a single type for the
 // `result` variable.

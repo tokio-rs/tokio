@@ -337,7 +337,7 @@ pub trait StreamExt: Stream {
     /// ```
     /// use tokio::sync::mpsc;
     /// use tokio::time;
-    /// use tokio_stream::{StreamExt, Stream};
+    /// use tokio_stream::{Stream, StreamExt};
     ///
     /// use std::pin::Pin;
     /// use std::time::Duration;
@@ -389,14 +389,14 @@ pub trait StreamExt: Stream {
     ///         tx2.send(5).await.unwrap();
     ///     });
     ///
-    ///    assert_eq!(1, rx.next().await.unwrap());
-    ///    assert_eq!(2, rx.next().await.unwrap());
-    ///    assert_eq!(3, rx.next().await.unwrap());
-    ///    assert_eq!(4, rx.next().await.unwrap());
-    ///    assert_eq!(5, rx.next().await.unwrap());
+    ///     assert_eq!(1, rx.next().await.unwrap());
+    ///     assert_eq!(2, rx.next().await.unwrap());
+    ///     assert_eq!(3, rx.next().await.unwrap());
+    ///     assert_eq!(4, rx.next().await.unwrap());
+    ///     assert_eq!(5, rx.next().await.unwrap());
     ///
-    ///    // The merged stream is consumed
-    ///    assert!(rx.next().await.is_none());
+    ///     // The merged stream is consumed
+    ///     assert!(rx.next().await.is_none());
     /// }
     /// ```
     fn merge<U>(self, other: U) -> Merge<Self, U>
@@ -646,7 +646,7 @@ pub trait StreamExt: Stream {
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
     /// use tokio_stream::{self as stream, StreamExt};
-    /// let mut stream = stream::iter(vec![1,2,3,4,1]).skip_while(|x| *x < 3);
+    /// let mut stream = stream::iter(vec![1, 2, 3, 4, 1]).skip_while(|x| *x < 3);
     ///
     /// assert_eq!(Some(3), stream.next().await);
     /// assert_eq!(Some(4), stream.next().await);
@@ -1168,7 +1168,7 @@ pub trait StreamExt: Stream {
     ///     tokio::pin!(chunk_stream);
     ///
     ///     // a full batch was received
-    ///     assert_eq!(chunk_stream.next().await, Some(vec![1,2,3]));
+    ///     assert_eq!(chunk_stream.next().await, Some(vec![1, 2, 3]));
     ///     // deadline was reached before max_size was reached
     ///     assert_eq!(chunk_stream.next().await, Some(vec![4]));
     ///     // last element in the stream

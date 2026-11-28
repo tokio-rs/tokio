@@ -13,7 +13,6 @@
 //!
 //! # Example
 //! ```rust
-//!
 //! use futures_util::StreamExt;
 //! use std::time::Duration;
 //! use tokio_test::stream_mock::StreamMockBuilder;
