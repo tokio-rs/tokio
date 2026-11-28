@@ -640,11 +640,12 @@ where
     F: Send + 'static,
     T: Send + 'static,
 {
+    #[track_caller]
     fn from_iter<I: IntoIterator<Item = F>>(iter: I) -> Self {
         let mut set = Self::new();
-        iter.into_iter().for_each(|task| {
+        for task in iter {
             set.spawn(task);
-        });
+        }
         set
     }
 }
@@ -684,13 +685,14 @@ where
     F: Send + 'static,
     T: Send + 'static,
 {
+    #[track_caller]
     fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = F>,
     {
-        iter.into_iter().for_each(|task| {
+        for task in iter {
             self.spawn(task);
-        });
+        }
     }
 }
 

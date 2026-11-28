@@ -225,6 +225,27 @@ fn task_hook_spawn_location_builder() {
     }
 }
 
+/// Test that JoinSet::from_iter and JoinSet::extend propagate the caller location.
+#[test]
+fn task_hook_spawn_location_join_set() {
+    let spawns = Arc::new(AtomicUsize::new(0));
+
+    let runtime = Builder::new_current_thread()
+        .on_task_spawn(mk_spawn_location_hook("(current_thread) JoinSet", &spawns))
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        let mut set: tokio::task::JoinSet<()> =
+            std::iter::FromIterator::from_iter([std::future::ready(()), std::future::ready(())]);
+        set.extend([std::future::ready(()), std::future::ready(())]);
+        while let Some(res) = set.join_next().await {
+            res.unwrap();
+        }
+    });
+    assert_eq!(spawns.load(Ordering::SeqCst), 4);
+}
+
 #[cfg(feature = "schedule-latency")]
 #[test]
 fn task_hook_schedule_latency_non_poll_callbacks() {
