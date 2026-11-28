@@ -23,6 +23,7 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use super::pool::{ShutdownHandles, SpawnError, SpawnerMetrics, Task, ThreadManagementState};
+use crate::runtime::task;
 
 /// Number of shards. Must be a power of two.
 ///
@@ -162,13 +163,13 @@ impl ShardedImpl {
         self.push_index.fetch_add(1, Ordering::Relaxed) % NUM_SHARDS
     }
 
-    /// Push a task onto one of the shards, or hand it back if the chosen
-    /// shard has been sealed for shutdown.
+    /// Push a task onto one of the shards and return that shard's index, or
+    /// hand the task back if the chosen shard has been sealed for shutdown.
     ///
     /// The queue-depth metric is incremented under the shard lock so that
     /// the pop that consumes this task (whose decrement is ordered after
     /// this lock's release) can never transiently wrap the counter.
-    fn push(&self, task: Task, metrics: &SpawnerMetrics) -> Result<(), Task> {
+    fn push(&self, task: Task, metrics: &SpawnerMetrics) -> Result<usize, Task> {
         let index = self.push_shard_index();
         let mut shard = self.shards[index].lock();
         if shard.sealed {
@@ -179,7 +180,21 @@ impl ShardedImpl {
         if shard.queue.len() == 1 {
             self.non_empty_mask.fetch_or(1 << index, Ordering::Relaxed);
         }
-        Ok(())
+        Ok(index)
+    }
+
+    /// Take back a task that `push` put in shard `index`, unless a worker
+    /// has already popped it.
+    fn remove(&self, index: usize, id: task::Id, metrics: &SpawnerMetrics) -> Option<Task> {
+        let mut shard = self.shards[index].lock();
+        let position = shard.queue.iter().position(|task| task.id() == id)?;
+        let task = shard.queue.remove(position)?;
+        metrics.dec_queue_depth();
+        if shard.queue.is_empty() {
+            self.non_empty_mask
+                .fetch_and(!(1 << index), Ordering::Relaxed);
+        }
+        Some(task)
     }
 
     /// Pop a task, advancing the worker's cursor after a bounded number of
@@ -255,14 +270,19 @@ impl ShardedImpl {
             return Err(SpawnError::ShuttingDown);
         }
 
+        let id = task.id();
+
         // Push before taking `coord`, so spawners don't serialize on a
         // pool-wide lock held across the queue operation.
-        if let Err(task) = self.push(task, metrics) {
-            // The shard was already drained and sealed for shutdown: reject
-            // the task, exactly as if the shutdown check above had caught it.
-            task.shutdown();
-            return Err(SpawnError::ShuttingDown);
-        }
+        let index = match self.push(task, metrics) {
+            Ok(index) => index,
+            Err(task) => {
+                // The shard was already drained and sealed for shutdown: reject
+                // the task, exactly as if the shutdown check above had caught it.
+                task.shutdown();
+                return Err(SpawnError::ShuttingDown);
+            }
+        };
 
         let mut coord = self.coord.lock();
 
@@ -275,7 +295,21 @@ impl ShardedImpl {
         }
 
         if metrics.num_idle_threads() == 0 {
-            on_no_idle(&mut coord.thread_mgmt_state)?;
+            if let Err(e) = on_no_idle(&mut coord.thread_mgmt_state) {
+                drop(coord);
+
+                // The task is already queued, so take it back before reporting
+                // the failure; otherwise a later worker would run a task whose
+                // spawn failed. If a busy worker has already popped it, the
+                // task will run, so the spawn did succeed.
+                return match self.remove(index, id, metrics) {
+                    Some(task) => {
+                        task.shutdown();
+                        Err(e)
+                    }
+                    None => Ok(()),
+                };
+            }
         } else {
             // Claim an idle worker (see `num_notify`). Signal after
             // releasing `coord` so the woken worker doesn't immediately
@@ -623,5 +657,31 @@ mod tests {
                 expected_order(shards, tasks)
             );
         }
+    }
+
+    #[test]
+    fn failed_spawn_does_not_leave_task_queued() {
+        let rt = Builder::new_current_thread().build().unwrap();
+        let queue = ShardedImpl::new(ThreadManagementState {
+            shutdown: false,
+            shutdown_tx: None,
+            last_exiting_thread: None,
+            worker_threads: HashMap::new(),
+            worker_thread_index: 0,
+        });
+        let metrics = SpawnerMetrics::default();
+        let (tx, rx) = mpsc::channel::<()>();
+        let task = blocking_task_for_test(rt.handle(), move || tx.send(()).unwrap());
+
+        // No idle workers, and starting a new one fails.
+        let result = queue.spawn_task(task, &metrics, |_| {
+            Err(SpawnError::NoThreads(std::io::Error::other("injected")))
+        });
+        assert!(matches!(result, Err(SpawnError::NoThreads(_))));
+
+        // The task must not stay queued for a later worker, and must have
+        // been shut down rather than run.
+        assert!(queue.pop(&mut PopCursor::new_for_test()).is_none());
+        assert_eq!(rx.try_recv(), Err(mpsc::TryRecvError::Disconnected));
     }
 }

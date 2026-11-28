@@ -565,6 +565,15 @@ impl<S: Schedule> UnownedTask<S> {
     pub(crate) fn shutdown(self) {
         self.into_task().shutdown();
     }
+
+    /// Returns a [task ID] that uniquely identifies this task relative to other
+    /// currently spawned tasks.
+    ///
+    /// [task ID]: crate::task::Id
+    pub(crate) fn id(&self) -> crate::task::Id {
+        // Safety: The header pointer is valid.
+        unsafe { Header::get_id(self.raw.header_ptr()) }
+    }
 }
 
 impl<S: 'static> Drop for Task<S> {
