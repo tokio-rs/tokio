@@ -38,8 +38,8 @@
 //! ```no_run
 //! # #[cfg(not(target_family = "wasm"))]
 //! # {
-//! use tokio::io::{self, AsyncReadExt};
 //! use tokio::fs::File;
+//! use tokio::io::{self, AsyncReadExt};
 //!
 //! #[tokio::main]
 //! async fn main() -> io::Result<()> {
@@ -78,8 +78,8 @@
 //! ```no_run
 //! # #[cfg(not(target_family = "wasm"))]
 //! # {
-//! use tokio::io::{self, BufReader, AsyncBufReadExt};
 //! use tokio::fs::File;
+//! use tokio::io::{self, AsyncBufReadExt, BufReader};
 //!
 //! #[tokio::main]
 //! async fn main() -> io::Result<()> {
@@ -103,8 +103,8 @@
 //! ```no_run
 //! # #[cfg(not(target_family = "wasm"))]
 //! # {
-//! use tokio::io::{self, BufWriter, AsyncWriteExt};
 //! use tokio::fs::File;
+//! use tokio::io::{self, AsyncWriteExt, BufWriter};
 //!
 //! #[tokio::main]
 //! async fn main() -> io::Result<()> {

@@ -61,9 +61,9 @@ use std::task::{ready, Context, Poll};
 /// Merging two streams, then remove them after receiving the first value
 ///
 /// ```
-/// use tokio_stream::{StreamExt, StreamMap, Stream};
-/// use tokio::sync::mpsc;
 /// use std::pin::Pin;
+/// use tokio::sync::mpsc;
+/// use tokio_stream::{Stream, StreamExt, StreamMap};
 ///
 /// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() {
@@ -215,7 +215,7 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::{StreamMap, pending};
+    /// use tokio_stream::{pending, StreamMap};
     ///
     /// let mut map = StreamMap::new();
     ///
@@ -238,7 +238,7 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::{StreamMap, pending};
+    /// use tokio_stream::{pending, StreamMap};
     ///
     /// let mut map = StreamMap::new();
     ///
@@ -262,7 +262,7 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::{StreamMap, Pending};
+    /// use tokio_stream::{Pending, StreamMap};
     ///
     /// let map: StreamMap<&str, Pending<()>> = StreamMap::new();
     /// ```
@@ -278,7 +278,7 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::{StreamMap, Pending};
+    /// use tokio_stream::{Pending, StreamMap};
     ///
     /// let map: StreamMap<&str, Pending<()>> = StreamMap::with_capacity(10);
     /// ```
@@ -295,7 +295,7 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::{StreamMap, pending};
+    /// use tokio_stream::{pending, StreamMap};
     ///
     /// let mut map = StreamMap::new();
     ///
@@ -318,7 +318,7 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::{StreamMap, pending};
+    /// use tokio_stream::{pending, StreamMap};
     ///
     /// let mut map = StreamMap::new();
     ///
@@ -341,7 +341,7 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::{StreamMap, pending};
+    /// use tokio_stream::{pending, StreamMap};
     ///
     /// let mut map = StreamMap::new();
     ///
@@ -365,7 +365,7 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::{StreamMap, Pending};
+    /// use tokio_stream::{Pending, StreamMap};
     ///
     /// let map: StreamMap<i32, Pending<()>> = StreamMap::with_capacity(100);
     /// assert!(map.capacity() >= 100);
@@ -379,7 +379,7 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::{StreamMap, pending};
+    /// use tokio_stream::{pending, StreamMap};
     ///
     /// let mut a = StreamMap::new();
     /// assert_eq!(a.len(), 0);
@@ -395,7 +395,7 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::{StreamMap, pending};
+    /// use tokio_stream::{pending, StreamMap};
     ///
     /// let mut a = StreamMap::new();
     /// assert!(a.is_empty());
@@ -412,7 +412,7 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::{StreamMap, pending};
+    /// use tokio_stream::{pending, StreamMap};
     ///
     /// let mut a = StreamMap::new();
     /// a.insert(1, pending::<i32>());
@@ -433,7 +433,7 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::{StreamMap, pending};
+    /// use tokio_stream::{pending, StreamMap};
     ///
     /// let mut map = StreamMap::new();
     ///
@@ -461,7 +461,7 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::{StreamMap, pending};
+    /// use tokio_stream::{pending, StreamMap};
     ///
     /// let mut map = StreamMap::new();
     /// map.insert(1, pending::<i32>());
@@ -490,7 +490,7 @@ impl<K, V> StreamMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::{StreamMap, pending};
+    /// use tokio_stream::{pending, StreamMap};
     ///
     /// let mut map = StreamMap::new();
     /// map.insert(1, pending::<i32>());

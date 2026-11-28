@@ -335,12 +335,12 @@ pub trait StreamExt: Stream {
     /// # Examples
     ///
     /// ```
-    /// use tokio_stream::{StreamExt, Stream};
     /// use tokio::sync::mpsc;
     /// use tokio::time;
+    /// use tokio_stream::{StreamExt, Stream};
     ///
-    /// use std::time::Duration;
     /// use std::pin::Pin;
+    /// use std::time::Duration;
     ///
     /// # /*
     /// #[tokio::main]
@@ -953,8 +953,8 @@ pub trait StreamExt: Stream {
     /// ```
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
-    /// use tokio_stream::{self as stream, StreamExt};
     /// use std::time::Duration;
+    /// use tokio_stream::{self as stream, StreamExt};
     /// # let int_stream = stream::iter(1..=3);
     ///
     /// let int_stream = int_stream.timeout(Duration::from_secs(1));
@@ -990,8 +990,8 @@ pub trait StreamExt: Stream {
     /// ```
     /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
     /// # async fn main() {
-    /// use tokio_stream::{StreamExt, wrappers::IntervalStream};
     /// use std::time::Duration;
+    /// use tokio_stream::{wrappers::IntervalStream, StreamExt};
     /// let interval_stream = IntervalStream::new(tokio::time::interval(Duration::from_millis(100)));
     /// let timeout_stream = interval_stream.timeout(Duration::from_millis(10));
     /// tokio::pin!(timeout_stream);
@@ -1039,8 +1039,8 @@ pub trait StreamExt: Stream {
     /// ```
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() {
-    /// use tokio_stream::{self as stream, StreamExt};
     /// use std::time::Duration;
+    /// use tokio_stream::{self as stream, StreamExt};
     /// # let int_stream = stream::iter(1..=3);
     ///
     /// let int_stream = int_stream.timeout_repeating(tokio::time::interval(Duration::from_secs(1)));
@@ -1076,8 +1076,8 @@ pub trait StreamExt: Stream {
     /// ```
     /// # #[tokio::main(flavor = "current_thread", start_paused = true)]
     /// # async fn main() {
-    /// use tokio_stream::{StreamExt, wrappers::IntervalStream};
     /// use std::time::Duration;
+    /// use tokio_stream::{wrappers::IntervalStream, StreamExt};
     /// let interval_stream = IntervalStream::new(tokio::time::interval(Duration::from_millis(23)));
     /// let timeout_stream = interval_stream.timeout_repeating(tokio::time::interval(Duration::from_millis(9)));
     /// tokio::pin!(timeout_stream);
@@ -1146,10 +1146,10 @@ pub trait StreamExt: Stream {
     /// # Example
     ///
     /// ```rust
+    /// use futures::FutureExt;
     /// use std::time::Duration;
     /// use tokio::time;
     /// use tokio_stream::{self as stream, StreamExt};
-    /// use futures::FutureExt;
     ///
     /// #[tokio::main]
     /// # async fn _unused() {}
