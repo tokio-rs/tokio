@@ -404,11 +404,12 @@ where
     F: Future<Output = T> + Send + 'static,
     T: Send + 'static,
 {
+    #[track_caller]
     fn from_iter<I: IntoIterator<Item = F>>(iter: I) -> Self {
         let mut set = Self::new();
-        iter.into_iter().for_each(|task| {
+        for task in iter {
             set.spawn(task);
-        });
+        }
         set
     }
 }
